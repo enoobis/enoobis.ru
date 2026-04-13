@@ -8,7 +8,7 @@ const auth = useAuthStore();
 <template>
   <div class="layout">
     <header class="nav">
-      <RouterLink to="/">EduSteam</RouterLink>
+      <RouterLink to="/">enoobis.ru</RouterLink>
       <RouterLink to="/blog">Блог</RouterLink>
       <RouterLink v-if="auth.token" to="/courses">Курсы</RouterLink>
       <RouterLink v-if="auth.token" to="/invites">Инвайты</RouterLink>

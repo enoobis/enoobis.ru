@@ -65,14 +65,15 @@ async fn api_only_stub() -> Html<&'static str> {
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>EduSteam</title>
+  <title>enoobis.ru</title>
   <style>
     body{font-family:system-ui,sans-serif;max-width:42rem;margin:2rem auto;padding:0 1rem;line-height:1.5;background:#0c0e14;color:#e8ecf4}
     a{color:#5eead4} code{background:#1c2230;padding:.1rem .35rem;border-radius:4px}
   </style>
 </head>
 <body>
-  <h1>Статика не собрана</h1>
+  <h1>enoobis.ru</h1>
+  <p>Статика фронтенда не собрана.</p>
   <p>Выполните из каталога <code>edu-platform/frontend</code>:</p>
   <pre style="background:#1c2230;padding:1rem;border-radius:8px">npm install && npm run build</pre>
   <p>Затем снова запустите бэкенд — интерфейс отдаётся с этого же процесса (порт см. лог).</p>
