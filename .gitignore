@@ -11,6 +11,9 @@ frontend/tsconfig.tsbuildinfo
 backend/*.db
 backend/*.db-*
 
+# Загруженные аватары
+backend/data/
+
 # Env
 .env
 .env.*.local

@@ -9,6 +9,7 @@ type Profile = {
   role: string;
   bio: string;
   wallpaper_url: string;
+  avatar_url: string;
   favorite_courses: { id: string; title: string }[];
   achievements: {
     slug: string;
@@ -23,11 +24,13 @@ const route = useRoute();
 const auth = useAuthStore();
 const profile = ref<Profile | null>(null);
 const err = ref("");
+const avatarBroken = ref(false);
 
 const nick = computed(() => route.params.nickname as string);
 
 async function load() {
   err.value = "";
+  avatarBroken.value = false;
   profile.value = null;
   try {
     profile.value = await api<Profile>(`/api/profile/${nick.value}`);
@@ -54,7 +57,14 @@ const bgStyle = computed(() => {
   <section v-if="profile">
     <div class="card profile-hero" :style="bgStyle">
       <div class="profile-head">
-        <div class="avatar">{{ profile.nickname.slice(0, 2).toUpperCase() }}</div>
+        <img
+          v-if="profile.avatar_url && !avatarBroken"
+          class="avatar avatar-img"
+          :src="profile.avatar_url"
+          alt=""
+          @error="avatarBroken = true"
+        />
+        <div v-else class="avatar">{{ profile.nickname.slice(0, 2).toUpperCase() }}</div>
         <div>
           <h1>{{ profile.nickname }}</h1>
           <span class="badge">{{ profile.role }}</span>
@@ -121,5 +131,11 @@ const bgStyle = computed(() => {
   justify-content: center;
   font-weight: 800;
   font-size: 1.5rem;
+  flex-shrink: 0;
+}
+.avatar-img {
+  object-fit: cover;
+  display: block;
+  padding: 0;
 }
 </style>

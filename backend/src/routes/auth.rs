@@ -120,8 +120,8 @@ async fn register(
     let now = chrono::Utc::now().to_rfc3339();
 
     let res = sqlx::query(
-        "INSERT INTO users (id, email, password_hash, nickname, role, status, bio, wallpaper_url, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, '', '', ?)",
+        "INSERT INTO users (id, email, password_hash, nickname, role, status, bio, wallpaper_url, avatar_url, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, '', '', '', ?)",
     )
     .bind(&id)
     .bind(&body.email)

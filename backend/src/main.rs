@@ -4,7 +4,7 @@ mod routes;
 mod state;
 
 use std::net::SocketAddr;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use axum::{response::Html, routing::get, Router};
 use sqlx::SqlitePool;
@@ -24,8 +24,8 @@ async fn seed_admin(pool: &SqlitePool) -> Result<(), sqlx::Error> {
     let hash = crate::auth::hash_password("Admin123!").expect("hash admin");
     let now = chrono::Utc::now().to_rfc3339();
     sqlx::query(
-        "INSERT INTO users (id, email, password_hash, nickname, role, status, bio, wallpaper_url, created_at)
-         VALUES (?, ?, ?, 'admin', 'admin', 'approved', 'Системный администратор', '', ?)",
+        "INSERT INTO users (id, email, password_hash, nickname, role, status, bio, wallpaper_url, avatar_url, created_at)
+         VALUES (?, ?, ?, 'admin', 'admin', 'approved', 'Системный администратор', '', '', ?)",
     )
     .bind(&id)
     .bind("admin@edu.local")
@@ -100,7 +100,18 @@ async fn main() -> anyhow::Result<()> {
 
     let jwt_secret =
         std::env::var("JWT_SECRET").unwrap_or_else(|_| "dev-secret-change-me".into());
-    let app_state = state::AppState { pool, jwt_secret };
+    let uploads_serve_root = std::env::var("UPLOADS_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| Path::new(env!("CARGO_MANIFEST_DIR")).join("data/uploads"));
+    tokio::fs::create_dir_all(uploads_serve_root.join("avatars"))
+        .await
+        .map_err(|e| anyhow::anyhow!("create uploads dir: {e}"))?;
+
+    let app_state = state::AppState {
+        pool,
+        jwt_secret,
+        uploads_serve_root: uploads_serve_root.clone(),
+    };
 
     let cors = CorsLayer::new()
         .allow_origin(Any)
@@ -114,6 +125,7 @@ async fn main() -> anyhow::Result<()> {
         tracing::info!(path = %dir.display(), "serving SPA static files");
         let static_svc = ServeDir::new(&dir).not_found_service(ServeFile::new(index));
         Router::new()
+            .nest_service("/uploads", ServeDir::new(uploads_serve_root.clone()))
             .merge(api)
             .fallback_service(static_svc)
             .layer(cors)
@@ -121,6 +133,7 @@ async fn main() -> anyhow::Result<()> {
     } else {
         tracing::warn!("frontend/dist not found — only API + stub at /");
         Router::new()
+            .nest_service("/uploads", ServeDir::new(uploads_serve_root.clone()))
             .route("/", get(api_only_stub))
             .merge(api)
             .layer(cors)
