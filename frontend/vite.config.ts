@@ -14,6 +14,11 @@ export default defineConfig(({ mode }) => {
           target: `http://127.0.0.1:${apiPort}`,
           changeOrigin: true,
         },
+        // Аватары отдаются с бэкенда; без этого <img src="/uploads/..."> на :5173 даёт 404
+        "/uploads": {
+          target: `http://127.0.0.1:${apiPort}`,
+          changeOrigin: true,
+        },
       },
     },
   };
