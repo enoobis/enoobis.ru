@@ -1,0 +1,22 @@
+# Rust
+backend/target/
+**/*.rs.bk
+
+# Node
+frontend/node_modules/
+frontend/dist/
+frontend/tsconfig.tsbuildinfo
+
+# SQLite (локальная БД)
+backend/*.db
+backend/*.db-*
+
+# Env
+.env
+.env.*.local
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
+*.swp
