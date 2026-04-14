@@ -19,8 +19,6 @@ onMounted(async () => {
 
 <template>
   <section>
-    <h1>Блог преподавателей</h1>
-    <p class="muted">Доступно всем, включая гостей.</p>
     <p v-if="err" class="error">{{ err }}</p>
     <article v-for="p in posts" :key="p.id" class="card" style="margin-bottom: 1rem">
       <h2 style="font-size: 1.15rem">

@@ -21,15 +21,12 @@ onMounted(async () => {
 <template>
   <section>
     <h1>enoobis.ru</h1>
-    <p class="muted">
-      Образовательная платформа: курсы (открытые и закрытые), блог преподавателей для гостей,
-      профили с достижениями и инвайт-ссылками.
-    </p>
+    <p class="muted">Курсы и блог.</p>
     <div v-if="!auth.token" class="card" style="margin-top: 1.5rem">
       <p>
-        Гости видят только <RouterLink to="/blog">блог</RouterLink>. Войдите или зарегистрируйтесь,
-        чтобы попасть на курсы (после одобрения администратора или по инвайт-коду).
+        <RouterLink to="/blog">Блог</RouterLink> доступен без входа.
       </p>
+      <p style="margin: 0"><RouterLink to="/login">Войти</RouterLink> / <RouterLink to="/register">Регистрация</RouterLink></p>
     </div>
     <div v-else class="card" style="margin-top: 1.5rem">
       <p>

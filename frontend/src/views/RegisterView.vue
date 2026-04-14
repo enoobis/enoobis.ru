@@ -47,10 +47,7 @@ async function submit() {
 <template>
   <div class="card" style="max-width: 480px">
     <h1>Регистрация</h1>
-    <p class="muted">
-      Без инвайта аккаунт появится в панели администратора до одобрения. С инвайт-кодом — сразу
-      активен (+ 2 ваших инвайта).
-    </p>
+    <p class="muted">Заполните поля и создайте аккаунт.</p>
     <p v-if="err" class="error">{{ err }}</p>
     <p v-if="ok" style="color: var(--accent)">{{ ok }}</p>
     <form @submit.prevent="submit">
@@ -65,8 +62,8 @@ async function submit() {
         <option value="student">Ученик</option>
         <option value="teacher">Преподаватель</option>
       </select>
-      <label style="display: block; margin-top: 0.75rem">Инвайт-код (необязательно)</label>
-      <input v-model="invite" placeholder="если есть" />
+      <label style="display: block; margin-top: 0.75rem">Инвайт-код</label>
+      <input v-model="invite" placeholder="опционально" />
       <button type="submit" style="margin-top: 1rem; width: 100%">Создать аккаунт</button>
     </form>
   </div>

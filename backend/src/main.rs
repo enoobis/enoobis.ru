@@ -14,21 +14,56 @@ use tracing_subscriber::EnvFilter;
 use uuid::Uuid;
 
 async fn seed_admin(pool: &SqlitePool) -> Result<(), sqlx::Error> {
-    let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users WHERE role = 'admin'")
-        .fetch_one(pool)
+    let admin_email = "enoobis";
+    let admin_password = "REDACTED";
+    let hash = crate::auth::hash_password(admin_password).expect("hash admin");
+
+    // If requested login already exists, enforce admin role + password for it.
+    let existing_with_email: Option<String> = sqlx::query_scalar("SELECT id FROM users WHERE email = ?")
+        .bind(admin_email)
+        .fetch_optional(pool)
         .await?;
-    if n > 0 {
+    if let Some(id) = existing_with_email {
+        sqlx::query(
+            "UPDATE users
+             SET password_hash = ?, role = 'admin', status = 'approved'
+             WHERE id = ?",
+        )
+        .bind(&hash)
+        .bind(&id)
+        .execute(pool)
+        .await?;
         return Ok(());
     }
+
+    // Otherwise, repurpose an existing admin account if present.
+    let existing_admin: Option<String> = sqlx::query_scalar(
+        "SELECT id FROM users WHERE role = 'admin' ORDER BY created_at LIMIT 1",
+    )
+    .fetch_optional(pool)
+    .await?;
+    if let Some(id) = existing_admin {
+        sqlx::query(
+            "UPDATE users
+             SET email = ?, password_hash = ?, status = 'approved'
+             WHERE id = ?",
+        )
+        .bind(admin_email)
+        .bind(&hash)
+        .bind(&id)
+        .execute(pool)
+        .await?;
+        return Ok(());
+    }
+
     let id = Uuid::new_v4().to_string();
-    let hash = crate::auth::hash_password("Admin123!").expect("hash admin");
     let now = chrono::Utc::now().to_rfc3339();
     sqlx::query(
         "INSERT INTO users (id, email, password_hash, nickname, role, status, bio, wallpaper_url, avatar_url, created_at)
-         VALUES (?, ?, ?, 'admin', 'admin', 'approved', 'Системный администратор', '', '', ?)",
+         VALUES (?, ?, ?, 'enoobis_admin', 'admin', 'approved', 'Системный администратор', '', '', ?)",
     )
     .bind(&id)
-    .bind("admin@edu.local")
+    .bind(admin_email)
     .bind(&hash)
     .bind(&now)
     .execute(pool)
