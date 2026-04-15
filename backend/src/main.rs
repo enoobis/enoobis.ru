@@ -142,6 +142,9 @@ async fn main() -> anyhow::Result<()> {
     tokio::fs::create_dir_all(uploads_serve_root.join("avatars"))
         .await
         .map_err(|e| anyhow::anyhow!("create uploads dir: {e}"))?;
+    tokio::fs::create_dir_all(uploads_serve_root.join("course-lectures"))
+        .await
+        .map_err(|e| anyhow::anyhow!("create course-lectures uploads dir: {e}"))?;
 
     let app_state = state::AppState {
         pool,
