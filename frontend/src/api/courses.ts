@@ -46,6 +46,7 @@ export type Assignment = {
   due_at: string;
   max_points: number;
   created_at: string;
+  lecture_id: string | null;
   my_submission: AssignmentSubmissionMine | null;
 };
 
@@ -62,11 +63,31 @@ export type AssignmentSubmission = {
   updated_at: string;
 };
 
+export type LectureAttachment = {
+  id: string;
+  file_name: string;
+  url: string;
+  created_at: string;
+};
+
+export type Lecture = {
+  id: string;
+  course_id: string;
+  author_id: string;
+  author_nickname: string;
+  title: string;
+  body_text: string;
+  video_url: string;
+  created_at: string;
+  attachments: LectureAttachment[];
+};
+
 export type CourseClassroom = {
   course: Course;
   is_teacher: boolean;
   stream: CourseStreamPost[];
   assignments: Assignment[];
+  lectures: Lecture[];
   members: CourseMember[];
 };
 
@@ -115,11 +136,30 @@ export function createStreamPost(courseId: string, body: string, token: string) 
 
 export function createAssignment(
   courseId: string,
-  payload: { title: string; description?: string; due_at?: string; max_points?: number },
+  payload: {
+    title: string;
+    description?: string;
+    due_at?: string;
+    max_points?: number;
+    lecture_id?: string;
+  },
   token: string,
 ) {
   return api<Assignment>(`/api/courses/${courseId}/assignments`, {
     method: "POST",
+    token,
+    body: JSON.stringify(payload),
+  });
+}
+
+export function patchAssignment(
+  courseId: string,
+  assignmentId: string,
+  payload: { title?: string; description?: string; due_at?: string; max_points?: number },
+  token: string,
+) {
+  return api<Assignment>(`/api/courses/${courseId}/assignments/${assignmentId}`, {
+    method: "PATCH",
     token,
     body: JSON.stringify(payload),
   });
@@ -154,4 +194,66 @@ export function gradeSubmission(
       body: JSON.stringify(payload),
     },
   );
+}
+
+export async function uploadLectureAttachment(courseId: string, file: File, token: string) {
+  const fd = new FormData();
+  fd.append("file", file);
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(`/api/courses/${courseId}/lectures/upload`, {
+    method: "POST",
+    headers,
+    body: fd,
+  });
+  const text = await res.text();
+  let data: unknown = null;
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = { error: text };
+    }
+  }
+  if (!res.ok) {
+    const err = (data as { error?: string })?.error ?? res.statusText;
+    throw new Error(err);
+  }
+  return data as { url: string; file_name: string };
+}
+
+export function createLecture(
+  courseId: string,
+  payload: {
+    title: string;
+    body_text?: string;
+    video_url?: string;
+    attachments?: { file_name: string; url: string }[];
+    task?: { title: string; description?: string; due_at?: string; max_points?: number };
+  },
+  token: string,
+) {
+  return api<Lecture>(`/api/courses/${courseId}/lectures`, {
+    method: "POST",
+    token,
+    body: JSON.stringify(payload),
+  });
+}
+
+export function patchLecture(
+  courseId: string,
+  lectureId: string,
+  payload: {
+    title?: string;
+    body_text?: string;
+    video_url?: string;
+    attachments?: { file_name: string; url: string }[];
+  },
+  token: string,
+) {
+  return api<Lecture>(`/api/courses/${courseId}/lectures/${lectureId}`, {
+    method: "PATCH",
+    token,
+    body: JSON.stringify(payload),
+  });
 }
