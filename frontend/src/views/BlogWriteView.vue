@@ -3,8 +3,6 @@ import { computed, nextTick, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { createPost, deletePost, getPostForEdit, publishPost, updatePost, uploadBlogImage } from "../api/blog";
 import { useAuthStore } from "../stores/auth";
-import { renderMarkdown } from "../utils/markdown";
-
 const auth = useAuthStore();
 const route = useRoute();
 const title = ref("");
@@ -18,13 +16,11 @@ const categoriesText = ref("");
 const err = ref("");
 const ok = ref("");
 const loading = ref(false);
-const showPreview = ref(true);
 const bodyInput = ref<HTMLTextAreaElement | null>(null);
 const router = useRouter();
 
 const editId = computed(() => (typeof route.params.id === "string" ? route.params.id : ""));
 const isEdit = computed(() => !!editId.value);
-const renderedBody = computed(() => renderMarkdown(body.value));
 const wordCount = computed(() =>
   body.value
     .replace(/[#_*`\-\[\]()!>]/g, " ")
@@ -263,14 +259,7 @@ onMounted(loadForEdit);
           required
           placeholder="Write in Markdown..."
         />
-        <div v-if="showPreview" class="preview-pane">
-          <div class="markdown-body" v-html="renderedBody" />
-        </div>
       </div>
-
-      <button class="secondary" type="button" style="margin-top: 0.5rem" @click="showPreview = !showPreview">
-        {{ showPreview ? "Скрыть превью" : "Показать превью" }}
-      </button>
 
       <label style="display: block; margin-top: 0.75rem">Картинка в пост</label>
       <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" @change="uploadImageFile" />
@@ -291,41 +280,6 @@ onMounted(loadForEdit);
   margin-top: 0.4rem;
 }
 .editor-grid {
-  display: grid;
-  gap: 0.75rem;
   margin-top: 0.5rem;
-}
-@media (min-width: 920px) {
-  .editor-grid {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-.preview-pane {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface2);
-  padding: 0.75rem;
-  min-height: 240px;
-}
-.markdown-body :deep(img) {
-  max-width: 100%;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-}
-.markdown-body :deep(pre) {
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 0.75rem;
-  overflow-x: auto;
-}
-.markdown-body :deep(code) {
-  font-family: var(--mono);
-}
-.markdown-body :deep(blockquote) {
-  margin: 0.75rem 0;
-  padding: 0.25rem 0.75rem;
-  border-left: 3px solid var(--border);
-  color: var(--muted);
 }
 </style>

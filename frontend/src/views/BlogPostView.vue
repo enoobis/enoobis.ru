@@ -161,7 +161,6 @@ watch(() => route.params.id, load);
       <RouterLink :to="`/u/${post.author_nickname}`">{{ post.author_nickname }}</RouterLink>
       · {{ (post.published_at || post.created_at).slice(0, 16).replace("T", " ") }}
     </p>
-    <p v-if="post.excerpt" class="muted">{{ post.excerpt }}</p>
     <div style="margin: 0.75rem 0; display: flex; gap: 0.5rem; flex-wrap: wrap">
       <span v-for="t in post.tags" :key="t" class="badge">#{{ t }}</span>
       <span v-for="c in post.categories" :key="`cat-${c}`" class="badge">{{ c }}</span>
@@ -241,14 +240,23 @@ watch(() => route.params.id, load);
   border: 1px solid var(--border);
 }
 .markdown-body :deep(pre) {
-  background: var(--surface2);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 0.75rem;
   overflow-x: auto;
+  margin: 0.75rem 0;
+}
+.markdown-body :deep(pre code.hljs) {
+  border-radius: 8px;
 }
 .markdown-body :deep(code) {
   font-family: var(--mono);
+}
+.markdown-body :deep(p code),
+.markdown-body :deep(li code) {
+  background: var(--surface2);
+  padding: 0.12em 0.35em;
+  border-radius: 4px;
+  border: 1px solid var(--border);
 }
 .markdown-body :deep(blockquote) {
   margin: 0.75rem 0;
