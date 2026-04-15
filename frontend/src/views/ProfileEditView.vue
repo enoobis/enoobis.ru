@@ -3,7 +3,15 @@ import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { api } from "../api/http";
 import { uploadAvatar } from "../api/uploadAvatar";
+import { uploadWallpaper } from "../api/uploadWallpaper";
+import AppIcon from "../components/AppIcon.vue";
 import { useAuthStore } from "../stores/auth";
+import { applyUserPreferences } from "../utils/preferences";
+
+type SocialLink = {
+  name: string;
+  url: string;
+};
 
 type Me = {
   id: string;
@@ -14,43 +22,60 @@ type Me = {
   bio: string;
   wallpaper_url: string;
   avatar_url: string;
+  theme_preference: "black" | "graphite" | "contrast";
+  language_preference: "ru" | "en";
+  font_preference: "compact" | "normal" | "large";
+  full_name: string;
+  website_url: string;
+  social_links: SocialLink[];
+  birthday: string;
+  country: string;
   favorite_course_ids: string[];
 };
 
 type Course = { id: string; title: string; is_open: boolean; teacher_nickname: string };
+type SettingsTab = "profile" | "account";
 
 const auth = useAuthStore();
 const router = useRouter();
 const me = ref<Me | null>(null);
 const courses = ref<Course[]>([]);
+const tab = ref<SettingsTab>("profile");
+
 const bio = ref("");
-const wallpaper = ref("");
+const themePreference = ref<"black" | "graphite" | "contrast">("black");
+const languagePreference = ref<"ru" | "en">("ru");
+const fontPreference = ref<"compact" | "normal" | "large">("normal");
+const fullName = ref("");
+const websiteUrl = ref("");
+const socialLinks = ref<SocialLink[]>([]);
+const birthday = ref("");
+const country = ref("");
 const favorites = ref<string[]>([]);
+
 const err = ref("");
 const avatarMsg = ref("");
-const uploading = ref(false);
+const uploadingAvatar = ref(false);
+const uploadingWallpaper = ref(false);
+const saving = ref(false);
 
 onMounted(async () => {
   try {
     me.value = await api<Me>("/api/me", { token: auth.token });
     bio.value = me.value.bio;
-    wallpaper.value = me.value.wallpaper_url;
+    themePreference.value = me.value.theme_preference;
+    languagePreference.value = me.value.language_preference;
+    fontPreference.value = me.value.font_preference;
+    fullName.value = me.value.full_name ?? "";
+    websiteUrl.value = me.value.website_url ?? "";
+    socialLinks.value = Array.isArray(me.value.social_links) ? [...me.value.social_links] : [];
+    birthday.value = me.value.birthday ?? "";
+    country.value = me.value.country ?? "";
+    applyUserPreferences(me.value);
     avatarMsg.value = "";
     favorites.value = [...me.value.favorite_course_ids];
-    const all = await api<
-      {
-        id: string;
-        title: string;
-        is_open: boolean;
-        teacher_nickname: string;
-      }[]
-    >("/api/courses", { token: auth.token });
-    courses.value = all.map((c) => ({
-      id: c.id,
-      title: c.title,
-      is_open: c.is_open,
-      teacher_nickname: c.teacher_nickname,
-    }));
+    const all = await api<Course[]>("/api/courses", { token: auth.token });
+    courses.value = all;
   } catch (e) {
     err.value = e instanceof Error ? e.message : "Ошибка";
   }
@@ -62,6 +87,15 @@ function toggleFav(id: string) {
   else if (favorites.value.length < 12) favorites.value.push(id);
 }
 
+function addSocialLink() {
+  if (socialLinks.value.length >= 12) return;
+  socialLinks.value.push({ name: "", url: "" });
+}
+
+function removeSocialLink(idx: number) {
+  socialLinks.value.splice(idx, 1);
+}
+
 async function onAvatarFile(ev: Event) {
   const input = ev.target as HTMLInputElement;
   const file = input.files?.[0];
@@ -69,7 +103,7 @@ async function onAvatarFile(ev: Event) {
   if (!file || !auth.token) return;
   err.value = "";
   avatarMsg.value = "";
-  uploading.value = true;
+  uploadingAvatar.value = true;
   try {
     const r = await uploadAvatar(auth.token, file);
     if (me.value) me.value.avatar_url = r.avatar_url;
@@ -77,7 +111,26 @@ async function onAvatarFile(ev: Event) {
   } catch (e) {
     err.value = e instanceof Error ? e.message : "Ошибка загрузки";
   } finally {
-    uploading.value = false;
+    uploadingAvatar.value = false;
+  }
+}
+
+async function onWallpaperFile(ev: Event) {
+  const input = ev.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = "";
+  if (!file || !auth.token) return;
+  err.value = "";
+  avatarMsg.value = "";
+  uploadingWallpaper.value = true;
+  try {
+    const r = await uploadWallpaper(auth.token, file);
+    if (me.value) me.value.wallpaper_url = r.wallpaper_url;
+    avatarMsg.value = "Обои обновлены.";
+  } catch (e) {
+    err.value = e instanceof Error ? e.message : "Ошибка загрузки обоев";
+  } finally {
+    uploadingWallpaper.value = false;
   }
 }
 
@@ -98,125 +151,406 @@ async function clearAvatar() {
   }
 }
 
-async function save() {
+async function clearWallpaper() {
+  if (!auth.token) return;
   err.value = "";
+  avatarMsg.value = "";
+  try {
+    await api("/api/me", {
+      method: "PATCH",
+      token: auth.token,
+      body: JSON.stringify({ wallpaper_url: "" }),
+    });
+    if (me.value) me.value.wallpaper_url = "";
+    avatarMsg.value = "Обои сброшены.";
+  } catch (e) {
+    err.value = e instanceof Error ? e.message : "Ошибка";
+  }
+}
+
+async function save() {
+  if (!auth.token || saving.value) return;
+  err.value = "";
+  saving.value = true;
   try {
     await api("/api/me", {
       method: "PATCH",
       token: auth.token,
       body: JSON.stringify({
         bio: bio.value,
-        wallpaper_url: wallpaper.value,
+        theme_preference: themePreference.value,
+        language_preference: languagePreference.value,
+        font_preference: fontPreference.value,
+        full_name: fullName.value,
+        website_url: websiteUrl.value,
+        social_links: socialLinks.value,
+        birthday: birthday.value,
+        country: country.value,
         favorite_course_ids: favorites.value,
       }),
+    });
+    applyUserPreferences({
+      theme_preference: themePreference.value,
+      language_preference: languagePreference.value,
+      font_preference: fontPreference.value,
     });
     await router.push(`/u/${auth.nickname}`);
   } catch (e) {
     err.value = e instanceof Error ? e.message : "Ошибка";
+  } finally {
+    saving.value = false;
   }
+}
+
+function closeSettings() {
+  router.push(`/u/${auth.nickname}`);
 }
 </script>
 
 <template>
-  <div v-if="me" class="card" style="max-width: 640px">
-    <h1>Профиль</h1>
-    <p class="muted">
-      Ник: <strong>{{ me.nickname }}</strong> · ID:
-      <code style="font-family: var(--mono); font-size: 0.85rem">{{ me.id }}</code>
-    </p>
-    <p v-if="err" class="error">{{ err }}</p>
-    <p v-if="avatarMsg" style="color: var(--accent)">{{ avatarMsg }}</p>
+  <section v-if="me" class="settings-shell">
+    <aside class="settings-nav card">
+      <button class="close-btn secondary" type="button" @click="closeSettings">
+        <AppIcon name="close" />
+      </button>
+      <button class="nav-item" :class="{ active: tab === 'profile' }" type="button" @click="tab = 'profile'">
+        <AppIcon name="profile" />
+        <span>Profile</span>
+      </button>
+      <button class="nav-item" :class="{ active: tab === 'account' }" type="button" @click="tab = 'account'">
+        <AppIcon name="settings" />
+        <span>Account details</span>
+      </button>
+    </aside>
 
-    <h2 style="margin-top: 0">Аватар</h2>
-    <div class="avatar-row">
-      <div v-if="me.avatar_url" class="avatar-preview-wrap">
-        <img :src="me.avatar_url" alt="" class="avatar-preview" />
+    <div class="settings-main card">
+      <p v-if="err" class="error">{{ err }}</p>
+      <p v-if="avatarMsg" class="ok">{{ avatarMsg }}</p>
+
+      <template v-if="tab === 'profile'">
+        <h1>Profile</h1>
+        <div class="avatar-header">
+          <div v-if="me.avatar_url" class="avatar-preview-wrap">
+            <img :src="me.avatar_url" alt="" class="avatar-preview" />
+          </div>
+          <div v-else class="avatar-placeholder">{{ me.nickname.slice(0, 2).toUpperCase() }}</div>
+          <div class="avatar-actions">
+            <label class="btn-file">
+              <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" :disabled="uploadingAvatar" @change="onAvatarFile" />
+              {{ uploadingAvatar ? "Uploading…" : "Upload photo" }}
+            </label>
+            <button v-if="me.avatar_url" class="secondary" type="button" @click="clearAvatar">Remove</button>
+          </div>
+        </div>
+
+        <div class="wallpaper-box">
+          <img v-if="me.wallpaper_url" :src="me.wallpaper_url" alt="" class="wallpaper-preview" />
+          <div v-else class="muted">Обои не загружены.</div>
+          <div class="avatar-actions">
+            <label class="btn-file">
+              <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" :disabled="uploadingWallpaper" @change="onWallpaperFile" />
+              {{ uploadingWallpaper ? "Uploading…" : "Upload wallpaper" }}
+            </label>
+            <button v-if="me.wallpaper_url" class="secondary" type="button" @click="clearWallpaper">Remove</button>
+          </div>
+        </div>
+
+        <div class="form-grid">
+          <label>
+            <span>Username</span>
+            <input :value="`@${me.nickname}`" disabled />
+          </label>
+          <label>
+            <span>Full name</span>
+            <input v-model="fullName" />
+          </label>
+          <label class="col-2">
+            <span>Bio</span>
+            <textarea v-model="bio" rows="3" maxlength="680" />
+          </label>
+          <label class="col-2">
+            <span>Website</span>
+            <input v-model="websiteUrl" />
+          </label>
+        </div>
+
+        <div class="socials">
+          <div class="socials-head">
+            <h2>Social links</h2>
+            <button class="secondary" type="button" @click="addSocialLink">Add link</button>
+          </div>
+          <div v-for="(s, i) in socialLinks" :key="`social-${i}`" class="social-row">
+            <input v-model="s.name" placeholder="Name (e.g. YouTube)" />
+            <input v-model="s.url" placeholder="Link (https://...)" />
+            <button class="secondary social-remove" type="button" @click="removeSocialLink(i)">
+              <AppIcon name="delete" />
+            </button>
+          </div>
+        </div>
+      </template>
+
+      <template v-else>
+        <h1>Account details</h1>
+        <div class="form-grid">
+          <label class="col-2">
+            <span>Email</span>
+            <input :value="me.email" disabled />
+          </label>
+          <label>
+            <span>Birthday</span>
+            <input v-model="birthday" />
+          </label>
+          <label>
+            <span>Country</span>
+            <input v-model="country" />
+          </label>
+          <label>
+            <span>Theme</span>
+            <select v-model="themePreference">
+              <option value="black">Black</option>
+              <option value="graphite">Graphite</option>
+              <option value="contrast">Contrast</option>
+            </select>
+          </label>
+          <label>
+            <span>Language</span>
+            <select v-model="languagePreference">
+              <option value="ru">Русский</option>
+              <option value="en">English</option>
+            </select>
+          </label>
+          <label>
+            <span>Font</span>
+            <select v-model="fontPreference">
+              <option value="compact">Compact</option>
+              <option value="normal">Normal</option>
+              <option value="large">Large</option>
+            </select>
+          </label>
+        </div>
+      </template>
+
+      <div class="favorites">
+        <h2>Favorite courses</h2>
+        <p class="muted">Up to 12 courses.</p>
+        <ul>
+          <li v-for="c in courses" :key="c.id">
+            <label>
+              <input type="checkbox" :checked="favorites.includes(c.id)" @change="toggleFav(c.id)" />
+              {{ c.title }} — {{ c.teacher_nickname }}
+            </label>
+          </li>
+        </ul>
       </div>
-      <div v-else class="avatar-placeholder">{{ me.nickname.slice(0, 2).toUpperCase() }}</div>
-      <div class="avatar-actions">
-        <label class="btn-file">
-          <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" :disabled="uploading" @change="onAvatarFile" />
-          {{ uploading ? "Загрузка…" : "Выбрать изображение" }}
-        </label>
-        <button v-if="me.avatar_url" class="secondary" type="button" @click="clearAvatar">Сбросить</button>
-        <p class="muted" style="margin: 0.35rem 0 0">JPEG, PNG, GIF, WebP, до 2 МБ.</p>
+
+      <div class="actions">
+        <button class="secondary" type="button" @click="closeSettings">Cancel</button>
+        <button type="button" :disabled="saving" @click="save">{{ saving ? "Saving..." : "Save" }}</button>
       </div>
     </div>
-
-    <label>О себе</label>
-    <textarea v-model="bio" rows="5" />
-    <label style="display: block; margin-top: 0.75rem">URL обоев (картинка)</label>
-    <input v-model="wallpaper" placeholder="https://..." />
-    <h2 style="margin-top: 1.25rem">Избранные курсы</h2>
-    <p class="muted">До 12, только из тех, к которым у вас есть доступ в каталоге.</p>
-    <ul style="list-style: none; padding: 0">
-      <li v-for="c in courses" :key="c.id" style="margin-bottom: 0.35rem">
-        <label style="display: flex; gap: 0.5rem; align-items: center; cursor: pointer">
-          <input
-            type="checkbox"
-            style="width: auto"
-            :checked="favorites.includes(c.id)"
-            @change="toggleFav(c.id)"
-          />
-          {{ c.title }} — {{ c.teacher_nickname }}
-        </label>
-      </li>
-    </ul>
-    <button type="button" style="margin-top: 1rem" @click="save">Сохранить</button>
-  </div>
+  </section>
   <p v-else-if="err" class="error">{{ err }}</p>
-  <p v-else class="muted">Загрузка…</p>
+  <p v-else class="muted">Loading…</p>
 </template>
 
 <style scoped>
-.avatar-row {
-  display: flex;
+.settings-shell {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
   gap: 1rem;
-  align-items: flex-start;
-  flex-wrap: wrap;
-  margin-bottom: 1rem;
+  min-height: calc(100vh - 140px);
 }
-.avatar-preview-wrap {
-  width: 88px;
-  height: 88px;
+
+.settings-nav {
+  padding: 0.75rem;
+  border-radius: 20px;
+}
+
+.close-btn {
+  margin-bottom: 0.7rem;
+}
+
+.nav-item {
+  width: 100%;
+  justify-content: flex-start;
+  margin-bottom: 0.45rem;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text);
+  border: 1px solid transparent;
+  padding: 0.7rem 0.8rem;
+}
+
+.nav-item.active {
+  background: var(--surface2);
+  border-color: var(--border);
+}
+
+.settings-main {
+  border-radius: 20px;
+}
+
+.avatar-header {
+  display: flex;
+  gap: 0.9rem;
+  align-items: center;
+  margin-bottom: 0.95rem;
+}
+
+.avatar-preview-wrap,
+.avatar-placeholder {
+  width: 78px;
+  height: 78px;
   border-radius: 16px;
   overflow: hidden;
-  border: 2px solid var(--accent);
-  flex-shrink: 0;
+  border: 1px solid var(--border);
+  background: var(--surface2);
 }
+
 .avatar-preview {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  display: block;
 }
+
 .avatar-placeholder {
-  width: 88px;
-  height: 88px;
-  border-radius: 16px;
-  background: var(--surface2);
-  border: 2px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 800;
-  font-size: 1.5rem;
-  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
 }
+
+.wallpaper-box {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.75rem;
+  margin-bottom: 0.95rem;
+}
+
+.wallpaper-preview {
+  width: 100%;
+  max-height: 170px;
+  object-fit: cover;
+  border-radius: 10px;
+  margin-bottom: 0.65rem;
+}
+
 .avatar-actions {
-  flex: 1;
-  min-width: 200px;
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
 }
+
 .btn-file {
   display: inline-block;
   cursor: pointer;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   padding: 0.55rem 1rem;
-  border-radius: var(--radius, 12px);
-  font-weight: 600;
-  background: linear-gradient(135deg, var(--accent, #5eead4), #2dd4bf);
-  color: #04120f;
+  background: var(--surface2);
 }
+
 .btn-file input {
   display: none;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.7rem;
+}
+
+.form-grid label {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.col-2 {
+  grid-column: span 2;
+}
+
+.socials {
+  margin-top: 1rem;
+}
+
+.socials-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.5rem;
+}
+
+.social-row {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.social-remove {
+  min-height: 0;
+  width: 40px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+}
+
+.favorites {
+  margin-top: 1rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.85rem;
+}
+
+.favorites ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 180px;
+  overflow: auto;
+}
+
+.favorites li {
+  margin-bottom: 0.35rem;
+}
+
+.favorites label {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.favorites input[type="checkbox"] {
+  width: auto;
+}
+
+.actions {
+  margin-top: 1rem;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.ok {
+  color: var(--accent);
+}
+
+@media (max-width: 980px) {
+  .settings-shell {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .col-2 {
+    grid-column: span 1;
+  }
+
+  .social-row {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

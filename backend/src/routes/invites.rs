@@ -16,6 +16,7 @@ use crate::{
 pub struct InviteLinkDto {
     pub id: String,
     pub code: String,
+    pub target_role: String,
     pub max_uses: i64,
     pub used_count: i64,
     pub remaining: i64,
@@ -28,7 +29,7 @@ pub fn router() -> Router<AppState> {
 
 async fn list_invites_inner(pool: &sqlx::SqlitePool, user_id: &str) -> AppResult<Vec<InviteLinkDto>> {
     let rows = sqlx::query(
-        "SELECT id, code, max_uses, used_count, created_at FROM invite_links WHERE owner_user_id = ? ORDER BY created_at DESC",
+        "SELECT id, code, target_role, max_uses, used_count, created_at FROM invite_links WHERE owner_user_id = ? ORDER BY created_at DESC",
     )
     .bind(user_id)
     .fetch_all(pool)
@@ -41,6 +42,7 @@ async fn list_invites_inner(pool: &sqlx::SqlitePool, user_id: &str) -> AppResult
         out.push(InviteLinkDto {
             id: r.try_get("id")?,
             code: r.try_get("code")?,
+            target_role: r.try_get("target_role")?,
             max_uses,
             used_count: used,
             remaining: (max_uses - used).max(0),

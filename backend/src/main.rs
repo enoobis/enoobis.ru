@@ -14,7 +14,7 @@ use tracing_subscriber::EnvFilter;
 use uuid::Uuid;
 
 async fn seed_admin(pool: &SqlitePool) -> Result<(), sqlx::Error> {
-    let admin_email = "enoobis";
+    let admin_email = "REDACTED";
     let admin_password = "REDACTED";
     let hash = crate::auth::hash_password(admin_password).expect("hash admin");
 

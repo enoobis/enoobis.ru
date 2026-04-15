@@ -1,40 +1,331 @@
 <script setup lang="ts">
-import { ref } from "vue";
-import { useRouter } from "vue-router";
-import { api } from "../api/http";
+import { computed, nextTick, onMounted, ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { createPost, deletePost, getPostForEdit, publishPost, updatePost, uploadBlogImage } from "../api/blog";
 import { useAuthStore } from "../stores/auth";
+import { renderMarkdown } from "../utils/markdown";
 
 const auth = useAuthStore();
+const route = useRoute();
 const title = ref("");
 const body = ref("");
+const excerpt = ref("");
+const slug = ref("");
+const cover_image_url = ref("");
+const status = ref<"draft" | "published">("draft");
+const tagsText = ref("");
+const categoriesText = ref("");
 const err = ref("");
+const ok = ref("");
+const loading = ref(false);
+const showPreview = ref(true);
+const bodyInput = ref<HTMLTextAreaElement | null>(null);
 const router = useRouter();
 
-async function submit() {
-  err.value = "";
+const editId = computed(() => (typeof route.params.id === "string" ? route.params.id : ""));
+const isEdit = computed(() => !!editId.value);
+const renderedBody = computed(() => renderMarkdown(body.value));
+const wordCount = computed(() =>
+  body.value
+    .replace(/[#_*`\-\[\]()!>]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean).length,
+);
+const readMinutes = computed(() => Math.max(1, Math.ceil(wordCount.value / 220)));
+
+function parseCsv(input: string) {
+  return input
+    .split(",")
+    .map((v) => v.trim())
+    .filter(Boolean);
+}
+
+async function loadForEdit() {
+  if (!isEdit.value || !auth.token) return;
+  loading.value = true;
   try {
-    const r = await api<{ id: string }>("/api/blog", {
-      method: "POST",
-      token: auth.token,
-      body: JSON.stringify({ title: title.value, body: body.value }),
-    });
-    await router.push(`/blog/${r.id}`);
+    const post = await getPostForEdit(editId.value, auth.token);
+    title.value = post.title;
+    body.value = post.body;
+    excerpt.value = post.excerpt;
+    slug.value = post.slug;
+    cover_image_url.value = post.cover_image_url;
+    status.value = post.status === "published" ? "published" : "draft";
+    tagsText.value = post.tags.join(", ");
+    categoriesText.value = post.categories.join(", ");
+  } catch (e) {
+    err.value = e instanceof Error ? e.message : "Ошибка";
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function save(publishNow = false) {
+  if (!auth.token) return;
+  err.value = "";
+  ok.value = "";
+  try {
+    const payload = {
+      title: title.value,
+      body: body.value,
+      excerpt: excerpt.value || undefined,
+      slug: slug.value || undefined,
+      cover_image_url: cover_image_url.value || undefined,
+      status: publishNow ? "published" : status.value,
+      tags: parseCsv(tagsText.value),
+      categories: parseCsv(categoriesText.value),
+    } as const;
+
+    if (isEdit.value) {
+      const updated = await updatePost(editId.value, auth.token, payload);
+      if (publishNow && updated.status !== "published") {
+        await publishPost(updated.id, auth.token);
+      }
+      ok.value = "Сохранено";
+      await router.push(`/blog/${editId.value}`);
+    } else {
+      const created = await createPost(auth.token, payload);
+      if (publishNow && created.status !== "published") {
+        await publishPost(created.id, auth.token);
+      }
+      await router.push(`/blog/${created.id}`);
+    }
   } catch (e) {
     err.value = e instanceof Error ? e.message : "Ошибка";
   }
 }
+
+async function remove() {
+  if (!isEdit.value || !auth.token) return;
+  if (!confirm("Удалить пост?")) return;
+  try {
+    await deletePost(editId.value, auth.token);
+    await router.push("/blog");
+  } catch (e) {
+    err.value = e instanceof Error ? e.message : "Ошибка";
+  }
+}
+
+async function uploadImageFile(ev: Event) {
+  if (!auth.token) return;
+  const input = ev.target as HTMLInputElement;
+  if (!input.files?.length) return;
+  try {
+    const r = await uploadBlogImage(input.files[0], auth.token, editId.value || undefined);
+    insertRaw(`\n![image](${r.url})\n`);
+  } catch (e) {
+    err.value = e instanceof Error ? e.message : "Ошибка";
+  } finally {
+    input.value = "";
+  }
+}
+
+async function uploadCoverFile(ev: Event) {
+  if (!auth.token) return;
+  const input = ev.target as HTMLInputElement;
+  if (!input.files?.length) return;
+  try {
+    const r = await uploadBlogImage(input.files[0], auth.token, editId.value || undefined);
+    cover_image_url.value = r.url;
+    ok.value = "Обложка загружена";
+  } catch (e) {
+    err.value = e instanceof Error ? e.message : "Ошибка";
+  } finally {
+    input.value = "";
+  }
+}
+
+function insertRaw(snippet: string) {
+  const el = bodyInput.value;
+  if (!el) {
+    body.value = `${body.value}${snippet}`;
+    return;
+  }
+  const start = el.selectionStart ?? body.value.length;
+  const left = body.value.slice(0, start);
+  const right = body.value.slice(start);
+  body.value = `${left}${snippet}${right}`;
+  nextTick(() => {
+    const pos = left.length + snippet.length;
+    el.focus();
+    el.setSelectionRange(pos, pos);
+  });
+}
+
+function insertWrap(prefix: string, suffix = prefix) {
+  const el = bodyInput.value;
+  if (!el) {
+    body.value += `${prefix}text${suffix}`;
+    return;
+  }
+  const start = el.selectionStart ?? 0;
+  const end = el.selectionEnd ?? start;
+  const left = body.value.slice(0, start);
+  const selected = body.value.slice(start, end) || "text";
+  const right = body.value.slice(end);
+  body.value = `${left}${prefix}${selected}${suffix}${right}`;
+  nextTick(() => {
+    const selStart = left.length + prefix.length;
+    const selEnd = selStart + selected.length;
+    el.focus();
+    el.setSelectionRange(selStart, selEnd);
+  });
+}
+
+function insertLine(prefix: string) {
+  const el = bodyInput.value;
+  if (!el) {
+    body.value += `\n${prefix}`;
+    return;
+  }
+  const start = el.selectionStart ?? 0;
+  const left = body.value.slice(0, start);
+  const right = body.value.slice(start);
+  body.value = `${left}\n${prefix}${right}`;
+  nextTick(() => {
+    const pos = left.length + prefix.length + 1;
+    el.focus();
+    el.setSelectionRange(pos, pos);
+  });
+}
+
+function addLink() {
+  const url = prompt("Вставьте URL", "https://");
+  if (!url) return;
+  const el = bodyInput.value;
+  if (!el) {
+    body.value += `[link](${url})`;
+    return;
+  }
+  const start = el.selectionStart ?? 0;
+  const end = el.selectionEnd ?? start;
+  const left = body.value.slice(0, start);
+  const selected = body.value.slice(start, end) || "link";
+  const right = body.value.slice(end);
+  body.value = `${left}[${selected}](${url})${right}`;
+}
+
+onMounted(loadForEdit);
 </script>
 
 <template>
-  <div class="card" style="max-width: 720px">
-    <h1>Новая запись</h1>
+  <div class="card" style="max-width: 980px">
+    <h1>{{ isEdit ? "Редактирование записи" : "Новая запись" }}</h1>
     <p v-if="err" class="error">{{ err }}</p>
-    <form @submit.prevent="submit">
+    <p v-if="ok" style="color: var(--accent)">{{ ok }}</p>
+    <p v-if="loading" class="muted">Загрузка...</p>
+    <form v-else @submit.prevent="save(false)">
       <label>Заголовок</label>
       <input v-model="title" required />
-      <label style="display: block; margin-top: 0.75rem">Текст</label>
-      <textarea v-model="body" rows="12" required />
-      <button type="submit" style="margin-top: 1rem">Опубликовать</button>
+      <label style="display: block; margin-top: 0.75rem">Slug</label>
+      <input v-model="slug" placeholder="если пусто, создастся автоматически" />
+      <label style="display: block; margin-top: 0.75rem">Кратко</label>
+      <input v-model="excerpt" placeholder="короткое описание" />
+      <label style="display: block; margin-top: 0.75rem">Обложка (файл)</label>
+      <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" @change="uploadCoverFile" />
+      <img
+        v-if="cover_image_url"
+        :src="cover_image_url"
+        alt="cover preview"
+        style="margin-top: 0.5rem; max-width: 100%; border-radius: 10px; border: 1px solid var(--border)"
+      />
+      <label style="display: block; margin-top: 0.75rem">Теги</label>
+      <input v-model="tagsText" placeholder="rust, vue, education" />
+      <label style="display: block; margin-top: 0.75rem">Категории</label>
+      <input v-model="categoriesText" placeholder="news, guides" />
+      <label style="display: block; margin-top: 0.75rem">Статус</label>
+      <select v-model="status">
+        <option value="draft">Черновик</option>
+        <option value="published">Опубликован</option>
+      </select>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.75rem">
+        <label>Текст</label>
+        <span class="muted">{{ wordCount }} слов · ~{{ readMinutes }} мин чтения</span>
+      </div>
+
+      <div class="editor-toolbar">
+        <button class="secondary" type="button" @click="insertWrap('**')"><b>B</b></button>
+        <button class="secondary" type="button" @click="insertWrap('*')"><i>I</i></button>
+        <button class="secondary" type="button" @click="insertLine('# ')">H1</button>
+        <button class="secondary" type="button" @click="insertLine('## ')">H2</button>
+        <button class="secondary" type="button" @click="insertLine('### ')">H3</button>
+        <button class="secondary" type="button" @click="addLink">Link</button>
+        <button class="secondary" type="button" @click="insertLine('- ')">List</button>
+        <button class="secondary" type="button" @click="insertLine('> ')">Quote</button>
+        <button class="secondary" type="button" @click="insertWrap('`')">Code</button>
+      </div>
+
+      <div class="editor-grid">
+        <textarea
+          ref="bodyInput"
+          v-model="body"
+          rows="18"
+          required
+          placeholder="Write in Markdown..."
+        />
+        <div v-if="showPreview" class="preview-pane">
+          <div class="markdown-body" v-html="renderedBody" />
+        </div>
+      </div>
+
+      <button class="secondary" type="button" style="margin-top: 0.5rem" @click="showPreview = !showPreview">
+        {{ showPreview ? "Скрыть превью" : "Показать превью" }}
+      </button>
+
+      <label style="display: block; margin-top: 0.75rem">Картинка в пост</label>
+      <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" @change="uploadImageFile" />
+      <div style="display: flex; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap">
+        <button type="submit">Сохранить</button>
+        <button class="secondary" type="button" @click="save(true)">Сохранить и опубликовать</button>
+        <button v-if="isEdit" class="secondary" type="button" @click="remove">Удалить</button>
+      </div>
     </form>
   </div>
 </template>
+
+<style scoped>
+.editor-toolbar {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-top: 0.4rem;
+}
+.editor-grid {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+@media (min-width: 920px) {
+  .editor-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.preview-pane {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface2);
+  padding: 0.75rem;
+  min-height: 240px;
+}
+.markdown-body :deep(img) {
+  max-width: 100%;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+.markdown-body :deep(pre) {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.75rem;
+  overflow-x: auto;
+}
+.markdown-body :deep(code) {
+  font-family: var(--mono);
+}
+.markdown-body :deep(blockquote) {
+  margin: 0.75rem 0;
+  padding: 0.25rem 0.75rem;
+  border-left: 3px solid var(--border);
+  color: var(--muted);
+}
+</style>

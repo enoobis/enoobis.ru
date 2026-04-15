@@ -28,6 +28,12 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      path: "/blog/:id/edit",
+      name: "blog-edit",
+      component: () => import("../views/BlogWriteView.vue"),
+      meta: { requiresAuth: true },
+    },
+    {
       path: "/admin",
       name: "admin",
       component: () => import("../views/AdminView.vue"),
@@ -43,6 +49,11 @@ const router = createRouter({
       name: "profile-edit",
       component: () => import("../views/ProfileEditView.vue"),
       meta: { requiresAuth: true },
+    },
+    {
+      path: "/:pathMatch(.*)*",
+      name: "not-found",
+      component: () => import("../views/NotFoundView.vue"),
     },
   ],
 });

@@ -51,7 +51,6 @@ export const useAuthStore = defineStore("auth", () => {
     email: string;
     password: string;
     nickname: string;
-    role?: string;
     invite_code?: string;
   }) {
     return api<{

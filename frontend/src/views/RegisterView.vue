@@ -6,7 +6,6 @@ import { useAuthStore } from "../stores/auth";
 const email = ref("");
 const password = ref("");
 const nickname = ref("");
-const role = ref<"student" | "teacher">("student");
 const invite = ref("");
 const err = ref("");
 const ok = ref("");
@@ -27,7 +26,6 @@ async function submit() {
       email: email.value,
       password: password.value,
       nickname: nickname.value,
-      role: role.value,
       invite_code: invite.value.trim() || undefined,
     });
     if (r.pending) {
@@ -47,23 +45,15 @@ async function submit() {
 <template>
   <div class="card" style="max-width: 480px">
     <h1>Регистрация</h1>
-    <p class="muted">Заполните поля и создайте аккаунт.</p>
     <p v-if="err" class="error">{{ err }}</p>
     <p v-if="ok" style="color: var(--accent)">{{ ok }}</p>
     <form @submit.prevent="submit">
-      <label>Ник (3–32, буквы, цифры, _)</label>
+      <label>Ник</label>
       <input v-model="nickname" required pattern="[A-Za-z0-9_]{3,32}" />
       <label style="display: block; margin-top: 0.75rem">Email</label>
       <input v-model="email" type="email" required />
-      <label style="display: block; margin-top: 0.75rem">Пароль (мин. 8)</label>
+      <label style="display: block; margin-top: 0.75rem">Пароль</label>
       <input v-model="password" type="password" minlength="8" required />
-      <label style="display: block; margin-top: 0.75rem">Роль</label>
-      <select v-model="role">
-        <option value="student">Ученик</option>
-        <option value="teacher">Преподаватель</option>
-      </select>
-      <label style="display: block; margin-top: 0.75rem">Инвайт-код</label>
-      <input v-model="invite" placeholder="опционально" />
       <button type="submit" style="margin-top: 1rem; width: 100%">Создать аккаунт</button>
     </form>
   </div>

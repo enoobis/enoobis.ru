@@ -19,7 +19,6 @@ pub struct RegisterBody {
     pub password: String,
     pub nickname: String,
     #[serde(default)]
-    pub role: Option<String>,
     pub invite_code: Option<String>,
 }
 
@@ -60,13 +59,6 @@ pub fn router() -> Router<AppState> {
         .route("/api/login", post(login))
 }
 
-fn normalize_role(r: Option<String>) -> String {
-    match r.as_deref() {
-        Some("teacher") => "teacher".into(),
-        _ => "student".into(),
-    }
-}
-
 async fn register(
     State(state): State<AppState>,
     Json(body): Json<RegisterBody>,
@@ -82,17 +74,14 @@ async fn register(
         ));
     }
 
-    let role = normalize_role(body.role.clone());
-    if role == "admin" {
-        return Err(AppError::Forbidden);
-    }
+    let mut role = "student".to_string();
 
     let mut status = "pending";
     let mut tx = state.pool.begin().await?;
 
     if let Some(code) = body.invite_code.as_ref().map(|c| c.trim()).filter(|c| !c.is_empty()) {
         let row = sqlx::query(
-            "SELECT id, max_uses, used_count FROM invite_links WHERE code = ?",
+            "SELECT id, max_uses, used_count, target_role FROM invite_links WHERE code = ?",
         )
         .bind(code)
         .fetch_optional(&mut *tx)
@@ -102,6 +91,7 @@ async fn register(
             let id: String = r.try_get("id")?;
             let max_uses: i64 = r.try_get("max_uses")?;
             let used: i64 = r.try_get("used_count")?;
+            let invite_role: String = r.try_get("target_role")?;
             if used >= max_uses {
                 return Err(AppError::BadRequest("invite exhausted".into()));
             }
@@ -110,6 +100,11 @@ async fn register(
                 .execute(&mut *tx)
                 .await?;
             status = "approved";
+            role = if invite_role == "teacher" {
+                "teacher".into()
+            } else {
+                "student".into()
+            };
         } else {
             return Err(AppError::BadRequest("invalid invite code".into()));
         }
@@ -220,16 +215,17 @@ fn is_valid_nickname(n: &str) -> bool {
 
 pub async fn seed_default_invites(pool: &sqlx::SqlitePool, user_id: &str) -> Result<(), sqlx::Error> {
     let now = chrono::Utc::now().to_rfc3339();
-    for _ in 0..2 {
+    for role in ["student", "teacher"] {
         let id = Uuid::new_v4().to_string();
         let code = Uuid::new_v4().simple().to_string();
         sqlx::query(
-            "INSERT INTO invite_links (id, code, owner_user_id, max_uses, used_count, created_at)
-             VALUES (?, ?, ?, 1, 0, ?)",
+            "INSERT INTO invite_links (id, code, owner_user_id, target_role, max_uses, used_count, created_at)
+             VALUES (?, ?, ?, ?, 1, 0, ?)",
         )
         .bind(&id)
         .bind(&code)
         .bind(user_id)
+        .bind(role)
         .bind(&now)
         .execute(pool)
         .await?;
