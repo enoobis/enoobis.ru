@@ -128,6 +128,18 @@ onMounted(async () => {
       </div>
     </div>
 
+    <div
+      v-if="auth.token && (auth.role === 'teacher' || auth.role === 'admin')"
+      class="card"
+      style="margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem"
+    >
+      <span class="muted">Материалы для авторов</span>
+      <RouterLink to="/blog/write" class="nav-link" style="display: inline-flex; align-items: center; gap: 0.4rem">
+        <AppIcon name="write" />
+        <span>Написать</span>
+      </RouterLink>
+    </div>
+
     <p v-if="err" class="error">{{ err }}</p>
     <p v-else-if="loading" class="muted">Загрузка...</p>
     <template v-else>

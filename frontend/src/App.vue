@@ -169,14 +169,6 @@ watch(
       <RouterLink to="/blog" class="nav-link"><AppIcon name="blog" /> <span>Блог</span></RouterLink>
       <RouterLink v-if="auth.token" to="/courses" class="nav-link"><AppIcon name="courses" /> <span>Курсы</span></RouterLink>
       <RouterLink v-if="auth.token" to="/invites" class="nav-link"><AppIcon name="invites" /> <span>Инвайты</span></RouterLink>
-      <RouterLink
-        v-if="auth.token && (auth.role === 'teacher' || auth.role === 'admin')"
-        to="/blog/write"
-        class="nav-link"
-      >
-        <AppIcon name="write" />
-        <span>Написать</span>
-      </RouterLink>
       <RouterLink v-if="auth.token && auth.role === 'admin'" to="/admin" class="nav-link">
         <AppIcon name="admin" />
         <span>Админ</span>
