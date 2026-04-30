@@ -1,0 +1,223 @@
+mod auth;
+mod error;
+mod routes;
+mod state;
+
+use std::net::SocketAddr;
+use std::path::{Path, PathBuf};
+
+use axum::{response::Html, routing::get, Router};
+use sqlx::SqlitePool;
+use tower_http::cors::{Any, CorsLayer};
+use tower_http::services::{ServeDir, ServeFile};
+use tracing_subscriber::EnvFilter;
+use uuid::Uuid;
+
+async fn seed_admin(pool: &SqlitePool) -> Result<(), sqlx::Error> {
+    let admin_email = "REDACTED";
+    let admin_password = "REDACTED";
+    let hash = crate::auth::hash_password(admin_password).expect("hash admin");
+
+    // If requested login already exists, enforce admin role + password for it.
+    let existing_with_email: Option<String> = sqlx::query_scalar("SELECT id FROM users WHERE email = ?")
+        .bind(admin_email)
+        .fetch_optional(pool)
+        .await?;
+    if let Some(id) = existing_with_email {
+        sqlx::query(
+            "UPDATE users
+             SET password_hash = ?, role = 'admin', status = 'approved'
+             WHERE id = ?",
+        )
+        .bind(&hash)
+        .bind(&id)
+        .execute(pool)
+        .await?;
+        return Ok(());
+    }
+
+    // Otherwise, repurpose an existing admin account if present.
+    let existing_admin: Option<String> = sqlx::query_scalar(
+        "SELECT id FROM users WHERE role = 'admin' ORDER BY created_at LIMIT 1",
+    )
+    .fetch_optional(pool)
+    .await?;
+    if let Some(id) = existing_admin {
+        sqlx::query(
+            "UPDATE users
+             SET email = ?, password_hash = ?, status = 'approved'
+             WHERE id = ?",
+        )
+        .bind(admin_email)
+        .bind(&hash)
+        .bind(&id)
+        .execute(pool)
+        .await?;
+        return Ok(());
+    }
+
+    let id = Uuid::new_v4().to_string();
+    let now = chrono::Utc::now().to_rfc3339();
+    sqlx::query(
+        "INSERT INTO users (id, email, password_hash, nickname, role, status, bio, wallpaper_url, avatar_url, created_at)
+         VALUES (?, ?, ?, 'enoobis_admin', 'admin', 'approved', 'Системный администратор', '', '', ?)",
+    )
+    .bind(&id)
+    .bind(admin_email)
+    .bind(&hash)
+    .bind(&now)
+    .execute(pool)
+    .await?;
+    crate::routes::auth::seed_default_invites(pool, &id).await?;
+    Ok(())
+}
+
+/// Собранный фронт: рядом с крейтом `../frontend/dist`, переменная `STATIC_DIR` или cwd.
+fn resolve_static_dir() -> Option<PathBuf> {
+    if let Ok(p) = std::env::var("STATIC_DIR") {
+        let pb = PathBuf::from(p);
+        if pb.join("index.html").is_file() {
+            return pb.canonicalize().ok().or(Some(pb));
+        }
+    }
+    let beside = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../frontend/dist");
+    if beside.join("index.html").is_file() {
+        return beside.canonicalize().ok().or(Some(beside));
+    }
+    for rel in ["../frontend/dist", "frontend/dist", "edu-platform/frontend/dist"] {
+        let pb = PathBuf::from(rel);
+        if pb.join("index.html").is_file() {
+            return pb.canonicalize().ok().or(Some(pb));
+        }
+    }
+    None
+}
+
+async fn api_only_stub() -> Html<&'static str> {
+    Html(
+        r#"<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>enoobis.ru</title>
+  <style>
+    body{font-family:system-ui,sans-serif;max-width:42rem;margin:2rem auto;padding:0 1rem;line-height:1.5;background:#0c0e14;color:#e8ecf4}
+    a{color:#5eead4} code{background:#1c2230;padding:.1rem .35rem;border-radius:4px}
+  </style>
+</head>
+<body>
+  <h1>enoobis.ru</h1>
+  <p>Статика фронтенда не собрана.</p>
+  <p>Выполните из каталога <code>edu-platform/frontend</code>:</p>
+  <pre style="background:#1c2230;padding:1rem;border-radius:8px">npm install && npm run build</pre>
+  <p>Затем снова запустите бэкенд — интерфейс отдаётся с этого же процесса (порт см. лог).</p>
+  <p><a href="/api/blog">/api/blog</a> (JSON)</p>
+</body>
+</html>"#,
+    )
+}
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
+        )
+        .init();
+
+    dotenvy::dotenv().ok();
+    let db_url =
+        std::env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite:edu.db?mode=rwc".into());
+    let pool = SqlitePool::connect(&db_url).await?;
+    sqlx::migrate!("./migrations").run(&pool).await?;
+
+    seed_admin(&pool).await?;
+
+    let jwt_secret =
+        std::env::var("JWT_SECRET").unwrap_or_else(|_| "dev-secret-change-me".into());
+    let uploads_serve_root = std::env::var("UPLOADS_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| Path::new(env!("CARGO_MANIFEST_DIR")).join("data/uploads"));
+    tokio::fs::create_dir_all(uploads_serve_root.join("avatars"))
+        .await
+        .map_err(|e| anyhow::anyhow!("create uploads dir: {e}"))?;
+    tokio::fs::create_dir_all(uploads_serve_root.join("course-lectures"))
+        .await
+        .map_err(|e| anyhow::anyhow!("create course-lectures uploads dir: {e}"))?;
+
+    let app_state = state::AppState {
+        pool,
+        jwt_secret,
+        uploads_serve_root: uploads_serve_root.clone(),
+    };
+
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods(Any)
+        .allow_headers(Any);
+
+    let api = routes::api_router();
+
+    let app = if let Some(dir) = resolve_static_dir() {
+        let index = dir.join("index.html");
+        tracing::info!(path = %dir.display(), "serving SPA static files");
+        let static_svc = ServeDir::new(&dir).not_found_service(ServeFile::new(index));
+        Router::new()
+            .nest_service("/uploads", ServeDir::new(uploads_serve_root.clone()))
+            .merge(api)
+            .fallback_service(static_svc)
+            .layer(cors)
+            .with_state(app_state)
+    } else {
+        tracing::warn!("frontend/dist not found — only API + stub at /");
+        Router::new()
+            .nest_service("/uploads", ServeDir::new(uploads_serve_root.clone()))
+            .route("/", get(api_only_stub))
+            .merge(api)
+            .layer(cors)
+            .with_state(app_state)
+    };
+
+    let preferred: u16 = std::env::var("PORT")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(80);
+
+    let (listener, bound_port) = bind_listener(preferred).await?;
+    tracing::info!("listening on http://127.0.0.1:{bound_port} (http://localhost:{bound_port})");
+    if bound_port != 80 {
+        tracing::warn!(
+            "чтобы открывался именно http://127.0.0.1/ без порта, нужен порт 80 (см. README в репозитории или cap_net_bind_service)"
+        );
+    }
+    axum::serve(listener, app).await?;
+    Ok(())
+}
+
+async fn bind_listener(preferred: u16) -> anyhow::Result<(tokio::net::TcpListener, u16)> {
+    let fallbacks: &[u16] = match preferred {
+        80 => &[80, 3000, 8080],
+        p => &[p, 3000, 8080],
+    };
+
+    for &port in fallbacks {
+        let addr = SocketAddr::from(([0, 0, 0, 0], port));
+        match tokio::net::TcpListener::bind(addr).await {
+            Ok(l) => return Ok((l, port)),
+            Err(e) if port == preferred => {
+                if e.kind() == std::io::ErrorKind::PermissionDenied && port == 80 {
+                    tracing::warn!(
+                        "порт 80: отказано в доступе — запустите с правами или: sudo setcap 'cap_net_bind_service=+ep' target/debug/edu-platform-backend"
+                    );
+                } else if e.kind() == std::io::ErrorKind::AddrInUse {
+                    tracing::warn!(port, "порт занят");
+                } else {
+                    tracing::warn!(port, error = %e, "bind failed");
+                }
+            }
+            Err(e) => tracing::debug!(port, error = %e, "bind failed, try next"),
+        }
+    }
+    anyhow::bail!("не удалось занять ни один из портов: {:?}", fallbacks);
+}
