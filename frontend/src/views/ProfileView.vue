@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import { api } from "../api/http";
 import { listAuthorPosts, listMyBookmarks, type BlogListItem } from "../api/blog";
+import { getProfileActivity, type ActivitySummary } from "../api/profile";
 import { useAuthStore } from "../stores/auth";
 
 type Profile = {
@@ -19,6 +20,13 @@ type Profile = {
   favorite_courses: { id: string; title: string }[];
   followers_count: number;
   following_count: number;
+  grade_overview: {
+    courses_count: number;
+    assignments_graded: number;
+    points_earned: number;
+    points_total: number;
+    average_percent: number;
+  };
 };
 
 type FollowPreview = {
@@ -39,6 +47,8 @@ const avatarBroken = ref(false);
 const following = ref(false);
 const followBusy = ref(false);
 const tab = ref<"elements" | "collections">("elements");
+const activity = ref<ActivitySummary | null>(null);
+const activityErr = ref("");
 
 const nick = computed(() => route.params.nickname as string);
 const displayName = computed(() => {
@@ -80,6 +90,8 @@ async function load() {
   followersPreview.value = [];
   followingPreview.value = [];
   following.value = false;
+  activity.value = null;
+  activityErr.value = "";
   try {
     profile.value = await api<Profile>(`/api/profile/${nick.value}`);
     const p = await listAuthorPosts(nick.value, { page: 1, page_size: 12 });
@@ -95,9 +107,19 @@ async function load() {
       const saved = await listMyBookmarks(auth.token, { page: 1, page_size: 12 });
       bookmarks.value = saved.items;
     }
+    try {
+      activity.value = await getProfileActivity(nick.value, auth.token);
+    } catch (e) {
+      activityErr.value = e instanceof Error ? e.message : "Activity unavailable";
+    }
     await loadFollowPreviews();
   } catch (e) {
-    err.value = e instanceof Error ? e.message : "Ошибка";
+    const msg = e instanceof Error ? e.message : "Ошибка";
+    if (msg.toLowerCase().includes("forbidden") || msg.includes("403")) {
+      err.value = "Профиль скрыт настройками приватности.";
+    } else {
+      err.value = msg;
+    }
   }
 }
 
@@ -194,6 +216,20 @@ watch(nick, load);
           </div>
         </div>
 
+        <section class="activity-card">
+          <div class="activity-head">
+            <h2>Оценки</h2>
+            <span class="badge">{{ profile.grade_overview.average_percent.toFixed(1) }}%</span>
+          </div>
+          <p class="muted">
+            Курсов: {{ profile.grade_overview.courses_count }} · Проверено заданий:
+            {{ profile.grade_overview.assignments_graded }}
+          </p>
+          <p class="muted">
+            Баллы: {{ profile.grade_overview.points_earned }} / {{ profile.grade_overview.points_total }}
+          </p>
+        </section>
+
         <div class="center-tabs">
           <button
             type="button"
@@ -210,6 +246,25 @@ watch(nick, load);
             Collections <span class="badge">{{ collectionsCount }}</span>
           </button>
         </div>
+
+        <section class="activity-card">
+          <div class="activity-head">
+            <h2>Activity</h2>
+            <span v-if="activity" class="badge">{{ Math.round(activity.total_seconds / 60) }} min</span>
+          </div>
+          <p v-if="activityErr" class="muted">{{ activityErr }}</p>
+          <template v-else-if="activity">
+            <p class="muted">Year {{ activity.year }} · {{ activity.days.length }} active days</p>
+            <div v-if="activity.days.length" class="activity-days">
+              <div v-for="d in activity.days.slice(-8)" :key="d.day" class="activity-day">
+                <strong>{{ d.day.slice(5) }}</strong>
+                <span>{{ Math.round(d.seconds_spent / 60) }}m</span>
+              </div>
+            </div>
+            <p v-else class="muted">No activity data yet.</p>
+          </template>
+          <p v-else class="muted">Loading activity…</p>
+        </section>
 
         <template v-if="tab === 'elements'">
           <div v-if="posts.length" class="post-list">
@@ -295,6 +350,35 @@ watch(nick, load);
   display: inline-flex;
   gap: 0.45rem;
   margin-bottom: 1rem;
+}
+
+.activity-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.75rem;
+  margin-bottom: 0.95rem;
+  background: rgba(10, 10, 10, 0.82);
+}
+
+.activity-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.activity-days {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.4rem;
+}
+
+.activity-day {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.35rem 0.45rem;
+  display: grid;
+  gap: 0.15rem;
 }
 
 .main-top-meta {

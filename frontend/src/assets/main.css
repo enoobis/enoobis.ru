@@ -201,7 +201,7 @@ button,
   width: var(--icon-size);
   height: var(--icon-size);
   flex: 0 0 var(--icon-size);
-  opacity: 0.95;
+  opacity: 0.96;
 }
 .nav a:hover {
   text-decoration: none;

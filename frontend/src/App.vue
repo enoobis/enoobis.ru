@@ -10,7 +10,6 @@ const auth = useAuthStore();
 const isOnline = ref(typeof navigator !== "undefined" ? navigator.onLine : true);
 const profileMenuOpen = ref(false);
 const profileMenuRoot = ref<HTMLElement | null>(null);
-const currentTheme = ref<"black" | "graphite" | "contrast">("black");
 const profileAvatarUrl = ref("");
 const profileAvatarBroken = ref(false);
 const initials = computed(() => (auth.nickname || "U").slice(0, 2).toUpperCase());
@@ -44,21 +43,6 @@ function toggleProfileMenu() {
   profileMenuOpen.value = !profileMenuOpen.value;
 }
 
-async function setTheme(theme: "black" | "graphite" | "contrast") {
-  currentTheme.value = theme;
-  applyUserPreferences({ theme_preference: theme });
-  if (!auth.token) return;
-  try {
-    await api("/api/me", {
-      method: "PATCH",
-      token: auth.token,
-      body: JSON.stringify({ theme_preference: theme }),
-    });
-  } catch {
-    // keep local theme even if save fails
-  }
-}
-
 function logoutFromMenu() {
   profileMenuOpen.value = false;
   profileAvatarUrl.value = "";
@@ -80,9 +64,6 @@ async function loadMePresentation() {
       font_preference: string;
       avatar_url: string;
     }>("/api/me", { token: auth.token });
-    if (me.theme_preference === "black" || me.theme_preference === "graphite" || me.theme_preference === "contrast") {
-      currentTheme.value = me.theme_preference;
-    }
     profileAvatarUrl.value = me.avatar_url || "";
     profileAvatarBroken.value = false;
     applyUserPreferences(me);
@@ -165,7 +146,12 @@ watch(
 <template>
   <div class="layout">
     <header class="nav">
-      <RouterLink to="/" class="nav-link"><AppIcon name="home" /> <span>enoobis.ru</span></RouterLink>
+      <RouterLink to="/" class="nav-link brand-link">
+        <span class="brand-logo-wrap">
+          <img src="/favicon.png" alt="enoobis logo" class="brand-logo" />
+        </span>
+        <span>enoobis.ru</span>
+      </RouterLink>
       <RouterLink to="/blog" class="nav-link"><AppIcon name="blog" /> <span>Блог</span></RouterLink>
       <RouterLink v-if="auth.token" to="/courses" class="nav-link"><AppIcon name="courses" /> <span>Курсы</span></RouterLink>
       <RouterLink v-if="auth.token" to="/invites" class="nav-link"><AppIcon name="invites" /> <span>Инвайты</span></RouterLink>
@@ -210,32 +196,6 @@ watch(
               <span>Logout</span>
               <AppIcon name="logout" />
             </button>
-            <div class="profile-menu-theme">
-              <span>Theme</span>
-              <div class="theme-switch">
-                <button
-                  type="button"
-                  :class="{ active: currentTheme === 'graphite' }"
-                  @click="setTheme('graphite')"
-                >
-                  <AppIcon name="sun" />
-                </button>
-                <button
-                  type="button"
-                  :class="{ active: currentTheme === 'black' }"
-                  @click="setTheme('black')"
-                >
-                  <AppIcon name="moon" />
-                </button>
-                <button
-                  type="button"
-                  :class="{ active: currentTheme === 'contrast' }"
-                  @click="setTheme('contrast')"
-                >
-                  <AppIcon name="contrast" />
-                </button>
-              </div>
-            </div>
           </div>
         </div>
       </template>
@@ -352,39 +312,30 @@ watch(
   min-height: 0;
 }
 
-.profile-menu-theme {
-  border-top: 1px solid var(--border);
-  margin-top: 0.3rem;
-  padding: 0.95rem 0.7rem 0.3rem;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.brand-link {
   gap: 0.6rem;
 }
 
-.theme-switch {
-  background: #0a0a0a;
+.brand-logo-wrap {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  overflow: hidden;
   display: inline-flex;
-  gap: 0.2rem;
-  padding: 0.15rem;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+  flex: 0 0 40px;
 }
 
-.theme-switch button {
-  min-height: 0;
-  width: 30px;
-  height: 30px;
-  border-radius: 999px;
-  padding: 0;
-  background: transparent;
-  color: var(--muted);
-  border-color: transparent;
+.brand-logo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(1.25);
+  transform-origin: center;
+  display: block;
 }
 
-.theme-switch button.active {
-  background: #2a2a2a;
-  color: #f5f5f5;
-  border-color: #444;
-}
 </style>

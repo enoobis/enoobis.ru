@@ -2,6 +2,7 @@ import { api } from "./http";
 
 export type Course = {
   id: string;
+  course_code: string;
   title: string;
   description: string;
   is_open: boolean;
@@ -19,6 +20,17 @@ export type CourseMember = {
 
 export type CourseStreamPost = {
   id: string;
+  course_id: string;
+  author_id: string;
+  author_nickname: string;
+  body: string;
+  created_at: string;
+  comments: CourseStreamComment[];
+};
+
+export type CourseStreamComment = {
+  id: string;
+  post_id: string;
   course_id: string;
   author_id: string;
   author_nickname: string;
@@ -110,6 +122,14 @@ export function enrollCourse(id: string, token: string) {
   return api<{ ok: boolean }>(`/api/courses/${id}/enroll`, { method: "POST", token });
 }
 
+export function joinCourseByCode(code: string, token: string) {
+  return api<Course>("/api/courses/join-by-code", {
+    method: "POST",
+    token,
+    body: JSON.stringify({ code }),
+  });
+}
+
 export function unenrollCourse(id: string, token: string) {
   return api<{ ok: boolean }>(`/api/courses/${id}/enroll`, { method: "DELETE", token });
 }
@@ -128,6 +148,14 @@ export function getClassroom(courseId: string, token: string) {
 
 export function createStreamPost(courseId: string, body: string, token: string) {
   return api<CourseStreamPost>(`/api/courses/${courseId}/stream`, {
+    method: "POST",
+    token,
+    body: JSON.stringify({ body }),
+  });
+}
+
+export function createStreamComment(courseId: string, postId: string, body: string, token: string) {
+  return api<CourseStreamComment>(`/api/courses/${courseId}/stream/${postId}/comments`, {
     method: "POST",
     token,
     body: JSON.stringify({ body }),

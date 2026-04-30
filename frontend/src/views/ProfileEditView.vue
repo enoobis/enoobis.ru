@@ -1,9 +1,20 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { api } from "../api/http";
 import { uploadAvatar } from "../api/uploadAvatar";
 import { uploadWallpaper } from "../api/uploadWallpaper";
+import {
+  getProfileActivity,
+  getMyPrivacy,
+  getMyNotifications,
+  patchMyPrivacy,
+  patchMyNotifications,
+  changeMyPassword,
+  type ActivitySummary,
+  type PrivacySettings,
+  type NotificationSettings,
+} from "../api/profile";
 import AppIcon from "../components/AppIcon.vue";
 import { useAuthStore } from "../stores/auth";
 import { applyUserPreferences } from "../utils/preferences";
@@ -34,7 +45,7 @@ type Me = {
 };
 
 type Course = { id: string; title: string; is_open: boolean; teacher_nickname: string };
-type SettingsTab = "profile" | "account";
+type SettingsTab = "profile" | "account" | "activity" | "privacy" | "security" | "notifications";
 
 const auth = useAuthStore();
 const router = useRouter();
@@ -59,6 +70,102 @@ const uploadingAvatar = ref(false);
 const uploadingWallpaper = ref(false);
 const saving = ref(false);
 
+const myActivity = ref<ActivitySummary | null>(null);
+const activityYear = ref(new Date().getFullYear());
+const activityLoading = ref(false);
+
+const privacy = ref<PrivacySettings | null>(null);
+const savingPrivacy = ref(false);
+const notif = ref<NotificationSettings | null>(null);
+const savingNotif = ref(false);
+
+const currentPassword = ref("");
+const newPassword = ref("");
+const changingPassword = ref(false);
+
+const yearOptions = computed(() => {
+  const cur = new Date().getFullYear();
+  const from = myActivity.value?.registration_year ?? cur - 5;
+  const to = myActivity.value?.current_year ?? cur;
+  const out: number[] = [];
+  for (let y = from; y <= to; y++) out.push(y);
+  return out.length ? out : [cur];
+});
+
+async function loadMyActivity() {
+  if (!auth.token || !me.value) return;
+  activityLoading.value = true;
+  err.value = "";
+  try {
+    myActivity.value = await getProfileActivity(me.value.nickname, auth.token, activityYear.value);
+  } catch (e) {
+    err.value = e instanceof Error ? e.message : "Ошибка";
+  } finally {
+    activityLoading.value = false;
+  }
+}
+
+async function loadPrivacyAndNotif() {
+  if (!auth.token) return;
+  try {
+    const [p, n] = await Promise.all([getMyPrivacy(auth.token), getMyNotifications(auth.token)]);
+    privacy.value = p;
+    notif.value = n;
+  } catch (e) {
+    err.value = e instanceof Error ? e.message : "Ошибка";
+  }
+}
+
+async function savePrivacySettings() {
+  if (!auth.token || !privacy.value) return;
+  savingPrivacy.value = true;
+  err.value = "";
+  try {
+    privacy.value = await patchMyPrivacy(auth.token, {
+      profile_visibility: privacy.value.profile_visibility,
+      activity_visibility: privacy.value.activity_visibility,
+      media_visibility: privacy.value.media_visibility,
+      show_birthday: privacy.value.show_birthday,
+      show_country: privacy.value.show_country,
+    });
+    avatarMsg.value = "Настройки приватности сохранены.";
+  } catch (e) {
+    err.value = e instanceof Error ? e.message : "Ошибка";
+  } finally {
+    savingPrivacy.value = false;
+  }
+}
+
+async function saveNotificationSettings() {
+  if (!auth.token || !notif.value) return;
+  savingNotif.value = true;
+  err.value = "";
+  try {
+    notif.value = await patchMyNotifications(auth.token, { ...notif.value });
+    avatarMsg.value = "Настройки уведомлений сохранены.";
+  } catch (e) {
+    err.value = e instanceof Error ? e.message : "Ошибка";
+  } finally {
+    savingNotif.value = false;
+  }
+}
+
+async function onChangePassword() {
+  if (!auth.token) return;
+  err.value = "";
+  changingPassword.value = true;
+  try {
+    await changeMyPassword(auth.token, currentPassword.value, newPassword.value);
+    currentPassword.value = "";
+    newPassword.value = "";
+    avatarMsg.value = "Пароль обновлён.";
+  } catch (e) {
+    err.value = e instanceof Error ? e.message : "Ошибка";
+  } finally {
+    changingPassword.value = false;
+  }
+}
+
 onMounted(async () => {
   try {
     me.value = await api<Me>("/api/me", { token: auth.token });
@@ -76,9 +183,14 @@ onMounted(async () => {
     favorites.value = [...me.value.favorite_course_ids];
     const all = await api<Course[]>("/api/courses", { token: auth.token });
     courses.value = all;
+    await Promise.all([loadPrivacyAndNotif(), loadMyActivity()]);
   } catch (e) {
     err.value = e instanceof Error ? e.message : "Ошибка";
   }
+});
+
+watch(activityYear, () => {
+  void loadMyActivity();
 });
 
 function toggleFav(id: string) {
@@ -219,7 +331,28 @@ function closeSettings() {
       </button>
       <button class="nav-item" :class="{ active: tab === 'account' }" type="button" @click="tab = 'account'">
         <AppIcon name="settings" />
-        <span>Account details</span>
+        <span>Account</span>
+      </button>
+      <button class="nav-item" :class="{ active: tab === 'activity' }" type="button" @click="tab = 'activity'">
+        <AppIcon name="play" />
+        <span>Activity</span>
+      </button>
+      <button class="nav-item" :class="{ active: tab === 'privacy' }" type="button" @click="tab = 'privacy'">
+        <AppIcon name="block" />
+        <span>Privacy</span>
+      </button>
+      <button class="nav-item" :class="{ active: tab === 'security' }" type="button" @click="tab = 'security'">
+        <AppIcon name="edit" />
+        <span>Security</span>
+      </button>
+      <button
+        class="nav-item"
+        :class="{ active: tab === 'notifications' }"
+        type="button"
+        @click="tab = 'notifications'"
+      >
+        <AppIcon name="comment" />
+        <span>Notifications</span>
       </button>
     </aside>
 
@@ -287,9 +420,22 @@ function closeSettings() {
             </button>
           </div>
         </div>
+
+        <div class="favorites">
+          <h2>Favorite courses</h2>
+          <p class="muted">Up to 12 courses.</p>
+          <ul>
+            <li v-for="c in courses" :key="c.id">
+              <label>
+                <input type="checkbox" :checked="favorites.includes(c.id)" @change="toggleFav(c.id)" />
+                {{ c.title }} — {{ c.teacher_nickname }}
+              </label>
+            </li>
+          </ul>
+        </div>
       </template>
 
-      <template v-else>
+      <template v-else-if="tab === 'account'">
         <h1>Account details</h1>
         <div class="form-grid">
           <label class="col-2">
@@ -330,20 +476,135 @@ function closeSettings() {
         </div>
       </template>
 
-      <div class="favorites">
-        <h2>Favorite courses</h2>
-        <p class="muted">Up to 12 courses.</p>
-        <ul>
-          <li v-for="c in courses" :key="c.id">
-            <label>
-              <input type="checkbox" :checked="favorites.includes(c.id)" @change="toggleFav(c.id)" />
-              {{ c.title }} — {{ c.teacher_nickname }}
-            </label>
-          </li>
-        </ul>
-      </div>
+      <template v-else-if="tab === 'activity'">
+        <h1>Activity</h1>
+        <p class="muted">Time on the site (collected in the app).</p>
+        <div class="form-grid">
+          <label>
+            <span>Year</span>
+            <select v-model.number="activityYear">
+              <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}</option>
+            </select>
+          </label>
+        </div>
+        <p v-if="activityLoading" class="muted">Loading…</p>
+        <template v-else-if="myActivity">
+          <p class="muted">Total: {{ Math.round(myActivity.total_seconds / 60) }} min · {{ myActivity.days.length }} active days</p>
+          <div v-if="myActivity.days.length" class="activity-grid">
+            <div v-for="d in myActivity.days.slice(-14)" :key="d.day" class="activity-cell">
+              <span class="activity-day-label">{{ d.day.slice(5) }}</span>
+              <span>{{ Math.round(d.seconds_spent / 60) }}m</span>
+            </div>
+          </div>
+          <p v-else class="muted">No data for this year.</p>
+        </template>
+      </template>
 
-      <div class="actions">
+      <template v-else-if="tab === 'privacy' && privacy">
+        <h1>Privacy</h1>
+        <p class="muted">Кто видит профиль, активность и аватар/обои.</p>
+        <div class="form-grid">
+          <label>
+            <span>Profile</span>
+            <select v-model="privacy.profile_visibility">
+              <option value="public">Public</option>
+              <option value="followers">Followers only</option>
+              <option value="private">Only me</option>
+            </select>
+          </label>
+          <label>
+            <span>Activity &amp; location fields</span>
+            <select v-model="privacy.activity_visibility">
+              <option value="public">Public</option>
+              <option value="followers">Followers only</option>
+              <option value="private">Only me</option>
+            </select>
+          </label>
+          <label>
+            <span>Media (avatar, wallpaper, favorites)</span>
+            <select v-model="privacy.media_visibility">
+              <option value="public">Public</option>
+              <option value="followers">Followers only</option>
+              <option value="private">Only me</option>
+            </select>
+          </label>
+          <label class="inline-check">
+            <input v-model="privacy.show_birthday" type="checkbox" />
+            <span>Show birthday when activity is visible</span>
+          </label>
+          <label class="inline-check">
+            <input v-model="privacy.show_country" type="checkbox" />
+            <span>Show country when activity is visible</span>
+          </label>
+        </div>
+        <div class="actions" style="margin-top: 1rem">
+          <button type="button" :disabled="savingPrivacy" @click="savePrivacySettings">
+            {{ savingPrivacy ? "Saving…" : "Save privacy" }}
+          </button>
+        </div>
+      </template>
+
+      <template v-else-if="tab === 'security'">
+        <h1>Security</h1>
+        <p class="muted">Change password. Minimum 8 characters for the new one.</p>
+        <div class="form-grid col-one">
+          <label class="col-2">
+            <span>Current password</span>
+            <input v-model="currentPassword" type="password" autocomplete="current-password" />
+          </label>
+          <label class="col-2">
+            <span>New password</span>
+            <input v-model="newPassword" type="password" autocomplete="new-password" />
+          </label>
+        </div>
+        <div class="actions" style="margin-top: 1rem">
+          <button type="button" :disabled="changingPassword || !currentPassword || !newPassword" @click="onChangePassword">
+            {{ changingPassword ? "Updating…" : "Update password" }}
+          </button>
+        </div>
+      </template>
+
+      <template v-else-if="tab === 'notifications' && notif">
+        <h1>Notifications</h1>
+        <p class="muted">Preferences (delivery will follow product updates).</p>
+        <div class="form-grid col-one">
+          <label class="inline-check">
+            <input v-model="notif.email_enabled" type="checkbox" />
+            <span>Email</span>
+          </label>
+          <label class="inline-check">
+            <input v-model="notif.push_enabled" type="checkbox" />
+            <span>Push (coming soon)</span>
+          </label>
+          <label class="inline-check">
+            <input v-model="notif.course_updates" type="checkbox" />
+            <span>Course updates</span>
+          </label>
+          <label class="inline-check">
+            <input v-model="notif.assignment_deadlines" type="checkbox" />
+            <span>Assignment deadlines</span>
+          </label>
+          <label class="inline-check">
+            <input v-model="notif.grades_released" type="checkbox" />
+            <span>Grades released</span>
+          </label>
+          <label class="inline-check">
+            <input v-model="notif.new_followers" type="checkbox" />
+            <span>New followers</span>
+          </label>
+          <label class="inline-check">
+            <input v-model="notif.marketing_news" type="checkbox" />
+            <span>News &amp; tips</span>
+          </label>
+        </div>
+        <div class="actions" style="margin-top: 1rem">
+          <button type="button" :disabled="savingNotif" @click="saveNotificationSettings">
+            {{ savingNotif ? "Saving…" : "Save notifications" }}
+          </button>
+        </div>
+      </template>
+
+      <div v-if="tab === 'profile' || tab === 'account'" class="actions">
         <button class="secondary" type="button" @click="closeSettings">Cancel</button>
         <button type="button" :disabled="saving" @click="save">{{ saving ? "Saving..." : "Save" }}</button>
       </div>
@@ -364,6 +625,8 @@ function closeSettings() {
 .settings-nav {
   padding: 0.75rem;
   border-radius: 20px;
+  max-height: min(70vh, 520px);
+  overflow-y: auto;
 }
 
 .close-btn {
@@ -521,6 +784,44 @@ function closeSettings() {
 
 .favorites input[type="checkbox"] {
   width: auto;
+}
+
+.col-one {
+  grid-template-columns: 1fr;
+}
+
+.inline-check {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.inline-check input[type="checkbox"] {
+  width: auto;
+  flex-shrink: 0;
+}
+
+.activity-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+
+.activity-cell {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.4rem 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: 0.9rem;
+}
+
+.activity-day-label {
+  color: var(--muted);
+  font-size: 0.8rem;
 }
 
 .actions {

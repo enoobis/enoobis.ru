@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import {
   createAssignment,
   createCourse,
+  createStreamComment,
   createLecture,
   createStreamPost,
   enrollCourse,
+  joinCourseByCode,
   getClassroom,
   gradeSubmission,
   listAssignmentSubmissions,
@@ -24,7 +27,11 @@ import {
 } from "../api/courses";
 import { useAuthStore } from "../stores/auth";
 
-type Tab = "stream" | "lectures" | "assignments" | "people";
+type Tab = "stream" | "lectures" | "assignments" | "people" | "grades" | "calendar";
+type GradebookCell = {
+  assignment: Assignment;
+  submission: AssignmentSubmission | null;
+};
 
 type VideoEmbed =
   | { kind: "iframe"; src: string }
@@ -45,16 +52,24 @@ function lectureVideoEmbed(url: string): VideoEmbed {
 }
 
 const auth = useAuthStore();
+const route = useRoute();
+const router = useRouter();
 const courses = ref<Course[]>([]);
 const classroom = ref<CourseClassroom | null>(null);
 const selectedCourseId = ref("");
-const tab = ref<Tab>("stream");
+const allowedTabs: readonly Tab[] = ["stream", "lectures", "assignments", "people", "grades", "calendar"];
+function normalizeTab(value: unknown): Tab {
+  if (typeof value === "string" && allowedTabs.includes(value as Tab)) return value as Tab;
+  return "stream";
+}
+const tab = ref<Tab>(normalizeTab(route.params.tab));
 const err = ref("");
 
 const title = ref("");
 const description = ref("");
 const isOpen = ref(true);
 const studentsDraft = ref("");
+const joinCode = ref("");
 const activeClosedId = ref<string | null>(null);
 
 const streamBody = ref("");
@@ -63,9 +78,14 @@ const assignmentDescription = ref("");
 const assignmentDueAt = ref("");
 const assignmentMaxPoints = ref(100);
 const submissionBody = ref<Record<string, string>>({});
+const streamCommentBody = ref<Record<string, string>>({});
 const submissionsByAssignment = ref<Record<string, AssignmentSubmission[]>>({});
 const grading = ref<Record<string, { points: number; comment: string }>>({});
 const activeAssignmentForGrading = ref<string | null>(null);
+const teacherSubmissionsByAssignment = ref<Record<string, AssignmentSubmission[]>>({});
+const teacherGradebookLoading = ref(false);
+const teacherGradebookError = ref("");
+const teacherGradebookLoadedFor = ref("");
 
 const lectureTitle = ref("");
 const lectureBody = ref("");
@@ -104,10 +124,170 @@ const addTaskMaxPoints = ref(100);
 
 const canTeach = computed(() => auth.role === "teacher" || auth.role === "admin");
 const isTeacherInCurrent = computed(() => classroom.value?.is_teacher ?? false);
+const selectedCourseMeta = computed(() => courses.value.find((c) => c.id === selectedCourseId.value) ?? null);
+
+const courseStats = computed(() => ({
+  stream: classroom.value?.stream.length ?? 0,
+  lectures: classroom.value?.lectures.length ?? 0,
+  assignments: classroom.value?.assignments.length ?? 0,
+  members: classroom.value?.members.length ?? 0,
+}));
+
+function roleLabel(role: string): string {
+  if (role === "teacher") return "преподаватель";
+  if (role === "admin") return "админ";
+  if (role === "student") return "студент";
+  return role;
+}
+
+function parseDueDate(raw: string): Date | null {
+  const value = raw?.trim();
+  if (!value) return null;
+  const normalized = value.includes("T") ? value : value.replace(" ", "T");
+  const parsed = new Date(normalized);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed;
+}
+
+function formatDateTime(raw: string): string {
+  const parsed = parseDueDate(raw);
+  if (!parsed) return raw || "без дедлайна";
+  return parsed.toLocaleString("ru-RU", {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+const calendarAssignments = computed(() => {
+  if (!classroom.value) return [];
+  return classroom.value.assignments
+    .filter((a) => parseDueDate(a.due_at))
+    .map((a) => ({
+      ...a,
+      dueDate: parseDueDate(a.due_at)!,
+    }))
+    .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime());
+});
+
+const teacherGradebookMatrix = computed<Record<string, Record<string, AssignmentSubmission>>>(() => {
+  const matrix: Record<string, Record<string, AssignmentSubmission>> = {};
+  for (const [assignmentId, list] of Object.entries(teacherSubmissionsByAssignment.value)) {
+    for (const submission of list) {
+      if (!matrix[submission.student_id]) matrix[submission.student_id] = {};
+      matrix[submission.student_id][assignmentId] = submission;
+    }
+  }
+  return matrix;
+});
+
+const teacherGradebookRows = computed(() => {
+  if (!classroom.value || !isTeacherInCurrent.value) return [];
+  const assignments = classroom.value.assignments;
+  const students = classroom.value.members.filter((m) => m.role === "student");
+  const maxTotal = assignments.reduce((sum, a) => sum + a.max_points, 0);
+  return students.map((student) => {
+    const cells: GradebookCell[] = assignments.map((assignment) => ({
+      assignment,
+      submission: teacherGradebookMatrix.value[student.id]?.[assignment.id] ?? null,
+    }));
+    let gradedCount = 0;
+    let pointsEarned = 0;
+    let submittedCount = 0;
+    for (const cell of cells) {
+      if (!cell.submission) continue;
+      submittedCount += 1;
+      if (cell.submission.grade_points !== null) {
+        gradedCount += 1;
+        pointsEarned += cell.submission.grade_points;
+      }
+    }
+    return {
+      student,
+      cells,
+      submittedCount,
+      gradedCount,
+      pointsEarned,
+      pointsTotal: maxTotal,
+    };
+  });
+});
+
+const studentGradeRows = computed(() => {
+  if (!classroom.value || isTeacherInCurrent.value) return [];
+  const assignments = classroom.value.assignments;
+  const me = classroom.value.members.find((m) => m.id === auth.user?.id);
+  if (!me) return [];
+  let pointsEarned = 0;
+  let pointsTotal = 0;
+  for (const a of assignments) {
+    if (a.my_submission?.grade_points !== null && a.my_submission?.grade_points !== undefined) {
+      pointsEarned += a.my_submission.grade_points;
+      pointsTotal += a.max_points;
+    }
+  }
+  return [
+    {
+      student: me,
+      pointsEarned,
+      pointsTotal,
+      progress: `${assignments.length} заданий`,
+    },
+  ];
+});
 
 function assignmentsForLecture(lecId: string): Assignment[] {
   if (!classroom.value) return [];
   return classroom.value.assignments.filter((a) => a.lecture_id === lecId);
+}
+
+function syncRouteState(courseId: string, nextTab: Tab = tab.value) {
+  if (!courseId) return;
+  const currentCourseId = typeof route.params.courseId === "string" ? route.params.courseId : "";
+  const currentTab = normalizeTab(route.params.tab);
+  if (currentCourseId === courseId && currentTab === nextTab) return;
+  router
+    .replace({
+      name: "course-classroom",
+      params: { courseId, tab: nextTab },
+    })
+    .catch(() => undefined);
+}
+
+async function openCourse(courseId: string) {
+  await loadClassroom(courseId);
+  syncRouteState(courseId);
+}
+
+function invalidateTeacherGradebook() {
+  teacherGradebookLoadedFor.value = "";
+  teacherSubmissionsByAssignment.value = {};
+}
+
+async function loadTeacherGradebook(force = false) {
+  if (!auth.token || !classroom.value || !isTeacherInCurrent.value) return;
+  const courseId = classroom.value.course.id;
+  const assignmentIds = classroom.value.assignments.map((a) => a.id);
+  const cacheKey = `${courseId}:${assignmentIds.join(",")}`;
+  if (!force && teacherGradebookLoadedFor.value === cacheKey) return;
+  teacherGradebookLoading.value = true;
+  teacherGradebookError.value = "";
+  try {
+    const pairs = await Promise.all(
+      classroom.value.assignments.map(async (assignment) => {
+        const submissions = await listAssignmentSubmissions(courseId, assignment.id, auth.token!);
+        return [assignment.id, submissions] as const;
+      }),
+    );
+    teacherSubmissionsByAssignment.value = Object.fromEntries(pairs);
+    teacherGradebookLoadedFor.value = cacheKey;
+  } catch (e) {
+    teacherGradebookError.value = e instanceof Error ? e.message : "Ошибка загрузки ведомости";
+  } finally {
+    teacherGradebookLoading.value = false;
+  }
 }
 
 async function loadCourses() {
@@ -115,11 +295,17 @@ async function loadCourses() {
   if (!auth.token) return;
   try {
     courses.value = await listCourses(auth.token);
-    if (!selectedCourseId.value && courses.value.length) {
+    const routeCourseId = typeof route.params.courseId === "string" ? route.params.courseId : "";
+    const hasRouteCourse = routeCourseId && courses.value.some((c) => c.id === routeCourseId);
+    const initialCourseId = hasRouteCourse ? routeCourseId : selectedCourseId.value;
+    if (!initialCourseId && courses.value.length) {
       selectedCourseId.value = courses.value[0].id;
       await loadClassroom(selectedCourseId.value);
-    } else if (selectedCourseId.value) {
-      await loadClassroom(selectedCourseId.value);
+      syncRouteState(selectedCourseId.value);
+    } else if (initialCourseId) {
+      selectedCourseId.value = initialCourseId;
+      await loadClassroom(initialCourseId);
+      syncRouteState(initialCourseId);
     }
   } catch (e) {
     err.value = e instanceof Error ? e.message : "Ошибка";
@@ -131,12 +317,37 @@ async function loadClassroom(courseId: string) {
   try {
     classroom.value = await getClassroom(courseId, auth.token);
     selectedCourseId.value = courseId;
+    invalidateTeacherGradebook();
+    if (tab.value === "grades") await loadTeacherGradebook(true);
   } catch (e) {
     err.value = e instanceof Error ? e.message : "Ошибка";
   }
 }
 
 onMounted(loadCourses);
+
+watch(
+  () => route.params.tab,
+  (next) => {
+    tab.value = normalizeTab(next);
+  },
+);
+
+watch(
+  () => route.params.courseId,
+  async (next) => {
+    const nextCourse = typeof next === "string" ? next : "";
+    if (!nextCourse || nextCourse === selectedCourseId.value || !auth.token) return;
+    if (courses.value.some((c) => c.id === nextCourse)) {
+      await loadClassroom(nextCourse);
+    }
+  },
+);
+
+watch(tab, async (next) => {
+  if (selectedCourseId.value) syncRouteState(selectedCourseId.value, next);
+  if (next === "grades") await loadTeacherGradebook();
+});
 
 async function onCreateCourse() {
   if (!auth.token) return;
@@ -178,6 +389,21 @@ async function onUnenroll(courseId: string) {
   }
 }
 
+async function onJoinByCode() {
+  if (!auth.token) return;
+  const code = joinCode.value.trim();
+  if (!code) return;
+  err.value = "";
+  try {
+    const joined = await joinCourseByCode(code, auth.token);
+    joinCode.value = "";
+    await loadCourses();
+    await loadClassroom(joined.id);
+  } catch (e) {
+    err.value = e instanceof Error ? e.message : "Ошибка";
+  }
+}
+
 function openClosedEditor(c: Course) {
   if (!canTeach.value || c.teacher_id !== auth.user?.id) return;
   activeClosedId.value = c.id;
@@ -208,6 +434,20 @@ async function onCreateStreamPost() {
   try {
     await createStreamPost(classroom.value.course.id, body, auth.token);
     streamBody.value = "";
+    await loadClassroom(classroom.value.course.id);
+  } catch (e) {
+    err.value = e instanceof Error ? e.message : "Ошибка";
+  }
+}
+
+async function onCreateStreamComment(postId: string) {
+  if (!auth.token || !classroom.value) return;
+  const body = (streamCommentBody.value[postId] || "").trim();
+  if (!body) return;
+  err.value = "";
+  try {
+    await createStreamComment(classroom.value.course.id, postId, body, auth.token);
+    streamCommentBody.value[postId] = "";
     await loadClassroom(classroom.value.course.id);
   } catch (e) {
     err.value = e instanceof Error ? e.message : "Ошибка";
@@ -488,9 +728,11 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 </script>
 
 <template>
-  <section>
-    <h1>Курсы (Classroom)</h1>
-    <p class="muted">Лента, лекции (видео, текст, файлы), задания, участники.</p>
+  <section class="classroom-page">
+    <div class="classroom-hero card">
+      <h1>Курсы</h1>
+      <p class="muted">Classroom-режим: лента, задания, участники, календарь и оценки.</p>
+    </div>
     <p v-if="err" class="error">{{ err }}</p>
 
     <div v-if="canTeach" class="card" style="margin-bottom: 1rem">
@@ -504,13 +746,31 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
       <button type="button" style="margin-top: 0.75rem" @click="onCreateCourse">Создать</button>
     </div>
 
-    <div class="grid-2 course-layout">
-      <aside class="card">
-        <h2>Список курсов</h2>
-        <div v-for="c in courses" :key="c.id" class="course-list-item" :class="{ active: selectedCourseId === c.id }">
-          <button class="secondary" type="button" @click="loadClassroom(c.id)">{{ c.title }}</button>
-          <div class="muted">{{ c.teacher_nickname }} · {{ c.is_open ? "открытый" : "закрытый" }}</div>
-          <div style="display: flex; gap: 0.4rem; margin-top: 0.45rem; flex-wrap: wrap">
+    <div class="card" style="margin-bottom: 1rem">
+      <h2>Вступить по коду курса</h2>
+      <div class="join-by-code">
+        <input v-model="joinCode" placeholder="Введите код курса (например A1B2C3)" @keyup.enter="onJoinByCode" />
+        <button type="button" @click="onJoinByCode">Вступить</button>
+      </div>
+    </div>
+
+    <div class="courses-board card">
+      <div class="courses-board-head">
+        <h2>Мои курсы</h2>
+        <p class="muted">Карточки как в Classroom: быстро открыть курс, записаться или выйти.</p>
+      </div>
+      <div class="courses-grid">
+        <article v-for="c in courses" :key="c.id" class="course-tile" :class="{ active: selectedCourseId === c.id }">
+          <button class="course-tile-cover" type="button" @click="openCourse(c.id)">
+            <span class="course-tile-chip">{{ c.is_open ? "открытый" : "закрытый" }}</span>
+            <strong>{{ c.title }}</strong>
+            <span class="muted">Преподаватель: {{ c.teacher_nickname }}</span>
+            <span class="muted">Код: {{ c.course_code }}</span>
+          </button>
+          <div class="course-tile-actions">
+            <button class="secondary" type="button" @click="openCourse(c.id)">
+              {{ selectedCourseId === c.id ? "Открыт" : "Открыть" }}
+            </button>
             <button v-if="c.is_open && !c.enrolled" type="button" @click="onEnroll(c.id)">Записаться</button>
             <button v-if="c.is_open && c.enrolled" class="secondary" type="button" @click="onUnenroll(c.id)">Покинуть</button>
             <button
@@ -519,21 +779,45 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
               type="button"
               @click="openClosedEditor(c)"
             >
-              Ученики (UUID)
+              Доступ (UUID)
             </button>
           </div>
-        </div>
-      </aside>
+        </article>
+      </div>
+      <p v-if="!courses.length" class="muted">Пока нет доступных курсов.</p>
+    </div>
 
-      <div class="card" v-if="classroom">
-        <h2>{{ classroom.course.title }}</h2>
-        <p class="muted">{{ classroom.course.description }}</p>
+    <div class="card classroom-main" v-if="classroom">
+        <header class="classroom-header">
+          <p class="classroom-header-label">Класс</p>
+          <h2>{{ classroom.course.title }}</h2>
+          <p class="muted">{{ classroom.course.description }}</p>
+          <p v-if="selectedCourseMeta" class="muted">
+            Ведёт:
+            <RouterLink :to="`/u/${selectedCourseMeta.teacher_nickname}`">{{ selectedCourseMeta.teacher_nickname }}</RouterLink>
+          </p>
+          <p class="muted">Код курса: <strong>{{ classroom.course.course_code }}</strong></p>
+        </header>
+        <div class="classroom-meta-row">
+          <span class="badge">Постов: {{ courseStats.stream }}</span>
+          <span class="badge">Материалов: {{ courseStats.lectures }}</span>
+          <span class="badge">Заданий: {{ courseStats.assignments }}</span>
+          <span class="badge">Участников: {{ courseStats.members }}</span>
+        </div>
+        <div class="quick-actions">
+          <button class="secondary" type="button" @click="tab = 'stream'">Написать в ленту</button>
+          <button class="secondary" type="button" @click="tab = 'assignments'">Перейти к заданиям</button>
+          <button class="secondary" type="button" @click="tab = 'people'">Открыть участников</button>
+          <button class="secondary" type="button" @click="tab = 'calendar'">Смотреть дедлайны</button>
+        </div>
 
         <div class="tab-row">
-          <button :class="{ secondary: tab !== 'stream' }" type="button" @click="tab = 'stream'">Лента</button>
-          <button :class="{ secondary: tab !== 'lectures' }" type="button" @click="tab = 'lectures'">Лекции</button>
-          <button :class="{ secondary: tab !== 'assignments' }" type="button" @click="tab = 'assignments'">Задания</button>
-          <button :class="{ secondary: tab !== 'people' }" type="button" @click="tab = 'people'">Участники</button>
+          <button class="tab-pill" :class="{ active: tab === 'stream' }" type="button" @click="tab = 'stream'">Лента</button>
+          <button class="tab-pill" :class="{ active: tab === 'lectures' }" type="button" @click="tab = 'lectures'">Материалы</button>
+          <button class="tab-pill" :class="{ active: tab === 'assignments' }" type="button" @click="tab = 'assignments'">Задания</button>
+          <button class="tab-pill" :class="{ active: tab === 'people' }" type="button" @click="tab = 'people'">Участники</button>
+          <button class="tab-pill" :class="{ active: tab === 'grades' }" type="button" @click="tab = 'grades'">Оценки</button>
+          <button class="tab-pill" :class="{ active: tab === 'calendar' }" type="button" @click="tab = 'calendar'">Календарь</button>
         </div>
 
         <template v-if="tab === 'stream'">
@@ -543,8 +827,30 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
             <button type="button" style="margin-top: 0.5rem" @click="onCreateStreamPost">Опубликовать</button>
           </div>
           <div v-for="post in classroom.stream" :key="post.id" class="card" style="margin-top: 0.7rem">
-            <div class="muted">{{ post.author_nickname }} · {{ post.created_at.slice(0, 16).replace("T", " ") }}</div>
+            <div class="muted">
+              <RouterLink :to="`/u/${post.author_nickname}`">{{ post.author_nickname }}</RouterLink>
+              · {{ post.created_at.slice(0, 16).replace("T", " ") }}
+            </div>
             <p style="margin: 0.45rem 0 0">{{ post.body }}</p>
+            <div class="stream-comments">
+              <div v-if="post.comments.length" class="stream-comment-list">
+                <div v-for="comment in post.comments" :key="comment.id" class="stream-comment">
+                  <div class="muted">
+                    <RouterLink :to="`/u/${comment.author_nickname}`">{{ comment.author_nickname }}</RouterLink>
+                    · {{ comment.created_at.slice(0, 16).replace("T", " ") }}
+                  </div>
+                  <p>{{ comment.body }}</p>
+                </div>
+              </div>
+              <div class="stream-comment-form">
+                <input
+                  v-model="streamCommentBody[post.id]"
+                  placeholder="Комментарий к посту"
+                  @keyup.enter="onCreateStreamComment(post.id)"
+                />
+                <button class="secondary" type="button" @click="onCreateStreamComment(post.id)">Ответить</button>
+              </div>
+            </div>
           </div>
           <p v-if="!classroom.stream.length" class="muted" style="margin-top: 0.7rem">Лента пока пустая.</p>
         </template>
@@ -620,7 +926,10 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
                   Редактировать
                 </button>
               </div>
-              <p class="muted">{{ lec.author_nickname }} · {{ lec.created_at.slice(0, 16).replace("T", " ") }}</p>
+              <p class="muted">
+                <RouterLink :to="`/u/${lec.author_nickname}`">{{ lec.author_nickname }}</RouterLink>
+                · {{ lec.created_at.slice(0, 16).replace("T", " ") }}
+              </p>
               <template v-for="ev in [lectureVideoEmbed(lec.video_url)]" :key="'v-' + lec.id">
                 <div v-if="ev" class="lecture-video">
                   <iframe
@@ -661,7 +970,8 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
                   <template v-else>
                     <strong>{{ a.title }}</strong>
                     <p class="muted" style="margin: 0.25rem 0">
-                      Дедлайн: {{ a.due_at || "нет" }} · {{ a.max_points }} баллов · {{ a.author_nickname }}
+                      Дедлайн: {{ a.due_at || "нет" }} · {{ a.max_points }} баллов ·
+                      <RouterLink :to="`/u/${a.author_nickname}`">{{ a.author_nickname }}</RouterLink>
                     </p>
                     <p v-if="a.description">{{ a.description }}</p>
                     <template v-if="isTeacherInCurrent">
@@ -730,7 +1040,8 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
           <div v-for="a in classroom.assignments" :key="a.id" class="card" style="margin-top: 0.7rem">
             <h3>{{ a.title }}</h3>
             <p class="muted">
-              due: {{ a.due_at || "без дедлайна" }} · max: {{ a.max_points }} · {{ a.author_nickname }}
+              due: {{ a.due_at || "без дедлайна" }} · max: {{ a.max_points }} ·
+              <RouterLink :to="`/u/${a.author_nickname}`">{{ a.author_nickname }}</RouterLink>
               <span v-if="a.lecture_id" class="muted"> · к лекции</span>
             </p>
             <p>{{ a.description }}</p>
@@ -756,16 +1067,80 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
           <p v-if="!classroom.assignments.length" class="muted" style="margin-top: 0.7rem">Заданий пока нет.</p>
         </template>
 
-        <template v-else>
+        <template v-else-if="tab === 'people'">
           <ul style="list-style: none; padding: 0; margin-top: 0.6rem">
             <li v-for="m in classroom.members" :key="m.id" class="card" style="margin-bottom: 0.5rem">
-              <strong>{{ m.nickname }}</strong>
-              <span class="muted"> · {{ m.role }}</span>
+              <strong><RouterLink :to="`/u/${m.nickname}`">{{ m.nickname }}</RouterLink></strong>
+              <span class="muted"> · {{ roleLabel(m.role) }}</span>
             </li>
           </ul>
         </template>
+        <template v-else-if="tab === 'grades'">
+          <div class="card" style="margin-top: 0.7rem">
+            <h3>Сводка оценок</h3>
+            <template v-if="isTeacherInCurrent">
+              <p class="muted">Ведомость строится автоматически по текущим сдачам по каждому заданию.</p>
+              <p v-if="teacherGradebookError" class="error">{{ teacherGradebookError }}</p>
+              <p v-else-if="teacherGradebookLoading" class="muted">Загрузка ведомости…</p>
+              <div v-else-if="teacherGradebookRows.length" class="gradebook-wrap">
+                <table class="gradebook-table">
+                  <thead>
+                    <tr>
+                      <th>Студент</th>
+                      <th v-for="a in classroom.assignments" :key="'h-' + a.id">{{ a.title }}</th>
+                      <th>Итог</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="row in teacherGradebookRows" :key="row.student.id">
+                      <td class="gradebook-student">{{ row.student.nickname }}</td>
+                      <td v-for="cell in row.cells" :key="row.student.id + '-' + cell.assignment.id">
+                        <span v-if="!cell.submission" class="muted">—</span>
+                        <span v-else-if="cell.submission.grade_points !== null" class="grade-chip grade-chip-ok">
+                          {{ cell.submission.grade_points }} / {{ cell.assignment.max_points }}
+                        </span>
+                        <span v-else class="grade-chip grade-chip-pending">сдано</span>
+                      </td>
+                      <td>
+                        <strong>{{ row.pointsEarned }} / {{ row.pointsTotal }}</strong>
+                        <div class="muted">{{ row.gradedCount }} проверено · {{ row.submittedCount }} сдано</div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <p v-else class="muted">Студентов пока нет или задания ещё не созданы.</p>
+            </template>
+            <div v-else class="grades-grid">
+              <div class="grades-head">Студент</div>
+              <div class="grades-head">Прогресс</div>
+              <div class="grades-head">Баллы</div>
+              <template v-for="row in studentGradeRows" :key="row.student.id">
+                <div>{{ row.student.nickname }}</div>
+                <div class="muted">{{ row.progress }}</div>
+                <div>{{ row.pointsEarned }} / {{ row.pointsTotal }}</div>
+              </template>
+            </div>
+          </div>
+        </template>
+        <template v-else-if="tab === 'calendar'">
+          <div class="card" style="margin-top: 0.7rem">
+            <h3>Ближайшие дедлайны</h3>
+            <div v-if="calendarAssignments.length">
+              <div v-for="item in calendarAssignments" :key="item.id" class="calendar-item">
+                <div>
+                  <strong>{{ item.title }}</strong>
+                  <p class="muted" style="margin: 0.2rem 0 0">
+                    {{ item.lecture_id ? "К лекции" : "Общее задание" }} · {{ item.max_points }} баллов
+                  </p>
+                </div>
+                <span class="badge">{{ formatDateTime(item.due_at) }}</span>
+              </div>
+            </div>
+            <p v-else class="muted">Пока нет заданий с дедлайном.</p>
+          </div>
+        </template>
       </div>
-    </div>
 
     <div v-if="activeClosedId" class="card" style="margin-top: 1rem">
       <h3>Доступ к закрытому курсу</h3>
@@ -805,19 +1180,116 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 </template>
 
 <style scoped>
-.course-layout {
-  align-items: flex-start;
+.classroom-page {
+  display: grid;
+  gap: 1rem;
 }
 
-.course-list-item {
+.classroom-hero {
+  background: linear-gradient(135deg, #101010 0%, #151515 100%);
+}
+
+.courses-board {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.join-by-code {
+  display: grid;
+  gap: 0.5rem;
+}
+
+@media (min-width: 760px) {
+  .join-by-code {
+    grid-template-columns: 1fr auto;
+  }
+}
+
+.courses-board-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  align-items: baseline;
+}
+
+.courses-grid {
+  display: grid;
+  gap: 0.75rem;
+}
+
+@media (min-width: 760px) {
+  .courses-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.course-tile {
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 0.6rem;
-  margin-bottom: 0.55rem;
+  border-radius: 14px;
+  background: #0d0d0d;
+  overflow: hidden;
+  display: grid;
 }
 
-.course-list-item.active {
-  border-color: var(--accent-dim);
+.course-tile.active {
+  border-color: #3b3b3b;
+  box-shadow: 0 0 0 1px #3b3b3b inset;
+}
+
+.course-tile-cover {
+  width: 100%;
+  border: 0;
+  border-radius: 0;
+  background: linear-gradient(135deg, #1d1f24 0%, #141517 100%);
+  padding: 0.9rem;
+  min-height: 132px;
+  display: flex;
+  align-items: flex-start;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 0.3rem;
+  text-align: left;
+}
+
+.course-tile-cover strong {
+  font-size: 1.02rem;
+}
+
+.course-tile-chip {
+  border: 1px solid #444;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  padding: 0.12rem 0.48rem;
+  margin-bottom: auto;
+  background: #0f0f0f;
+}
+
+.course-tile-actions {
+  padding: 0.65rem;
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.classroom-header {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: linear-gradient(135deg, #151822 0%, #101318 100%);
+  padding: 0.95rem;
+  margin-bottom: 0.65rem;
+}
+
+.classroom-header-label {
+  margin: 0 0 0.2rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
+.classroom-main {
+  min-height: 520px;
 }
 
 .tab-row {
@@ -825,6 +1297,53 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   gap: 0.5rem;
   flex-wrap: wrap;
   margin-top: 0.45rem;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.55rem;
+}
+
+.tab-pill {
+  background: transparent;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  padding: 0.42rem 0.92rem;
+  min-height: auto;
+}
+
+.tab-pill.active {
+  background: #1f1f1f;
+  border-color: #3a3a3a;
+}
+
+.tab-pill:not(.active) {
+  color: var(--muted);
+}
+
+.course-select {
+  width: 100%;
+  justify-content: flex-start;
+}
+
+.classroom-main {
+  min-height: 520px;
+}
+
+.classroom-meta-row {
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  margin: 0.45rem 0 0.6rem;
+}
+
+.quick-actions {
+  display: grid;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+
+@media (min-width: 760px) {
+  .quick-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .pending-files {
@@ -873,5 +1392,115 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 .attach-list {
   margin: 0.5rem 0 0;
   padding-left: 1.1rem;
+}
+
+.stream-comments {
+  margin-top: 0.65rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.55rem;
+}
+
+.stream-comment-list {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.stream-comment {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.45rem 0.55rem;
+  background: #0f0f0f;
+}
+
+.stream-comment p {
+  margin: 0.15rem 0 0;
+  white-space: pre-wrap;
+}
+
+.stream-comment-form {
+  margin-top: 0.55rem;
+  display: grid;
+  gap: 0.4rem;
+}
+
+@media (min-width: 760px) {
+  .stream-comment-form {
+    grid-template-columns: 1fr auto;
+  }
+}
+
+.grades-grid {
+  margin-top: 0.65rem;
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 1fr;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.grades-head {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.gradebook-wrap {
+  overflow-x: auto;
+  margin-top: 0.65rem;
+}
+
+.gradebook-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 760px;
+}
+
+.gradebook-table th,
+.gradebook-table td {
+  border: 1px solid var(--border);
+  padding: 0.55rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.gradebook-table th {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+}
+
+.gradebook-student {
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.grade-chip {
+  display: inline-flex;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  padding: 0.15rem 0.45rem;
+  font-size: 0.8rem;
+}
+
+.grade-chip-ok {
+  background: #162315;
+  border-color: #294126;
+}
+
+.grade-chip-pending {
+  background: #21211a;
+  border-color: #3d3d2b;
+}
+
+.calendar-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.65rem;
+  margin-top: 0.55rem;
 }
 </style>

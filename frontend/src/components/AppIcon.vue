@@ -45,31 +45,31 @@ const viewBox = "0 0 24 24";
 const d = computed(() => {
   switch (props.name) {
     case "home":
-      return "M3 10.5L12 3l9 7.5M6.5 9.5V21h11V9.5";
+      return "M4 10.5L12 4l8 6.5M6.5 9.8V20h11V9.8M10 20v-4.5h4V20";
     case "blog":
-      return "M5 5h14v14H5zM8 9h8M8 13h8M8 17h5";
+      return "M6 4.5h8l4 4V19a1 1 0 01-1 1H6a1 1 0 01-1-1V5.5a1 1 0 011-1zM14 4.5V9h4M8 12h8M8 15.5h8M8 19h5";
     case "courses":
-      return "M3 8l9-4 9 4-9 4-9-4zm3 3.5l6 2.7 6-2.7M6 16l6 2.8 6-2.8";
+      return "M3 8l9-4 9 4-9 4-9-4zm4 4v4l5 2.2 5-2.2v-4";
     case "invites":
-      return "M9 8h6M9 12h6M9 16h4M5 4h14v16H5z";
+      return "M4 8l8-4 8 4-8 4-8-4zm3 4v5l5 2.4 5-2.4v-5";
     case "write":
-      return "M4 20h4l10-10-4-4L4 16v4zm9-13l4 4";
+      return "M4 20h4l10.2-10.2a1.5 1.5 0 000-2.1l-2-2a1.5 1.5 0 00-2.1 0L4 16v4zm9.8-12.2l2.9 2.9";
     case "admin":
-      return "M12 3l2.1 2.1 3-.4.9 2.8 2.8.9-.4 3L23 12l-2.1 2.1.4 3-2.8.9-.9 2.8-3-.4L12 23l-2.1-2.1-3 .4-.9-2.8-2.8-.9.4-3L1 12l2.1-2.1-.4-3 2.8-.9.9-2.8 3 .4L12 3zm0 5.5A3.5 3.5 0 1012 15a3.5 3.5 0 000-7z";
+      return "M12 3l7 3v6c0 4.8-3 8-7 9-4-1-7-4.2-7-9V6l7-3zm0 5l1.2 2.3 2.6.4-1.9 1.8.4 2.6-2.3-1.2-2.3 1.2.4-2.6-1.9-1.8 2.6-.4L12 8z";
     case "profile":
-      return "M12 12a4 4 0 100-8 4 4 0 000 8zm-7 9a7 7 0 0114 0";
+      return "M12 12a3.5 3.5 0 100-7 3.5 3.5 0 000 7zm-6.5 7a6.5 6.5 0 0113 0";
     case "login":
-      return "M10 17l-5-5 5-5M5 12h10M14 4h5v16h-5";
+      return "M10 17l-5-5 5-5M5 12h11M15 4h4v16h-4";
     case "register":
-      return "M12 5v14M5 12h14";
+      return "M16 21v-1.2a3.8 3.8 0 00-3.8-3.8H8.8A3.8 3.8 0 005 19.8V21M10.5 8.5a2.5 2.5 0 105 0 2.5 2.5 0 00-5 0zM19 8v4M17 10h4";
     case "logout":
-      return "M14 7l5 5-5 5M4 12h14M10 4H5v16h5";
+      return "M15 7l5 5-5 5M20 12H9M9 4H5v16h4";
     case "like":
-      return "M12 20s-7-4.5-7-10a4 4 0 017-2.5A4 4 0 0119 10c0 5.5-7 10-7 10z";
+      return "M12 20s-6.8-4.3-6.8-9.6A3.8 3.8 0 0112 8a3.8 3.8 0 016.8 2.4C18.8 15.7 12 20 12 20z";
     case "liked":
-      return "M12 20s-7-4.5-7-10a4 4 0 017-2.5A4 4 0 0119 10c0 5.5-7 10-7 10z";
+      return "M12 20s-6.8-4.3-6.8-9.6A3.8 3.8 0 0112 8a3.8 3.8 0 016.8 2.4C18.8 15.7 12 20 12 20z";
     case "comment":
-      return "M4 5h16v11H8l-4 4V5z";
+      return "M5 6h14v9H10l-5 4V6z";
     case "tag":
       return "M20 10l-9.5 9.5L3 12V4h8l9 6zM8 8h.01";
     case "bookmark":
@@ -77,35 +77,35 @@ const d = computed(() => {
     case "bookmarked":
       return "M7 4h10v16l-5-3-5 3V4z";
     case "report":
-      return "M12 9v4m0 4h.01M10.3 3h3.4L21 17.5a2 2 0 01-1.7 3H4.7a2 2 0 01-1.7-3L10.3 3z";
+      return "M12 3l8 4.5v9L12 21 4 16.5v-9L12 3zm0 5v5m0 3h.01";
     case "send":
-      return "M3 11l18-8-8 18-2-7-8-3zm8 3l10-10";
+      return "M3 11.5L21 4l-7 16-2.6-6.4L3 11.5zm8.4 2.1L21 4";
     case "delete":
-      return "M6 7h12M9 7V5h6v2m-8 0l1 12h8l1-12";
+      return "M6 7h12M9 7V5h6v2m-8 0l1 12h8l1-12M10 11v6M14 11v6";
     case "edit":
       return "M4 20h4l10-10-4-4L4 16v4zm9-13l4 4";
     case "settings":
-      return "M12 3l2.1 2.1 3-.4.9 2.8 2.8.9-.4 3L23 12l-2.1 2.1.4 3-2.8.9-.9 2.8-3-.4L12 23l-2.1-2.1-3 .4-.9-2.8-2.8-.9.4-3L1 12l2.1-2.1-.4-3 2.8-.9.9-2.8 3 .4L12 3zm0 5.5A3.5 3.5 0 1012 15a3.5 3.5 0 000-7z";
+      return "M12 3v3M12 18v3M21 12h-3M6 12H3m13.7-5.7L14.6 8.4M9.4 15.6l-2.1 2.1m0-11.4l2.1 2.1m5.2 7.2l2.1 2.1M12 9a3 3 0 100 6 3 3 0 000-6z";
     case "menu":
-      return "M4 7h16M4 12h16M4 17h16";
+      return "M4.5 7h15M4.5 12h15M4.5 17h15";
     case "play":
-      return "M9 7l9 5-9 5V7z";
+      return "M8 6.5v11L18 12 8 6.5z";
     case "sun":
-      return "M12 4V2m0 20v-2m8-8h2M2 12h2m13.66 5.66l1.41 1.41M2.93 4.93l1.41 1.41m0 11.32l-1.41 1.41m14.73-14.73l-1.41 1.41M12 8a4 4 0 100 8 4 4 0 000-8z";
+      return "M12 3v2M12 19v2M21 12h-2M5 12H3m14.4 6.4l-1.4-1.4M8 8L6.6 6.6m10.8 0L16 8M8 16l-1.4 1.4M12 8a4 4 0 100 8 4 4 0 000-8z";
     case "moon":
-      return "M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z";
+      return "M20 14.2A8.5 8.5 0 119.8 4 6.8 6.8 0 0020 14.2z";
     case "contrast":
       return "M12 3a9 9 0 100 18V3zM12 3a9 9 0 010 18";
     case "close":
       return "M6 6l12 12M18 6L6 18";
     case "filter":
-      return "M3 5h18M6 12h12M10 19h4";
+      return "M4 6h16M7 12h10M10 18h4";
     case "spark":
-      return "M12 3l1.7 4.6L18 9.3l-4.3 1.7L12 16l-1.7-5L6 9.3l4.3-1.7L12 3z";
+      return "M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8L12 3z";
     case "import":
       return "M12 3v12m0 0l4-4m-4 4l-4-4M5 19h14";
     case "block":
-      return "M12 3a9 9 0 100 18 9 9 0 000-18zm0 0l0 0m6.4 2.6L5.6 18.4";
+      return "M12 3a9 9 0 100 18 9 9 0 000-18zm6.4 2.6L5.6 18.4";
     default:
       return "";
   }
@@ -120,7 +120,7 @@ const d = computed(() => {
     :viewBox="viewBox"
     fill="none"
     stroke="currentColor"
-    stroke-width="1.8"
+    stroke-width="2.2"
     stroke-linecap="round"
     stroke-linejoin="round"
     aria-hidden="true"
