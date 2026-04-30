@@ -10,6 +10,7 @@ use sqlx::Row;
 use chrono::Datelike;
 
 use crate::{
+    auth::{hash_password, verify_password},
     auth::AuthUser,
     error::{AppError, AppResult},
     state::AppState,
@@ -76,6 +77,16 @@ pub struct PublicProfile {
     pub achievements: Vec<AchievementDto>,
     pub followers_count: i64,
     pub following_count: i64,
+    pub grade_overview: GradeOverviewDto,
+}
+
+#[derive(Serialize)]
+pub struct GradeOverviewDto {
+    pub courses_count: i64,
+    pub assignments_graded: i64,
+    pub points_earned: i64,
+    pub points_total: i64,
+    pub average_percent: f64,
 }
 
 #[derive(Serialize)]
@@ -93,6 +104,52 @@ pub struct FollowUserDto {
 #[derive(Deserialize)]
 pub struct TrackActivityBody {
     pub seconds: i64,
+}
+
+#[derive(Deserialize)]
+pub struct UpdatePrivacyBody {
+    pub profile_visibility: Option<String>,
+    pub activity_visibility: Option<String>,
+    pub media_visibility: Option<String>,
+    pub show_birthday: Option<bool>,
+    pub show_country: Option<bool>,
+}
+
+#[derive(Serialize)]
+pub struct PrivacySettingsResponse {
+    pub profile_visibility: String,
+    pub activity_visibility: String,
+    pub media_visibility: String,
+    pub show_birthday: bool,
+    pub show_country: bool,
+}
+
+#[derive(Deserialize)]
+pub struct ChangePasswordBody {
+    pub current_password: String,
+    pub new_password: String,
+}
+
+#[derive(Deserialize)]
+pub struct UpdateNotificationSettingsBody {
+    pub email_enabled: Option<bool>,
+    pub push_enabled: Option<bool>,
+    pub course_updates: Option<bool>,
+    pub assignment_deadlines: Option<bool>,
+    pub grades_released: Option<bool>,
+    pub new_followers: Option<bool>,
+    pub marketing_news: Option<bool>,
+}
+
+#[derive(Serialize)]
+pub struct NotificationSettingsResponse {
+    pub email_enabled: bool,
+    pub push_enabled: bool,
+    pub course_updates: bool,
+    pub assignment_deadlines: bool,
+    pub grades_released: bool,
+    pub new_followers: bool,
+    pub marketing_news: bool,
 }
 
 #[derive(Deserialize)]
@@ -147,6 +204,9 @@ pub fn router() -> Router<AppState> {
             post(upload_wallpaper).layer(DefaultBodyLimit::max(6 * 1024 * 1024)),
         )
         .route("/api/me/activity", post(track_activity))
+        .route("/api/me/privacy", get(get_privacy_settings).patch(update_privacy_settings))
+        .route("/api/me/notifications", get(get_notification_settings).patch(update_notification_settings))
+        .route("/api/me/password", post(change_password))
         .route("/api/me", get(me).patch(update_me))
         .route(
             "/api/profile/:nickname/follow",
@@ -157,6 +217,78 @@ pub fn router() -> Router<AppState> {
         .route("/api/profile/:nickname/following", get(list_following))
         .route("/api/profile/:nickname/activity", get(profile_activity))
         .route("/api/profile/:nickname", get(public_profile))
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Visibility {
+    Public,
+    Followers,
+    Private,
+}
+
+fn parse_visibility(raw: &str) -> Option<Visibility> {
+    match raw {
+        "public" => Some(Visibility::Public),
+        "followers" => Some(Visibility::Followers),
+        "private" => Some(Visibility::Private),
+        _ => None,
+    }
+}
+
+fn require_visibility<'a>(raw: &'a str, field: &str) -> AppResult<&'a str> {
+    match raw {
+        "public" | "followers" | "private" => Ok(raw),
+        _ => Err(AppError::BadRequest(format!(
+            "{field} must be public|followers|private"
+        ))),
+    }
+}
+
+async fn ensure_privacy_row(state: &AppState, user_id: &str) -> AppResult<()> {
+    let now = chrono::Utc::now().to_rfc3339();
+    sqlx::query(
+        "INSERT OR IGNORE INTO user_privacy_settings
+         (user_id, profile_visibility, activity_visibility, media_visibility, show_birthday, show_country, updated_at)
+         VALUES (?, 'public', 'public', 'public', 1, 1, ?)",
+    )
+    .bind(user_id)
+    .bind(&now)
+    .execute(&state.pool)
+    .await?;
+    Ok(())
+}
+
+async fn ensure_notification_row(state: &AppState, user_id: &str) -> AppResult<()> {
+    let now = chrono::Utc::now().to_rfc3339();
+    sqlx::query(
+        "INSERT OR IGNORE INTO user_notification_settings
+         (user_id, email_enabled, push_enabled, course_updates, assignment_deadlines, grades_released, new_followers, marketing_news, updated_at)
+         VALUES (?, 1, 0, 1, 1, 1, 1, 0, ?)",
+    )
+    .bind(user_id)
+    .bind(&now)
+    .execute(&state.pool)
+    .await?;
+    Ok(())
+}
+
+async fn is_follower(state: &AppState, viewer_id: &str, target_id: &str) -> AppResult<bool> {
+    let row: Option<(i64,)> = sqlx::query_as(
+        "SELECT 1 FROM user_follows WHERE follower_user_id = ? AND following_user_id = ? LIMIT 1",
+    )
+    .bind(viewer_id)
+    .bind(target_id)
+    .fetch_optional(&state.pool)
+    .await?;
+    Ok(row.is_some())
+}
+
+fn can_view_visibility(level: Visibility, is_self: bool, is_follower: bool) -> bool {
+    match level {
+        Visibility::Public => true,
+        Visibility::Followers => is_self || is_follower,
+        Visibility::Private => is_self,
+    }
 }
 
 fn sniff_image_ext(buf: &[u8]) -> Result<&'static str, AppError> {
@@ -507,6 +639,7 @@ async fn update_me(
 
 async fn public_profile(
     State(state): State<AppState>,
+    viewer: Option<AuthUser>,
     Path(nickname): Path<String>,
 ) -> AppResult<Json<PublicProfile>> {
     let r = sqlx::query(
@@ -518,6 +651,37 @@ async fn public_profile(
 
     let r = r.ok_or(AppError::NotFound)?;
     let uid: String = r.try_get("id")?;
+    ensure_privacy_row(&state, &uid).await?;
+    let privacy_row = sqlx::query(
+        "SELECT profile_visibility, activity_visibility, media_visibility, show_birthday, show_country
+         FROM user_privacy_settings WHERE user_id = ?",
+    )
+    .bind(&uid)
+    .fetch_one(&state.pool)
+    .await?;
+    let profile_visibility = parse_visibility(&privacy_row.try_get::<String, _>("profile_visibility")?)
+        .unwrap_or(Visibility::Public);
+    let activity_visibility = parse_visibility(&privacy_row.try_get::<String, _>("activity_visibility")?)
+        .unwrap_or(Visibility::Public);
+    let media_visibility = parse_visibility(&privacy_row.try_get::<String, _>("media_visibility")?)
+        .unwrap_or(Visibility::Public);
+    let show_birthday = privacy_row.try_get::<i64, _>("show_birthday")? != 0;
+    let show_country = privacy_row.try_get::<i64, _>("show_country")? != 0;
+    let is_self = viewer.as_ref().map(|v| v.id == uid).unwrap_or(false);
+    let is_following = if let Some(v) = viewer.as_ref() {
+        if !is_self {
+            is_follower(&state, &v.id, &uid).await?
+        } else {
+            false
+        }
+    } else {
+        false
+    };
+    if !can_view_visibility(profile_visibility, is_self, is_following) {
+        return Err(AppError::Forbidden);
+    }
+    let can_view_activity = can_view_visibility(activity_visibility, is_self, is_following);
+    let can_view_media = can_view_visibility(media_visibility, is_self, is_following);
 
     let fav_rows = sqlx::query(
         "SELECT c.id, c.title FROM user_favorite_courses f
@@ -568,26 +732,80 @@ async fn public_profile(
             .fetch_one(&state.pool)
             .await?;
 
+    let grade_row = sqlx::query(
+        "SELECT
+            COUNT(*) as assignments_graded,
+            COALESCE(SUM(s.grade_points), 0) as points_earned,
+            COALESCE(SUM(a.max_points), 0) as points_total,
+            COUNT(DISTINCT a.course_id) as courses_count
+         FROM course_assignment_submissions s
+         JOIN course_assignments a ON a.id = s.assignment_id
+         WHERE s.student_id = ? AND s.grade_points IS NOT NULL",
+    )
+    .bind(&uid)
+    .fetch_one(&state.pool)
+    .await?;
+    let assignments_graded: i64 = grade_row.try_get("assignments_graded")?;
+    let points_earned: i64 = grade_row.try_get("points_earned")?;
+    let points_total: i64 = grade_row.try_get("points_total")?;
+    let courses_count: i64 = grade_row.try_get("courses_count")?;
+    let average_percent = if points_total > 0 {
+        (points_earned as f64 * 100.0) / points_total as f64
+    } else {
+        0.0
+    };
+
     Ok(Json(PublicProfile {
         nickname: r.try_get("nickname")?,
         role: r.try_get("role")?,
         bio: r.try_get("bio")?,
-        wallpaper_url: r.try_get("wallpaper_url")?,
-        avatar_url: r.try_get("avatar_url")?,
+        wallpaper_url: if can_view_media {
+            r.try_get("wallpaper_url")?
+        } else {
+            String::new()
+        },
+        avatar_url: if can_view_media {
+            r.try_get("avatar_url")?
+        } else {
+            String::new()
+        },
         theme_preference: r.try_get("theme_preference")?,
         language_preference: r.try_get("language_preference")?,
         font_preference: r.try_get("font_preference")?,
         full_name: r.try_get("full_name")?,
         website_url: r.try_get("website_url")?,
         social_links: parse_social_links(&r.try_get::<String, _>("social_links_json")?),
-        birthday: r.try_get("birthday")?,
-        country: r.try_get("country")?,
+        birthday: if can_view_activity && show_birthday {
+            r.try_get("birthday")?
+        } else {
+            String::new()
+        },
+        country: if can_view_activity && show_country {
+            r.try_get("country")?
+        } else {
+            String::new()
+        },
         created_at: r.try_get("created_at")?,
-        last_seen_at: r.try_get("last_seen_at")?,
-        favorite_courses,
+        last_seen_at: if can_view_activity {
+            r.try_get("last_seen_at")?
+        } else {
+            String::new()
+        },
+        favorite_courses: if can_view_media {
+            favorite_courses
+        } else {
+            Vec::new()
+        },
         achievements,
         followers_count,
         following_count,
+        grade_overview: GradeOverviewDto {
+            courses_count,
+            assignments_graded,
+            points_earned,
+            points_total,
+            average_percent,
+        },
     }))
 }
 
@@ -773,8 +991,202 @@ async fn track_activity(
     Ok(Json(serde_json::json!({ "ok": true })))
 }
 
+async fn get_privacy_settings(
+    State(state): State<AppState>,
+    user: AuthUser,
+) -> AppResult<Json<PrivacySettingsResponse>> {
+    ensure_privacy_row(&state, &user.id).await?;
+    let row = sqlx::query(
+        "SELECT profile_visibility, activity_visibility, media_visibility, show_birthday, show_country
+         FROM user_privacy_settings WHERE user_id = ?",
+    )
+    .bind(&user.id)
+    .fetch_one(&state.pool)
+    .await?;
+    Ok(Json(PrivacySettingsResponse {
+        profile_visibility: row.try_get("profile_visibility")?,
+        activity_visibility: row.try_get("activity_visibility")?,
+        media_visibility: row.try_get("media_visibility")?,
+        show_birthday: row.try_get::<i64, _>("show_birthday")? != 0,
+        show_country: row.try_get::<i64, _>("show_country")? != 0,
+    }))
+}
+
+async fn update_privacy_settings(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Json(body): Json<UpdatePrivacyBody>,
+) -> AppResult<Json<PrivacySettingsResponse>> {
+    ensure_privacy_row(&state, &user.id).await?;
+    let now = chrono::Utc::now().to_rfc3339();
+    if let Some(v) = body.profile_visibility.as_deref() {
+        let ok = require_visibility(v, "profile_visibility")?;
+        sqlx::query("UPDATE user_privacy_settings SET profile_visibility = ?, updated_at = ? WHERE user_id = ?")
+            .bind(ok)
+            .bind(&now)
+            .bind(&user.id)
+            .execute(&state.pool)
+            .await?;
+    }
+    if let Some(v) = body.activity_visibility.as_deref() {
+        let ok = require_visibility(v, "activity_visibility")?;
+        sqlx::query("UPDATE user_privacy_settings SET activity_visibility = ?, updated_at = ? WHERE user_id = ?")
+            .bind(ok)
+            .bind(&now)
+            .bind(&user.id)
+            .execute(&state.pool)
+            .await?;
+    }
+    if let Some(v) = body.media_visibility.as_deref() {
+        let ok = require_visibility(v, "media_visibility")?;
+        sqlx::query("UPDATE user_privacy_settings SET media_visibility = ?, updated_at = ? WHERE user_id = ?")
+            .bind(ok)
+            .bind(&now)
+            .bind(&user.id)
+            .execute(&state.pool)
+            .await?;
+    }
+    if let Some(v) = body.show_birthday {
+        sqlx::query("UPDATE user_privacy_settings SET show_birthday = ?, updated_at = ? WHERE user_id = ?")
+            .bind(if v { 1 } else { 0 })
+            .bind(&now)
+            .bind(&user.id)
+            .execute(&state.pool)
+            .await?;
+    }
+    if let Some(v) = body.show_country {
+        sqlx::query("UPDATE user_privacy_settings SET show_country = ?, updated_at = ? WHERE user_id = ?")
+            .bind(if v { 1 } else { 0 })
+            .bind(&now)
+            .bind(&user.id)
+            .execute(&state.pool)
+            .await?;
+    }
+    get_privacy_settings(State(state), user).await
+}
+
+async fn change_password(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Json(body): Json<ChangePasswordBody>,
+) -> AppResult<Json<serde_json::Value>> {
+    if body.new_password.len() < 8 {
+        return Err(AppError::BadRequest("new password min 8 chars".into()));
+    }
+    if body.new_password == body.current_password {
+        return Err(AppError::BadRequest(
+            "new password must differ from current".into(),
+        ));
+    }
+    let current_hash: Option<(String,)> = sqlx::query_as("SELECT password_hash FROM users WHERE id = ?")
+        .bind(&user.id)
+        .fetch_optional(&state.pool)
+        .await?;
+    let current_hash = current_hash.ok_or(AppError::Unauthorized)?.0;
+    if !verify_password(&body.current_password, &current_hash)? {
+        return Err(AppError::BadRequest("current password is incorrect".into()));
+    }
+    let next_hash = hash_password(&body.new_password)?;
+    sqlx::query("UPDATE users SET password_hash = ? WHERE id = ?")
+        .bind(&next_hash)
+        .bind(&user.id)
+        .execute(&state.pool)
+        .await?;
+    Ok(Json(serde_json::json!({ "ok": true })))
+}
+
+async fn get_notification_settings(
+    State(state): State<AppState>,
+    user: AuthUser,
+) -> AppResult<Json<NotificationSettingsResponse>> {
+    ensure_notification_row(&state, &user.id).await?;
+    let row = sqlx::query(
+        "SELECT email_enabled, push_enabled, course_updates, assignment_deadlines, grades_released, new_followers, marketing_news
+         FROM user_notification_settings WHERE user_id = ?",
+    )
+    .bind(&user.id)
+    .fetch_one(&state.pool)
+    .await?;
+    Ok(Json(NotificationSettingsResponse {
+        email_enabled: row.try_get::<i64, _>("email_enabled")? != 0,
+        push_enabled: row.try_get::<i64, _>("push_enabled")? != 0,
+        course_updates: row.try_get::<i64, _>("course_updates")? != 0,
+        assignment_deadlines: row.try_get::<i64, _>("assignment_deadlines")? != 0,
+        grades_released: row.try_get::<i64, _>("grades_released")? != 0,
+        new_followers: row.try_get::<i64, _>("new_followers")? != 0,
+        marketing_news: row.try_get::<i64, _>("marketing_news")? != 0,
+    }))
+}
+
+async fn update_notification_settings(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Json(body): Json<UpdateNotificationSettingsBody>,
+) -> AppResult<Json<NotificationSettingsResponse>> {
+    ensure_notification_row(&state, &user.id).await?;
+    let now = chrono::Utc::now().to_rfc3339();
+    if let Some(v) = body.email_enabled {
+        sqlx::query("UPDATE user_notification_settings SET email_enabled = ?, updated_at = ? WHERE user_id = ?")
+            .bind(if v { 1 } else { 0 })
+            .bind(&now)
+            .bind(&user.id)
+            .execute(&state.pool)
+            .await?;
+    }
+    if let Some(v) = body.push_enabled {
+        sqlx::query("UPDATE user_notification_settings SET push_enabled = ?, updated_at = ? WHERE user_id = ?")
+            .bind(if v { 1 } else { 0 })
+            .bind(&now)
+            .bind(&user.id)
+            .execute(&state.pool)
+            .await?;
+    }
+    if let Some(v) = body.course_updates {
+        sqlx::query("UPDATE user_notification_settings SET course_updates = ?, updated_at = ? WHERE user_id = ?")
+            .bind(if v { 1 } else { 0 })
+            .bind(&now)
+            .bind(&user.id)
+            .execute(&state.pool)
+            .await?;
+    }
+    if let Some(v) = body.assignment_deadlines {
+        sqlx::query("UPDATE user_notification_settings SET assignment_deadlines = ?, updated_at = ? WHERE user_id = ?")
+            .bind(if v { 1 } else { 0 })
+            .bind(&now)
+            .bind(&user.id)
+            .execute(&state.pool)
+            .await?;
+    }
+    if let Some(v) = body.grades_released {
+        sqlx::query("UPDATE user_notification_settings SET grades_released = ?, updated_at = ? WHERE user_id = ?")
+            .bind(if v { 1 } else { 0 })
+            .bind(&now)
+            .bind(&user.id)
+            .execute(&state.pool)
+            .await?;
+    }
+    if let Some(v) = body.new_followers {
+        sqlx::query("UPDATE user_notification_settings SET new_followers = ?, updated_at = ? WHERE user_id = ?")
+            .bind(if v { 1 } else { 0 })
+            .bind(&now)
+            .bind(&user.id)
+            .execute(&state.pool)
+            .await?;
+    }
+    if let Some(v) = body.marketing_news {
+        sqlx::query("UPDATE user_notification_settings SET marketing_news = ?, updated_at = ? WHERE user_id = ?")
+            .bind(if v { 1 } else { 0 })
+            .bind(&now)
+            .bind(&user.id)
+            .execute(&state.pool)
+            .await?;
+    }
+    get_notification_settings(State(state), user).await
+}
+
 async fn profile_activity(
     State(state): State<AppState>,
+    viewer: Option<AuthUser>,
     Path(nickname): Path<String>,
     Query(q): Query<ActivityQuery>,
 ) -> AppResult<Json<ActivitySummaryDto>> {
@@ -784,6 +1196,28 @@ async fn profile_activity(
             .fetch_optional(&state.pool)
             .await?;
     let (uid, created_at) = user_row.ok_or(AppError::NotFound)?;
+    ensure_privacy_row(&state, &uid).await?;
+    let privacy_row = sqlx::query(
+        "SELECT activity_visibility FROM user_privacy_settings WHERE user_id = ?",
+    )
+    .bind(&uid)
+    .fetch_one(&state.pool)
+    .await?;
+    let activity_visibility = parse_visibility(&privacy_row.try_get::<String, _>("activity_visibility")?)
+        .unwrap_or(Visibility::Public);
+    let is_self = viewer.as_ref().map(|v| v.id == uid).unwrap_or(false);
+    let is_following = if let Some(v) = viewer.as_ref() {
+        if !is_self {
+            is_follower(&state, &v.id, &uid).await?
+        } else {
+            false
+        }
+    } else {
+        false
+    };
+    if !can_view_visibility(activity_visibility, is_self, is_following) {
+        return Err(AppError::Forbidden);
+    }
 
     let current_year = chrono::Utc::now().year();
     let registration_year = created_at

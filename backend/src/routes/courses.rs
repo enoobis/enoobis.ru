@@ -18,6 +18,7 @@ use crate::{
 #[derive(Serialize, Clone)]
 pub struct CourseDto {
     pub id: String,
+    pub course_code: String,
     pub title: String,
     pub description: String,
     pub is_open: bool,
@@ -35,6 +36,17 @@ pub struct CourseMemberDto {
 }
 
 #[derive(Serialize)]
+pub struct CourseStreamCommentDto {
+    pub id: String,
+    pub post_id: String,
+    pub course_id: String,
+    pub author_id: String,
+    pub author_nickname: String,
+    pub body: String,
+    pub created_at: String,
+}
+
+#[derive(Serialize)]
 pub struct CourseStreamPostDto {
     pub id: String,
     pub course_id: String,
@@ -42,6 +54,7 @@ pub struct CourseStreamPostDto {
     pub author_nickname: String,
     pub body: String,
     pub created_at: String,
+    pub comments: Vec<CourseStreamCommentDto>,
 }
 
 #[derive(Serialize, Clone)]
@@ -123,6 +136,11 @@ pub struct CreateCourseBody {
 }
 
 #[derive(Deserialize)]
+pub struct JoinByCodeBody {
+    pub code: String,
+}
+
+#[derive(Deserialize)]
 pub struct PatchCourseBody {
     pub title: Option<String>,
     pub description: Option<String>,
@@ -136,6 +154,11 @@ pub struct SetStudentsBody {
 
 #[derive(Deserialize)]
 pub struct CreateStreamPostBody {
+    pub body: String,
+}
+
+#[derive(Deserialize)]
+pub struct CreateStreamCommentBody {
     pub body: String,
 }
 
@@ -201,12 +224,17 @@ pub struct PatchLectureBody {
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/api/courses", get(list_courses).post(create_course))
+        .route("/api/courses/join-by-code", post(join_by_code))
         .route(
             "/api/courses/:id",
             get(get_course).patch(patch_course).delete(delete_course),
         )
         .route("/api/courses/:id/classroom", get(get_classroom))
         .route("/api/courses/:id/stream", post(create_stream_post))
+        .route(
+            "/api/courses/:id/stream/:post_id/comments",
+            post(create_stream_comment),
+        )
         .route(
             "/api/courses/:id/lectures/upload",
             post(upload_lecture_file).layer(DefaultBodyLimit::max(22 * 1024 * 1024)),
@@ -338,7 +366,7 @@ async fn load_course_access(
     course_id: &str,
 ) -> AppResult<(CourseDto, bool)> {
     let r = sqlx::query(
-        "SELECT c.id, c.title, c.description, c.is_open, c.teacher_id, c.created_at, u.nickname as tn
+        "SELECT c.id, c.course_code, c.title, c.description, c.is_open, c.teacher_id, c.created_at, u.nickname as tn
          FROM courses c JOIN users u ON u.id = c.teacher_id WHERE c.id = ?",
     )
     .bind(course_id)
@@ -366,6 +394,7 @@ async fn load_course_access(
     Ok((
         CourseDto {
             id: r.try_get("id")?,
+            course_code: r.try_get("course_code")?,
             title: r.try_get("title")?,
             description: r.try_get("description")?,
             is_open: open,
@@ -384,7 +413,7 @@ async fn list_courses(
 ) -> AppResult<Json<Vec<CourseDto>>> {
     require_approved(&user)?;
     let rows = sqlx::query(
-        "SELECT c.id, c.title, c.description, c.is_open, c.teacher_id, c.created_at, u.nickname as tn
+        "SELECT c.id, c.course_code, c.title, c.description, c.is_open, c.teacher_id, c.created_at, u.nickname as tn
          FROM courses c JOIN users u ON u.id = c.teacher_id",
     )
     .fetch_all(&state.pool)
@@ -410,6 +439,7 @@ async fn list_courses(
         let enrolled = teacher_id == user.id || enrolled_set.contains(&id);
         out.push(CourseDto {
             id: id.clone(),
+            course_code: r.try_get("course_code")?,
             title: r.try_get("title")?,
             description: r.try_get("description")?,
             is_open: open,
@@ -453,13 +483,37 @@ async fn get_classroom(
     .await?;
     let mut stream = Vec::new();
     for r in stream_rows {
+        let post_id: String = r.try_get("id")?;
+        let comment_rows = sqlx::query(
+            "SELECT c.id, c.post_id, c.course_id, c.author_id, u.nickname as author_nickname, c.body, c.created_at
+             FROM course_stream_comments c
+             JOIN users u ON u.id = c.author_id
+             WHERE c.post_id = ?
+             ORDER BY c.created_at ASC",
+        )
+        .bind(&post_id)
+        .fetch_all(&state.pool)
+        .await?;
+        let mut comments = Vec::new();
+        for c in comment_rows {
+            comments.push(CourseStreamCommentDto {
+                id: c.try_get("id")?,
+                post_id: c.try_get("post_id")?,
+                course_id: c.try_get("course_id")?,
+                author_id: c.try_get("author_id")?,
+                author_nickname: c.try_get("author_nickname")?,
+                body: c.try_get("body")?,
+                created_at: c.try_get("created_at")?,
+            });
+        }
         stream.push(CourseStreamPostDto {
-            id: r.try_get("id")?,
+            id: post_id,
             course_id: r.try_get("course_id")?,
             author_id: r.try_get("author_id")?,
             author_nickname: r.try_get("author_nickname")?,
             body: r.try_get("body")?,
             created_at: r.try_get("created_at")?,
+            comments,
         });
     }
 
@@ -599,15 +653,23 @@ async fn create_course(
         return Err(AppError::BadRequest("title required".into()));
     }
     let id = Uuid::new_v4().to_string();
+    let code = Uuid::new_v4()
+        .simple()
+        .to_string()
+        .chars()
+        .take(6)
+        .collect::<String>()
+        .to_uppercase();
     let now = chrono::Utc::now().to_rfc3339();
     let desc = body.description.clone().unwrap_or_default();
     let is_open = if body.is_open { 1 } else { 0 };
 
     sqlx::query(
-        "INSERT INTO courses (id, teacher_id, title, description, is_open, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO courses (id, teacher_id, course_code, title, description, is_open, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&id)
     .bind(&user.id)
+    .bind(&code)
     .bind(&body.title)
     .bind(&desc)
     .bind(is_open)
@@ -616,6 +678,35 @@ async fn create_course(
     .await?;
 
     let (course, _) = load_course_access(&state, &user, &id).await?;
+    Ok(Json(course))
+}
+
+async fn join_by_code(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Json(body): Json<JoinByCodeBody>,
+) -> AppResult<Json<CourseDto>> {
+    require_approved(&user)?;
+    let code = body.code.trim().to_uppercase();
+    if code.is_empty() {
+        return Err(AppError::BadRequest("course code required".into()));
+    }
+    let row = sqlx::query("SELECT id, teacher_id FROM courses WHERE course_code = ?")
+        .bind(&code)
+        .fetch_optional(&state.pool)
+        .await?
+        .ok_or_else(|| AppError::BadRequest("invalid course code".into()))?;
+    let course_id: String = row.try_get("id")?;
+    let teacher_id: String = row.try_get("teacher_id")?;
+    if teacher_id != user.id {
+        sqlx::query("INSERT OR IGNORE INTO course_students (course_id, student_id) VALUES (?, ?)")
+            .bind(&course_id)
+            .bind(&user.id)
+            .execute(&state.pool)
+            .await?;
+        grant_scholar_if_first(&state.pool, &user.id).await.ok();
+    }
+    let (course, _) = load_course_access(&state, &user, &course_id).await?;
     Ok(Json(course))
 }
 
@@ -1195,6 +1286,61 @@ async fn create_stream_post(
         .unwrap_or_default();
     Ok(Json(CourseStreamPostDto {
         id: post_id,
+        course_id: id,
+        author_id: user.id,
+        author_nickname,
+        body: text.to_string(),
+        created_at: now,
+        comments: Vec::new(),
+    }))
+}
+
+async fn create_stream_comment(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path((id, post_id)): Path<(String, String)>,
+    Json(body): Json<CreateStreamCommentBody>,
+) -> AppResult<Json<CourseStreamCommentDto>> {
+    require_approved(&user)?;
+    let (course, _is_teacher) = load_course_access(&state, &user, &id).await?;
+    if !course.enrolled {
+        return Err(AppError::Forbidden);
+    }
+    let post_exists: Option<(String,)> =
+        sqlx::query_as("SELECT id FROM course_stream_posts WHERE id = ? AND course_id = ?")
+            .bind(&post_id)
+            .bind(&id)
+            .fetch_optional(&state.pool)
+            .await?;
+    if post_exists.is_none() {
+        return Err(AppError::NotFound);
+    }
+    let text = body.body.trim();
+    if text.is_empty() {
+        return Err(AppError::BadRequest("comment body required".into()));
+    }
+    let comment_id = Uuid::new_v4().to_string();
+    let now = chrono::Utc::now().to_rfc3339();
+    sqlx::query(
+        "INSERT INTO course_stream_comments (id, post_id, course_id, author_id, body, created_at)
+         VALUES (?, ?, ?, ?, ?, ?)",
+    )
+    .bind(&comment_id)
+    .bind(&post_id)
+    .bind(&id)
+    .bind(&user.id)
+    .bind(text)
+    .bind(&now)
+    .execute(&state.pool)
+    .await?;
+    let author_nickname: String = sqlx::query_scalar("SELECT nickname FROM users WHERE id = ?")
+        .bind(&user.id)
+        .fetch_optional(&state.pool)
+        .await?
+        .unwrap_or_default();
+    Ok(Json(CourseStreamCommentDto {
+        id: comment_id,
+        post_id,
         course_id: id,
         author_id: user.id,
         author_nickname,
