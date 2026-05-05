@@ -4,6 +4,7 @@ import { RouterLink, RouterView } from "vue-router";
 import { api } from "./api/http";
 import { useAuthStore } from "./stores/auth";
 import AppIcon from "./components/AppIcon.vue";
+import AppToast from "./components/AppToast.vue";
 import { applyUserPreferences } from "./utils/preferences";
 
 const auth = useAuthStore();
@@ -154,7 +155,6 @@ watch(
       </RouterLink>
       <RouterLink to="/blog" class="nav-link"><AppIcon name="blog" /> <span>Блог</span></RouterLink>
       <RouterLink v-if="auth.token" to="/courses" class="nav-link"><AppIcon name="courses" /> <span>Курсы</span></RouterLink>
-      <RouterLink v-if="auth.token" to="/invites" class="nav-link"><AppIcon name="invites" /> <span>Инвайты</span></RouterLink>
       <RouterLink v-if="auth.token && auth.role === 'admin'" to="/admin" class="nav-link">
         <AppIcon name="admin" />
         <span>Админ</span>
@@ -188,10 +188,6 @@ watch(
               <span>Contact us</span>
               <AppIcon name="comment" />
             </a>
-            <RouterLink to="/invites" class="profile-menu-item" @click="profileMenuOpen = false">
-              <span>Invites</span>
-              <AppIcon name="invites" />
-            </RouterLink>
             <button class="profile-menu-item profile-menu-btn" type="button" @click="logoutFromMenu">
               <span>Logout</span>
               <AppIcon name="logout" />
@@ -209,6 +205,7 @@ watch(
         <component :is="Component" :key="route.fullPath" />
       </Transition>
     </RouterView>
+    <AppToast />
     <div v-if="!isOnline" class="offline-overlay" role="status" aria-live="polite">
       <div class="offline-card">
         <h2>You’re offline!</h2>

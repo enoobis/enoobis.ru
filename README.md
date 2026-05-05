@@ -19,11 +19,12 @@ npm install
 npm run dev
 ```
 
-Backend:
+Backend (JS):
 
 ```bash
 cd backend
-cargo run
+npm install
+npm run dev
 ```
 
 ## Blog Platform Features

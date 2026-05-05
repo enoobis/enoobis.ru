@@ -46,12 +46,13 @@ onMounted(async () => {
       </ul>
     </template>
     <h2 style="margin-top: 2rem">Свежие записи блога</h2>
-    <ul style="list-style: none; padding: 0">
+    <ul v-if="posts.length" style="list-style: none; padding: 0">
       <li v-for="p in posts" :key="p.id" class="card" style="margin-bottom: 0.75rem">
         <RouterLink :to="`/blog/${p.id}`">{{ p.title }}</RouterLink>
         <div class="muted">{{ p.author_nickname }} · {{ (p.published_at || p.created_at).slice(0, 10) }}</div>
       </li>
     </ul>
+    <p v-else class="muted">Записей пока нет.</p>
     <RouterLink to="/blog">Все записи →</RouterLink>
   </section>
 </template>

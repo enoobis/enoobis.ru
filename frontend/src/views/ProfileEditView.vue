@@ -18,6 +18,7 @@ import {
 import AppIcon from "../components/AppIcon.vue";
 import { useAuthStore } from "../stores/auth";
 import { applyUserPreferences } from "../utils/preferences";
+import { toastError, toastSuccess } from "../utils/toast";
 
 type SocialLink = {
   name: string;
@@ -45,7 +46,16 @@ type Me = {
 };
 
 type Course = { id: string; title: string; is_open: boolean; teacher_nickname: string };
-type SettingsTab = "profile" | "account" | "activity" | "privacy" | "security" | "notifications";
+type InviteLink = {
+  id: string;
+  code: string;
+  target_role: string;
+  max_uses: number;
+  used_count: number;
+  remaining: number;
+  created_at: string;
+};
+type SettingsTab = "profile" | "account" | "activity" | "privacy" | "security" | "notifications" | "invites";
 
 const auth = useAuthStore();
 const router = useRouter();
@@ -78,6 +88,8 @@ const privacy = ref<PrivacySettings | null>(null);
 const savingPrivacy = ref(false);
 const notif = ref<NotificationSettings | null>(null);
 const savingNotif = ref(false);
+const invites = ref<InviteLink[]>([]);
+const invitesLoading = ref(false);
 
 const currentPassword = ref("");
 const newPassword = ref("");
@@ -113,6 +125,23 @@ async function loadPrivacyAndNotif() {
     notif.value = n;
   } catch (e) {
     err.value = e instanceof Error ? e.message : "Ошибка";
+  }
+}
+
+function fullInviteUrl(code: string) {
+  const base = `${window.location.origin}/register`;
+  return `${base}?invite=${encodeURIComponent(code)}`;
+}
+
+async function loadInvites() {
+  if (!auth.token) return;
+  invitesLoading.value = true;
+  try {
+    invites.value = await api<InviteLink[]>("/api/me/invites", { token: auth.token });
+  } catch (e) {
+    err.value = e instanceof Error ? e.message : "Ошибка";
+  } finally {
+    invitesLoading.value = false;
   }
 }
 
@@ -183,7 +212,7 @@ onMounted(async () => {
     favorites.value = [...me.value.favorite_course_ids];
     const all = await api<Course[]>("/api/courses", { token: auth.token });
     courses.value = all;
-    await Promise.all([loadPrivacyAndNotif(), loadMyActivity()]);
+    await Promise.all([loadPrivacyAndNotif(), loadMyActivity(), loadInvites()]);
   } catch (e) {
     err.value = e instanceof Error ? e.message : "Ошибка";
   }
@@ -306,9 +335,11 @@ async function save() {
       language_preference: languagePreference.value,
       font_preference: fontPreference.value,
     });
+    toastSuccess("Профиль обновлён");
     await router.push(`/u/${auth.nickname}`);
   } catch (e) {
     err.value = e instanceof Error ? e.message : "Ошибка";
+    toastError(e);
   } finally {
     saving.value = false;
   }
@@ -353,6 +384,10 @@ function closeSettings() {
       >
         <AppIcon name="comment" />
         <span>Notifications</span>
+      </button>
+      <button class="nav-item" :class="{ active: tab === 'invites' }" type="button" @click="tab = 'invites'">
+        <AppIcon name="invites" />
+        <span>Invites</span>
       </button>
     </aside>
 
@@ -604,6 +639,21 @@ function closeSettings() {
         </div>
       </template>
 
+      <template v-else-if="tab === 'invites'">
+        <h1>My invite links</h1>
+        <p class="muted">Ссылки перенесены в Settings и больше не показываются в основном меню.</p>
+        <p v-if="invitesLoading" class="muted">Loading…</p>
+        <p v-else-if="!invites.length" class="muted">Инвайтов пока нет.</p>
+        <div v-else class="invite-list">
+          <div v-for="l in invites" :key="l.id" class="invite-card">
+            <div class="invite-code">{{ l.code }}</div>
+            <div class="muted">роль: {{ l.target_role === "teacher" ? "ментор" : "ученик" }}</div>
+            <div class="muted">осталось: {{ l.remaining }} / {{ l.max_uses }}</div>
+            <div class="muted invite-url">{{ fullInviteUrl(l.code) }}</div>
+          </div>
+        </div>
+      </template>
+
       <div v-if="tab === 'profile' || tab === 'account'" class="actions">
         <button class="secondary" type="button" @click="closeSettings">Cancel</button>
         <button type="button" :disabled="saving" @click="save">{{ saving ? "Saving..." : "Save" }}</button>
@@ -833,6 +883,27 @@ function closeSettings() {
 
 .ok {
   color: var(--accent);
+}
+
+.invite-list {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.invite-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.7rem;
+}
+
+.invite-code {
+  font-family: var(--mono);
+  font-size: 0.92rem;
+}
+
+.invite-url {
+  margin-top: 0.35rem;
+  word-break: break-all;
 }
 
 @media (max-width: 980px) {

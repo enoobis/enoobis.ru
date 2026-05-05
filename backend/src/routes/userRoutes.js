@@ -1,0 +1,446 @@
+import express from "express";
+import { all, get, nowIso, run } from "../db.js";
+import { authRequired, hashPassword, verifyPassword } from "../auth.js";
+
+const router = express.Router();
+
+function buildMe(row) {
+  if (!row) return null;
+  const favIds = all(
+    "SELECT course_id FROM user_favorite_courses WHERE user_id = ?",
+    row.id,
+  ).map((r) => r.course_id);
+  let socialLinks = [];
+  try {
+    socialLinks = JSON.parse(row.social_links_json ?? "[]");
+    if (!Array.isArray(socialLinks)) socialLinks = [];
+  } catch {
+    socialLinks = [];
+  }
+  return {
+    id: row.id,
+    email: row.email,
+    nickname: row.nickname,
+    role: row.role,
+    status: row.status,
+    bio: row.bio ?? "",
+    wallpaper_url: row.wallpaper_url ?? "",
+    avatar_url: row.avatar_url ?? "",
+    theme_preference: row.theme_preference ?? "black",
+    language_preference: row.language_preference ?? "ru",
+    font_preference: row.font_preference ?? "normal",
+    full_name: row.full_name ?? "",
+    website_url: row.website_url ?? "",
+    social_links: socialLinks,
+    birthday: row.birthday ?? "",
+    country: row.country ?? "",
+    created_at: row.created_at ?? "",
+    last_seen_at: row.last_seen_at ?? "",
+    favorite_course_ids: favIds,
+  };
+}
+
+router.get("/me", authRequired, (req, res) => {
+  const row = get(
+    `SELECT id, email, nickname, role, status, bio, wallpaper_url, avatar_url,
+            theme_preference, language_preference, font_preference, full_name, website_url,
+            social_links_json, birthday, country, created_at, last_seen_at
+     FROM users WHERE id = ?`,
+    req.user.id,
+  );
+  const me = buildMe(row);
+  if (!me) return res.status(404).json({ error: "not found" });
+  return res.json(me);
+});
+
+router.patch("/me", authRequired, (req, res) => {
+  const allowed = [
+    "bio",
+    "wallpaper_url",
+    "avatar_url",
+    "theme_preference",
+    "language_preference",
+    "font_preference",
+    "full_name",
+    "website_url",
+    "birthday",
+    "country",
+  ];
+  const body = req.body ?? {};
+  for (const field of allowed) {
+    if (body[field] !== undefined) {
+      run(`UPDATE users SET ${field} = ? WHERE id = ?`, body[field] ?? "", req.user.id);
+    }
+  }
+  if (Array.isArray(body.social_links)) {
+    run(
+      "UPDATE users SET social_links_json = ? WHERE id = ?",
+      JSON.stringify(body.social_links),
+      req.user.id,
+    );
+  }
+  if (Array.isArray(body.favorite_course_ids)) {
+    run("DELETE FROM user_favorite_courses WHERE user_id = ?", req.user.id);
+    const insert = run.bind(null, "INSERT OR IGNORE INTO user_favorite_courses (user_id, course_id) VALUES (?, ?)");
+    for (const id of body.favorite_course_ids.slice(0, 24)) {
+      try {
+        insert(req.user.id, String(id));
+      } catch {
+        // ignore
+      }
+    }
+  }
+  return res.json({ ok: true });
+});
+
+router.post("/me/activity", authRequired, (req, res) => {
+  const seconds = Math.max(0, Math.min(3600, Number(req.body?.seconds ?? 0) | 0));
+  if (!seconds) return res.json({ ok: true });
+  const day = new Date().toISOString().slice(0, 10);
+  const now = nowIso();
+  run(
+    `INSERT INTO user_daily_activity (user_id, day, seconds_spent, updated_at)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT(user_id, day) DO UPDATE SET
+       seconds_spent = seconds_spent + excluded.seconds_spent,
+       updated_at = excluded.updated_at`,
+    req.user.id,
+    day,
+    seconds,
+    now,
+  );
+  run("UPDATE users SET last_seen_at = ? WHERE id = ?", now, req.user.id);
+  return res.json({ ok: true });
+});
+
+router.get("/me/invites", authRequired, (req, res) => {
+  const rows = all(
+    `SELECT id, code, target_role, max_uses, used_count, created_at
+     FROM invite_links
+     WHERE owner_user_id = ?
+     ORDER BY created_at DESC`,
+    req.user.id,
+  );
+  return res.json(
+    rows.map((r) => ({
+      ...r,
+      remaining: Math.max(0, (r.max_uses ?? 0) - (r.used_count ?? 0)),
+    })),
+  );
+});
+
+function ensurePrivacyRow(userId) {
+  run(
+    `INSERT OR IGNORE INTO user_privacy_settings
+       (user_id, profile_visibility, activity_visibility, media_visibility, show_birthday, show_country, updated_at)
+       VALUES (?, 'public', 'public', 'public', 1, 1, ?)`,
+    userId,
+    nowIso(),
+  );
+}
+
+router.get("/me/privacy", authRequired, (req, res) => {
+  ensurePrivacyRow(req.user.id);
+  const row = get(
+    `SELECT profile_visibility, activity_visibility, media_visibility, show_birthday, show_country
+     FROM user_privacy_settings WHERE user_id = ?`,
+    req.user.id,
+  );
+  return res.json({
+    profile_visibility: row?.profile_visibility ?? "public",
+    activity_visibility: row?.activity_visibility ?? "public",
+    media_visibility: row?.media_visibility ?? "public",
+    show_birthday: !!row?.show_birthday,
+    show_country: !!row?.show_country,
+  });
+});
+
+router.patch("/me/privacy", authRequired, (req, res) => {
+  ensurePrivacyRow(req.user.id);
+  const body = req.body ?? {};
+  const fields = {
+    profile_visibility: body.profile_visibility,
+    activity_visibility: body.activity_visibility,
+    media_visibility: body.media_visibility,
+    show_birthday: body.show_birthday,
+    show_country: body.show_country,
+  };
+  for (const [k, v] of Object.entries(fields)) {
+    if (v === undefined) continue;
+    if (k.startsWith("show_")) {
+      run(`UPDATE user_privacy_settings SET ${k} = ?, updated_at = ? WHERE user_id = ?`, v ? 1 : 0, nowIso(), req.user.id);
+    } else if (typeof v === "string" && ["public", "followers", "private"].includes(v)) {
+      run(`UPDATE user_privacy_settings SET ${k} = ?, updated_at = ? WHERE user_id = ?`, v, nowIso(), req.user.id);
+    }
+  }
+  const updated = get(
+    `SELECT profile_visibility, activity_visibility, media_visibility, show_birthday, show_country
+     FROM user_privacy_settings WHERE user_id = ?`,
+    req.user.id,
+  );
+  return res.json({
+    profile_visibility: updated.profile_visibility,
+    activity_visibility: updated.activity_visibility,
+    media_visibility: updated.media_visibility,
+    show_birthday: !!updated.show_birthday,
+    show_country: !!updated.show_country,
+  });
+});
+
+function ensureNotificationsRow(userId) {
+  run(
+    `INSERT OR IGNORE INTO user_notification_settings
+      (user_id, email_enabled, push_enabled, course_updates, assignment_deadlines, grades_released, new_followers, marketing_news, updated_at)
+      VALUES (?, 1, 0, 1, 1, 1, 1, 0, ?)`,
+    userId,
+    nowIso(),
+  );
+}
+
+router.get("/me/notifications", authRequired, (req, res) => {
+  ensureNotificationsRow(req.user.id);
+  const row = get(
+    `SELECT email_enabled, push_enabled, course_updates, assignment_deadlines,
+            grades_released, new_followers, marketing_news
+     FROM user_notification_settings WHERE user_id = ?`,
+    req.user.id,
+  );
+  return res.json({
+    email_enabled: !!row?.email_enabled,
+    push_enabled: !!row?.push_enabled,
+    course_updates: !!row?.course_updates,
+    assignment_deadlines: !!row?.assignment_deadlines,
+    grades_released: !!row?.grades_released,
+    new_followers: !!row?.new_followers,
+    marketing_news: !!row?.marketing_news,
+  });
+});
+
+router.patch("/me/notifications", authRequired, (req, res) => {
+  ensureNotificationsRow(req.user.id);
+  const body = req.body ?? {};
+  const flags = [
+    "email_enabled",
+    "push_enabled",
+    "course_updates",
+    "assignment_deadlines",
+    "grades_released",
+    "new_followers",
+    "marketing_news",
+  ];
+  for (const f of flags) {
+    if (body[f] !== undefined) {
+      run(`UPDATE user_notification_settings SET ${f} = ?, updated_at = ? WHERE user_id = ?`, body[f] ? 1 : 0, nowIso(), req.user.id);
+    }
+  }
+  const updated = get(
+    `SELECT email_enabled, push_enabled, course_updates, assignment_deadlines,
+            grades_released, new_followers, marketing_news
+     FROM user_notification_settings WHERE user_id = ?`,
+    req.user.id,
+  );
+  return res.json({
+    email_enabled: !!updated.email_enabled,
+    push_enabled: !!updated.push_enabled,
+    course_updates: !!updated.course_updates,
+    assignment_deadlines: !!updated.assignment_deadlines,
+    grades_released: !!updated.grades_released,
+    new_followers: !!updated.new_followers,
+    marketing_news: !!updated.marketing_news,
+  });
+});
+
+router.post("/me/password", authRequired, async (req, res) => {
+  const { current_password = "", new_password = "" } = req.body ?? {};
+  if (new_password.length < 8) return res.status(400).json({ error: "new password too short" });
+  const row = get("SELECT password_hash FROM users WHERE id = ?", req.user.id);
+  if (!row) return res.status(404).json({ error: "not found" });
+  const ok = await verifyPassword(current_password, row.password_hash);
+  if (!ok) return res.status(400).json({ error: "wrong current password" });
+  const hash = await hashPassword(new_password);
+  run("UPDATE users SET password_hash = ? WHERE id = ?", hash, req.user.id);
+  return res.json({ ok: true });
+});
+
+function gradeOverviewFor(userId) {
+  const earned =
+    get(
+      `SELECT COALESCE(SUM(grade_points), 0) as v
+       FROM course_assignment_submissions
+       WHERE student_id = ? AND grade_points IS NOT NULL`,
+      userId,
+    )?.v ?? 0;
+  const totalGraded =
+    get(
+      `SELECT COALESCE(SUM(a.max_points), 0) as v
+       FROM course_assignment_submissions s
+       JOIN course_assignments a ON a.id = s.assignment_id
+       WHERE s.student_id = ? AND s.grade_points IS NOT NULL`,
+      userId,
+    )?.v ?? 0;
+  const courseCount =
+    get("SELECT COUNT(*) as v FROM course_students WHERE student_id = ?", userId)?.v ?? 0;
+  const gradedCount =
+    get(
+      `SELECT COUNT(*) as v
+       FROM course_assignment_submissions
+       WHERE student_id = ? AND grade_points IS NOT NULL`,
+      userId,
+    )?.v ?? 0;
+  return {
+    courses_count: courseCount,
+    assignments_graded: gradedCount,
+    points_earned: earned,
+    points_total: totalGraded,
+    average_percent: totalGraded > 0 ? Math.round((earned / totalGraded) * 1000) / 10 : 0,
+  };
+}
+
+router.get("/profile/:nickname", (req, res) => {
+  const p = get(
+    `SELECT id, nickname, role, bio, wallpaper_url, avatar_url, theme_preference,
+            language_preference, font_preference, full_name, website_url, social_links_json,
+            birthday, country, created_at, last_seen_at
+     FROM users WHERE nickname = ?`,
+    req.params.nickname,
+  );
+  if (!p) return res.status(404).json({ error: "not found" });
+  let socialLinks = [];
+  try {
+    socialLinks = JSON.parse(p.social_links_json ?? "[]");
+    if (!Array.isArray(socialLinks)) socialLinks = [];
+  } catch {
+    socialLinks = [];
+  }
+  const favCourseIds = all(
+    "SELECT course_id FROM user_favorite_courses WHERE user_id = ?",
+    p.id,
+  ).map((r) => r.course_id);
+  const favorite_courses = [];
+  for (const id of favCourseIds) {
+    const c = get("SELECT id, title FROM courses WHERE id = ?", id);
+    if (c) favorite_courses.push(c);
+  }
+  const achievements = all(
+    `SELECT a.slug, a.name, a.description, a.icon_url, ua.earned_at
+     FROM user_achievements ua
+     JOIN achievements a ON a.id = ua.achievement_id
+     WHERE ua.user_id = ?
+     ORDER BY ua.earned_at DESC`,
+    p.id,
+  );
+  const followers_count =
+    get("SELECT COUNT(*) as v FROM user_follows WHERE following_user_id = ?", p.id)?.v ?? 0;
+  const following_count =
+    get("SELECT COUNT(*) as v FROM user_follows WHERE follower_user_id = ?", p.id)?.v ?? 0;
+
+  return res.json({
+    nickname: p.nickname,
+    role: p.role,
+    bio: p.bio ?? "",
+    wallpaper_url: p.wallpaper_url ?? "",
+    avatar_url: p.avatar_url ?? "",
+    theme_preference: p.theme_preference ?? "black",
+    language_preference: p.language_preference ?? "ru",
+    font_preference: p.font_preference ?? "normal",
+    full_name: p.full_name ?? "",
+    website_url: p.website_url ?? "",
+    social_links: socialLinks,
+    birthday: p.birthday ?? "",
+    country: p.country ?? "",
+    created_at: p.created_at ?? "",
+    last_seen_at: p.last_seen_at ?? "",
+    favorite_courses,
+    achievements,
+    followers_count,
+    following_count,
+    grade_overview: gradeOverviewFor(p.id),
+  });
+});
+
+router.get("/profile/:nickname/activity", (req, res) => {
+  const p = get("SELECT id, created_at FROM users WHERE nickname = ?", req.params.nickname);
+  if (!p) return res.status(404).json({ error: "not found" });
+  const year = Number(req.query.year) || new Date().getFullYear();
+  const days = all(
+    `SELECT day, seconds_spent FROM user_daily_activity
+     WHERE user_id = ? AND substr(day, 1, 4) = ?
+     ORDER BY day`,
+    p.id,
+    String(year),
+  );
+  const total = days.reduce((acc, d) => acc + (d.seconds_spent ?? 0), 0);
+  const regYear = (p.created_at || "").slice(0, 4);
+  return res.json({
+    year,
+    registration_year: Number(regYear) || year,
+    current_year: new Date().getFullYear(),
+    total_seconds: total,
+    days,
+  });
+});
+
+router.get("/profile/:nickname/following/me", authRequired, (req, res) => {
+  const p = get("SELECT id FROM users WHERE nickname = ?", req.params.nickname);
+  if (!p) return res.json({ following: false });
+  const r = get(
+    "SELECT 1 as v FROM user_follows WHERE follower_user_id = ? AND following_user_id = ?",
+    req.user.id,
+    p.id,
+  );
+  return res.json({ following: !!r });
+});
+
+router.post("/profile/:nickname/follow", authRequired, (req, res) => {
+  const p = get("SELECT id FROM users WHERE nickname = ?", req.params.nickname);
+  if (!p) return res.status(404).json({ error: "not found" });
+  if (p.id === req.user.id) return res.status(400).json({ error: "cannot follow yourself" });
+  run(
+    "INSERT OR IGNORE INTO user_follows (follower_user_id, following_user_id, created_at) VALUES (?, ?, ?)",
+    req.user.id,
+    p.id,
+    nowIso(),
+  );
+  return res.json({ ok: true });
+});
+
+router.delete("/profile/:nickname/follow", authRequired, (req, res) => {
+  const p = get("SELECT id FROM users WHERE nickname = ?", req.params.nickname);
+  if (!p) return res.status(404).json({ error: "not found" });
+  run(
+    "DELETE FROM user_follows WHERE follower_user_id = ? AND following_user_id = ?",
+    req.user.id,
+    p.id,
+  );
+  return res.json({ ok: true });
+});
+
+router.get("/profile/:nickname/followers", (req, res) => {
+  const p = get("SELECT id FROM users WHERE nickname = ?", req.params.nickname);
+  if (!p) return res.json([]);
+  const rows = all(
+    `SELECT u.id, u.nickname, u.avatar_url
+     FROM user_follows f
+     JOIN users u ON u.id = f.follower_user_id
+     WHERE f.following_user_id = ?
+     ORDER BY f.created_at DESC`,
+    p.id,
+  );
+  return res.json(rows);
+});
+
+router.get("/profile/:nickname/following", (req, res) => {
+  const p = get("SELECT id FROM users WHERE nickname = ?", req.params.nickname);
+  if (!p) return res.json([]);
+  const rows = all(
+    `SELECT u.id, u.nickname, u.avatar_url
+     FROM user_follows f
+     JOIN users u ON u.id = f.following_user_id
+     WHERE f.follower_user_id = ?
+     ORDER BY f.created_at DESC`,
+    p.id,
+  );
+  return res.json(rows);
+});
+
+export default router;

@@ -10,11 +10,9 @@ const body = ref("");
 const excerpt = ref("");
 const slug = ref("");
 const cover_image_url = ref("");
-const status = ref<"draft" | "published">("draft");
 const tagsText = ref("");
 const categoriesText = ref("");
 const err = ref("");
-const ok = ref("");
 const loading = ref(false);
 const bodyInput = ref<HTMLTextAreaElement | null>(null);
 const router = useRouter();
@@ -46,7 +44,6 @@ async function loadForEdit() {
     excerpt.value = post.excerpt;
     slug.value = post.slug;
     cover_image_url.value = post.cover_image_url;
-    status.value = post.status === "published" ? "published" : "draft";
     tagsText.value = post.tags.join(", ");
     categoriesText.value = post.categories.join(", ");
   } catch (e) {
@@ -56,10 +53,9 @@ async function loadForEdit() {
   }
 }
 
-async function save(publishNow = false) {
+async function save(targetStatus: "draft" | "published") {
   if (!auth.token) return;
   err.value = "";
-  ok.value = "";
   try {
     const payload = {
       title: title.value,
@@ -67,21 +63,20 @@ async function save(publishNow = false) {
       excerpt: excerpt.value || undefined,
       slug: slug.value || undefined,
       cover_image_url: cover_image_url.value || undefined,
-      status: publishNow ? "published" : status.value,
+      status: targetStatus,
       tags: parseCsv(tagsText.value),
       categories: parseCsv(categoriesText.value),
     } as const;
 
     if (isEdit.value) {
       const updated = await updatePost(editId.value, auth.token, payload);
-      if (publishNow && updated.status !== "published") {
+      if (targetStatus === "published" && updated.status !== "published") {
         await publishPost(updated.id, auth.token);
       }
-      ok.value = "Сохранено";
       await router.push(`/blog/${editId.value}`);
     } else {
       const created = await createPost(auth.token, payload);
-      if (publishNow && created.status !== "published") {
+      if (targetStatus === "published" && created.status !== "published") {
         await publishPost(created.id, auth.token);
       }
       await router.push(`/blog/${created.id}`);
@@ -123,7 +118,6 @@ async function uploadCoverFile(ev: Event) {
   try {
     const r = await uploadBlogImage(input.files[0], auth.token, editId.value || undefined);
     cover_image_url.value = r.url;
-    ok.value = "Обложка загружена";
   } catch (e) {
     err.value = e instanceof Error ? e.message : "Ошибка";
   } finally {
@@ -208,9 +202,8 @@ onMounted(loadForEdit);
   <div class="card" style="max-width: 980px">
     <h1>{{ isEdit ? "Редактирование записи" : "Новая запись" }}</h1>
     <p v-if="err" class="error">{{ err }}</p>
-    <p v-if="ok" style="color: var(--accent)">{{ ok }}</p>
     <p v-if="loading" class="muted">Загрузка...</p>
-    <form v-else @submit.prevent="save(false)">
+    <form v-else @submit.prevent="save('draft')">
       <label>Заголовок</label>
       <input v-model="title" required />
       <label style="display: block; margin-top: 0.75rem">Slug</label>
@@ -226,14 +219,9 @@ onMounted(loadForEdit);
         style="margin-top: 0.5rem; max-width: 100%; border-radius: 10px; border: 1px solid var(--border)"
       />
       <label style="display: block; margin-top: 0.75rem">Теги</label>
-      <input v-model="tagsText" placeholder="rust, vue, education" />
+      <input v-model="tagsText" placeholder="Введите теги через запятую (опционально)" />
       <label style="display: block; margin-top: 0.75rem">Категории</label>
       <input v-model="categoriesText" placeholder="news, guides" />
-      <label style="display: block; margin-top: 0.75rem">Статус</label>
-      <select v-model="status">
-        <option value="draft">Черновик</option>
-        <option value="published">Опубликован</option>
-      </select>
       <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.75rem">
         <label>Текст</label>
         <span class="muted">{{ wordCount }} слов · ~{{ readMinutes }} мин чтения</span>
@@ -264,8 +252,8 @@ onMounted(loadForEdit);
       <label style="display: block; margin-top: 0.75rem">Картинка в пост</label>
       <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" @change="uploadImageFile" />
       <div style="display: flex; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap">
-        <button type="submit">Сохранить</button>
-        <button class="secondary" type="button" @click="save(true)">Сохранить и опубликовать</button>
+        <button type="submit">Сохранить в черновики</button>
+        <button class="secondary" type="button" @click="save('published')">Опубликовать</button>
         <button v-if="isEdit" class="secondary" type="button" @click="remove">Удалить</button>
       </div>
     </form>
