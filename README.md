@@ -25,7 +25,6 @@ git reset --hard origin/main
 sudo bash deploy.sh `the.domname`
 ```
 
-
 TLS once DNS points to the server:
 
 ```bash

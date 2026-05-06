@@ -79,7 +79,93 @@ systemctl daemon-reload
 systemctl enable enoobis-backend
 systemctl restart enoobis-backend
 
-cat >/etc/nginx/sites-available/enoobis <<EOF
+LE_LIVE=""
+if [[ -n "${1:-}" && "$DOMAIN" != "_" ]]; then
+  shopt -s nullglob
+  for d in /etc/letsencrypt/live/"${DOMAIN}"*; do
+    if [[ -f "$d/fullchain.pem" && -f "$d/privkey.pem" ]]; then
+      LE_LIVE="$d"
+      break
+    fi
+  done
+  shopt -u nullglob
+fi
+
+ssl_lines=""
+if [[ -n "$LE_LIVE" ]]; then
+  ssl_lines="    ssl_certificate $LE_LIVE/fullchain.pem;
+    ssl_certificate_key $LE_LIVE/privkey.pem;"
+  if [[ -f /etc/letsencrypt/options-ssl-nginx.conf ]]; then
+    ssl_lines="$ssl_lines
+    include /etc/letsencrypt/options-ssl-nginx.conf;"
+  fi
+  if [[ -f /etc/letsencrypt/ssl-dhparams.pem ]]; then
+    ssl_lines="$ssl_lines
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;"
+  fi
+fi
+
+if [[ -n "$LE_LIVE" ]]; then
+  cat >/etc/nginx/sites-available/enoobis <<EOF
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name $DOMAIN;
+
+    root $FRONTEND/dist;
+    index index.html;
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
+    location /uploads/ {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+    }
+
+    location / {
+        try_files \$uri \$uri/ /index.html;
+    }
+}
+
+server {
+    listen 443 ssl default_server;
+    listen [::]:443 ssl default_server;
+    server_name $DOMAIN;
+$ssl_lines
+
+    root $FRONTEND/dist;
+    index index.html;
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
+    location /uploads/ {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+    }
+
+    location / {
+        try_files \$uri \$uri/ /index.html;
+    }
+}
+EOF
+else
+  cat >/etc/nginx/sites-available/enoobis <<EOF
 server {
     listen 80 default_server;
     listen [::]:80 default_server;
@@ -108,6 +194,7 @@ server {
     }
 }
 EOF
+fi
 
 rm -f /etc/nginx/sites-enabled/default
 ln -sf /etc/nginx/sites-available/enoobis /etc/nginx/sites-enabled/enoobis
@@ -116,7 +203,7 @@ systemctl reload nginx
 
 echo ""
 echo "готово. бэк: systemctl status enoobis-backend"
-if [[ -n "${1:-}" && "$DOMAIN" != "_" ]]; then
-  echo "https: apt install -y certbot python3-certbot-nginx && certbot --nginx -d $DOMAIN"
+if [[ -n "${1:-}" && "$DOMAIN" != "_" && -z "$LE_LIVE" ]]; then
+  echo "https (один раз): apt install -y certbot python3-certbot-nginx && certbot --nginx -d $DOMAIN"
 fi
 echo "обновление: cd $REPO_ROOT && git pull && sudo bash deploy.sh ${1:-}"
