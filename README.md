@@ -29,7 +29,7 @@ TLS once DNS points to the server:
 
 ```bash
 sudo apt install -y certbot python3-certbot-nginx
-sudo certbot --nginx -d enoobis.ru
+sudo certbot --nginx -d `the.domname`
 ```
 
 Sanity check:
