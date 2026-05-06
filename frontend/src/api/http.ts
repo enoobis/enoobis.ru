@@ -9,6 +9,10 @@ function backendUnavailableMessage() {
   return "API backend недоступен: вместо JSON пришла HTML-страница. Проверь, что backend запущен и /api маршруты доступны.";
 }
 
+function networkErrorMessage() {
+  return "нет ответа от сервера: не запущен backend, нет сети или неверный адрес сайта.";
+}
+
 export async function api<T>(
   path: string,
   opts: RequestInit & { token?: string | null } = {},
@@ -19,7 +23,13 @@ export async function api<T>(
   };
   if (opts.token) headers.Authorization = `Bearer ${opts.token}`;
   const { token: _t, ...rest } = opts;
-  const res = await fetch(`${base}${path}`, { ...rest, headers });
+  let res: Response;
+  try {
+    res = await fetch(`${base}${path}`, { ...rest, headers });
+  } catch (e) {
+    if (e instanceof TypeError) throw new Error(networkErrorMessage());
+    throw e;
+  }
   const text = await res.text();
 
   if (looksLikeHtml(text)) {

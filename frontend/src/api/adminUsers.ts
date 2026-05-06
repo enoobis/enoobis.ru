@@ -19,11 +19,19 @@ export async function uploadAdminUserAvatar(
 ): Promise<{ avatar_url: string }> {
   const form = new FormData();
   form.append("file", file);
-  const res = await fetch(`/api/admin/users/${userId}/avatar`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
-    body: form,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`/api/admin/users/${userId}/avatar`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    });
+  } catch (e) {
+    if (e instanceof TypeError) {
+      throw new Error("нет ответа от сервера: проверь, что сайт открыт по тому же адресу, куда настроен backend.");
+    }
+    throw e;
+  }
   const data: unknown = await res.json().catch(() => ({}));
   if (!res.ok) {
     const err = data && typeof data === "object" && "error" in data ? String((data as { error: string }).error) : "ошибка";
