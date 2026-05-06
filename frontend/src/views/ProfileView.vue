@@ -34,6 +34,7 @@ type Profile = {
   nickname: string;
   role: string;
   bio: string;
+  wallpaper_url: string;
   avatar_url: string;
   full_name: string;
   website_url: string;
@@ -64,6 +65,9 @@ const nick = computed(() => route.params.nickname as string);
 const isMe = computed(() => auth.token && auth.nickname === nick.value);
 const displayName = computed(() => profile.value?.full_name?.trim() || profile.value?.nickname || "");
 const renderedReadme = computed(() => renderMarkdown(profile.value?.readme_md ?? ""));
+const socialPublic = computed(() =>
+  (profile.value?.social_links ?? []).filter((s) => String(s?.url ?? "").trim().length > 0),
+);
 
 async function load() {
   err.value = "";
@@ -147,6 +151,12 @@ watch(nick, load);
 
 <template>
   <section v-if="profile" class="profile">
+    <div
+      v-if="profile.wallpaper_url"
+      class="wall-banner"
+      :style="{ backgroundImage: `url(${profile.wallpaper_url})` }"
+      aria-hidden="true"
+    />
     <header class="head">
       <img
         v-if="profile.avatar_url && !avatarBroken"
@@ -179,6 +189,13 @@ watch(nick, load);
         <a v-if="profile.website_url" :href="profile.website_url" target="_blank" rel="noopener noreferrer" class="muted">
           {{ profile.website_url }}
         </a>
+        <ul v-if="socialPublic.length" class="socials">
+          <li v-for="(s, i) in socialPublic" :key="i">
+            <a :href="s.url" target="_blank" rel="noopener noreferrer" class="muted small">
+              {{ s.name?.trim() || s.url }}
+            </a>
+          </li>
+        </ul>
       </div>
 
       <div class="actions">
@@ -297,6 +314,22 @@ watch(nick, load);
 .profile {
   max-width: 640px;
   margin: 0 auto;
+}
+.wall-banner {
+  height: 7.5rem;
+  margin: 0 0 1rem;
+  border-radius: var(--radius);
+  background-size: cover;
+  background-position: center;
+  border: 1px solid var(--border);
+}
+.socials {
+  list-style: none;
+  padding: 0;
+  margin: 0.35rem 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
 }
 .head {
   display: grid;

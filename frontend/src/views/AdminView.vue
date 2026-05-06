@@ -9,8 +9,21 @@ import {
   restoreCommentByAdmin,
   type BlogReport,
 } from "../api/blog";
-import { patchAdminUserProfile, uploadAdminUserAvatar } from "../api/adminUsers";
+import {
+  deleteAdminUserInvite,
+  getAdminUserDetail,
+  listAdminUserInvites,
+  patchAdminUserProfile,
+  uploadAdminUserAvatar,
+  uploadAdminUserWallpaper,
+  type AdminInviteRow,
+  type AdminUserDetail,
+} from "../api/adminUsers";
 import { useAuthStore } from "../stores/auth";
+
+const README_MAX = 4000;
+
+type SocialRow = { name: string; url: string };
 
 type Pending = { id: string; email: string; nickname: string; role: string; created_at: string };
 type AdminUser = {
@@ -34,14 +47,17 @@ const reports = ref<BlogReport[]>([]);
 const err = ref("");
 const usersQuery = ref("");
 const moderateUserId = ref<string | null>(null);
+const moderateDetail = ref<AdminUserDetail | null>(null);
+const moderateNick = ref("");
+const moderateFullName = ref("");
+const moderateWebsite = ref("");
 const moderateBio = ref("");
+const moderateReadme = ref("");
+const moderateSocial = ref<SocialRow[]>([]);
+const moderatePassword = ref("");
+const modInvites = ref<AdminInviteRow[]>([]);
 const modMsg = ref("");
 const modBusy = ref(false);
-
-const moderateUser = computed(() => {
-  if (!moderateUserId.value) return null;
-  return users.value.find((u) => u.id === moderateUserId.value) ?? null;
-});
 
 const filteredUsers = computed(() => {
   const q = usersQuery.value.trim().toLowerCase();
@@ -54,12 +70,34 @@ const filteredUsers = computed(() => {
   );
 });
 
+function syncModerateFromDetail() {
+  const d = moderateDetail.value;
+  if (!d) return;
+  moderateNick.value = d.nickname;
+  moderateFullName.value = d.full_name ?? "";
+  moderateWebsite.value = d.website_url ?? "";
+  moderateBio.value = d.bio ?? "";
+  moderateReadme.value = d.readme_md ?? "";
+  moderateSocial.value = Array.isArray(d.social_links)
+    ? d.social_links.map((s) => ({ name: s.name ?? "", url: s.url ?? "" }))
+    : [];
+}
+
 async function load() {
   err.value = "";
   try {
     pending.value = await api<Pending[]>("/api/admin/pending", { token: auth.token });
     users.value = await api<AdminUser[]>("/api/admin/users", { token: auth.token });
     reports.value = await listBlogReports(auth.token ?? "");
+    if (moderateUserId.value && auth.token) {
+      try {
+        moderateDetail.value = await getAdminUserDetail(auth.token, moderateUserId.value);
+        syncModerateFromDetail();
+        modInvites.value = await listAdminUserInvites(auth.token, moderateUserId.value);
+      } catch {
+        /* панель закроется при ошибке */
+      }
+    }
   } catch (e) {
     err.value = e instanceof Error ? e.message : "ошибка";
   }
@@ -112,23 +150,58 @@ async function addInvite(id: string, role: "student" | "teacher") {
   await load();
 }
 
-function openModerate(u: AdminUser) {
+async function addModerateInvite(role: "student" | "teacher") {
+  const id = moderateUserId.value;
+  if (!id) return;
+  await addInvite(id, role);
+}
+
+async function openModerate(u: AdminUser) {
+  if (!auth.token) return;
   moderateUserId.value = u.id;
-  moderateBio.value = u.bio ?? "";
   modMsg.value = "";
+  modBusy.value = true;
+  moderatePassword.value = "";
+  try {
+    moderateDetail.value = await getAdminUserDetail(auth.token, u.id);
+    syncModerateFromDetail();
+    modInvites.value = await listAdminUserInvites(auth.token, u.id);
+  } catch (e) {
+    modMsg.value = e instanceof Error ? e.message : "ошибка";
+    moderateDetail.value = null;
+  } finally {
+    modBusy.value = false;
+  }
 }
 
 function closeModerate() {
   moderateUserId.value = null;
+  moderateDetail.value = null;
+  modInvites.value = [];
   modMsg.value = "";
+  moderatePassword.value = "";
 }
 
-async function saveModerateBio() {
+async function saveModerateProfile() {
   if (!auth.token || !moderateUserId.value) return;
   modBusy.value = true;
   modMsg.value = "";
   try {
-    await patchAdminUserProfile(auth.token, moderateUserId.value, { bio: moderateBio.value });
+    const id = moderateUserId.value;
+    const body: Parameters<typeof patchAdminUserProfile>[2] = {
+      nickname: moderateNick.value.trim(),
+      full_name: moderateFullName.value,
+      website_url: moderateWebsite.value,
+      bio: moderateBio.value,
+      readme_md: moderateReadme.value,
+      social_links: moderateSocial.value
+        .filter((s) => s.url.trim().length > 0)
+        .map((s) => ({ name: s.name.trim(), url: s.url.trim() })),
+    };
+    const pw = moderatePassword.value.trim();
+    if (pw.length > 0) body.new_password = pw;
+    await patchAdminUserProfile(auth.token, id, body);
+    moderatePassword.value = "";
     await load();
     modMsg.value = "сохранено";
   } catch (e) {
@@ -136,6 +209,15 @@ async function saveModerateBio() {
   } finally {
     modBusy.value = false;
   }
+}
+
+function addModerateSocial() {
+  if (moderateSocial.value.length >= 12) return;
+  moderateSocial.value.push({ name: "", url: "" });
+}
+
+function removeModerateSocial(idx: number) {
+  moderateSocial.value.splice(idx, 1);
 }
 
 async function onModerateAvatarFile(e: Event) {
@@ -179,6 +261,43 @@ async function clearModerateWallpaper() {
     await patchAdminUserProfile(auth.token, moderateUserId.value, { wallpaper_url: "" });
     await load();
     modMsg.value = "обои убраны";
+  } catch (e) {
+    modMsg.value = e instanceof Error ? e.message : "ошибка";
+  } finally {
+    modBusy.value = false;
+  }
+}
+
+async function onModerateWallpaperFile(e: Event) {
+  const input = e.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = "";
+  if (!file || !auth.token || !moderateUserId.value) return;
+  modBusy.value = true;
+  modMsg.value = "";
+  try {
+    await uploadAdminUserWallpaper(auth.token, moderateUserId.value, file);
+    await load();
+    modMsg.value = "обои обновлены";
+  } catch (e) {
+    modMsg.value = e instanceof Error ? e.message : "ошибка";
+  } finally {
+    modBusy.value = false;
+  }
+}
+
+function fullInviteUrl(code: string) {
+  return `${window.location.origin}/register?invite=${encodeURIComponent(code)}`;
+}
+
+async function removeModerateInvite(inviteId: string) {
+  if (!auth.token || !moderateUserId.value) return;
+  modBusy.value = true;
+  modMsg.value = "";
+  try {
+    await deleteAdminUserInvite(auth.token, moderateUserId.value, inviteId);
+    modInvites.value = await listAdminUserInvites(auth.token, moderateUserId.value);
+    modMsg.value = "инвайт удалён";
   } catch (e) {
     modMsg.value = e instanceof Error ? e.message : "ошибка";
   } finally {
@@ -248,36 +367,106 @@ async function restoreComment(id: string | null) {
 
     <template v-else-if="tab === 'users'">
       <input v-model="usersQuery" placeholder="поиск" class="search" />
-      <div v-if="moderateUser" class="mod-panel">
-        <p class="mod-title">
-          <strong>{{ moderateUser.nickname }}</strong>
-          <span class="muted small"> · модерация профиля</span>
-        </p>
-        <div v-if="moderateUser.avatar_url" class="mod-avatar">
-          <img :src="moderateUser.avatar_url" alt="" />
-        </div>
-        <textarea v-model="moderateBio" class="mod-bio" rows="3" placeholder="описание в профиле" />
-        <div class="mod-actions">
-          <button type="button" :disabled="modBusy" @click="saveModerateBio">сохранить описание</button>
-          <label class="file-label secondary">
-            новый аватар
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/gif,image/webp"
-              :disabled="modBusy"
-              hidden
-              @change="onModerateAvatarFile"
-            />
-          </label>
-          <button class="secondary" type="button" :disabled="modBusy" @click="resetModerateAvatar">
-            сбросить аватар
-          </button>
-          <button class="secondary" type="button" :disabled="modBusy" @click="clearModerateWallpaper">
-            убрать обои
-          </button>
-          <button class="secondary" type="button" :disabled="modBusy" @click="closeModerate">закрыть</button>
-        </div>
+      <div v-if="moderateUserId" class="mod-panel">
+        <template v-if="moderateDetail">
+          <p class="mod-title">
+            <strong>{{ moderateDetail.nickname }}</strong>
+            <span class="muted small"> · {{ moderateDetail.email }}</span>
+          </p>
+          <div v-if="moderateDetail.avatar_url" class="mod-avatar">
+            <img :src="moderateDetail.avatar_url" alt="" />
+          </div>
+          <div class="mod-grid">
+            <label class="mod-field">
+              <span class="muted small">ник</span>
+              <input v-model="moderateNick" type="text" autocomplete="off" />
+            </label>
+            <label class="mod-field">
+              <span class="muted small">имя</span>
+              <input v-model="moderateFullName" type="text" autocomplete="name" />
+            </label>
+            <label class="mod-field mod-field-wide">
+              <span class="muted small">сайт</span>
+              <input v-model="moderateWebsite" type="url" autocomplete="url" />
+            </label>
+            <label class="mod-field mod-field-wide">
+              <span class="muted small">описание (bio)</span>
+              <textarea v-model="moderateBio" rows="2" />
+            </label>
+            <label class="mod-field mod-field-wide">
+              <span class="muted small">readme · markdown (макс. {{ README_MAX }})</span>
+              <textarea v-model="moderateReadme" rows="4" :maxlength="README_MAX" />
+            </label>
+            <label class="mod-field mod-field-wide">
+              <span class="muted small">новый пароль (оставь пустым, если не менять)</span>
+              <input v-model="moderatePassword" type="password" autocomplete="new-password" />
+            </label>
+          </div>
+          <div class="mod-social">
+            <p class="muted small">соцсети</p>
+            <ul class="mod-social-list">
+              <li v-for="(s, idx) in moderateSocial" :key="idx" class="mod-social-row">
+                <input v-model="s.name" type="text" placeholder="название" />
+                <input v-model="s.url" type="url" placeholder="url" />
+                <button class="secondary" type="button" @click="removeModerateSocial(idx)">×</button>
+              </li>
+            </ul>
+            <button class="secondary small" type="button" :disabled="moderateSocial.length >= 12" @click="addModerateSocial">
+              + ссылка
+            </button>
+          </div>
+          <div class="mod-actions">
+            <button type="button" :disabled="modBusy || moderateReadme.length > README_MAX" @click="saveModerateProfile">
+              сохранить профиль
+            </button>
+            <label class="file-label secondary">
+              аватар
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/gif,image/webp"
+                :disabled="modBusy"
+                hidden
+                @change="onModerateAvatarFile"
+              />
+            </label>
+            <label class="file-label secondary">
+              обои
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/gif,image/webp"
+                :disabled="modBusy"
+                hidden
+                @change="onModerateWallpaperFile"
+              />
+            </label>
+            <button class="secondary" type="button" :disabled="modBusy" @click="resetModerateAvatar">сбросить аватар</button>
+            <button class="secondary" type="button" :disabled="modBusy" @click="clearModerateWallpaper">убрать обои</button>
+            <button class="secondary" type="button" :disabled="modBusy" @click="closeModerate">закрыть</button>
+          </div>
+          <div class="mod-invites">
+            <p class="muted small">инвайты пользователя</p>
+            <ul v-if="modInvites.length" class="invite-list">
+              <li v-for="inv in modInvites" :key="inv.id">
+                <code class="invite-code">{{ fullInviteUrl(inv.code) }}</code>
+                <span class="muted small">{{ inv.target_role }} · осталось {{ inv.remaining }}</span>
+                <button class="secondary small" type="button" :disabled="modBusy" @click="removeModerateInvite(inv.id)">
+                  удалить
+                </button>
+              </li>
+            </ul>
+            <p v-else class="muted small">нет активных</p>
+            <div class="row-actions">
+              <button class="secondary" type="button" :disabled="modBusy" @click="addModerateInvite('student')">
+                + инвайт ученик
+              </button>
+              <button class="secondary" type="button" :disabled="modBusy" @click="addModerateInvite('teacher')">
+                + инвайт ментор
+              </button>
+            </div>
+          </div>
+        </template>
         <p v-if="modMsg" class="muted small">{{ modMsg }}</p>
+        <button v-if="!moderateDetail" class="secondary" type="button" @click="closeModerate">закрыть</button>
       </div>
       <p v-if="!filteredUsers.length" class="muted">не найдено</p>
       <ul v-else class="list">
@@ -432,6 +621,73 @@ strong {
   background: var(--bg);
   color: var(--text);
   border-radius: var(--radius);
+}
+.mod-grid {
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: 1fr 1fr;
+}
+.mod-field {
+  display: grid;
+  gap: 0.25rem;
+}
+.mod-field-wide {
+  grid-column: 1 / -1;
+}
+.mod-field input,
+.mod-field textarea {
+  font: inherit;
+  padding: 0.45rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+}
+.mod-social {
+  margin-top: 0.5rem;
+}
+.mod-social-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.35rem 0;
+  display: grid;
+  gap: 0.35rem;
+}
+.mod-social-row {
+  display: grid;
+  grid-template-columns: 1fr 2fr auto;
+  gap: 0.35rem;
+  align-items: center;
+}
+.mod-social-row input {
+  font: inherit;
+  padding: 0.35rem 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+}
+.invite-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 0.5rem;
+  display: grid;
+  gap: 0.5rem;
+}
+.invite-list li {
+  display: grid;
+  gap: 0.25rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+.invite-code {
+  font-size: 0.75rem;
+  word-break: break-all;
+}
+.mod-invites {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
 }
 .mod-actions {
   display: flex;

@@ -4,7 +4,7 @@ import path from "node:path";
 import fs from "node:fs";
 import { v4 as uuidv4 } from "uuid";
 import { all, get, nowIso, run } from "../db.js";
-import { authRequired } from "../auth.js";
+import { authRequired, hashPassword } from "../auth.js";
 import { awardAchievement } from "../utils/achievements.js";
 import { saveIdenticon } from "../utils/identicon.js";
 
@@ -20,6 +20,7 @@ router.use(authRequired, adminOnly);
 const UPLOAD_ROOT = path.resolve(process.env.UPLOADS_DIR ?? "./data/uploads");
 const IMAGE_MIMES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
 fs.mkdirSync(path.join(UPLOAD_ROOT, "avatars"), { recursive: true });
+fs.mkdirSync(path.join(UPLOAD_ROOT, "wallpapers"), { recursive: true });
 
 const adminAvatarUpload = multer({
   storage: multer.diskStorage({
@@ -30,6 +31,21 @@ const adminAvatarUpload = multer({
     },
   }),
   limits: { fileSize: 3 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (IMAGE_MIMES.has(file.mimetype)) cb(null, true);
+    else cb(new Error("only jpeg, png, gif, webp"));
+  },
+});
+
+const adminWallpaperUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, path.join(UPLOAD_ROOT, "wallpapers")),
+    filename: (req, file, cb) => {
+      const ext = (path.extname(file.originalname) || ".bin").toLowerCase();
+      cb(null, `wp-${req.params.id}-${uuidv4().replace(/-/g, "")}${ext}`);
+    },
+  }),
+  limits: { fileSize: 6 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     if (IMAGE_MIMES.has(file.mimetype)) cb(null, true);
     else cb(new Error("only jpeg, png, gif, webp"));
@@ -60,29 +76,137 @@ router.get("/admin/users", (_req, res) => {
   return res.json(rows);
 });
 
-router.patch("/admin/users/:id/profile", (req, res) => {
+router.get("/admin/users/:id", (req, res) => {
+  const row = get(
+    `SELECT id, email, nickname, role, status, bio, full_name, website_url, readme_md,
+            social_links_json, avatar_url, wallpaper_url, nickname_change_count, created_at
+     FROM users WHERE id = ?`,
+    req.params.id,
+  );
+  if (!row) return res.status(404).json({ error: "not found" });
+  let social_links = [];
+  try {
+    social_links = JSON.parse(row.social_links_json ?? "[]");
+    if (!Array.isArray(social_links)) social_links = [];
+  } catch {
+    social_links = [];
+  }
+  return res.json({
+    id: row.id,
+    email: row.email,
+    nickname: row.nickname,
+    role: row.role,
+    status: row.status,
+    bio: row.bio ?? "",
+    full_name: row.full_name ?? "",
+    website_url: row.website_url ?? "",
+    readme_md: row.readme_md ?? "",
+    social_links,
+    avatar_url: row.avatar_url ?? "",
+    wallpaper_url: row.wallpaper_url ?? "",
+    nickname_change_count: Number(row.nickname_change_count ?? 0),
+    created_at: row.created_at ?? "",
+  });
+});
+
+router.get("/admin/users/:id/invites", (req, res) => {
+  const target = get("SELECT id FROM users WHERE id = ?", req.params.id);
+  if (!target) return res.status(404).json({ error: "not found" });
+  const rows = all(
+    `SELECT id, code, target_role, max_uses, used_count, created_at
+     FROM invite_links WHERE owner_user_id = ? ORDER BY created_at DESC`,
+    req.params.id,
+  );
+  return res.json(
+    rows.map((r) => ({
+      ...r,
+      remaining: Math.max(0, (r.max_uses ?? 0) - (r.used_count ?? 0)),
+    })),
+  );
+});
+
+router.delete("/admin/users/:userId/invites/:inviteId", (req, res) => {
+  const row = get(
+    "SELECT id FROM invite_links WHERE id = ? AND owner_user_id = ?",
+    req.params.inviteId,
+    req.params.userId,
+  );
+  if (!row) return res.status(404).json({ error: "not found" });
+  run("DELETE FROM invite_links WHERE id = ?", req.params.inviteId);
+  return res.json({ ok: true });
+});
+
+router.patch("/admin/users/:id/profile", async (req, res) => {
   const id = req.params.id;
   const target = get("SELECT id, nickname FROM users WHERE id = ?", id);
   if (!target) return res.status(404).json({ error: "not found" });
   const body = req.body ?? {};
-  if (body.bio !== undefined) {
-    const bio = String(body.bio);
-    if (bio.length > 4000) return res.status(400).json({ error: "bio too long" });
-    run("UPDATE users SET bio = ? WHERE id = ?", bio, id);
-  }
-  if (body.wallpaper_url !== undefined) {
-    run("UPDATE users SET wallpaper_url = ? WHERE id = ?", String(body.wallpaper_url ?? ""), id);
-  }
-  if (body.avatar_url !== undefined) {
-    const v = body.avatar_url;
-    if (v === null || v === "") {
-      const url = saveIdenticon(target.nickname || target.id, target.id);
-      run("UPDATE users SET avatar_url = ? WHERE id = ?", url, target.id);
-    } else {
-      run("UPDATE users SET avatar_url = ? WHERE id = ?", String(v), id);
+  try {
+    if (body.nickname !== undefined) {
+      const nn = String(body.nickname).trim();
+      if (!/^[a-z0-9_.]{2,24}$/i.test(nn)) {
+        return res.status(400).json({ error: "bad nickname" });
+      }
+      const taken = get(
+        "SELECT 1 as v FROM users WHERE LOWER(nickname) = LOWER(?) AND id <> ?",
+        nn,
+        id,
+      );
+      if (taken) return res.status(400).json({ error: "ник занят" });
+      run("UPDATE users SET nickname = ? WHERE id = ?", nn, id);
     }
+    if (body.full_name !== undefined) {
+      run("UPDATE users SET full_name = ? WHERE id = ?", String(body.full_name ?? "").slice(0, 240), id);
+    }
+    if (body.website_url !== undefined) {
+      run("UPDATE users SET website_url = ? WHERE id = ?", String(body.website_url ?? "").slice(0, 2000), id);
+    }
+    if (body.bio !== undefined) {
+      const bio = String(body.bio);
+      if (bio.length > 4000) return res.status(400).json({ error: "bio too long" });
+      run("UPDATE users SET bio = ? WHERE id = ?", bio, id);
+    }
+    if (body.readme_md !== undefined) {
+      const readme = String(body.readme_md);
+      if (readme.length > 4000) return res.status(400).json({ error: "readme too long" });
+      run("UPDATE users SET readme_md = ? WHERE id = ?", readme, id);
+    }
+    if (body.social_links !== undefined) {
+      if (!Array.isArray(body.social_links)) {
+        return res.status(400).json({ error: "social_links must be array" });
+      }
+      const cleaned = body.social_links.slice(0, 12).map((x) => ({
+        name: String(x?.name ?? "").slice(0, 64),
+        url: String(x?.url ?? "").slice(0, 512),
+      }));
+      run("UPDATE users SET social_links_json = ? WHERE id = ?", JSON.stringify(cleaned), id);
+    }
+    if (body.wallpaper_url !== undefined) {
+      run("UPDATE users SET wallpaper_url = ? WHERE id = ?", String(body.wallpaper_url ?? ""), id);
+    }
+    if (body.avatar_url !== undefined) {
+      const nickRow = get("SELECT nickname FROM users WHERE id = ?", id);
+      const nick = nickRow?.nickname ?? target.nickname ?? target.id;
+      const v = body.avatar_url;
+      if (v === null || v === "") {
+        const url = saveIdenticon(nick, id);
+        run("UPDATE users SET avatar_url = ? WHERE id = ?", url, id);
+      } else {
+        run("UPDATE users SET avatar_url = ? WHERE id = ?", String(v), id);
+      }
+    }
+    if (body.new_password !== undefined && String(body.new_password).length > 0) {
+      const pw = String(body.new_password);
+      if (pw.length < 8) return res.status(400).json({ error: "password too short" });
+      if (pw.length > 256) return res.status(400).json({ error: "password too long" });
+      const hash = await hashPassword(pw);
+      run("UPDATE users SET password_hash = ? WHERE id = ?", hash, id);
+    }
+    return res.json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ error: "internal error" });
   }
-  return res.json({ ok: true });
 });
 
 router.post(
@@ -95,6 +219,19 @@ router.post(
     const url = `/uploads/avatars/${req.file.filename}`;
     run("UPDATE users SET avatar_url = ? WHERE id = ?", url, req.params.id);
     return res.json({ avatar_url: url });
+  },
+);
+
+router.post(
+  "/admin/users/:id/wallpaper",
+  uploadSingle(adminWallpaperUpload, "file"),
+  (req, res) => {
+    if (!req.file) return res.status(400).json({ error: "no file" });
+    const target = get("SELECT id FROM users WHERE id = ?", req.params.id);
+    if (!target) return res.status(404).json({ error: "not found" });
+    const url = `/uploads/wallpapers/${req.file.filename}`;
+    run("UPDATE users SET wallpaper_url = ? WHERE id = ?", url, req.params.id);
+    return res.json({ wallpaper_url: url });
   },
 );
 
