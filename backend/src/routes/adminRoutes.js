@@ -123,7 +123,7 @@ router.delete("/admin/users/:id", (req, res) => {
     run("DELETE FROM blog_post_bookmarks WHERE user_id = ?", id);
   } catch {}
   try {
-    run("DELETE FROM blog_comments WHERE author_id = ?", id);
+    run("DELETE FROM blog_comments WHERE user_id = ?", id);
   } catch {}
   try {
     run("DELETE FROM blog_posts WHERE author_id = ?", id);

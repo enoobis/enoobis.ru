@@ -4,6 +4,247 @@ const dbPath = process.env.DATABASE_FILE ?? "./edu.db";
 export const db = new Database(dbPath);
 db.pragma("journal_mode = WAL");
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    email TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    nickname TEXT NOT NULL UNIQUE,
+    role TEXT NOT NULL,
+    status TEXT NOT NULL,
+    bio TEXT NOT NULL DEFAULT '',
+    wallpaper_url TEXT NOT NULL DEFAULT '',
+    avatar_url TEXT NOT NULL DEFAULT '',
+    theme_preference TEXT NOT NULL DEFAULT 'black',
+    language_preference TEXT NOT NULL DEFAULT 'ru',
+    font_preference TEXT NOT NULL DEFAULT 'normal',
+    full_name TEXT NOT NULL DEFAULT '',
+    website_url TEXT NOT NULL DEFAULT '',
+    social_links_json TEXT NOT NULL DEFAULT '[]',
+    birthday TEXT NOT NULL DEFAULT '',
+    country TEXT NOT NULL DEFAULT '',
+    readme_md TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    last_seen_at TEXT,
+    nickname_change_count INTEGER NOT NULL DEFAULT 0,
+    pinned_post_id TEXT,
+    pinned_post_type TEXT NOT NULL DEFAULT ''
+  );
+
+  CREATE TABLE IF NOT EXISTS blog_posts (
+    id TEXT PRIMARY KEY,
+    author_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    status TEXT NOT NULL,
+    published_at TEXT,
+    updated_at TEXT NOT NULL,
+    slug TEXT NOT NULL,
+    excerpt TEXT NOT NULL DEFAULT '',
+    cover_image_url TEXT NOT NULL DEFAULT '',
+    is_deleted INTEGER NOT NULL DEFAULT 0
+  );
+  CREATE INDEX IF NOT EXISTS idx_blog_posts_author ON blog_posts(author_id);
+  CREATE INDEX IF NOT EXISTS idx_blog_posts_status_published ON blog_posts(status);
+
+  CREATE TABLE IF NOT EXISTS blog_tags (
+    id TEXT PRIMARY KEY,
+    slug TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS blog_categories (
+    id TEXT PRIMARY KEY,
+    slug TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS blog_post_tags (
+    post_id TEXT NOT NULL,
+    tag_id TEXT NOT NULL,
+    PRIMARY KEY (post_id, tag_id)
+  );
+  CREATE TABLE IF NOT EXISTS blog_post_categories (
+    post_id TEXT NOT NULL,
+    category_id TEXT NOT NULL,
+    PRIMARY KEY (post_id, category_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS blog_comments (
+    id TEXT PRIMARY KEY,
+    post_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    parent_comment_id TEXT,
+    body TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'visible',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_blog_comments_post ON blog_comments(post_id);
+
+  CREATE TABLE IF NOT EXISTS blog_post_likes (
+    user_id TEXT NOT NULL,
+    post_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, post_id)
+  );
+  CREATE TABLE IF NOT EXISTS blog_post_bookmarks (
+    user_id TEXT NOT NULL,
+    post_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, post_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS blog_reports (
+    id TEXT PRIMARY KEY,
+    target_type TEXT NOT NULL,
+    target_post_id TEXT,
+    target_comment_id TEXT,
+    reporter_user_id TEXT NOT NULL,
+    reason TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'open',
+    created_at TEXT NOT NULL,
+    resolved_at TEXT,
+    resolved_by TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_blog_reports_created ON blog_reports(created_at DESC);
+
+  CREATE TABLE IF NOT EXISTS blog_post_images (
+    id TEXT PRIMARY KEY,
+    post_id TEXT NOT NULL,
+    uploader_user_id TEXT NOT NULL,
+    url TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS invite_links (
+    id TEXT PRIMARY KEY,
+    code TEXT NOT NULL UNIQUE,
+    owner_user_id TEXT NOT NULL,
+    max_uses INTEGER NOT NULL DEFAULT 1,
+    used_count INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    target_role TEXT NOT NULL DEFAULT 'student'
+  );
+
+  CREATE TABLE IF NOT EXISTS user_follows (
+    follower_user_id TEXT NOT NULL,
+    following_user_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (follower_user_id, following_user_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_user_follows_following ON user_follows(following_user_id);
+
+  CREATE TABLE IF NOT EXISTS courses (
+    id TEXT PRIMARY KEY,
+    teacher_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    is_open INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL,
+    course_code TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_courses_code ON courses(course_code);
+
+  CREATE TABLE IF NOT EXISTS course_students (
+    course_id TEXT NOT NULL,
+    student_id TEXT NOT NULL,
+    PRIMARY KEY (course_id, student_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS course_lectures (
+    id TEXT PRIMARY KEY,
+    course_id TEXT NOT NULL,
+    author_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    body_text TEXT NOT NULL DEFAULT '',
+    video_url TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS course_lecture_attachments (
+    id TEXT PRIMARY KEY,
+    lecture_id TEXT NOT NULL,
+    file_name TEXT NOT NULL,
+    url TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS course_assignments (
+    id TEXT PRIMARY KEY,
+    course_id TEXT NOT NULL,
+    author_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    due_at TEXT,
+    max_points INTEGER,
+    created_at TEXT NOT NULL,
+    lecture_id TEXT
+  );
+  CREATE TABLE IF NOT EXISTS course_assignment_submissions (
+    id TEXT PRIMARY KEY,
+    assignment_id TEXT NOT NULL,
+    student_id TEXT NOT NULL,
+    content TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'draft',
+    grade_points REAL,
+    teacher_comment TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_submission_unique ON course_assignment_submissions(assignment_id, student_id);
+
+  CREATE TABLE IF NOT EXISTS course_stream_posts (
+    id TEXT PRIMARY KEY,
+    course_id TEXT NOT NULL,
+    author_id TEXT NOT NULL,
+    body TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS course_stream_comments (
+    id TEXT PRIMARY KEY,
+    post_id TEXT NOT NULL,
+    course_id TEXT NOT NULL,
+    author_id TEXT NOT NULL,
+    body TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS user_favorite_courses (
+    user_id TEXT NOT NULL,
+    course_id TEXT NOT NULL,
+    PRIMARY KEY (user_id, course_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS user_daily_activity (
+    user_id TEXT NOT NULL,
+    day TEXT NOT NULL,
+    seconds_spent INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, day)
+  );
+
+  CREATE TABLE IF NOT EXISTS user_privacy_settings (
+    user_id TEXT PRIMARY KEY,
+    profile_visibility TEXT NOT NULL DEFAULT 'public',
+    activity_visibility TEXT NOT NULL DEFAULT 'public',
+    media_visibility TEXT NOT NULL DEFAULT 'public',
+    show_birthday INTEGER NOT NULL DEFAULT 1,
+    show_country INTEGER NOT NULL DEFAULT 1,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS user_notification_settings (
+    user_id TEXT PRIMARY KEY,
+    email_enabled INTEGER NOT NULL DEFAULT 1,
+    push_enabled INTEGER NOT NULL DEFAULT 0,
+    course_updates INTEGER NOT NULL DEFAULT 1,
+    assignment_deadlines INTEGER NOT NULL DEFAULT 1,
+    grades_released INTEGER NOT NULL DEFAULT 1,
+    new_followers INTEGER NOT NULL DEFAULT 1,
+    marketing_news INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL
+  );
+`);
+
 export function nowIso() {
   return new Date().toISOString();
 }
