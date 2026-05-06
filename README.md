@@ -1,7 +1,5 @@
 # enoobis.ru
 
-## Run Locally
-
 Frontend:
 
 ```bash
