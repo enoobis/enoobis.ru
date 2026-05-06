@@ -1,8 +1,12 @@
 import express from "express";
+import multer from "multer";
+import path from "node:path";
+import fs from "node:fs";
 import { v4 as uuidv4 } from "uuid";
 import { all, get, nowIso, run } from "../db.js";
 import { authRequired } from "../auth.js";
 import { awardAchievement } from "../utils/achievements.js";
+import { saveIdenticon } from "../utils/identicon.js";
 
 const router = express.Router();
 
@@ -13,6 +17,34 @@ function adminOnly(req, res, next) {
 
 router.use(authRequired, adminOnly);
 
+const UPLOAD_ROOT = path.resolve(process.env.UPLOADS_DIR ?? "./data/uploads");
+const IMAGE_MIMES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
+fs.mkdirSync(path.join(UPLOAD_ROOT, "avatars"), { recursive: true });
+
+const adminAvatarUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, path.join(UPLOAD_ROOT, "avatars")),
+    filename: (req, file, cb) => {
+      const ext = (path.extname(file.originalname) || ".bin").toLowerCase();
+      cb(null, `${req.params.id}-${uuidv4().replace(/-/g, "")}${ext}`);
+    },
+  }),
+  limits: { fileSize: 3 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (IMAGE_MIMES.has(file.mimetype)) cb(null, true);
+    else cb(new Error("only jpeg, png, gif, webp"));
+  },
+});
+
+function uploadSingle(upload, field) {
+  return (req, res, next) => {
+    upload.single(field)(req, res, (err) => {
+      if (err) return res.status(400).json({ error: err.message ?? "upload error" });
+      next();
+    });
+  };
+}
+
 router.get("/admin/pending", (_req, res) => {
   const rows = all(
     "SELECT id, email, nickname, role, created_at FROM users WHERE status = 'pending' ORDER BY created_at",
@@ -22,10 +54,49 @@ router.get("/admin/pending", (_req, res) => {
 
 router.get("/admin/users", (_req, res) => {
   const rows = all(
-    "SELECT id, email, nickname, role, status, created_at FROM users ORDER BY created_at DESC",
+    `SELECT id, email, nickname, role, status, created_at, bio, avatar_url, wallpaper_url
+     FROM users ORDER BY created_at DESC`,
   );
   return res.json(rows);
 });
+
+router.patch("/admin/users/:id/profile", (req, res) => {
+  const id = req.params.id;
+  const target = get("SELECT id, nickname FROM users WHERE id = ?", id);
+  if (!target) return res.status(404).json({ error: "not found" });
+  const body = req.body ?? {};
+  if (body.bio !== undefined) {
+    const bio = String(body.bio);
+    if (bio.length > 4000) return res.status(400).json({ error: "bio too long" });
+    run("UPDATE users SET bio = ? WHERE id = ?", bio, id);
+  }
+  if (body.wallpaper_url !== undefined) {
+    run("UPDATE users SET wallpaper_url = ? WHERE id = ?", String(body.wallpaper_url ?? ""), id);
+  }
+  if (body.avatar_url !== undefined) {
+    const v = body.avatar_url;
+    if (v === null || v === "") {
+      const url = saveIdenticon(target.nickname || target.id, target.id);
+      run("UPDATE users SET avatar_url = ? WHERE id = ?", url, target.id);
+    } else {
+      run("UPDATE users SET avatar_url = ? WHERE id = ?", String(v), id);
+    }
+  }
+  return res.json({ ok: true });
+});
+
+router.post(
+  "/admin/users/:id/avatar",
+  uploadSingle(adminAvatarUpload, "file"),
+  (req, res) => {
+    if (!req.file) return res.status(400).json({ error: "no file" });
+    const target = get("SELECT id FROM users WHERE id = ?", req.params.id);
+    if (!target) return res.status(404).json({ error: "not found" });
+    const url = `/uploads/avatars/${req.file.filename}`;
+    run("UPDATE users SET avatar_url = ? WHERE id = ?", url, req.params.id);
+    return res.json({ avatar_url: url });
+  },
+);
 
 router.post("/admin/users/:id/approve", (req, res) => {
   run("UPDATE users SET status = 'approved' WHERE id = ?", req.params.id);

@@ -9,10 +9,21 @@ import {
   restoreCommentByAdmin,
   type BlogReport,
 } from "../api/blog";
+import { patchAdminUserProfile, uploadAdminUserAvatar } from "../api/adminUsers";
 import { useAuthStore } from "../stores/auth";
 
 type Pending = { id: string; email: string; nickname: string; role: string; created_at: string };
-type AdminUser = { id: string; email: string; nickname: string; role: string; status: string; created_at: string };
+type AdminUser = {
+  id: string;
+  email: string;
+  nickname: string;
+  role: string;
+  status: string;
+  created_at: string;
+  bio: string;
+  avatar_url: string;
+  wallpaper_url: string;
+};
 type Tab = "pending" | "users" | "reports";
 
 const auth = useAuthStore();
@@ -22,6 +33,15 @@ const users = ref<AdminUser[]>([]);
 const reports = ref<BlogReport[]>([]);
 const err = ref("");
 const usersQuery = ref("");
+const moderateUserId = ref<string | null>(null);
+const moderateBio = ref("");
+const modMsg = ref("");
+const modBusy = ref(false);
+
+const moderateUser = computed(() => {
+  if (!moderateUserId.value) return null;
+  return users.value.find((u) => u.id === moderateUserId.value) ?? null;
+});
 
 const filteredUsers = computed(() => {
   const q = usersQuery.value.trim().toLowerCase();
@@ -92,6 +112,80 @@ async function addInvite(id: string, role: "student" | "teacher") {
   await load();
 }
 
+function openModerate(u: AdminUser) {
+  moderateUserId.value = u.id;
+  moderateBio.value = u.bio ?? "";
+  modMsg.value = "";
+}
+
+function closeModerate() {
+  moderateUserId.value = null;
+  modMsg.value = "";
+}
+
+async function saveModerateBio() {
+  if (!auth.token || !moderateUserId.value) return;
+  modBusy.value = true;
+  modMsg.value = "";
+  try {
+    await patchAdminUserProfile(auth.token, moderateUserId.value, { bio: moderateBio.value });
+    await load();
+    modMsg.value = "сохранено";
+  } catch (e) {
+    modMsg.value = e instanceof Error ? e.message : "ошибка";
+  } finally {
+    modBusy.value = false;
+  }
+}
+
+async function onModerateAvatarFile(e: Event) {
+  const input = e.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = "";
+  if (!file || !auth.token || !moderateUserId.value) return;
+  modBusy.value = true;
+  modMsg.value = "";
+  try {
+    await uploadAdminUserAvatar(auth.token, moderateUserId.value, file);
+    await load();
+    modMsg.value = "аватар обновлён";
+  } catch (e) {
+    modMsg.value = e instanceof Error ? e.message : "ошибка";
+  } finally {
+    modBusy.value = false;
+  }
+}
+
+async function resetModerateAvatar() {
+  if (!auth.token || !moderateUserId.value) return;
+  modBusy.value = true;
+  modMsg.value = "";
+  try {
+    await patchAdminUserProfile(auth.token, moderateUserId.value, { avatar_url: "" });
+    await load();
+    modMsg.value = "аватар сброшен";
+  } catch (e) {
+    modMsg.value = e instanceof Error ? e.message : "ошибка";
+  } finally {
+    modBusy.value = false;
+  }
+}
+
+async function clearModerateWallpaper() {
+  if (!auth.token || !moderateUserId.value) return;
+  modBusy.value = true;
+  modMsg.value = "";
+  try {
+    await patchAdminUserProfile(auth.token, moderateUserId.value, { wallpaper_url: "" });
+    await load();
+    modMsg.value = "обои убраны";
+  } catch (e) {
+    modMsg.value = e instanceof Error ? e.message : "ошибка";
+  } finally {
+    modBusy.value = false;
+  }
+}
+
 async function resolveReport(id: string, status: "resolved" | "dismissed") {
   if (!auth.token) return;
   await resolveBlogReport(id, status, auth.token);
@@ -154,6 +248,37 @@ async function restoreComment(id: string | null) {
 
     <template v-else-if="tab === 'users'">
       <input v-model="usersQuery" placeholder="поиск" class="search" />
+      <div v-if="moderateUser" class="mod-panel">
+        <p class="mod-title">
+          <strong>{{ moderateUser.nickname }}</strong>
+          <span class="muted small"> · модерация профиля</span>
+        </p>
+        <div v-if="moderateUser.avatar_url" class="mod-avatar">
+          <img :src="moderateUser.avatar_url" alt="" />
+        </div>
+        <textarea v-model="moderateBio" class="mod-bio" rows="3" placeholder="описание в профиле" />
+        <div class="mod-actions">
+          <button type="button" :disabled="modBusy" @click="saveModerateBio">сохранить описание</button>
+          <label class="file-label secondary">
+            новый аватар
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/gif,image/webp"
+              :disabled="modBusy"
+              hidden
+              @change="onModerateAvatarFile"
+            />
+          </label>
+          <button class="secondary" type="button" :disabled="modBusy" @click="resetModerateAvatar">
+            сбросить аватар
+          </button>
+          <button class="secondary" type="button" :disabled="modBusy" @click="clearModerateWallpaper">
+            убрать обои
+          </button>
+          <button class="secondary" type="button" :disabled="modBusy" @click="closeModerate">закрыть</button>
+        </div>
+        <p v-if="modMsg" class="muted small">{{ modMsg }}</p>
+      </div>
       <p v-if="!filteredUsers.length" class="muted">не найдено</p>
       <ul v-else class="list">
         <li v-for="u in filteredUsers" :key="u.id">
@@ -162,6 +287,7 @@ async function restoreComment(id: string | null) {
             <span class="muted small"> · {{ u.role }} · {{ u.status }} · {{ u.email }}</span>
           </div>
           <div class="row-actions">
+            <button class="secondary" type="button" :disabled="modBusy" @click="openModerate(u)">модерация</button>
             <button class="secondary" type="button" :disabled="u.role === 'student'" @click="setRole(u.id, 'student')">
               ученик
             </button>
@@ -279,5 +405,50 @@ async function restoreComment(id: string | null) {
 }
 strong {
   font-weight: 500;
+}
+.mod-panel {
+  margin-bottom: 1.25rem;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--border);
+  display: grid;
+  gap: 0.6rem;
+}
+.mod-title {
+  margin: 0;
+}
+.mod-avatar img {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius);
+  object-fit: cover;
+}
+.mod-bio {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  border-radius: var(--radius);
+}
+.mod-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+}
+.file-label.secondary {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+}
+.file-label.secondary:hover {
+  background: var(--surface);
 }
 </style>

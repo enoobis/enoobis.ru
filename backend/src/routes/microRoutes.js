@@ -16,6 +16,7 @@ const MAX_BODY = 480;
 
 const UPLOAD_ROOT = path.resolve(process.env.UPLOADS_DIR ?? "./data/uploads");
 fs.mkdirSync(path.join(UPLOAD_ROOT, "micro"), { recursive: true });
+const IMAGE_MIMES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
 const microUpload = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, path.join(UPLOAD_ROOT, "micro")),
@@ -25,6 +26,10 @@ const microUpload = multer({
     },
   }),
   limits: { fileSize: 6 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (IMAGE_MIMES.has(file.mimetype)) cb(null, true);
+    else cb(new Error("only jpeg, png, gif, webp"));
+  },
 });
 
 function authorizeBearer(req) {
@@ -255,7 +260,12 @@ router.post("/micro", authRequired, (req, res) => {
 router.post(
   "/micro/upload-image",
   authRequired,
-  microUpload.single("file"),
+  (req, res, next) => {
+    microUpload.single("file")(req, res, (err) => {
+      if (err) return res.status(400).json({ error: err.message ?? "upload error" });
+      next();
+    });
+  },
   (req, res) => {
     if (!req.file) return res.status(400).json({ error: "no file" });
     return res.json({ url: `/uploads/micro/${req.file.filename}` });
