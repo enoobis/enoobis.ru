@@ -133,7 +133,6 @@ router.post("/me/nickname", authRequired, (req, res) => {
 router.patch("/me", authRequired, (req, res) => {
   const allowed = [
     "bio",
-    "wallpaper_url",
     "avatar_url",
     "theme_preference",
     "language_preference",

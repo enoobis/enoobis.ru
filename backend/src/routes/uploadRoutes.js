@@ -9,7 +9,7 @@ import { authRequired } from "../auth.js";
 const router = express.Router();
 
 const UPLOAD_ROOT = path.resolve(process.env.UPLOADS_DIR ?? "./data/uploads");
-const SUBDIRS = ["avatars", "wallpapers", "blog", "course-lectures"];
+const SUBDIRS = ["avatars", "blog", "course-lectures"];
 for (const d of SUBDIRS) fs.mkdirSync(path.join(UPLOAD_ROOT, d), { recursive: true });
 
 const IMAGE_MIMES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
@@ -43,11 +43,6 @@ const avatarUpload = multer({
   limits: { fileSize: 3 * 1024 * 1024 },
   fileFilter: imageFileFilter,
 });
-const wallpaperUpload = multer({
-  storage: makeStorage("wallpapers"),
-  limits: { fileSize: 6 * 1024 * 1024 },
-  fileFilter: imageFileFilter,
-});
 const blogUpload = multer({
   storage: makeStorage("blog"),
   limits: { fileSize: 8 * 1024 * 1024 },
@@ -63,13 +58,6 @@ router.post("/me/avatar", authRequired, uploadSingle(avatarUpload, "file"), (req
   const url = `/uploads/avatars/${req.file.filename}`;
   run("UPDATE users SET avatar_url = ? WHERE id = ?", url, req.user.id);
   return res.json({ avatar_url: url });
-});
-
-router.post("/me/wallpaper", authRequired, uploadSingle(wallpaperUpload, "file"), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: "no file" });
-  const url = `/uploads/wallpapers/${req.file.filename}`;
-  run("UPDATE users SET wallpaper_url = ? WHERE id = ?", url, req.user.id);
-  return res.json({ wallpaper_url: url });
 });
 
 router.post("/blog/upload-image", authRequired, uploadSingle(blogUpload, "file"), (req, res) => {

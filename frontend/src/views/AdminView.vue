@@ -15,7 +15,6 @@ import {
   listAdminUserInvites,
   patchAdminUserProfile,
   uploadAdminUserAvatar,
-  uploadAdminUserWallpaper,
   type AdminInviteRow,
   type AdminUserDetail,
 } from "../api/adminUsers";
@@ -35,7 +34,6 @@ type AdminUser = {
   created_at: string;
   bio: string;
   avatar_url: string;
-  wallpaper_url: string;
 };
 type Tab = "pending" | "users" | "reports";
 
@@ -253,39 +251,6 @@ async function resetModerateAvatar() {
   }
 }
 
-async function clearModerateWallpaper() {
-  if (!auth.token || !moderateUserId.value) return;
-  modBusy.value = true;
-  modMsg.value = "";
-  try {
-    await patchAdminUserProfile(auth.token, moderateUserId.value, { wallpaper_url: "" });
-    await load();
-    modMsg.value = "обои убраны";
-  } catch (e) {
-    modMsg.value = e instanceof Error ? e.message : "ошибка";
-  } finally {
-    modBusy.value = false;
-  }
-}
-
-async function onModerateWallpaperFile(e: Event) {
-  const input = e.target as HTMLInputElement;
-  const file = input.files?.[0];
-  input.value = "";
-  if (!file || !auth.token || !moderateUserId.value) return;
-  modBusy.value = true;
-  modMsg.value = "";
-  try {
-    await uploadAdminUserWallpaper(auth.token, moderateUserId.value, file);
-    await load();
-    modMsg.value = "обои обновлены";
-  } catch (e) {
-    modMsg.value = e instanceof Error ? e.message : "ошибка";
-  } finally {
-    modBusy.value = false;
-  }
-}
-
 function fullInviteUrl(code: string) {
   return `${window.location.origin}/register?invite=${encodeURIComponent(code)}`;
 }
@@ -429,18 +394,7 @@ async function restoreComment(id: string | null) {
                 @change="onModerateAvatarFile"
               />
             </label>
-            <label class="file-label secondary">
-              обои
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/gif,image/webp"
-                :disabled="modBusy"
-                hidden
-                @change="onModerateWallpaperFile"
-              />
-            </label>
             <button class="secondary" type="button" :disabled="modBusy" @click="resetModerateAvatar">сбросить аватар</button>
-            <button class="secondary" type="button" :disabled="modBusy" @click="clearModerateWallpaper">убрать обои</button>
             <button class="secondary" type="button" :disabled="modBusy" @click="closeModerate">закрыть</button>
           </div>
           <div class="mod-invites">

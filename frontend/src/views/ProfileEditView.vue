@@ -23,7 +23,6 @@ type Me = {
   role: string;
   status: string;
   bio: string;
-  wallpaper_url: string;
   avatar_url: string;
   readme_md: string;
   language_preference: "ru" | "en";

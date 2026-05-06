@@ -20,7 +20,6 @@ router.use(authRequired, adminOnly);
 const UPLOAD_ROOT = path.resolve(process.env.UPLOADS_DIR ?? "./data/uploads");
 const IMAGE_MIMES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
 fs.mkdirSync(path.join(UPLOAD_ROOT, "avatars"), { recursive: true });
-fs.mkdirSync(path.join(UPLOAD_ROOT, "wallpapers"), { recursive: true });
 
 const adminAvatarUpload = multer({
   storage: multer.diskStorage({
@@ -31,21 +30,6 @@ const adminAvatarUpload = multer({
     },
   }),
   limits: { fileSize: 3 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    if (IMAGE_MIMES.has(file.mimetype)) cb(null, true);
-    else cb(new Error("only jpeg, png, gif, webp"));
-  },
-});
-
-const adminWallpaperUpload = multer({
-  storage: multer.diskStorage({
-    destination: (_req, _file, cb) => cb(null, path.join(UPLOAD_ROOT, "wallpapers")),
-    filename: (req, file, cb) => {
-      const ext = (path.extname(file.originalname) || ".bin").toLowerCase();
-      cb(null, `wp-${req.params.id}-${uuidv4().replace(/-/g, "")}${ext}`);
-    },
-  }),
-  limits: { fileSize: 6 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     if (IMAGE_MIMES.has(file.mimetype)) cb(null, true);
     else cb(new Error("only jpeg, png, gif, webp"));
@@ -70,7 +54,7 @@ router.get("/admin/pending", (_req, res) => {
 
 router.get("/admin/users", (_req, res) => {
   const rows = all(
-    `SELECT id, email, nickname, role, status, created_at, bio, avatar_url, wallpaper_url
+    `SELECT id, email, nickname, role, status, created_at, bio, avatar_url
      FROM users ORDER BY created_at DESC`,
   );
   return res.json(rows);
@@ -79,7 +63,7 @@ router.get("/admin/users", (_req, res) => {
 router.get("/admin/users/:id", (req, res) => {
   const row = get(
     `SELECT id, email, nickname, role, status, bio, full_name, website_url, readme_md,
-            social_links_json, avatar_url, wallpaper_url, nickname_change_count, created_at
+            social_links_json, avatar_url, nickname_change_count, created_at
      FROM users WHERE id = ?`,
     req.params.id,
   );
@@ -103,7 +87,6 @@ router.get("/admin/users/:id", (req, res) => {
     readme_md: row.readme_md ?? "",
     social_links,
     avatar_url: row.avatar_url ?? "",
-    wallpaper_url: row.wallpaper_url ?? "",
     nickname_change_count: Number(row.nickname_change_count ?? 0),
     created_at: row.created_at ?? "",
   });
@@ -181,9 +164,6 @@ router.patch("/admin/users/:id/profile", async (req, res) => {
       }));
       run("UPDATE users SET social_links_json = ? WHERE id = ?", JSON.stringify(cleaned), id);
     }
-    if (body.wallpaper_url !== undefined) {
-      run("UPDATE users SET wallpaper_url = ? WHERE id = ?", String(body.wallpaper_url ?? ""), id);
-    }
     if (body.avatar_url !== undefined) {
       const nickRow = get("SELECT nickname FROM users WHERE id = ?", id);
       const nick = nickRow?.nickname ?? target.nickname ?? target.id;
@@ -219,19 +199,6 @@ router.post(
     const url = `/uploads/avatars/${req.file.filename}`;
     run("UPDATE users SET avatar_url = ? WHERE id = ?", url, req.params.id);
     return res.json({ avatar_url: url });
-  },
-);
-
-router.post(
-  "/admin/users/:id/wallpaper",
-  uploadSingle(adminWallpaperUpload, "file"),
-  (req, res) => {
-    if (!req.file) return res.status(400).json({ error: "no file" });
-    const target = get("SELECT id FROM users WHERE id = ?", req.params.id);
-    if (!target) return res.status(404).json({ error: "not found" });
-    const url = `/uploads/wallpapers/${req.file.filename}`;
-    run("UPDATE users SET wallpaper_url = ? WHERE id = ?", url, req.params.id);
-    return res.json({ wallpaper_url: url });
   },
 );
 
