@@ -34,7 +34,15 @@ const props = withDefaults(
       | "filter"
       | "spark"
       | "import"
-      | "block";
+      | "block"
+      | "search"
+      | "back"
+      | "chat"
+      | "folder"
+      | "copy"
+      | "image"
+      | "pin"
+      | "trophy";
     size?: number;
   }>(),
   { size: 16 },
@@ -106,6 +114,22 @@ const d = computed(() => {
       return "M12 3v12m0 0l4-4m-4 4l-4-4M5 19h14";
     case "block":
       return "M12 3a9 9 0 100 18 9 9 0 000-18zm6.4 2.6L5.6 18.4";
+    case "search":
+      return "M11 4a7 7 0 100 14 7 7 0 000-14zm5.5 12.5L21 21";
+    case "back":
+      return "M14 6l-6 6 6 6";
+    case "chat":
+      return "M4 5h16v11H10l-4 4V5zm4 4h8M8 12h6";
+    case "folder":
+      return "M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z";
+    case "copy":
+      return "M9 4h9a1 1 0 011 1v11M6 8h9a1 1 0 011 1v10a1 1 0 01-1 1H6a1 1 0 01-1-1V9a1 1 0 011-1z";
+    case "image":
+      return "M4 5h16v14H4V5zm0 11l5-5 4 4 3-3 4 4M9 10a1.5 1.5 0 100-3 1.5 1.5 0 000 3z";
+    case "pin":
+      return "M9 4h6l-1 5 3 4H7l3-4-1-5zM12 13v7";
+    case "trophy":
+      return "M7 4h10v4a5 5 0 01-10 0V4zM5 5H3v2a3 3 0 003 3M19 5h2v2a3 3 0 01-3 3M10 13h4v3h-4zM8 17h8l1 3H7l1-3z";
     default:
       return "";
   }

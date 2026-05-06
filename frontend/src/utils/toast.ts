@@ -5,7 +5,7 @@ export function toast(text: string, type: ToastType = "info") {
   window.dispatchEvent(new CustomEvent("app:toast", { detail: { text, type } }));
 }
 
-export function toastError(err: unknown, fallback = "Ошибка") {
+export function toastError(err: unknown, fallback = "ошибка") {
   const text = err instanceof Error ? err.message : fallback;
   toast(text, "error");
 }

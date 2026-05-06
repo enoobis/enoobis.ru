@@ -11,34 +11,17 @@ import {
 } from "../api/blog";
 import { useAuthStore } from "../stores/auth";
 
-type Pending = {
-  id: string;
-  email: string;
-  nickname: string;
-  role: string;
-  created_at: string;
-};
-
-type AdminUser = {
-  id: string;
-  email: string;
-  nickname: string;
-  role: string;
-  status: string;
-  created_at: string;
-};
+type Pending = { id: string; email: string; nickname: string; role: string; created_at: string };
+type AdminUser = { id: string; email: string; nickname: string; role: string; status: string; created_at: string };
+type Tab = "pending" | "users" | "reports";
 
 const auth = useAuthStore();
+const tab = ref<Tab>("pending");
 const pending = ref<Pending[]>([]);
 const users = ref<AdminUser[]>([]);
-const err = ref("");
-const inviteUserId = ref("");
-const inviteCount = ref(2);
-const inviteRole = ref<"student" | "teacher">("student");
-const roleUserId = ref("");
-const roleValue = ref<"student" | "teacher">("student");
-const usersQuery = ref("");
 const reports = ref<BlogReport[]>([]);
+const err = ref("");
+const usersQuery = ref("");
 
 const filteredUsers = computed(() => {
   const q = usersQuery.value.trim().toLowerCase();
@@ -58,7 +41,7 @@ async function load() {
     users.value = await api<AdminUser[]>("/api/admin/users", { token: auth.token });
     reports.value = await listBlogReports(auth.token ?? "");
   } catch (e) {
-    err.value = e instanceof Error ? e.message : "Ошибка";
+    err.value = e instanceof Error ? e.message : "ошибка";
   }
 }
 
@@ -74,35 +57,7 @@ async function reject(id: string) {
   await load();
 }
 
-async function addInvites() {
-  err.value = "";
-  try {
-    await api(`/api/admin/users/${inviteUserId.value.trim()}/invites`, {
-      method: "POST",
-      token: auth.token,
-      body: JSON.stringify({ count: inviteCount.value, target_role: inviteRole.value }),
-    });
-    inviteUserId.value = "";
-  } catch (e) {
-    err.value = e instanceof Error ? e.message : "Ошибка";
-  }
-}
-
-async function setUserRole() {
-  err.value = "";
-  try {
-    await api(`/api/admin/users/${roleUserId.value.trim()}/role`, {
-      method: "POST",
-      token: auth.token,
-      body: JSON.stringify({ role: roleValue.value }),
-    });
-    roleUserId.value = "";
-  } catch (e) {
-    err.value = e instanceof Error ? e.message : "Ошибка";
-  }
-}
-
-async function setUserRoleQuick(id: string, role: "student" | "teacher") {
+async function setRole(id: string, role: "student" | "teacher") {
   if (!auth.token) return;
   await api(`/api/admin/users/${id}/role`, {
     method: "POST",
@@ -112,12 +67,27 @@ async function setUserRoleQuick(id: string, role: "student" | "teacher") {
   await load();
 }
 
-async function addInviteQuick(id: string, targetRole: "student" | "teacher") {
+async function removeUser(id: string, nickname: string) {
+  if (!auth.token) return;
+  if (!window.confirm(`удалить пользователя ${nickname}? это действие необратимо`)) return;
+  err.value = "";
+  try {
+    await api(`/api/admin/users/${id}`, {
+      method: "DELETE",
+      token: auth.token,
+    });
+    await load();
+  } catch (e) {
+    err.value = e instanceof Error ? e.message : "ошибка";
+  }
+}
+
+async function addInvite(id: string, role: "student" | "teacher") {
   if (!auth.token) return;
   await api(`/api/admin/users/${id}/invites`, {
     method: "POST",
     token: auth.token,
-    body: JSON.stringify({ count: 1, target_role: targetRole }),
+    body: JSON.stringify({ count: 1, target_role: role }),
   });
   await load();
 }
@@ -148,128 +118,166 @@ async function restoreComment(id: string | null) {
 </script>
 
 <template>
-  <section>
-    <h1>Администрирование</h1>
+  <section class="admin">
+    <nav class="tabs">
+      <button class="link" :class="{ active: tab === 'pending' }" type="button" @click="tab = 'pending'">
+        заявки <span v-if="pending.length" class="muted small">{{ pending.length }}</span>
+      </button>
+      <button class="link" :class="{ active: tab === 'users' }" type="button" @click="tab = 'users'">
+        пользователи
+      </button>
+      <button class="link" :class="{ active: tab === 'reports' }" type="button" @click="tab = 'reports'">
+        жалобы <span v-if="reports.length" class="muted small">{{ reports.length }}</span>
+      </button>
+    </nav>
+
     <p v-if="err" class="error">{{ err }}</p>
 
-    <div class="card" style="margin-bottom: 1.5rem">
-      <h2>Выдать инвайты</h2>
-      <input v-model="inviteUserId" placeholder="user uuid" />
-      <select v-model="inviteRole" style="margin-top: 0.5rem; max-width: 220px">
-        <option value="student">Инвайт на ученика</option>
-        <option value="teacher">Инвайт на ментора</option>
-      </select>
-      <input
-        v-model.number="inviteCount"
-        type="number"
-        min="1"
-        max="50"
-        style="margin-top: 0.5rem; max-width: 120px"
-      />
-      <button type="button" style="margin-top: 0.5rem; display: block" @click="addInvites">
-        Выдать
-      </button>
-    </div>
+    <template v-if="tab === 'pending'">
+      <p v-if="!pending.length" class="muted">пусто</p>
+      <ul v-else class="list">
+        <li v-for="u in pending" :key="u.id">
+          <div>
+            <strong>{{ u.nickname }}</strong>
+            <span class="muted small"> · {{ u.role }} · {{ u.email }}</span>
+          </div>
+          <div class="row-actions">
+            <button type="button" @click="approve(u.id)">одобрить</button>
+            <button class="secondary" type="button" @click="reject(u.id)">отклонить</button>
+            <button class="secondary danger" type="button" @click="removeUser(u.id, u.nickname)">
+              удалить
+            </button>
+          </div>
+        </li>
+      </ul>
+    </template>
 
-    <div class="card" style="margin-bottom: 1.5rem">
-      <h2>Назначить роль пользователю</h2>
-      <input v-model="roleUserId" placeholder="user uuid" />
-      <select v-model="roleValue" style="margin-top: 0.5rem; max-width: 220px">
-        <option value="student">Сделать учеником</option>
-        <option value="teacher">Сделать ментором</option>
-      </select>
-      <button type="button" style="margin-top: 0.5rem; display: block" @click="setUserRole">
-        Применить
-      </button>
-    </div>
+    <template v-else-if="tab === 'users'">
+      <input v-model="usersQuery" placeholder="поиск" class="search" />
+      <p v-if="!filteredUsers.length" class="muted">не найдено</p>
+      <ul v-else class="list">
+        <li v-for="u in filteredUsers" :key="u.id">
+          <div>
+            <strong>{{ u.nickname }}</strong>
+            <span class="muted small"> · {{ u.role }} · {{ u.status }} · {{ u.email }}</span>
+          </div>
+          <div class="row-actions">
+            <button class="secondary" type="button" :disabled="u.role === 'student'" @click="setRole(u.id, 'student')">
+              ученик
+            </button>
+            <button class="secondary" type="button" :disabled="u.role === 'teacher' || u.role === 'admin'" @click="setRole(u.id, 'teacher')">
+              ментор
+            </button>
+            <button class="secondary" type="button" @click="addInvite(u.id, 'student')">+ инвайт</button>
+            <button
+              v-if="u.role !== 'admin'"
+              class="secondary danger"
+              type="button"
+              @click="removeUser(u.id, u.nickname)"
+            >
+              удалить
+            </button>
+          </div>
+        </li>
+      </ul>
+    </template>
 
-    <h2>Ожидают одобрения</h2>
-    <p v-if="!pending.length" class="muted">Пусто</p>
-    <div v-for="u in pending" :key="u.id" class="card" style="margin-bottom: 0.75rem">
-      <strong>{{ u.nickname }}</strong> ({{ u.role }}) — {{ u.email }}
-      <div class="muted" style="font-family: var(--mono); font-size: 0.8rem">{{ u.id }}</div>
-      <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem">
-        <button type="button" @click="approve(u.id)">Одобрить</button>
-        <button class="secondary" type="button" @click="reject(u.id)">Отклонить</button>
-      </div>
-    </div>
-
-    <h2 style="margin-top: 2rem">Все пользователи</h2>
-    <input
-      v-model="usersQuery"
-      placeholder="поиск: ник, email, uuid"
-      style="margin-bottom: 0.75rem; max-width: 420px"
-    />
-    <p v-if="!filteredUsers.length" class="muted">Пользователи не найдены.</p>
-    <div v-for="u in filteredUsers" :key="`all-${u.id}`" class="card" style="margin-bottom: 0.75rem">
-      <strong>{{ u.nickname }}</strong> — {{ u.email }}
-      <div class="muted">роль: {{ u.role }} · статус: {{ u.status }}</div>
-      <div class="muted" style="font-family: var(--mono); font-size: 0.8rem">{{ u.id }}</div>
-      <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem; flex-wrap: wrap">
-        <button
-          class="secondary"
-          type="button"
-          :disabled="u.role === 'student'"
-          @click="setUserRoleQuick(u.id, 'student')"
-        >
-          Сделать учеником
-        </button>
-        <button
-          class="secondary"
-          type="button"
-          :disabled="u.role === 'teacher' || u.role === 'admin'"
-          @click="setUserRoleQuick(u.id, 'teacher')"
-        >
-          Сделать ментором
-        </button>
-        <button class="secondary" type="button" @click="addInviteQuick(u.id, 'student')">
-          + Инвайт ученика
-        </button>
-        <button class="secondary" type="button" @click="addInviteQuick(u.id, 'teacher')">
-          + Инвайт ментора
-        </button>
-      </div>
-    </div>
-
-    <h2 style="margin-top: 2rem">Модерация блога</h2>
-    <p v-if="!reports.length" class="muted">Жалоб пока нет.</p>
-    <div v-for="r in reports" :key="r.id" class="card" style="margin-bottom: 0.75rem">
-      <div>
-        <strong>{{ r.target_type === "post" ? "Пост" : "Комментарий" }}</strong>
-        · <span class="badge">{{ r.status }}</span>
-      </div>
-      <div class="muted" style="margin-top: 0.35rem">{{ r.reason }}</div>
-      <div class="muted" style="margin-top: 0.35rem">
-        post: {{ r.target_post_id || "-" }} · comment: {{ r.target_comment_id || "-" }}
-      </div>
-      <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem; flex-wrap: wrap">
-        <button class="secondary" type="button" @click="resolveReport(r.id, 'resolved')">Решено</button>
-        <button class="secondary" type="button" @click="resolveReport(r.id, 'dismissed')">Отклонить</button>
-        <button
-          v-if="r.target_type === 'post'"
-          class="secondary"
-          type="button"
-          @click="hidePost(r.target_post_id)"
-        >
-          Скрыть пост
-        </button>
-        <button
-          v-if="r.target_type === 'comment'"
-          class="secondary"
-          type="button"
-          @click="hideComment(r.target_comment_id)"
-        >
-          Скрыть комментарий
-        </button>
-        <button
-          v-if="r.target_type === 'comment'"
-          class="secondary"
-          type="button"
-          @click="restoreComment(r.target_comment_id)"
-        >
-          Восстановить комментарий
-        </button>
-      </div>
-    </div>
+    <template v-else-if="tab === 'reports'">
+      <p v-if="!reports.length" class="muted">пусто</p>
+      <ul v-else class="list">
+        <li v-for="r in reports" :key="r.id">
+          <div>
+            <span class="badge">{{ r.target_type === "post" ? "пост" : "коммент" }}</span>
+            <span class="muted small"> · {{ r.status }}</span>
+          </div>
+          <p class="reason">{{ r.reason }}</p>
+          <div class="row-actions">
+            <button class="secondary" type="button" @click="resolveReport(r.id, 'resolved')">решено</button>
+            <button class="secondary" type="button" @click="resolveReport(r.id, 'dismissed')">отклонить</button>
+            <button v-if="r.target_type === 'post'" class="secondary" type="button" @click="hidePost(r.target_post_id)">
+              скрыть
+            </button>
+            <button v-if="r.target_type === 'comment'" class="secondary" type="button" @click="hideComment(r.target_comment_id)">
+              скрыть
+            </button>
+            <button v-if="r.target_type === 'comment'" class="secondary" type="button" @click="restoreComment(r.target_comment_id)">
+              вернуть
+            </button>
+          </div>
+        </li>
+      </ul>
+    </template>
   </section>
 </template>
+
+<style scoped>
+.admin {
+  max-width: 720px;
+  margin: 0 auto;
+}
+.tabs {
+  display: flex;
+  gap: 0.4rem;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+.link {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  padding: 0.3rem 0.5rem;
+  min-height: 0;
+  font-size: 0.9rem;
+}
+.link:hover {
+  background: transparent;
+  color: var(--text);
+}
+.link.active {
+  color: var(--text);
+}
+.search {
+  margin-bottom: 1rem;
+}
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 1.2rem;
+}
+.list li {
+  display: grid;
+  gap: 0.4rem;
+  padding-bottom: 1.2rem;
+  border-bottom: 1px solid var(--border);
+}
+.list li:last-child {
+  border-bottom: none;
+}
+.row-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+.row-actions .danger {
+  color: var(--danger, #c44);
+  border-color: var(--danger, #c44);
+}
+.row-actions .danger:hover {
+  background: var(--danger, #c44);
+  color: var(--bg);
+}
+.reason {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.small {
+  font-size: 0.8rem;
+}
+strong {
+  font-weight: 500;
+}
+</style>

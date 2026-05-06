@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { RouterLink, useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "../stores/auth";
 
 const email = ref("");
@@ -17,21 +17,50 @@ async function submit() {
     const next = (route.query.next as string) || "/courses";
     await router.push(next);
   } catch (e) {
-    err.value = e instanceof Error ? e.message : "Ошибка";
+    err.value = e instanceof Error ? e.message : "ошибка";
   }
 }
 </script>
 
 <template>
-  <div class="card" style="max-width: 420px">
-    <h1>Вход</h1>
-    <p v-if="err" class="error">{{ err }}</p>
+  <section class="auth">
+    <h1>вход</h1>
     <form @submit.prevent="submit">
-      <label>Email</label>
-      <input v-model="email" type="email" required autocomplete="username" />
-      <label style="display: block; margin-top: 0.75rem">Пароль</label>
-      <input v-model="password" type="password" required autocomplete="current-password" />
-      <button type="submit" style="margin-top: 1rem; width: 100%">Войти</button>
+      <input v-model="email" type="email" placeholder="email" required autocomplete="username" />
+      <input
+        v-model="password"
+        type="password"
+        placeholder="пароль"
+        required
+        autocomplete="current-password"
+      />
+      <button type="submit">войти</button>
     </form>
-  </div>
+    <p v-if="err" class="error">{{ err }}</p>
+    <p class="muted alt">
+      нет аккаунта? <RouterLink to="/register">создать</RouterLink>
+    </p>
+  </section>
 </template>
+
+<style scoped>
+.auth {
+  max-width: 320px;
+  margin: 12vh auto 0;
+}
+.auth h1 {
+  font-size: 1.4rem;
+  margin-bottom: 1.2rem;
+  text-transform: lowercase;
+}
+form {
+  display: grid;
+  gap: 0.6rem;
+}
+button {
+  margin-top: 0.4rem;
+}
+.alt {
+  margin-top: 1.2rem;
+}
+</style>

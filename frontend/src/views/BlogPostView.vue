@@ -17,9 +17,11 @@ import {
   type CommentItem,
 } from "../api/blog";
 import AppIcon from "../components/AppIcon.vue";
+import { pinPost } from "../api/profile";
 import { useAuthStore } from "../stores/auth";
 import { renderMarkdown } from "../utils/markdown";
 import { addRecentPost, updateRecentPostProgress } from "../utils/recentPosts";
+import { toast, toastError, toastSuccess } from "../utils/toast";
 
 const route = useRoute();
 const auth = useAuthStore();
@@ -32,6 +34,13 @@ const myState = ref({ liked: false, bookmarked: false, can_edit: false });
 
 const postId = computed(() => String(route.params.id || ""));
 const renderedBody = computed(() => renderMarkdown(post.value?.body ?? ""));
+
+const readingMinutes = computed(() => {
+  const text = (post.value?.body ?? "").replace(/\s+/g, " ").trim();
+  if (!text) return 0;
+  const words = text.split(" ").length;
+  return Math.max(1, Math.round(words / 200));
+});
 
 async function load() {
   err.value = "";
@@ -47,7 +56,7 @@ async function load() {
       myState.value = { liked: false, bookmarked: false, can_edit: false };
     }
   } catch (e) {
-    err.value = e instanceof Error ? e.message : "Ошибка";
+    err.value = e instanceof Error ? e.message : "ошибка";
   }
 }
 
@@ -73,7 +82,7 @@ async function toggleLike() {
     }
     await load();
   } catch (e) {
-    err.value = e instanceof Error ? e.message : "Ошибка";
+    err.value = e instanceof Error ? e.message : "ошибка";
   } finally {
     working.value = false;
   }
@@ -90,9 +99,19 @@ async function toggleBookmark() {
     }
     await load();
   } catch (e) {
-    err.value = e instanceof Error ? e.message : "Ошибка";
+    err.value = e instanceof Error ? e.message : "ошибка";
   } finally {
     working.value = false;
+  }
+}
+
+async function pinThis() {
+  if (!auth.token || !post.value) return;
+  try {
+    await pinPost(auth.token, { type: "blog", id: post.value.id });
+    toastSuccess("закреплено в профиле");
+  } catch (e) {
+    toastError(e);
   }
 }
 
@@ -105,7 +124,7 @@ async function sendComment() {
     commentBody.value = "";
     comments.value = await listComments(post.value.id);
   } catch (e) {
-    err.value = e instanceof Error ? e.message : "Ошибка";
+    err.value = e instanceof Error ? e.message : "ошибка";
   }
 }
 
@@ -115,31 +134,40 @@ async function removeComment(id: string) {
     await deleteComment(id, auth.token);
     comments.value = await listComments(post.value.id);
   } catch (e) {
-    err.value = e instanceof Error ? e.message : "Ошибка";
+    err.value = e instanceof Error ? e.message : "ошибка";
   }
 }
 
 async function sendPostReport() {
   if (!auth.token || !post.value) return;
-  const reason = prompt("Причина жалобы:");
+  const reason = prompt("причина:");
   if (!reason) return;
   try {
     await reportPost(post.value.id, auth.token, reason);
-    alert("Жалоба отправлена");
   } catch (e) {
-    err.value = e instanceof Error ? e.message : "Ошибка";
+    err.value = e instanceof Error ? e.message : "ошибка";
+  }
+}
+
+async function sharePost() {
+  if (!post.value) return;
+  const url = `${window.location.origin}/blogs/${post.value.id}`;
+  try {
+    await navigator.clipboard.writeText(url);
+    toastSuccess("ссылка скопирована");
+  } catch {
+    toast(url);
   }
 }
 
 async function sendCommentReport(commentId: string) {
   if (!auth.token) return;
-  const reason = prompt("Причина жалобы:");
+  const reason = prompt("причина:");
   if (!reason) return;
   try {
     await reportComment(commentId, auth.token, reason);
-    alert("Жалоба отправлена");
   } catch (e) {
-    err.value = e instanceof Error ? e.message : "Ошибка";
+    err.value = e instanceof Error ? e.message : "ошибка";
   }
 }
 
@@ -155,113 +183,230 @@ watch(() => route.params.id, load);
 </script>
 
 <template>
-  <article v-if="post" class="card">
+  <article v-if="post" class="post">
     <h1>{{ post.title }}</h1>
-    <p class="muted">
+    <p class="meta muted">
       <RouterLink :to="`/u/${post.author_nickname}`">{{ post.author_nickname }}</RouterLink>
-      · {{ (post.published_at || post.created_at).slice(0, 16).replace("T", " ") }}
+      · {{ (post.published_at || post.created_at).slice(0, 10) }}
+      <span v-if="readingMinutes">· {{ readingMinutes }} мин чтения</span>
     </p>
-    <div style="margin: 0.75rem 0; display: flex; gap: 0.5rem; flex-wrap: wrap">
-      <span v-for="t in post.tags" :key="t" class="badge">#{{ t }}</span>
-      <span v-for="c in post.categories" :key="`cat-${c}`" class="badge">{{ c }}</span>
-    </div>
     <img
       v-if="post.cover_image_url"
       :src="post.cover_image_url"
       alt=""
-      style="width: 100%; border-radius: 10px; border: 1px solid var(--border); margin: 0.75rem 0"
+      class="cover"
     />
-    <div class="markdown-body" style="margin-top: 1rem" v-html="renderedBody" />
+    <div class="markdown-body" v-html="renderedBody" />
 
-    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 1rem">
-      <button
-        v-if="auth.token"
-        class="secondary"
-        type="button"
-        @click="toggleLike"
-      >
-        <AppIcon :name="myState.liked ? 'liked' : 'like'" /> <span>Лайк ({{ post.like_count }})</span>
+    <div class="actions">
+      <button v-if="auth.token" class="icon-action" type="button" :title="myState.liked ? 'убрать лайк' : 'лайк'" @click="toggleLike">
+        <AppIcon :name="myState.liked ? 'liked' : 'like'" />
+        <span>{{ post.like_count }}</span>
       </button>
-      <button
-        v-if="auth.token"
-        class="secondary"
-        type="button"
-        @click="toggleBookmark"
-      >
+      <button v-if="auth.token" class="icon-action" type="button" :title="myState.bookmarked ? 'убрать из закладок' : 'в закладки'" @click="toggleBookmark">
         <AppIcon :name="myState.bookmarked ? 'bookmarked' : 'bookmark'" />
-        <span>{{ myState.bookmarked ? "В закладках" : "В закладки" }} ({{ post.bookmark_count }})</span>
       </button>
-      <RouterLink
+      <button class="icon-action" type="button" title="поделиться" @click="sharePost">
+        <AppIcon name="send" />
+      </button>
+      <button
         v-if="myState.can_edit"
-        :to="`/blog/${post.id}/edit`"
-        class="btn secondary"
+        class="icon-action"
+        type="button"
+        title="закрепить в профиле"
+        @click="pinThis"
       >
-        <AppIcon name="edit" /> <span>Редактировать</span>
+        <AppIcon name="pin" />
+      </button>
+      <RouterLink v-if="myState.can_edit" :to="`/blogs/${post.id}/edit`" class="icon-action" title="редактировать">
+        <AppIcon name="edit" />
       </RouterLink>
-      <button v-if="auth.token" class="secondary" type="button" @click="sendPostReport">
-        <AppIcon name="report" /> <span>Пожаловаться</span>
+      <button v-if="auth.token" class="icon-action" type="button" title="пожаловаться" @click="sendPostReport">
+        <AppIcon name="report" />
       </button>
     </div>
 
-    <h2 style="margin-top: 1.5rem">Комментарии ({{ comments.length }})</h2>
-    <div v-if="auth.token" style="display: grid; gap: 0.5rem; margin-bottom: 1rem">
-      <textarea v-model="commentBody" rows="3" placeholder="Комментарий" />
-      <button type="button" @click="sendComment"><AppIcon name="send" /> <span>Отправить</span></button>
-    </div>
-    <p v-else class="muted">
-      <RouterLink to="/login">Войдите</RouterLink>, чтобы комментировать.
-    </p>
-    <div v-for="c in comments" :key="c.id" class="card" style="margin-bottom: 0.5rem">
-      <div class="muted">{{ c.author_nickname }} · {{ c.created_at.slice(0, 16).replace("T", " ") }}</div>
-      <p style="margin: 0.35rem 0">{{ c.body }}</p>
-      <div v-if="auth.token" style="display: flex; gap: 0.5rem">
-        <button
-          v-if="auth.user?.id === c.user_id || auth.role === 'admin'"
-          class="secondary"
-          type="button"
-          @click="removeComment(c.id)"
-        >
-          <AppIcon name="delete" /> <span>Удалить</span>
-        </button>
-        <button class="secondary" type="button" @click="sendCommentReport(c.id)">
-          <AppIcon name="report" /> <span>Жалоба</span>
-        </button>
+    <section class="comments">
+      <h2>комментарии · {{ comments.length }}</h2>
+      <div v-if="auth.token" class="comment-form">
+        <textarea v-model="commentBody" rows="2" placeholder="комментарий" />
+        <button type="button" :disabled="!commentBody.trim()" @click="sendComment">отправить</button>
       </div>
-    </div>
+      <p v-else class="muted">
+        <RouterLink to="/login">войдите</RouterLink>, чтобы комментировать
+      </p>
+      <ul v-if="comments.length" class="comment-list">
+        <li v-for="c in comments" :key="c.id">
+          <div class="muted small">{{ c.author_nickname }} · {{ c.created_at.slice(0, 10) }}</div>
+          <p>{{ c.body }}</p>
+          <div v-if="auth.token" class="comment-actions">
+            <button
+              v-if="auth.user?.id === c.user_id || auth.role === 'admin'"
+              class="link-btn"
+              type="button"
+              @click="removeComment(c.id)"
+            >
+              удалить
+            </button>
+            <button class="link-btn" type="button" @click="sendCommentReport(c.id)">
+              жалоба
+            </button>
+          </div>
+        </li>
+      </ul>
+    </section>
   </article>
   <p v-else-if="err" class="error">{{ err }}</p>
-  <p v-else class="muted">Загрузка...</p>
+  <p v-else class="muted">загрузка</p>
 </template>
 
 <style scoped>
+.post {
+  max-width: 680px;
+  margin: 0 auto;
+}
+h1 {
+  font-size: 1.6rem;
+  font-weight: 600;
+  line-height: 1.25;
+  margin-bottom: 0.5rem;
+}
+.meta {
+  font-size: 0.85rem;
+  margin-bottom: 1.5rem;
+}
+.cover {
+  width: 100%;
+  border-radius: var(--radius);
+  margin-bottom: 1.5rem;
+}
+
+.markdown-body {
+  line-height: 1.7;
+  font-size: 1rem;
+}
+.markdown-body :deep(h1),
+.markdown-body :deep(h2),
+.markdown-body :deep(h3) {
+  font-weight: 600;
+  margin: 1.6rem 0 0.6rem;
+}
+.markdown-body :deep(h2) {
+  font-size: 1.25rem;
+}
+.markdown-body :deep(h3) {
+  font-size: 1.1rem;
+}
+.markdown-body :deep(p) {
+  margin: 0.6rem 0;
+}
 .markdown-body :deep(img) {
   max-width: 100%;
-  border-radius: 10px;
-  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin: 1rem 0;
 }
 .markdown-body :deep(pre) {
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   overflow-x: auto;
-  margin: 0.75rem 0;
+  margin: 1rem 0;
+  background: var(--surface);
 }
 .markdown-body :deep(pre code.hljs) {
-  border-radius: 8px;
+  border-radius: var(--radius);
 }
 .markdown-body :deep(code) {
   font-family: var(--mono);
+  font-size: 0.9em;
 }
 .markdown-body :deep(p code),
 .markdown-body :deep(li code) {
   background: var(--surface2);
-  padding: 0.12em 0.35em;
+  padding: 0.1em 0.3em;
   border-radius: 4px;
-  border: 1px solid var(--border);
 }
 .markdown-body :deep(blockquote) {
-  margin: 0.75rem 0;
-  padding: 0.25rem 0.75rem;
-  border-left: 3px solid var(--border);
+  margin: 1rem 0;
+  padding: 0.1rem 0.9rem;
+  border-left: 2px solid var(--border);
   color: var(--muted);
+}
+.markdown-body :deep(a) {
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+  margin: 2rem 0 0;
+  padding-top: 1.2rem;
+  border-top: 1px solid var(--border);
+}
+.icon-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  padding: 0.4rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  min-height: 0;
+}
+.icon-action:hover {
+  color: var(--text);
+  background: var(--surface);
+}
+
+.comments {
+  margin-top: 2.5rem;
+}
+.comments h2 {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--muted);
+  margin-bottom: 1rem;
+  text-transform: lowercase;
+}
+.comment-form {
+  display: grid;
+  gap: 0.5rem;
+  margin-bottom: 1.2rem;
+}
+.comment-form button {
+  justify-self: end;
+}
+.comment-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 1.2rem;
+}
+.comment-list p {
+  margin: 0.3rem 0;
+}
+.small {
+  font-size: 0.8rem;
+}
+.comment-actions {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 0.3rem;
+}
+.link-btn {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  padding: 0;
+  min-height: 0;
+  font-size: 0.8rem;
+  text-transform: lowercase;
+}
+.link-btn:hover {
+  color: var(--text);
+  background: transparent;
 }
 </style>

@@ -5,8 +5,67 @@ const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: "/", name: "home", component: () => import("../views/HomeView.vue") },
-    { path: "/blog", name: "blog", component: () => import("../views/BlogListView.vue") },
-    { path: "/blog/:id", name: "blog-post", component: () => import("../views/BlogPostView.vue") },
+
+    { path: "/blogs", name: "blog", component: () => import("../views/BlogListView.vue") },
+    {
+      path: "/blogs/write",
+      name: "blog-write",
+      component: () => import("../views/BlogWriteView.vue"),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: "/blogs/:id",
+      name: "blog-post",
+      component: () => import("../views/BlogPostView.vue"),
+    },
+    {
+      path: "/blogs/:id/edit",
+      name: "blog-edit",
+      component: () => import("../views/BlogWriteView.vue"),
+      meta: { requiresAuth: true },
+    },
+    { path: "/blog", redirect: "/blogs" },
+    { path: "/blog/write", redirect: "/blogs/write" },
+    { path: "/blog/:id", redirect: (to) => `/blogs/${to.params.id}` },
+    { path: "/blog/:id/edit", redirect: (to) => `/blogs/${to.params.id}/edit` },
+
+    {
+      path: "/microblogs",
+      name: "micro",
+      component: () => import("../views/MicroFeedView.vue"),
+    },
+    {
+      path: "/microblogs/saved",
+      name: "micro-saved",
+      component: () => import("../views/MicroBookmarksView.vue"),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: "/microblogs/:id",
+      name: "micro-post",
+      component: () => import("../views/MicroPostView.vue"),
+    },
+    { path: "/micro", redirect: "/microblogs" },
+    { path: "/micro/:id", redirect: (to) => `/microblogs/${to.params.id}` },
+
+    { path: "/search", name: "search", component: () => import("../views/SearchView.vue") },
+    {
+      path: "/chats",
+      name: "chats",
+      component: () => import("../views/ChatsView.vue"),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: "/storage",
+      name: "storage",
+      component: () => import("../views/StorageView.vue"),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: "/s/:token",
+      name: "shared",
+      component: () => import("../views/SharedView.vue"),
+    },
     { path: "/login", name: "login", component: () => import("../views/LoginView.vue") },
     { path: "/register", name: "register", component: () => import("../views/RegisterView.vue") },
     {
@@ -22,21 +81,15 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      path: "/library",
+      name: "library",
+      component: () => import("../views/LibraryView.vue"),
+      meta: { requiresAuth: true },
+    },
+    {
       path: "/invites",
       name: "invites",
       component: () => import("../views/InvitesView.vue"),
-      meta: { requiresAuth: true },
-    },
-    {
-      path: "/blog/write",
-      name: "blog-write",
-      component: () => import("../views/BlogWriteView.vue"),
-      meta: { requiresAuth: true },
-    },
-    {
-      path: "/blog/:id/edit",
-      name: "blog-edit",
-      component: () => import("../views/BlogWriteView.vue"),
       meta: { requiresAuth: true },
     },
     {
@@ -49,6 +102,11 @@ const router = createRouter({
       path: "/u/:nickname",
       name: "profile",
       component: () => import("../views/ProfileView.vue"),
+    },
+    {
+      path: "/u/:nickname/follows",
+      name: "follows",
+      component: () => import("../views/FollowsView.vue"),
     },
     {
       path: "/me/edit",

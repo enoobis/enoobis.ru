@@ -2,131 +2,99 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import { api } from "../api/http";
-import { listAuthorPosts, listMyBookmarks, type BlogListItem } from "../api/blog";
-import { getProfileActivity, type ActivitySummary } from "../api/profile";
+import { listAuthorPosts, type BlogListItem } from "../api/blog";
+import { listMicroByAuthor, type MicroPost } from "../api/micro";
+import MicroItem from "../components/MicroItem.vue";
+import AppIcon from "../components/AppIcon.vue";
+import { unpinPost, type Achievement } from "../api/profile";
 import { useAuthStore } from "../stores/auth";
+import { renderMarkdown } from "../utils/markdown";
+import { toastError, toastSuccess } from "../utils/toast";
+
+type PinnedPost =
+  | {
+      type: "micro";
+      id: string;
+      body: string;
+      image_url: string;
+      author_nickname: string;
+      author_avatar: string;
+      created_at: string;
+    }
+  | {
+      type: "blog";
+      id: string;
+      title: string;
+      excerpt: string;
+      author_nickname: string;
+      created_at: string;
+    };
 
 type Profile = {
   nickname: string;
   role: string;
   bio: string;
-  wallpaper_url: string;
   avatar_url: string;
   full_name: string;
   website_url: string;
   social_links: { name: string; url: string }[];
+  readme_md: string;
   created_at: string;
   last_seen_at: string;
-  favorite_courses: { id: string; title: string }[];
   followers_count: number;
   following_count: number;
-  grade_overview: {
-    courses_count: number;
-    assignments_graded: number;
-    points_earned: number;
-    points_total: number;
-    average_percent: number;
-  };
+  achievements: Achievement[];
+  pinned_post: PinnedPost | null;
 };
 
-type FollowPreview = {
-  id: string;
-  nickname: string;
-  avatar_url: string;
-};
+type Tab = "blog" | "micro";
 
 const route = useRoute();
 const auth = useAuthStore();
 const profile = ref<Profile | null>(null);
 const posts = ref<BlogListItem[]>([]);
-const bookmarks = ref<BlogListItem[]>([]);
-const followersPreview = ref<FollowPreview[]>([]);
-const followingPreview = ref<FollowPreview[]>([]);
+const micro = ref<MicroPost[]>([]);
+const tab = ref<Tab>("blog");
 const err = ref("");
 const avatarBroken = ref(false);
 const following = ref(false);
 const followBusy = ref(false);
-const tab = ref<"elements" | "collections">("elements");
-const activity = ref<ActivitySummary | null>(null);
-const activityErr = ref("");
 
 const nick = computed(() => route.params.nickname as string);
-const displayName = computed(() => {
-  if (!profile.value) return "";
-  return profile.value.full_name?.trim() || profile.value.nickname;
-});
-
-const onlineLabel = computed(() => {
-  const raw = profile.value?.last_seen_at || profile.value?.created_at;
-  if (!raw) return "";
-  const ts = Date.parse(raw);
-  if (Number.isNaN(ts)) return "";
-  const diff = Math.max(0, Math.floor((Date.now() - ts) / 1000));
-  if (diff <= 120) return "Online now";
-  if (diff < 3600) return `Online ${Math.floor(diff / 60)} minutes ago`;
-  if (diff < 86400) return `Online ${Math.floor(diff / 3600)} hours ago`;
-  if (diff < 86400 * 30) return `Online ${Math.floor(diff / 86400)} days ago`;
-  if (diff < 86400 * 365) return `Online ${Math.floor(diff / (86400 * 30))} months ago`;
-  if (diff < 86400 * 365 * 100) return `Online ${Math.floor(diff / (86400 * 365))} years ago`;
-  return `Online ${Math.floor(diff / (86400 * 365 * 100))} centuries ago`;
-});
-
-const collectionsCount = computed(() => {
-  if (auth.token && auth.nickname === nick.value) return bookmarks.value.length;
-  return profile.value?.favorite_courses.length ?? 0;
-});
-
-async function loadFollowPreviews() {
-  followersPreview.value = await api<FollowPreview[]>(`/api/profile/${nick.value}/followers`);
-  followingPreview.value = await api<FollowPreview[]>(`/api/profile/${nick.value}/following`);
-}
+const isMe = computed(() => auth.token && auth.nickname === nick.value);
+const displayName = computed(() => profile.value?.full_name?.trim() || profile.value?.nickname || "");
+const renderedReadme = computed(() => renderMarkdown(profile.value?.readme_md ?? ""));
 
 async function load() {
   err.value = "";
   avatarBroken.value = false;
   profile.value = null;
   posts.value = [];
-  bookmarks.value = [];
-  followersPreview.value = [];
-  followingPreview.value = [];
+  micro.value = [];
   following.value = false;
-  activity.value = null;
-  activityErr.value = "";
   try {
     profile.value = await api<Profile>(`/api/profile/${nick.value}`);
-    const p = await listAuthorPosts(nick.value, { page: 1, page_size: 12 });
-    posts.value = p.items;
-
+    const [pBlog, pMicro] = await Promise.all([
+      listAuthorPosts(nick.value, { page: 1, page_size: 20 }),
+      listMicroByAuthor(nick.value, auth.token),
+    ]);
+    posts.value = pBlog.items;
+    micro.value = pMicro.items;
     if (auth.token && auth.nickname !== nick.value) {
       const state = await api<{ following: boolean }>(`/api/profile/${nick.value}/following/me`, {
         token: auth.token,
       });
       following.value = state.following;
     }
-    if (auth.token && auth.nickname === nick.value) {
-      const saved = await listMyBookmarks(auth.token, { page: 1, page_size: 12 });
-      bookmarks.value = saved.items;
-    }
-    try {
-      activity.value = await getProfileActivity(nick.value, auth.token);
-    } catch (e) {
-      activityErr.value = e instanceof Error ? e.message : "Activity unavailable";
-    }
-    await loadFollowPreviews();
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Ошибка";
-    if (msg.toLowerCase().includes("forbidden") || msg.includes("403")) {
-      err.value = "Профиль скрыт настройками приватности.";
-    } else {
-      err.value = msg;
-    }
+    const msg = e instanceof Error ? e.message : "ошибка";
+    err.value = msg.toLowerCase().includes("forbidden") || msg.includes("403") ? "профиль скрыт" : msg;
   }
 }
 
 async function toggleFollow() {
-  if (!auth.token || !profile.value || auth.nickname === profile.value.nickname || followBusy.value) return;
+  if (!auth.token || !profile.value || followBusy.value) return;
   followBusy.value = true;
-  err.value = "";
   try {
     const path = `/api/profile/${profile.value.nickname}/follow`;
     if (following.value) {
@@ -138,11 +106,38 @@ async function toggleFollow() {
       following.value = true;
       profile.value.followers_count += 1;
     }
-    await loadFollowPreviews();
   } catch (e) {
-    err.value = e instanceof Error ? e.message : "Ошибка";
+    err.value = e instanceof Error ? e.message : "ошибка";
   } finally {
     followBusy.value = false;
+  }
+}
+
+function onMicroDeleted(id: string) {
+  micro.value = micro.value.filter((p) => p.id !== id);
+}
+
+function onMicroUpdated(updated: MicroPost) {
+  micro.value = micro.value.map((p) => (p.id === updated.id ? updated : p));
+}
+
+const earnedAchievements = computed(() =>
+  (profile.value?.achievements ?? []).filter((a) => a.earned),
+);
+
+const pinBusy = ref(false);
+
+async function unpinFromProfile() {
+  if (!auth.token || pinBusy.value) return;
+  pinBusy.value = true;
+  try {
+    await unpinPost(auth.token);
+    if (profile.value) profile.value.pinned_post = null;
+    toastSuccess("открепили");
+  } catch (e) {
+    toastError(e);
+  } finally {
+    pinBusy.value = false;
   }
 }
 
@@ -151,314 +146,470 @@ watch(nick, load);
 </script>
 
 <template>
-  <section v-if="profile" class="cosmos-profile">
-    <p v-if="err" class="error">{{ err }}</p>
+  <section v-if="profile" class="profile">
+    <header class="head">
+      <img
+        v-if="profile.avatar_url && !avatarBroken"
+        class="avatar"
+        :src="profile.avatar_url"
+        alt=""
+        @error="avatarBroken = true"
+      />
+      <div v-else class="avatar fallback">{{ profile.nickname.slice(0, 2) }}</div>
 
-    <div class="profile-grid">
-      <aside class="profile-side card">
-        <img
-          v-if="profile.avatar_url && !avatarBroken"
-          class="profile-avatar"
-          :src="profile.avatar_url"
-          alt=""
-          @error="avatarBroken = true"
-        />
-        <div v-else class="profile-avatar profile-avatar-fallback">{{ profile.nickname.slice(0, 2).toUpperCase() }}</div>
-
+      <div class="info">
         <h1>{{ displayName }}</h1>
         <p class="muted">@{{ profile.nickname }}</p>
-        <p class="muted">{{ onlineLabel }}</p>
-        <p class="bio">{{ profile.bio || "Add a bio..." }}</p>
-
-        <div class="profile-actions">
+        <p v-if="profile.bio" class="bio">{{ profile.bio }}</p>
+        <p class="meta muted">
           <RouterLink
-            v-if="auth.token && auth.nickname === profile.nickname"
-            to="/me/edit"
-            class="btn secondary"
+            :to="{ name: 'follows', params: { nickname: profile.nickname }, query: { tab: 'followers' } }"
+            class="link-btn"
           >
-            Edit profile
+            {{ profile.followers_count }} подписчиков
+          </RouterLink>
+          <span>·</span>
+          <RouterLink
+            :to="{ name: 'follows', params: { nickname: profile.nickname }, query: { tab: 'following' } }"
+            class="link-btn"
+          >
+            {{ profile.following_count }} подписок
+          </RouterLink>
+        </p>
+        <a v-if="profile.website_url" :href="profile.website_url" target="_blank" rel="noopener noreferrer" class="muted">
+          {{ profile.website_url }}
+        </a>
+      </div>
+
+      <div class="actions">
+        <RouterLink v-if="isMe" to="/me/edit" class="btn secondary">редактировать</RouterLink>
+        <template v-else-if="auth.token">
+          <RouterLink :to="{ name: 'chats', query: { with: profile.nickname } }" class="btn">
+            написать
           </RouterLink>
           <button
-            v-if="auth.token && auth.nickname !== profile.nickname"
             class="secondary"
             type="button"
             :disabled="followBusy"
             @click="toggleFollow"
           >
-            {{ following ? "Unfollow" : "Follow" }}
+            {{ following ? "отписаться" : "подписаться" }}
           </button>
-        </div>
-
-        <a v-if="profile.website_url" :href="profile.website_url" target="_blank" rel="noopener noreferrer">
-          {{ profile.website_url }}
-        </a>
-      </aside>
-
-      <main class="profile-main card">
-        <div class="main-top-meta">
-          <div class="meta-row">
-            <div class="follow-avatars">
-              <template v-for="f in followersPreview.slice(0, 3)" :key="`f-${f.id}`">
-                <img v-if="f.avatar_url" :src="f.avatar_url" :alt="f.nickname" class="follow-avatar" />
-                <span v-else class="follow-avatar follow-avatar-fallback">{{ f.nickname.slice(0, 1).toUpperCase() }}</span>
-              </template>
-            </div>
-            <div><strong>{{ profile.followers_count }}</strong> Follower</div>
-          </div>
-          <div class="meta-row">
-            <div class="follow-avatars">
-              <template v-for="f in followingPreview.slice(0, 3)" :key="`g-${f.id}`">
-                <img v-if="f.avatar_url" :src="f.avatar_url" :alt="f.nickname" class="follow-avatar" />
-                <span v-else class="follow-avatar follow-avatar-fallback">{{ f.nickname.slice(0, 1).toUpperCase() }}</span>
-              </template>
-            </div>
-            <div><strong>{{ profile.following_count }}</strong> Following</div>
-          </div>
-        </div>
-
-        <section class="activity-card">
-          <div class="activity-head">
-            <h2>Оценки</h2>
-            <span class="badge">{{ profile.grade_overview.average_percent.toFixed(1) }}%</span>
-          </div>
-          <p class="muted">
-            Курсов: {{ profile.grade_overview.courses_count }} · Проверено заданий:
-            {{ profile.grade_overview.assignments_graded }}
-          </p>
-          <p class="muted">
-            Баллы: {{ profile.grade_overview.points_earned }} / {{ profile.grade_overview.points_total }}
-          </p>
-        </section>
-
-        <div class="center-tabs">
-          <button
-            type="button"
-            :class="{ secondary: tab !== 'elements' }"
-            @click="tab = 'elements'"
-          >
-            Elements <span class="badge">{{ posts.length }}</span>
-          </button>
-          <button
-            type="button"
-            :class="{ secondary: tab !== 'collections' }"
-            @click="tab = 'collections'"
-          >
-            Collections <span class="badge">{{ collectionsCount }}</span>
-          </button>
-        </div>
-
-        <section class="activity-card">
-          <div class="activity-head">
-            <h2>Activity</h2>
-            <span v-if="activity" class="badge">{{ Math.round(activity.total_seconds / 60) }} min</span>
-          </div>
-          <p v-if="activityErr" class="muted">{{ activityErr }}</p>
-          <template v-else-if="activity">
-            <p class="muted">Year {{ activity.year }} · {{ activity.days.length }} active days</p>
-            <div v-if="activity.days.length" class="activity-days">
-              <div v-for="d in activity.days.slice(-8)" :key="d.day" class="activity-day">
-                <strong>{{ d.day.slice(5) }}</strong>
-                <span>{{ Math.round(d.seconds_spent / 60) }}m</span>
-              </div>
-            </div>
-            <p v-else class="muted">No activity data yet.</p>
-          </template>
-          <p v-else class="muted">Loading activity…</p>
-        </section>
-
-        <template v-if="tab === 'elements'">
-          <div v-if="posts.length" class="post-list">
-            <article v-for="p in posts" :key="p.id" class="post-item">
-              <RouterLink :to="`/blog/${p.id}`">{{ p.title }}</RouterLink>
-              <div class="muted">{{ (p.published_at || p.created_at).slice(0, 10) }}</div>
-            </article>
-          </div>
-          <div v-else class="center-empty">
-            <h2>Your taste, on display</h2>
-            <p class="muted">Save elements to shape your profile</p>
-          </div>
         </template>
+      </div>
+    </header>
 
-        <template v-else>
-          <div v-if="auth.token && auth.nickname === profile.nickname && bookmarks.length" class="post-list">
-            <article v-for="b in bookmarks" :key="b.id" class="post-item">
-              <RouterLink :to="`/blog/${b.id}`">{{ b.title }}</RouterLink>
-              <div class="muted">{{ b.author_nickname }} · {{ (b.published_at || b.created_at).slice(0, 10) }}</div>
-            </article>
-          </div>
-          <ul v-else-if="profile.favorite_courses.length" class="course-list">
-            <li v-for="c in profile.favorite_courses" :key="c.id">{{ c.title }}</li>
-          </ul>
-          <div v-else class="center-empty">
-            <h2>No collections yet</h2>
-            <p class="muted">Saved items and favorites will be shown here</p>
-          </div>
-        </template>
-      </main>
+    <article v-if="profile.readme_md" class="readme markdown-body" v-html="renderedReadme" />
+
+    <section v-if="profile.pinned_post" class="pinned">
+      <header class="pinned-head">
+        <span class="muted small pinned-label">
+          <AppIcon name="pin" :size="12" />
+          закреплено
+        </span>
+        <button
+          v-if="isMe"
+          type="button"
+          class="pin-x"
+          :disabled="pinBusy"
+          aria-label="открепить"
+          title="открепить"
+          @click="unpinFromProfile"
+        >
+          <AppIcon name="close" :size="12" />
+        </button>
+      </header>
+      <RouterLink
+        v-if="profile.pinned_post.type === 'blog'"
+        :to="`/blogs/${profile.pinned_post.id}`"
+        class="pinned-blog"
+      >
+        <strong>{{ profile.pinned_post.title }}</strong>
+        <span v-if="profile.pinned_post.excerpt" class="muted small">{{ profile.pinned_post.excerpt }}</span>
+      </RouterLink>
+      <RouterLink
+        v-else-if="profile.pinned_post.type === 'micro'"
+        :to="`/microblogs/${profile.pinned_post.id}`"
+        class="pinned-micro"
+      >
+        <p v-if="profile.pinned_post.body" class="pinned-body">{{ profile.pinned_post.body }}</p>
+        <img
+          v-if="profile.pinned_post.image_url"
+          :src="profile.pinned_post.image_url"
+          alt=""
+          class="pinned-img"
+        />
+      </RouterLink>
+    </section>
+
+    <section v-if="earnedAchievements.length" class="ach">
+      <p class="muted small ach-title">
+        <AppIcon name="trophy" :size="12" />
+        ачивки
+      </p>
+      <ul class="ach-list">
+        <li v-for="a in earnedAchievements" :key="a.key" class="ach-item" :title="a.description">
+          <span>{{ a.title }}</span>
+        </li>
+      </ul>
+    </section>
+
+    <div class="tabs">
+      <button class="tab" :class="{ on: tab === 'blog' }" type="button" @click="tab = 'blog'">
+        блоги
+        <span v-if="posts.length" class="count muted">{{ posts.length }}</span>
+      </button>
+      <button class="tab" :class="{ on: tab === 'micro' }" type="button" @click="tab = 'micro'">
+        микроблоги
+        <span v-if="micro.length" class="count muted">{{ micro.length }}</span>
+      </button>
     </div>
+
+    <template v-if="tab === 'blog'">
+      <ul v-if="posts.length" class="post-list">
+        <li v-for="p in posts" :key="p.id">
+          <RouterLink :to="`/blogs/${p.id}`" class="post-title">{{ p.title }}</RouterLink>
+          <span class="muted small">{{ (p.published_at || p.created_at).slice(0, 10) }}</span>
+        </li>
+      </ul>
+      <p v-else class="muted empty">записей нет</p>
+    </template>
+
+    <template v-else>
+      <div v-if="micro.length" class="micro-list">
+        <MicroItem
+          v-for="m in micro"
+          :key="m.id"
+          :post="m"
+          clickable
+          @deleted="onMicroDeleted"
+          @updated="onMicroUpdated"
+        />
+      </div>
+      <p v-else class="muted empty">записей нет</p>
+    </template>
   </section>
   <p v-else-if="err" class="error">{{ err }}</p>
-  <p v-else class="muted">Loading…</p>
+  <p v-else class="muted">загрузка</p>
 </template>
 
 <style scoped>
-.cosmos-profile {
-  display: grid;
-  gap: 1rem;
+.profile {
+  max-width: 640px;
+  margin: 0 auto;
 }
-
-.profile-grid {
+.head {
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
+  grid-template-columns: 64px 1fr auto;
   gap: 1rem;
   align-items: start;
+  padding-bottom: 2rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 1rem;
 }
-
-.profile-side,
-.profile-main {
-  min-height: 420px;
-}
-
-.profile-avatar {
-  width: 74px;
-  height: 74px;
+.avatar {
+  width: 64px;
+  height: 64px;
   border-radius: 999px;
   border: 1px solid var(--border);
   object-fit: cover;
-  background: var(--surface2);
+  background: var(--surface);
 }
-
-.profile-avatar-fallback {
+.avatar.fallback {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-weight: 800;
-}
-
-.bio {
-  margin-top: 0.7rem;
+  font-weight: 500;
   color: var(--muted);
+  text-transform: lowercase;
 }
-
-.profile-actions {
-  margin-top: 0.8rem;
+.info h1 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin: 0;
+}
+.info .muted {
+  margin: 0.2rem 0;
+  font-size: 0.9rem;
+}
+.bio {
+  margin-top: 0.6rem;
+  color: var(--text);
+}
+.meta {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.4rem;
+  margin-top: 0.4rem;
 }
-
-.center-tabs {
-  display: inline-flex;
-  gap: 0.45rem;
-  margin-bottom: 1rem;
-}
-
-.activity-card {
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 0.75rem;
-  margin-bottom: 0.95rem;
-  background: rgba(10, 10, 10, 0.82);
-}
-
-.activity-head {
+.actions {
+  align-self: start;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.6rem;
-}
-
-.activity-days {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  flex-direction: column;
   gap: 0.4rem;
 }
-
-.activity-day {
+.actions .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.4rem 0.85rem;
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 0.35rem 0.45rem;
-  display: grid;
-  gap: 0.15rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  text-transform: lowercase;
+  color: var(--text);
+  text-align: center;
+}
+.actions .btn:hover {
+  background: var(--surface);
+  text-decoration: none;
 }
 
-.main-top-meta {
+.readme {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.2rem;
+  margin: 0 0 1.2rem;
+  line-height: 1.65;
+  font-size: 0.95rem;
+}
+.readme :deep(h1),
+.readme :deep(h2),
+.readme :deep(h3) {
+  font-weight: 600;
+  margin: 1rem 0 0.5rem;
+  text-transform: lowercase;
+}
+.readme :deep(h1) {
+  font-size: 1.2rem;
+}
+.readme :deep(h2) {
+  font-size: 1.05rem;
+}
+.readme :deep(h3) {
+  font-size: 0.98rem;
+}
+.readme :deep(p) {
+  margin: 0.4rem 0;
+}
+.readme :deep(ul),
+.readme :deep(ol) {
+  padding-left: 1.4rem;
+  margin: 0.4rem 0;
+}
+.readme :deep(li) {
+  margin: 0.2rem 0;
+}
+.readme :deep(img) {
+  max-width: 100%;
+  border-radius: var(--radius);
+  margin: 0.6rem 0;
+}
+.readme :deep(a) {
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+}
+.readme :deep(a:hover) {
+  border-bottom-color: var(--text);
+  text-decoration: none;
+}
+.readme :deep(blockquote) {
+  margin: 0.6rem 0;
+  padding: 0.05rem 0.8rem;
+  border-left: 2px solid var(--border);
+  color: var(--muted);
+}
+.readme :deep(code) {
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 0.88em;
+}
+.readme :deep(p code),
+.readme :deep(li code) {
+  background: var(--surface2);
+  padding: 0.05em 0.3em;
+  border-radius: 4px;
+}
+.readme :deep(pre) {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 0.6rem 0.8rem;
+  overflow-x: auto;
+  margin: 0.6rem 0;
+}
+.readme :deep(pre code) {
+  background: none;
+  padding: 0;
+}
+
+.pinned {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.7rem 0.85rem;
+  margin-bottom: 1rem;
+  background: var(--surface);
+}
+.pinned-head {
   display: flex;
-  justify-content: flex-end;
-  align-items: flex-start;
-  gap: 1.25rem;
-  margin-bottom: 0.7rem;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.4rem;
+}
+.pinned-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.7rem;
+}
+.pin-x {
+  width: 22px;
+  height: 22px;
+  min-height: 22px;
+  padding: 0;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.pin-x:hover {
+  color: var(--text);
+  background: var(--surface2);
+}
+.pinned-blog,
+.pinned-micro {
+  display: block;
+  color: var(--text);
+}
+.pinned-blog strong {
+  display: block;
+  margin-bottom: 0.2rem;
+}
+.pinned-body {
+  margin: 0;
+  font-size: 0.95rem;
+  white-space: pre-wrap;
+}
+.pinned-img {
+  max-width: 100%;
+  max-height: 240px;
+  border-radius: 8px;
+  margin-top: 0.4rem;
+  border: 1px solid var(--border);
+  display: block;
+}
+
+.ach {
+  margin-bottom: 1rem;
+}
+.ach-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.7rem;
+  margin-bottom: 0.4rem;
+}
+.ach-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+.ach-item {
+  padding: 0.2rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.78rem;
+  color: var(--muted);
+  cursor: help;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.3rem;
+  margin: 0 0 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.tab {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  padding: 0.5rem 0.8rem;
+  min-height: 0;
+  font-size: 0.9rem;
+  border-radius: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.tab:hover {
+  color: var(--text);
+  background: transparent;
+}
+.tab.on {
+  color: var(--text);
+  border-bottom-color: var(--text);
+}
+.count {
+  font-size: 0.78rem;
 }
 
 .post-list {
-  display: grid;
-  gap: 0.55rem;
-}
-
-.post-item {
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 0.65rem;
-  background: rgba(10, 10, 10, 0.82);
-}
-
-.course-list {
+  list-style: none;
+  padding: 0;
   margin: 0;
-  padding-left: 1.1rem;
-  color: var(--text);
-}
-
-.center-empty {
-  min-height: 260px;
   display: grid;
-  place-content: center;
-  text-align: center;
-  gap: 0.3rem;
+  gap: 1rem;
 }
-
-.meta-row {
-  margin-bottom: 0;
-}
-
-.follow-avatars {
+.post-list li {
   display: flex;
-  align-items: center;
-  margin-bottom: 0.35rem;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: baseline;
+}
+.post-title {
+  color: var(--text);
+  font-weight: 500;
+}
+.micro-list {
+  display: grid;
+}
+.small {
+  font-size: 0.82rem;
+}
+.empty {
+  text-align: center;
+  margin-top: 4vh;
 }
 
-.follow-avatar {
-  width: 26px;
-  height: 26px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  object-fit: cover;
-  background: var(--surface2);
-  margin-left: -7px;
-}
-
-.follow-avatars .follow-avatar:first-child {
-  margin-left: 0;
-}
-
-.follow-avatar-fallback {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.72rem;
-  font-weight: 700;
-}
-
-@media (max-width: 1100px) {
-  .profile-grid {
-    grid-template-columns: 1fr;
+@media (max-width: 600px) {
+  .head {
+    grid-template-columns: 56px 1fr;
   }
-
-  .profile-side,
-  .profile-main {
-    min-height: 0;
+  .actions {
+    grid-column: 1 / -1;
   }
+}
 
-  .main-top-meta {
-    justify-content: flex-start;
-  }
+.link-btn {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-height: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.link-btn:hover {
+  color: var(--text);
+  background: transparent;
+  text-decoration: none;
 }
 </style>

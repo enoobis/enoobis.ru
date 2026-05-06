@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { RouterLink, useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "../stores/auth";
 
 const email = ref("");
@@ -29,7 +29,7 @@ async function submit() {
       invite_code: invite.value.trim() || undefined,
     });
     if (r.pending) {
-      ok.value = r.message ?? "Заявка отправлена.";
+      ok.value = r.message ?? "заявка отправлена";
       return;
     }
     if (r.token && r.user) {
@@ -37,24 +37,46 @@ async function submit() {
       await router.push("/courses");
     }
   } catch (e) {
-    err.value = e instanceof Error ? e.message : "Ошибка";
+    err.value = e instanceof Error ? e.message : "ошибка";
   }
 }
 </script>
 
 <template>
-  <div class="card" style="max-width: 480px">
-    <h1>Регистрация</h1>
-    <p v-if="err" class="error">{{ err }}</p>
-    <p v-if="ok" style="color: var(--accent)">{{ ok }}</p>
+  <section class="auth">
+    <h1>регистрация</h1>
     <form @submit.prevent="submit">
-      <label>Ник</label>
-      <input v-model="nickname" required pattern="[A-Za-z0-9_]{3,32}" />
-      <label style="display: block; margin-top: 0.75rem">Email</label>
-      <input v-model="email" type="email" required />
-      <label style="display: block; margin-top: 0.75rem">Пароль</label>
-      <input v-model="password" type="password" minlength="8" required />
-      <button type="submit" style="margin-top: 1rem; width: 100%">Создать аккаунт</button>
+      <input v-model="nickname" placeholder="ник" required pattern="[A-Za-z0-9_]{3,32}" />
+      <input v-model="email" type="email" placeholder="email" required />
+      <input v-model="password" type="password" placeholder="пароль" minlength="8" required />
+      <button type="submit">создать</button>
     </form>
-  </div>
+    <p v-if="err" class="error">{{ err }}</p>
+    <p v-if="ok" class="muted">{{ ok }}</p>
+    <p class="muted alt">
+      уже есть аккаунт? <RouterLink to="/login">войти</RouterLink>
+    </p>
+  </section>
 </template>
+
+<style scoped>
+.auth {
+  max-width: 320px;
+  margin: 12vh auto 0;
+}
+.auth h1 {
+  font-size: 1.4rem;
+  margin-bottom: 1.2rem;
+  text-transform: lowercase;
+}
+form {
+  display: grid;
+  gap: 0.6rem;
+}
+button {
+  margin-top: 0.4rem;
+}
+.alt {
+  margin-top: 1.2rem;
+}
+</style>

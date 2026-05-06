@@ -1,6 +1,25 @@
 import express from "express";
+import jwt from "jsonwebtoken";
+import { v4 as uuidv4 } from "uuid";
 import { all, get, nowIso, run } from "../db.js";
 import { authRequired, hashPassword, verifyPassword } from "../auth.js";
+import {
+  listAchievementsForUser,
+  checkFollowerMilestones,
+} from "../utils/achievements.js";
+
+const JWT_SECRET = process.env.JWT_SECRET ?? "dev-secret-change-me";
+
+function viewerId(req) {
+  const auth = req.headers.authorization ?? "";
+  if (!auth.startsWith("Bearer ")) return null;
+  try {
+    const claims = jwt.verify(auth.slice(7), JWT_SECRET);
+    return claims?.sub ?? null;
+  } catch {
+    return null;
+  }
+}
 
 const router = express.Router();
 
@@ -34,23 +53,81 @@ function buildMe(row) {
     social_links: socialLinks,
     birthday: row.birthday ?? "",
     country: row.country ?? "",
+    readme_md: row.readme_md ?? "",
     created_at: row.created_at ?? "",
     last_seen_at: row.last_seen_at ?? "",
     favorite_course_ids: favIds,
+    nickname_change_count: Number(row.nickname_change_count ?? 0),
+    pinned_post_id: row.pinned_post_id ?? null,
+    pinned_post_type: row.pinned_post_type ?? "",
   };
 }
+
+const MAX_NICK_CHANGES = 3;
 
 router.get("/me", authRequired, (req, res) => {
   const row = get(
     `SELECT id, email, nickname, role, status, bio, wallpaper_url, avatar_url,
             theme_preference, language_preference, font_preference, full_name, website_url,
-            social_links_json, birthday, country, created_at, last_seen_at
+            social_links_json, birthday, country, readme_md, created_at, last_seen_at,
+            nickname_change_count, pinned_post_id, pinned_post_type
      FROM users WHERE id = ?`,
     req.user.id,
   );
   const me = buildMe(row);
   if (!me) return res.status(404).json({ error: "not found" });
   return res.json(me);
+});
+
+router.get("/me/nickname/check", authRequired, (req, res) => {
+  const requested = String(req.query.nickname ?? "").trim().toLowerCase();
+  if (!requested) return res.json({ available: false, reason: "пустой ник" });
+  if (!/^[a-z0-9_.]{2,24}$/i.test(requested)) {
+    return res.json({ available: false, reason: "от 2 до 24 символов: буквы, цифры, _ и ." });
+  }
+  const me = get("SELECT nickname FROM users WHERE id = ?", req.user.id);
+  if (me?.nickname?.toLowerCase() === requested) {
+    return res.json({ available: false, reason: "это текущий ник" });
+  }
+  const taken = get("SELECT 1 as v FROM users WHERE LOWER(nickname) = ?", requested);
+  if (taken) return res.json({ available: false, reason: "ник занят" });
+  return res.json({ available: true });
+});
+
+router.post("/me/nickname", authRequired, (req, res) => {
+  const requested = String(req.body?.nickname ?? "").trim();
+  if (!requested) return res.status(400).json({ error: "пустой ник" });
+  if (!/^[a-z0-9_.]{2,24}$/i.test(requested)) {
+    return res.status(400).json({ error: "от 2 до 24 символов: буквы, цифры, _ и ." });
+  }
+  const me = get(
+    "SELECT id, nickname, nickname_change_count FROM users WHERE id = ?",
+    req.user.id,
+  );
+  if (!me) return res.status(404).json({ error: "not found" });
+  if (me.nickname.toLowerCase() === requested.toLowerCase()) {
+    return res.status(400).json({ error: "это текущий ник" });
+  }
+  const used = Number(me.nickname_change_count ?? 0);
+  if (used >= MAX_NICK_CHANGES) {
+    return res.status(400).json({ error: "лимит смен ника исчерпан" });
+  }
+  const taken = get(
+    "SELECT 1 as v FROM users WHERE LOWER(nickname) = ? AND id <> ?",
+    requested.toLowerCase(),
+    req.user.id,
+  );
+  if (taken) return res.status(400).json({ error: "ник занят" });
+  run(
+    "UPDATE users SET nickname = ?, nickname_change_count = nickname_change_count + 1 WHERE id = ?",
+    requested,
+    req.user.id,
+  );
+  return res.json({
+    nickname: requested,
+    changes_used: used + 1,
+    changes_left: MAX_NICK_CHANGES - (used + 1),
+  });
 });
 
 router.patch("/me", authRequired, (req, res) => {
@@ -65,8 +142,12 @@ router.patch("/me", authRequired, (req, res) => {
     "website_url",
     "birthday",
     "country",
+    "readme_md",
   ];
   const body = req.body ?? {};
+  if (typeof body.readme_md === "string" && body.readme_md.length > 4000) {
+    return res.status(400).json({ error: "readme_too_long" });
+  }
   for (const field of allowed) {
     if (body[field] !== undefined) {
       run(`UPDATE users SET ${field} = ? WHERE id = ?`, body[field] ?? "", req.user.id);
@@ -127,6 +208,51 @@ router.get("/me/invites", authRequired, (req, res) => {
       remaining: Math.max(0, (r.max_uses ?? 0) - (r.used_count ?? 0)),
     })),
   );
+});
+
+router.post("/me/invites", authRequired, (req, res) => {
+  const me = get("SELECT role FROM users WHERE id = ?", req.user.id);
+  if (!me || (me.role !== "admin" && me.role !== "teacher")) {
+    return res.status(403).json({ error: "недостаточно прав" });
+  }
+  const targetRole = req.body?.target_role === "teacher" ? "teacher" : "student";
+  if (targetRole === "teacher" && me.role !== "admin") {
+    return res.status(403).json({ error: "только админ может создавать инвайты для менторов" });
+  }
+  const maxUses = Math.max(1, Math.min(100, Number(req.body?.max_uses ?? 1) | 0));
+  const id = uuidv4();
+  const code = uuidv4().replace(/-/g, "");
+  run(
+    `INSERT INTO invite_links (id, code, owner_user_id, max_uses, used_count, created_at, target_role)
+     VALUES (?, ?, ?, ?, 0, ?, ?)`,
+    id,
+    code,
+    req.user.id,
+    maxUses,
+    nowIso(),
+    targetRole,
+  );
+  return res.json({
+    id,
+    code,
+    target_role: targetRole,
+    max_uses: maxUses,
+    used_count: 0,
+    remaining: maxUses,
+    created_at: nowIso(),
+  });
+});
+
+router.delete("/me/invites/:id", authRequired, (req, res) => {
+  const row = get(
+    "SELECT id, owner_user_id, used_count FROM invite_links WHERE id = ?",
+    req.params.id,
+  );
+  if (!row || row.owner_user_id !== req.user.id) {
+    return res.status(404).json({ error: "не найдено" });
+  }
+  run("DELETE FROM invite_links WHERE id = ?", req.params.id);
+  return res.json({ ok: true });
 });
 
 function ensurePrivacyRow(userId) {
@@ -296,11 +422,57 @@ function gradeOverviewFor(userId) {
   };
 }
 
+function fetchPinnedPost(userId) {
+  const u = get(
+    "SELECT pinned_post_id, pinned_post_type FROM users WHERE id = ?",
+    userId,
+  );
+  if (!u || !u.pinned_post_id || !u.pinned_post_type) return null;
+  if (u.pinned_post_type === "micro") {
+    const m = get(
+      `SELECT m.id, m.body, m.image_url, m.created_at,
+              au.nickname as author_nickname, au.avatar_url as author_avatar
+       FROM microposts m JOIN users au ON au.id = m.author_id
+       WHERE m.id = ? AND m.is_deleted = 0`,
+      u.pinned_post_id,
+    );
+    if (!m) return null;
+    return {
+      type: "micro",
+      id: m.id,
+      body: m.body,
+      image_url: m.image_url ?? "",
+      author_nickname: m.author_nickname ?? "",
+      author_avatar: m.author_avatar ?? "",
+      created_at: m.created_at,
+    };
+  }
+  if (u.pinned_post_type === "blog") {
+    const b = get(
+      `SELECT bp.id, bp.title, bp.excerpt, bp.created_at, bp.published_at,
+              au.nickname as author_nickname
+       FROM blog_posts bp JOIN users au ON au.id = bp.author_id
+       WHERE bp.id = ? AND bp.is_deleted = 0 AND bp.status = 'published'`,
+      u.pinned_post_id,
+    );
+    if (!b) return null;
+    return {
+      type: "blog",
+      id: b.id,
+      title: b.title,
+      excerpt: b.excerpt ?? "",
+      author_nickname: b.author_nickname ?? "",
+      created_at: b.published_at ?? b.created_at,
+    };
+  }
+  return null;
+}
+
 router.get("/profile/:nickname", (req, res) => {
   const p = get(
     `SELECT id, nickname, role, bio, wallpaper_url, avatar_url, theme_preference,
             language_preference, font_preference, full_name, website_url, social_links_json,
-            birthday, country, created_at, last_seen_at
+            birthday, country, readme_md, created_at, last_seen_at
      FROM users WHERE nickname = ?`,
     req.params.nickname,
   );
@@ -321,14 +493,7 @@ router.get("/profile/:nickname", (req, res) => {
     const c = get("SELECT id, title FROM courses WHERE id = ?", id);
     if (c) favorite_courses.push(c);
   }
-  const achievements = all(
-    `SELECT a.slug, a.name, a.description, a.icon_url, ua.earned_at
-     FROM user_achievements ua
-     JOIN achievements a ON a.id = ua.achievement_id
-     WHERE ua.user_id = ?
-     ORDER BY ua.earned_at DESC`,
-    p.id,
-  );
+  const achievements = listAchievementsForUser(p.id);
   const followers_count =
     get("SELECT COUNT(*) as v FROM user_follows WHERE following_user_id = ?", p.id)?.v ?? 0;
   const following_count =
@@ -348,6 +513,7 @@ router.get("/profile/:nickname", (req, res) => {
     social_links: socialLinks,
     birthday: p.birthday ?? "",
     country: p.country ?? "",
+    readme_md: p.readme_md ?? "",
     created_at: p.created_at ?? "",
     last_seen_at: p.last_seen_at ?? "",
     favorite_courses,
@@ -355,7 +521,51 @@ router.get("/profile/:nickname", (req, res) => {
     followers_count,
     following_count,
     grade_overview: gradeOverviewFor(p.id),
+    pinned_post: fetchPinnedPost(p.id),
   });
+});
+
+router.post("/me/pin", authRequired, (req, res) => {
+  const type = String(req.body?.type ?? "");
+  const id = String(req.body?.id ?? "");
+  if (!["micro", "blog"].includes(type) || !id) {
+    return res.status(400).json({ error: "неверные параметры" });
+  }
+  if (type === "micro") {
+    const row = get(
+      "SELECT id, author_id FROM microposts WHERE id = ? AND is_deleted = 0",
+      id,
+    );
+    if (!row) return res.status(404).json({ error: "не найдено" });
+    if (row.author_id !== req.user.id) return res.status(403).json({ error: "не ваш пост" });
+  } else {
+    const row = get(
+      "SELECT id, author_id, status FROM blog_posts WHERE id = ? AND is_deleted = 0",
+      id,
+    );
+    if (!row) return res.status(404).json({ error: "не найдено" });
+    if (row.author_id !== req.user.id) return res.status(403).json({ error: "не ваш пост" });
+    if (row.status !== "published") return res.status(400).json({ error: "только опубликованные" });
+  }
+  run(
+    "UPDATE users SET pinned_post_id = ?, pinned_post_type = ? WHERE id = ?",
+    id,
+    type,
+    req.user.id,
+  );
+  res.json({ ok: true });
+});
+
+router.delete("/me/pin", authRequired, (req, res) => {
+  run(
+    "UPDATE users SET pinned_post_id = NULL, pinned_post_type = '' WHERE id = ?",
+    req.user.id,
+  );
+  res.json({ ok: true });
+});
+
+router.get("/me/achievements", authRequired, (req, res) => {
+  res.json({ items: listAchievementsForUser(req.user.id) });
 });
 
 router.get("/profile/:nickname/activity", (req, res) => {
@@ -401,6 +611,7 @@ router.post("/profile/:nickname/follow", authRequired, (req, res) => {
     p.id,
     nowIso(),
   );
+  checkFollowerMilestones(p.id);
   return res.json({ ok: true });
 });
 
@@ -415,32 +626,56 @@ router.delete("/profile/:nickname/follow", authRequired, (req, res) => {
   return res.json({ ok: true });
 });
 
+function decorateFollows(rows, viewer) {
+  if (!viewer) {
+    return rows.map((r) => ({ ...r, is_following: false, is_me: false }));
+  }
+  const ids = rows.map((r) => r.id);
+  const followingSet = new Set();
+  if (ids.length) {
+    const placeholders = ids.map(() => "?").join(",");
+    const followed = all(
+      `SELECT following_user_id FROM user_follows
+       WHERE follower_user_id = ? AND following_user_id IN (${placeholders})`,
+      viewer,
+      ...ids,
+    );
+    for (const f of followed) followingSet.add(f.following_user_id);
+  }
+  return rows.map((r) => ({
+    ...r,
+    is_following: followingSet.has(r.id),
+    is_me: r.id === viewer,
+    full_name: r.full_name ?? "",
+  }));
+}
+
 router.get("/profile/:nickname/followers", (req, res) => {
   const p = get("SELECT id FROM users WHERE nickname = ?", req.params.nickname);
   if (!p) return res.json([]);
   const rows = all(
-    `SELECT u.id, u.nickname, u.avatar_url
+    `SELECT u.id, u.nickname, u.avatar_url, u.full_name
      FROM user_follows f
      JOIN users u ON u.id = f.follower_user_id
      WHERE f.following_user_id = ?
      ORDER BY f.created_at DESC`,
     p.id,
   );
-  return res.json(rows);
+  return res.json(decorateFollows(rows, viewerId(req)));
 });
 
 router.get("/profile/:nickname/following", (req, res) => {
   const p = get("SELECT id FROM users WHERE nickname = ?", req.params.nickname);
   if (!p) return res.json([]);
   const rows = all(
-    `SELECT u.id, u.nickname, u.avatar_url
+    `SELECT u.id, u.nickname, u.avatar_url, u.full_name
      FROM user_follows f
      JOIN users u ON u.id = f.following_user_id
      WHERE f.follower_user_id = ?
      ORDER BY f.created_at DESC`,
     p.id,
   );
-  return res.json(rows);
+  return res.json(decorateFollows(rows, viewerId(req)));
 });
 
 export default router;

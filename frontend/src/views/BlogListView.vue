@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { RouterLink } from "vue-router";
 import AppIcon from "../components/AppIcon.vue";
 import {
-  listCategories,
   listMyBookmarks,
   listPosts,
   listTags,
@@ -12,31 +11,58 @@ import {
 } from "../api/blog";
 import { useAuthStore } from "../stores/auth";
 
+type SortKey = "new" | "popular" | "discussed";
+type Mode = "all" | "bookmarks";
+
+const auth = useAuthStore();
 const posts = ref<BlogListItem[]>([]);
 const tags = ref<TaxonomyItem[]>([]);
-const categories = ref<TaxonomyItem[]>([]);
 const err = ref("");
 const loading = ref(false);
 const total = ref(0);
 const page = ref(1);
-const pageSize = 10;
+const pageSize = 20;
+
 const q = ref("");
 const tag = ref("");
-const category = ref("");
-const mode = ref<"all" | "bookmarks">("all");
-const auth = useAuthStore();
+const sort = ref<SortKey>("new");
+const mode = ref<Mode>("all");
+const filtersOpen = ref(false);
+
+const sortedPosts = computed(() => {
+  const items = posts.value.slice();
+  if (sort.value === "popular") items.sort((a, b) => b.like_count - a.like_count);
+  else if (sort.value === "discussed") items.sort((a, b) => b.comment_count - a.comment_count);
+  return items;
+});
+
+const activeChips = computed(() => {
+  const chips: { key: string; label: string; clear: () => void }[] = [];
+  if (sort.value !== "new") {
+    chips.push({
+      key: "sort",
+      label: sort.value === "popular" ? "по лайкам" : "по обсуждениям",
+      clear: () => (sort.value = "new"),
+    });
+  }
+  if (tag.value) {
+    chips.push({ key: "tag", label: `#${tag.value}`, clear: () => { tag.value = ""; reload(); } });
+  }
+  if (mode.value === "bookmarks") {
+    chips.push({ key: "bm", label: "закладки", clear: () => { mode.value = "all"; reload(); } });
+  }
+  return chips;
+});
 
 async function loadTaxonomy() {
   try {
     tags.value = await listTags();
-    categories.value = await listCategories();
   } catch {
     tags.value = [];
-    categories.value = [];
   }
 }
 
-async function loadPosts() {
+async function load() {
   err.value = "";
   loading.value = true;
   try {
@@ -45,7 +71,6 @@ async function loadPosts() {
       page_size: pageSize,
       q: q.value.trim() || undefined,
       tag: tag.value || undefined,
-      category: category.value || undefined,
     };
     const data =
       mode.value === "bookmarks" && auth.token
@@ -54,140 +79,298 @@ async function loadPosts() {
     posts.value = data.items;
     total.value = data.total;
   } catch (e) {
-    err.value = e instanceof Error ? e.message : "Ошибка";
+    err.value = e instanceof Error ? e.message : "ошибка";
   } finally {
     loading.value = false;
   }
 }
 
-function search() {
+function reload() {
   page.value = 1;
-  loadPosts();
+  load();
+}
+
+function search() {
+  reload();
+}
+
+function resetAll() {
+  q.value = "";
+  tag.value = "";
+  sort.value = "new";
+  mode.value = "all";
+  reload();
 }
 
 function prev() {
   if (page.value === 1) return;
   page.value -= 1;
-  loadPosts();
+  load();
 }
 
 function next() {
   if (page.value * pageSize >= total.value) return;
   page.value += 1;
-  loadPosts();
+  load();
 }
 
+watch([tag, mode], reload);
+
 onMounted(async () => {
-  await Promise.all([loadTaxonomy(), loadPosts()]);
+  await Promise.all([loadTaxonomy(), load()]);
 });
 </script>
 
 <template>
-  <section>
-    <div class="card" style="margin-bottom: 1rem">
-      <div class="grid-2">
-        <div>
-          <label>Поиск</label>
-          <input v-model="q" placeholder="по заголовку или тексту" @keydown.enter.prevent="search" />
-        </div>
-        <div>
-          <label>Тег</label>
-          <select v-model="tag" @change="search">
-            <option value="">Все теги</option>
-            <option v-for="t in tags" :key="t.slug" :value="t.slug">{{ t.name }} ({{ t.post_count }})</option>
-          </select>
+  <section class="blog">
+    <div class="search" :class="{ active: filtersOpen }">
+      <AppIcon name="search" :size="16" />
+      <input
+        v-model="q"
+        placeholder="поиск"
+        @keydown.enter.prevent="search"
+        @input="
+          () => {
+            if (!q.trim()) search();
+          }
+        "
+      />
+      <button
+        class="filter-toggle"
+        type="button"
+        :class="{ on: filtersOpen || activeChips.length }"
+        :title="filtersOpen ? 'свернуть' : 'фильтры'"
+        @click="filtersOpen = !filtersOpen"
+      >
+        <AppIcon name="filter" :size="16" />
+      </button>
+    </div>
+
+    <div v-if="filtersOpen" class="filters">
+      <div class="row">
+        <span class="muted small">сортировка</span>
+        <div class="chips">
+          <button class="chip" :class="{ on: sort === 'new' }" type="button" @click="sort = 'new'">новые</button>
+          <button class="chip" :class="{ on: sort === 'popular' }" type="button" @click="sort = 'popular'">популярные</button>
+          <button class="chip" :class="{ on: sort === 'discussed' }" type="button" @click="sort = 'discussed'">обсуждаемые</button>
         </div>
       </div>
-      <div style="margin-top: 0.75rem; display: grid; gap: 0.75rem; grid-template-columns: 1fr auto">
-        <div>
-          <label>Категория</label>
-          <select v-model="category" @change="search">
-            <option value="">Все категории</option>
-            <option v-for="c in categories" :key="c.slug" :value="c.slug">{{ c.name }} ({{ c.post_count }})</option>
-          </select>
-        </div>
-        <button type="button" style="align-self: end" @click="search">Применить</button>
+      <div v-if="tags.length" class="row">
+        <span class="muted small">тег</span>
+        <select v-model="tag">
+          <option value="">все</option>
+          <option v-for="t in tags" :key="t.slug" :value="t.slug">{{ t.name }} · {{ t.post_count }}</option>
+        </select>
       </div>
-      <div v-if="auth.token" style="display: flex; gap: 0.5rem; margin-top: 0.75rem">
-        <button
-          class="secondary"
-          type="button"
-          :disabled="mode === 'all'"
-          @click="mode = 'all'; search()"
-        >
-          Все посты
-        </button>
-        <button
-          class="secondary"
-          type="button"
-          :disabled="mode === 'bookmarks'"
-          @click="mode = 'bookmarks'; search()"
-        >
-          Мои закладки
-        </button>
+      <div v-if="auth.token" class="row">
+        <span class="muted small">показать</span>
+        <div class="chips">
+          <button class="chip" :class="{ on: mode === 'all' }" type="button" @click="mode = 'all'">все</button>
+          <button class="chip" :class="{ on: mode === 'bookmarks' }" type="button" @click="mode = 'bookmarks'">закладки</button>
+        </div>
       </div>
     </div>
 
-    <div
-      v-if="auth.token && (auth.role === 'teacher' || auth.role === 'admin')"
-      class="card"
-      style="margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem"
-    >
-      <span class="muted">Материалы для авторов</span>
-      <RouterLink to="/blog/write" class="nav-link" style="display: inline-flex; align-items: center; gap: 0.4rem">
-        <AppIcon name="write" />
-        <span>Написать</span>
-      </RouterLink>
+    <div v-if="activeChips.length" class="active-chips">
+      <button v-for="c in activeChips" :key="c.key" class="active-chip" type="button" @click="c.clear">
+        {{ c.label }} ×
+      </button>
+      <button class="active-chip clear" type="button" @click="resetAll">сбросить</button>
     </div>
 
     <p v-if="err" class="error">{{ err }}</p>
-    <p v-else-if="loading" class="muted">Загрузка...</p>
+    <p v-else-if="loading" class="muted">загрузка</p>
     <template v-else>
-      <article v-for="p in posts" :key="p.id" class="card" style="margin-bottom: 1rem">
-        <img
-          v-if="p.cover_image_url"
-          :src="p.cover_image_url"
-          alt=""
-          style="width: 100%; max-height: 220px; object-fit: cover; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 0.6rem"
-        />
-        <h2 style="font-size: 1.15rem; margin-bottom: 0.25rem">
-          <RouterLink :to="`/blog/${p.id}`">{{ p.title }}</RouterLink>
-        </h2>
-        <div class="muted">{{ p.author_nickname }} · {{ (p.published_at || p.created_at).slice(0, 16).replace("T", " ") }}</div>
-        <p style="margin-top: 0.5rem">{{ p.excerpt }}</p>
-        <div class="muted post-meta">
-          <span class="meta-item"><AppIcon name="like" :size="14" /> {{ p.like_count }}</span>
-          <span class="meta-item"><AppIcon name="comment" :size="14" /> {{ p.comment_count }}</span>
-          <span class="meta-item"><AppIcon name="tag" :size="14" /> {{ p.tags.join(", ") || "none" }}</span>
-        </div>
-      </article>
-      <p v-if="!posts.length" class="muted">Постов пока нет.</p>
-      <div style="display: flex; align-items: center; gap: 0.5rem">
-        <button class="secondary" type="button" :disabled="page === 1" @click="prev">Назад</button>
-        <span class="muted">Страница {{ page }} · {{ total }} записей</span>
-        <button
-          class="secondary"
-          type="button"
-          :disabled="page * pageSize >= total"
-          @click="next"
-        >
-          Далее
-        </button>
+      <ul v-if="sortedPosts.length" class="post-list">
+        <li v-for="p in sortedPosts" :key="p.id">
+          <RouterLink :to="`/blogs/${p.id}`" class="post-title">{{ p.title }}</RouterLink>
+          <p v-if="p.excerpt" class="excerpt muted">{{ p.excerpt }}</p>
+          <div class="meta muted">
+            <span>{{ p.author_nickname }}</span>
+            <span>·</span>
+            <span>{{ (p.published_at || p.created_at).slice(0, 10) }}</span>
+            <span v-if="p.like_count">· {{ p.like_count }} ♥</span>
+            <span v-if="p.comment_count">· {{ p.comment_count }} ✦</span>
+          </div>
+        </li>
+      </ul>
+      <p v-else class="muted empty">пусто</p>
+
+      <div v-if="total > pageSize" class="pager muted">
+        <button class="link" type="button" :disabled="page === 1" @click="prev">←</button>
+        <span>{{ page }}</span>
+        <button class="link" type="button" :disabled="page * pageSize >= total" @click="next">→</button>
       </div>
     </template>
   </section>
 </template>
 
 <style scoped>
-.post-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  align-items: center;
+.blog {
+  max-width: 640px;
+  margin: 0 auto;
 }
-.meta-item {
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.5rem 0.4rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  margin-bottom: 0.6rem;
+  color: var(--muted);
+}
+.search:focus-within,
+.search.active {
+  border-color: #3a3a3a;
+  color: var(--text);
+}
+.search input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 0.25rem 0;
+  color: var(--text);
+}
+.search input:focus {
+  outline: none;
+}
+.filter-toggle {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 999px;
+}
+.filter-toggle:hover,
+.filter-toggle.on {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.filters {
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 0.6rem;
+}
+.row {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  align-items: center;
+  gap: 0.6rem;
+}
+.chips {
+  display: flex;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+}
+.chip {
+  padding: 0.25rem 0.65rem;
+  min-height: 28px;
+  border-radius: 999px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+.chip:hover {
+  color: var(--text);
+}
+.chip.on {
+  background: var(--surface2);
+  color: var(--text);
+  border-color: #2f2f2f;
+}
+
+.active-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-bottom: 1.5rem;
+}
+.active-chip {
+  padding: 0.2rem 0.55rem;
+  min-height: 24px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+.active-chip:hover {
+  color: var(--text);
+}
+.active-chip.clear {
+  border-style: dashed;
+}
+
+.post-list {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0 0;
+  display: grid;
+  gap: 1.6rem;
+}
+.post-list li {
+  display: grid;
+  gap: 0.3rem;
+}
+.post-title {
+  color: var(--text);
+  font-size: 1.1rem;
+  font-weight: 500;
+}
+.excerpt {
+  margin: 0;
+}
+.meta {
+  display: flex;
+  flex-wrap: wrap;
   gap: 0.35rem;
+  font-size: 0.82rem;
+}
+.empty {
+  margin-top: 4vh;
+  text-align: center;
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 2rem;
+  font-size: 0.88rem;
+}
+.link {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  padding: 0.2rem 0.4rem;
+  min-height: 0;
+  cursor: pointer;
+}
+.link:hover:not(:disabled) {
+  color: var(--text);
+  background: transparent;
+}
+.small {
+  font-size: 0.78rem;
+}
+
+@media (max-width: 500px) {
+  .row {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

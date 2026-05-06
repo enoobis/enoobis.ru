@@ -65,3 +65,29 @@ export function changeMyPassword(token: string, current_password: string, new_pa
     body: JSON.stringify({ current_password, new_password }),
   });
 }
+
+export type PinPayload = { type: "micro" | "blog"; id: string };
+
+export function pinPost(token: string, payload: PinPayload) {
+  return api<{ ok: boolean }>("/api/me/pin", {
+    method: "POST",
+    token,
+    body: JSON.stringify(payload),
+  });
+}
+
+export function unpinPost(token: string) {
+  return api<{ ok: boolean }>("/api/me/pin", { method: "DELETE", token });
+}
+
+export type Achievement = {
+  key: string;
+  title: string;
+  description: string;
+  earned: boolean;
+  earned_at: string | null;
+};
+
+export function listMyAchievements(token: string) {
+  return api<{ items: Achievement[] }>("/api/me/achievements", { token });
+}

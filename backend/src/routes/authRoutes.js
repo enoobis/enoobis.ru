@@ -2,6 +2,7 @@ import express from "express";
 import { v4 as uuidv4 } from "uuid";
 import { get, nowIso, run } from "../db.js";
 import { hashPassword, mintToken, verifyPassword } from "../auth.js";
+import { saveIdenticon } from "../utils/identicon.js";
 
 const router = express.Router();
 
@@ -12,7 +13,7 @@ function validNickname(n) {
 router.post("/register", async (req, res) => {
   const { email = "", password = "", nickname = "", invite_code } = req.body ?? {};
   if (!email || password.length < 8) {
-    return res.status(400).json({ error: "email required, password min 8 chars" });
+    return res.status(400).json({ error: "нужен email, пароль минимум 8 символов" });
   }
   if (!validNickname(nickname)) {
     return res.status(400).json({ error: "nickname: 3-32 chars, letters, digits, underscore" });
@@ -35,16 +36,23 @@ router.post("/register", async (req, res) => {
   try {
     const id = uuidv4();
     const hash = await hashPassword(password);
+    let avatarUrl = "";
+    try {
+      avatarUrl = saveIdenticon(nickname, id);
+    } catch {
+      avatarUrl = "";
+    }
     run(
       `INSERT INTO users
       (id, email, password_hash, nickname, role, status, bio, wallpaper_url, avatar_url, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, '', '', '', ?)`,
+      VALUES (?, ?, ?, ?, ?, ?, '', '', ?, ?)`,
       id,
       email,
       hash,
       nickname,
       role,
       status,
+      avatarUrl,
       nowIso(),
     );
 

@@ -3,6 +3,10 @@ import { v4 as uuidv4 } from "uuid";
 import jwtLib from "jsonwebtoken";
 import { all, get, nowIso, run } from "../db.js";
 import { authRequired } from "../auth.js";
+import {
+  awardAchievement,
+  checkBlogLikeMilestone,
+} from "../utils/achievements.js";
 
 const router = express.Router();
 
@@ -332,7 +336,7 @@ router.post("/blog", authRequired, (req, res) => {
   }
   const body = req.body ?? {};
   if (!body.title || !body.body) {
-    return res.status(400).json({ error: "title and body required" });
+    return res.status(400).json({ error: "нужны заголовок и текст" });
   }
   const id = uuidv4();
   const now = nowIso();
@@ -356,6 +360,9 @@ router.post("/blog", authRequired, (req, res) => {
   );
   if (Array.isArray(body.tags)) syncTags(id, body.tags);
   if (Array.isArray(body.categories)) syncCategories(id, body.categories);
+  if (status === "published") {
+    awardAchievement(req.user.id, "first_blog");
+  }
   return res.json(fetchPostFull(id, req.user.id));
 });
 
@@ -400,6 +407,7 @@ router.post("/blog/:id/publish", authRequired, (req, res) => {
     nowIso(),
     req.params.id,
   );
+  awardAchievement(row.author_id, "first_blog");
   return res.json({ ok: true });
 });
 
@@ -503,6 +511,7 @@ router.post("/blog/:id/like", authRequired, (req, res) => {
     req.params.id,
     nowIso(),
   );
+  checkBlogLikeMilestone(req.params.id);
   return res.json({ ok: true });
 });
 router.delete("/blog/:id/like", authRequired, (req, res) => {

@@ -1,0 +1,126 @@
+import express from "express";
+import multer from "multer";
+import path from "node:path";
+import fs from "node:fs";
+import { v4 as uuidv4 } from "uuid";
+import { all, get, nowIso, run } from "../db.js";
+import { authRequired } from "../auth.js";
+
+const router = express.Router();
+
+const FILES_ROOT = path.resolve(process.env.PRIVATE_FILES_DIR ?? "./data/private-files");
+fs.mkdirSync(FILES_ROOT, { recursive: true });
+
+export const QUOTA_BYTES = 100 * 1024 * 1024;
+
+function staffOnly(req, res, next) {
+  if (req.user?.role !== "admin" && req.user?.role !== "teacher") {
+    return res.status(403).json({ error: "forbidden" });
+  }
+  next();
+}
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, FILES_ROOT),
+    filename: (req, file, cb) => {
+      const ext = (path.extname(file.originalname) || ".bin").toLowerCase();
+      cb(null, `${req.user.id}-${uuidv4().replace(/-/g, "")}${ext}`);
+    },
+  }),
+  limits: { fileSize: QUOTA_BYTES },
+});
+
+function totalUsed(userId) {
+  const row = get(
+    "SELECT COALESCE(SUM(size_bytes), 0) AS total FROM user_files WHERE owner_id = ?",
+    userId,
+  );
+  return Number(row?.total ?? 0);
+}
+
+router.get("/files", authRequired, staffOnly, (req, res) => {
+  const items = all(
+    `SELECT id, original_name, mime_type, size_bytes, created_at
+     FROM user_files WHERE owner_id = ? ORDER BY created_at DESC`,
+    req.user.id,
+  );
+  res.json({
+    items,
+    used: totalUsed(req.user.id),
+    quota: QUOTA_BYTES,
+  });
+});
+
+router.post("/files", authRequired, staffOnly, (req, res, next) => {
+  upload.single("file")(req, res, (err) => {
+    if (err) {
+      if (err.code === "LIMIT_FILE_SIZE") {
+        return res.status(413).json({ error: "file_too_large" });
+      }
+      return next(err);
+    }
+    if (!req.file) return res.status(400).json({ error: "no_file" });
+    const used = totalUsed(req.user.id);
+    if (used + req.file.size > QUOTA_BYTES) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch {
+        /* ignore */
+      }
+      return res.status(413).json({ error: "quota_exceeded" });
+    }
+    const id = uuidv4();
+    run(
+      `INSERT INTO user_files (id, owner_id, storage_path, original_name, mime_type, size_bytes, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      id,
+      req.user.id,
+      req.file.filename,
+      req.file.originalname,
+      req.file.mimetype || "",
+      req.file.size,
+      nowIso(),
+    );
+    return res.json({
+      id,
+      original_name: req.file.originalname,
+      mime_type: req.file.mimetype,
+      size_bytes: req.file.size,
+      created_at: nowIso(),
+    });
+  });
+});
+
+router.get("/files/:id/download", authRequired, (req, res) => {
+  const row = get(
+    "SELECT id, owner_id, storage_path, original_name FROM user_files WHERE id = ?",
+    req.params.id,
+  );
+  if (!row) return res.status(404).json({ error: "not_found" });
+  if (row.owner_id !== req.user.id && req.user.role !== "admin") {
+    return res.status(403).json({ error: "forbidden" });
+  }
+  const abs = path.join(FILES_ROOT, row.storage_path);
+  return res.download(abs, row.original_name);
+});
+
+router.delete("/files/:id", authRequired, staffOnly, (req, res) => {
+  const row = get(
+    "SELECT id, owner_id, storage_path FROM user_files WHERE id = ?",
+    req.params.id,
+  );
+  if (!row) return res.status(404).json({ error: "not_found" });
+  if (row.owner_id !== req.user.id && req.user.role !== "admin") {
+    return res.status(403).json({ error: "forbidden" });
+  }
+  try {
+    fs.unlinkSync(path.join(FILES_ROOT, row.storage_path));
+  } catch {
+    /* ignore */
+  }
+  run("DELETE FROM user_files WHERE id = ?", row.id);
+  return res.json({ ok: true });
+});
+
+export default router;

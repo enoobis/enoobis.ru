@@ -1,24 +1,15 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { api } from "../api/http";
 import { uploadAvatar } from "../api/uploadAvatar";
-import { uploadWallpaper } from "../api/uploadWallpaper";
-import {
-  getProfileActivity,
-  getMyPrivacy,
-  getMyNotifications,
-  patchMyPrivacy,
-  patchMyNotifications,
-  changeMyPassword,
-  type ActivitySummary,
-  type PrivacySettings,
-  type NotificationSettings,
-} from "../api/profile";
+import { changeMyPassword } from "../api/profile";
 import AppIcon from "../components/AppIcon.vue";
 import { useAuthStore } from "../stores/auth";
 import { applyUserPreferences } from "../utils/preferences";
 import { toastError, toastSuccess } from "../utils/toast";
+
+const README_MAX = 4000;
 
 type SocialLink = {
   name: string;
@@ -34,18 +25,18 @@ type Me = {
   bio: string;
   wallpaper_url: string;
   avatar_url: string;
-  theme_preference: "black" | "graphite" | "contrast";
+  readme_md: string;
   language_preference: "ru" | "en";
-  font_preference: "compact" | "normal" | "large";
   full_name: string;
   website_url: string;
   social_links: SocialLink[];
   birthday: string;
   country: string;
-  favorite_course_ids: string[];
+  nickname_change_count: number;
 };
 
-type Course = { id: string; title: string; is_open: boolean; teacher_nickname: string };
+const MAX_NICK_CHANGES = 3;
+
 type InviteLink = {
   id: string;
   code: string;
@@ -53,41 +44,30 @@ type InviteLink = {
   max_uses: number;
   used_count: number;
   remaining: number;
+  unlimited?: boolean;
   created_at: string;
 };
-type SettingsTab = "profile" | "account" | "activity" | "privacy" | "security" | "notifications" | "invites";
+type SettingsTab = "profile" | "account" | "security" | "invites";
 
 const auth = useAuthStore();
 const router = useRouter();
 const me = ref<Me | null>(null);
-const courses = ref<Course[]>([]);
 const tab = ref<SettingsTab>("profile");
 
 const bio = ref("");
-const themePreference = ref<"black" | "graphite" | "contrast">("black");
+const readmeMd = ref("");
 const languagePreference = ref<"ru" | "en">("ru");
-const fontPreference = ref<"compact" | "normal" | "large">("normal");
 const fullName = ref("");
 const websiteUrl = ref("");
 const socialLinks = ref<SocialLink[]>([]);
 const birthday = ref("");
 const country = ref("");
-const favorites = ref<string[]>([]);
 
 const err = ref("");
 const avatarMsg = ref("");
 const uploadingAvatar = ref(false);
-const uploadingWallpaper = ref(false);
 const saving = ref(false);
 
-const myActivity = ref<ActivitySummary | null>(null);
-const activityYear = ref(new Date().getFullYear());
-const activityLoading = ref(false);
-
-const privacy = ref<PrivacySettings | null>(null);
-const savingPrivacy = ref(false);
-const notif = ref<NotificationSettings | null>(null);
-const savingNotif = ref(false);
 const invites = ref<InviteLink[]>([]);
 const invitesLoading = ref(false);
 
@@ -95,36 +75,83 @@ const currentPassword = ref("");
 const newPassword = ref("");
 const changingPassword = ref(false);
 
-const yearOptions = computed(() => {
-  const cur = new Date().getFullYear();
-  const from = myActivity.value?.registration_year ?? cur - 5;
-  const to = myActivity.value?.current_year ?? cur;
-  const out: number[] = [];
-  for (let y = from; y <= to; y++) out.push(y);
-  return out.length ? out : [cur];
+const newNick = ref("");
+const nickStatus = ref<"idle" | "checking" | "ok" | "err">("idle");
+const nickMessage = ref("");
+const changingNick = ref(false);
+let nickTimer: ReturnType<typeof setTimeout> | null = null;
+
+const nickChangesLeft = computed(() => {
+  if (!me.value) return MAX_NICK_CHANGES;
+  return Math.max(0, MAX_NICK_CHANGES - (me.value.nickname_change_count ?? 0));
 });
 
-async function loadMyActivity() {
-  if (!auth.token || !me.value) return;
-  activityLoading.value = true;
-  err.value = "";
+function onNickInput() {
+  nickStatus.value = "idle";
+  nickMessage.value = "";
+  if (nickTimer) clearTimeout(nickTimer);
+  const v = newNick.value.trim();
+  if (!v) return;
+  nickStatus.value = "checking";
+  nickTimer = setTimeout(checkNick, 350);
+}
+
+async function checkNick() {
+  if (!auth.token) return;
+  const v = newNick.value.trim();
+  if (!v) {
+    nickStatus.value = "idle";
+    return;
+  }
   try {
-    myActivity.value = await getProfileActivity(me.value.nickname, auth.token, activityYear.value);
+    const r = await api<{ available: boolean; reason?: string }>(
+      `/api/me/nickname/check?nickname=${encodeURIComponent(v)}`,
+      { token: auth.token },
+    );
+    if (r.available) {
+      nickStatus.value = "ok";
+      nickMessage.value = "ник свободен";
+    } else {
+      nickStatus.value = "err";
+      nickMessage.value = r.reason ?? "недоступен";
+    }
   } catch (e) {
-    err.value = e instanceof Error ? e.message : "Ошибка";
-  } finally {
-    activityLoading.value = false;
+    nickStatus.value = "err";
+    nickMessage.value = e instanceof Error ? e.message : "ошибка";
   }
 }
 
-async function loadPrivacyAndNotif() {
-  if (!auth.token) return;
+async function changeNickname() {
+  if (!auth.token || !me.value || changingNick.value) return;
+  if (nickChangesLeft.value <= 0) return;
+  if (nickStatus.value !== "ok") return;
+  err.value = "";
+  changingNick.value = true;
   try {
-    const [p, n] = await Promise.all([getMyPrivacy(auth.token), getMyNotifications(auth.token)]);
-    privacy.value = p;
-    notif.value = n;
+    const r = await api<{ nickname: string; changes_used: number; changes_left: number }>(
+      "/api/me/nickname",
+      {
+        method: "POST",
+        token: auth.token,
+        body: JSON.stringify({ nickname: newNick.value.trim() }),
+      },
+    );
+    if (me.value) {
+      me.value.nickname = r.nickname;
+      me.value.nickname_change_count = r.changes_used;
+    }
+    if (auth.user) {
+      auth.applySession(auth.token, { ...auth.user, nickname: r.nickname });
+    }
+    newNick.value = "";
+    nickStatus.value = "idle";
+    nickMessage.value = "";
+    toastSuccess("ник обновлён");
   } catch (e) {
-    err.value = e instanceof Error ? e.message : "Ошибка";
+    err.value = e instanceof Error ? e.message : "ошибка";
+    toastError(e);
+  } finally {
+    changingNick.value = false;
   }
 }
 
@@ -139,43 +166,9 @@ async function loadInvites() {
   try {
     invites.value = await api<InviteLink[]>("/api/me/invites", { token: auth.token });
   } catch (e) {
-    err.value = e instanceof Error ? e.message : "Ошибка";
+    err.value = e instanceof Error ? e.message : "ошибка";
   } finally {
     invitesLoading.value = false;
-  }
-}
-
-async function savePrivacySettings() {
-  if (!auth.token || !privacy.value) return;
-  savingPrivacy.value = true;
-  err.value = "";
-  try {
-    privacy.value = await patchMyPrivacy(auth.token, {
-      profile_visibility: privacy.value.profile_visibility,
-      activity_visibility: privacy.value.activity_visibility,
-      media_visibility: privacy.value.media_visibility,
-      show_birthday: privacy.value.show_birthday,
-      show_country: privacy.value.show_country,
-    });
-    avatarMsg.value = "Настройки приватности сохранены.";
-  } catch (e) {
-    err.value = e instanceof Error ? e.message : "Ошибка";
-  } finally {
-    savingPrivacy.value = false;
-  }
-}
-
-async function saveNotificationSettings() {
-  if (!auth.token || !notif.value) return;
-  savingNotif.value = true;
-  err.value = "";
-  try {
-    notif.value = await patchMyNotifications(auth.token, { ...notif.value });
-    avatarMsg.value = "Настройки уведомлений сохранены.";
-  } catch (e) {
-    err.value = e instanceof Error ? e.message : "Ошибка";
-  } finally {
-    savingNotif.value = false;
   }
 }
 
@@ -187,9 +180,9 @@ async function onChangePassword() {
     await changeMyPassword(auth.token, currentPassword.value, newPassword.value);
     currentPassword.value = "";
     newPassword.value = "";
-    avatarMsg.value = "Пароль обновлён.";
+    avatarMsg.value = "пароль обновлён";
   } catch (e) {
-    err.value = e instanceof Error ? e.message : "Ошибка";
+    err.value = e instanceof Error ? e.message : "ошибка";
   } finally {
     changingPassword.value = false;
   }
@@ -199,34 +192,20 @@ onMounted(async () => {
   try {
     me.value = await api<Me>("/api/me", { token: auth.token });
     bio.value = me.value.bio;
-    themePreference.value = me.value.theme_preference;
+    readmeMd.value = me.value.readme_md ?? "";
     languagePreference.value = me.value.language_preference;
-    fontPreference.value = me.value.font_preference;
     fullName.value = me.value.full_name ?? "";
     websiteUrl.value = me.value.website_url ?? "";
     socialLinks.value = Array.isArray(me.value.social_links) ? [...me.value.social_links] : [];
     birthday.value = me.value.birthday ?? "";
     country.value = me.value.country ?? "";
-    applyUserPreferences(me.value);
+    applyUserPreferences({ language_preference: me.value.language_preference });
     avatarMsg.value = "";
-    favorites.value = [...me.value.favorite_course_ids];
-    const all = await api<Course[]>("/api/courses", { token: auth.token });
-    courses.value = all;
-    await Promise.all([loadPrivacyAndNotif(), loadMyActivity(), loadInvites()]);
+    await loadInvites();
   } catch (e) {
-    err.value = e instanceof Error ? e.message : "Ошибка";
+    err.value = e instanceof Error ? e.message : "ошибка";
   }
 });
-
-watch(activityYear, () => {
-  void loadMyActivity();
-});
-
-function toggleFav(id: string) {
-  const i = favorites.value.indexOf(id);
-  if (i >= 0) favorites.value.splice(i, 1);
-  else if (favorites.value.length < 12) favorites.value.push(id);
-}
 
 function addSocialLink() {
   if (socialLinks.value.length >= 12) return;
@@ -248,30 +227,11 @@ async function onAvatarFile(ev: Event) {
   try {
     const r = await uploadAvatar(auth.token, file);
     if (me.value) me.value.avatar_url = r.avatar_url;
-    avatarMsg.value = "Аватар обновлён.";
+    avatarMsg.value = "аватар обновлён";
   } catch (e) {
-    err.value = e instanceof Error ? e.message : "Ошибка загрузки";
+    err.value = e instanceof Error ? e.message : "ошибка";
   } finally {
     uploadingAvatar.value = false;
-  }
-}
-
-async function onWallpaperFile(ev: Event) {
-  const input = ev.target as HTMLInputElement;
-  const file = input.files?.[0];
-  input.value = "";
-  if (!file || !auth.token) return;
-  err.value = "";
-  avatarMsg.value = "";
-  uploadingWallpaper.value = true;
-  try {
-    const r = await uploadWallpaper(auth.token, file);
-    if (me.value) me.value.wallpaper_url = r.wallpaper_url;
-    avatarMsg.value = "Обои обновлены.";
-  } catch (e) {
-    err.value = e instanceof Error ? e.message : "Ошибка загрузки обоев";
-  } finally {
-    uploadingWallpaper.value = false;
   }
 }
 
@@ -286,26 +246,9 @@ async function clearAvatar() {
       body: JSON.stringify({ avatar_url: "" }),
     });
     if (me.value) me.value.avatar_url = "";
-    avatarMsg.value = "Аватар сброшен.";
+    avatarMsg.value = "аватар убран";
   } catch (e) {
-    err.value = e instanceof Error ? e.message : "Ошибка";
-  }
-}
-
-async function clearWallpaper() {
-  if (!auth.token) return;
-  err.value = "";
-  avatarMsg.value = "";
-  try {
-    await api("/api/me", {
-      method: "PATCH",
-      token: auth.token,
-      body: JSON.stringify({ wallpaper_url: "" }),
-    });
-    if (me.value) me.value.wallpaper_url = "";
-    avatarMsg.value = "Обои сброшены.";
-  } catch (e) {
-    err.value = e instanceof Error ? e.message : "Ошибка";
+    err.value = e instanceof Error ? e.message : "ошибка";
   }
 }
 
@@ -319,26 +262,20 @@ async function save() {
       token: auth.token,
       body: JSON.stringify({
         bio: bio.value,
-        theme_preference: themePreference.value,
+        readme_md: readmeMd.value,
         language_preference: languagePreference.value,
-        font_preference: fontPreference.value,
         full_name: fullName.value,
         website_url: websiteUrl.value,
         social_links: socialLinks.value,
         birthday: birthday.value,
         country: country.value,
-        favorite_course_ids: favorites.value,
       }),
     });
-    applyUserPreferences({
-      theme_preference: themePreference.value,
-      language_preference: languagePreference.value,
-      font_preference: fontPreference.value,
-    });
-    toastSuccess("Профиль обновлён");
+    applyUserPreferences({ language_preference: languagePreference.value });
+    toastSuccess("сохранено");
     await router.push(`/u/${auth.nickname}`);
   } catch (e) {
-    err.value = e instanceof Error ? e.message : "Ошибка";
+    err.value = e instanceof Error ? e.message : "ошибка";
     toastError(e);
   } finally {
     saving.value = false;
@@ -357,37 +294,16 @@ function closeSettings() {
         <AppIcon name="close" />
       </button>
       <button class="nav-item" :class="{ active: tab === 'profile' }" type="button" @click="tab = 'profile'">
-        <AppIcon name="profile" />
-        <span>Profile</span>
+        <AppIcon name="profile" :size="18" /><span>профиль</span>
       </button>
       <button class="nav-item" :class="{ active: tab === 'account' }" type="button" @click="tab = 'account'">
-        <AppIcon name="settings" />
-        <span>Account</span>
-      </button>
-      <button class="nav-item" :class="{ active: tab === 'activity' }" type="button" @click="tab = 'activity'">
-        <AppIcon name="play" />
-        <span>Activity</span>
-      </button>
-      <button class="nav-item" :class="{ active: tab === 'privacy' }" type="button" @click="tab = 'privacy'">
-        <AppIcon name="block" />
-        <span>Privacy</span>
+        <AppIcon name="settings" :size="18" /><span>аккаунт</span>
       </button>
       <button class="nav-item" :class="{ active: tab === 'security' }" type="button" @click="tab = 'security'">
-        <AppIcon name="edit" />
-        <span>Security</span>
-      </button>
-      <button
-        class="nav-item"
-        :class="{ active: tab === 'notifications' }"
-        type="button"
-        @click="tab = 'notifications'"
-      >
-        <AppIcon name="comment" />
-        <span>Notifications</span>
+        <AppIcon name="admin" :size="18" /><span>безопасность</span>
       </button>
       <button class="nav-item" :class="{ active: tab === 'invites' }" type="button" @click="tab = 'invites'">
-        <AppIcon name="invites" />
-        <span>Invites</span>
+        <AppIcon name="invites" :size="18" /><span>инвайты</span>
       </button>
     </aside>
 
@@ -396,267 +312,168 @@ function closeSettings() {
       <p v-if="avatarMsg" class="ok">{{ avatarMsg }}</p>
 
       <template v-if="tab === 'profile'">
-        <h1>Profile</h1>
+        <h1>профиль</h1>
         <div class="avatar-header">
           <div v-if="me.avatar_url" class="avatar-preview-wrap">
             <img :src="me.avatar_url" alt="" class="avatar-preview" />
           </div>
-          <div v-else class="avatar-placeholder">{{ me.nickname.slice(0, 2).toUpperCase() }}</div>
+          <div v-else class="avatar-placeholder">{{ me.nickname.slice(0, 2) }}</div>
           <div class="avatar-actions">
             <label class="btn-file">
               <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" :disabled="uploadingAvatar" @change="onAvatarFile" />
-              {{ uploadingAvatar ? "Uploading…" : "Upload photo" }}
+              {{ uploadingAvatar ? "загрузка…" : "загрузить фото" }}
             </label>
-            <button v-if="me.avatar_url" class="secondary" type="button" @click="clearAvatar">Remove</button>
-          </div>
-        </div>
-
-        <div class="wallpaper-box">
-          <img v-if="me.wallpaper_url" :src="me.wallpaper_url" alt="" class="wallpaper-preview" />
-          <div v-else class="muted">Обои не загружены.</div>
-          <div class="avatar-actions">
-            <label class="btn-file">
-              <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" :disabled="uploadingWallpaper" @change="onWallpaperFile" />
-              {{ uploadingWallpaper ? "Uploading…" : "Upload wallpaper" }}
-            </label>
-            <button v-if="me.wallpaper_url" class="secondary" type="button" @click="clearWallpaper">Remove</button>
+            <button v-if="me.avatar_url" class="secondary" type="button" @click="clearAvatar">убрать</button>
           </div>
         </div>
 
         <div class="form-grid">
           <label>
-            <span>Username</span>
+            <span>ник</span>
             <input :value="`@${me.nickname}`" disabled />
           </label>
           <label>
-            <span>Full name</span>
+            <span>имя</span>
             <input v-model="fullName" />
           </label>
           <label class="col-2">
-            <span>Bio</span>
+            <span>био</span>
             <textarea v-model="bio" rows="3" maxlength="680" />
           </label>
           <label class="col-2">
-            <span>Website</span>
+            <span>сайт</span>
             <input v-model="websiteUrl" />
+          </label>
+          <label class="col-2">
+            <span>readme · markdown, отображается в профиле</span>
+            <textarea
+              v-model="readmeMd"
+              rows="10"
+              :maxlength="README_MAX"
+              placeholder="# привет&#10;немного о себе, проекты, ссылки…"
+              class="readme-input"
+            />
+            <span class="readme-counter muted">{{ readmeMd.length }} / {{ README_MAX }}</span>
           </label>
         </div>
 
         <div class="socials">
           <div class="socials-head">
-            <h2>Social links</h2>
-            <button class="secondary" type="button" @click="addSocialLink">Add link</button>
+            <h2>соцсети</h2>
+            <button class="secondary" type="button" @click="addSocialLink">+ ссылка</button>
           </div>
           <div v-for="(s, i) in socialLinks" :key="`social-${i}`" class="social-row">
-            <input v-model="s.name" placeholder="Name (e.g. YouTube)" />
-            <input v-model="s.url" placeholder="Link (https://...)" />
+            <input v-model="s.name" placeholder="название" />
+            <input v-model="s.url" placeholder="https://" />
             <button class="secondary social-remove" type="button" @click="removeSocialLink(i)">
               <AppIcon name="delete" />
             </button>
           </div>
         </div>
 
-        <div class="favorites">
-          <h2>Favorite courses</h2>
-          <p class="muted">Up to 12 courses.</p>
-          <ul>
-            <li v-for="c in courses" :key="c.id">
-              <label>
-                <input type="checkbox" :checked="favorites.includes(c.id)" @change="toggleFav(c.id)" />
-                {{ c.title }} — {{ c.teacher_nickname }}
-              </label>
-            </li>
-          </ul>
-        </div>
       </template>
 
       <template v-else-if="tab === 'account'">
-        <h1>Account details</h1>
+        <h1>аккаунт</h1>
+
+        <section class="nick-block">
+          <h2>ник</h2>
+          <p class="muted small">текущий: <strong>@{{ me.nickname }}</strong></p>
+          <p class="muted small">осталось смен: {{ nickChangesLeft }} из {{ MAX_NICK_CHANGES }}</p>
+          <template v-if="nickChangesLeft > 0">
+            <div class="nick-row">
+              <input
+                v-model="newNick"
+                placeholder="новый ник"
+                maxlength="24"
+                :disabled="changingNick"
+                @input="onNickInput"
+              />
+              <button
+                type="button"
+                :disabled="changingNick || nickStatus !== 'ok'"
+                @click="changeNickname"
+              >
+                {{ changingNick ? "…" : "сменить" }}
+              </button>
+            </div>
+            <p
+              v-if="nickMessage"
+              class="small"
+              :class="{
+                'ok-msg': nickStatus === 'ok',
+                error: nickStatus === 'err',
+                muted: nickStatus === 'checking' || nickStatus === 'idle',
+              }"
+            >
+              {{ nickStatus === "checking" ? "проверка…" : nickMessage }}
+            </p>
+          </template>
+          <p v-else class="muted small">лимит смен исчерпан</p>
+        </section>
+
         <div class="form-grid">
           <label class="col-2">
-            <span>Email</span>
+            <span>email</span>
             <input :value="me.email" disabled />
           </label>
           <label>
-            <span>Birthday</span>
+            <span>день рождения</span>
             <input v-model="birthday" />
           </label>
           <label>
-            <span>Country</span>
+            <span>страна</span>
             <input v-model="country" />
           </label>
           <label>
-            <span>Theme</span>
-            <select v-model="themePreference">
-              <option value="black">Black</option>
-              <option value="graphite">Graphite</option>
-              <option value="contrast">Contrast</option>
-            </select>
-          </label>
-          <label>
-            <span>Language</span>
+            <span>язык</span>
             <select v-model="languagePreference">
-              <option value="ru">Русский</option>
-              <option value="en">English</option>
+              <option value="ru">русский</option>
+              <option value="en">english</option>
             </select>
           </label>
-          <label>
-            <span>Font</span>
-            <select v-model="fontPreference">
-              <option value="compact">Compact</option>
-              <option value="normal">Normal</option>
-              <option value="large">Large</option>
-            </select>
-          </label>
-        </div>
-      </template>
-
-      <template v-else-if="tab === 'activity'">
-        <h1>Activity</h1>
-        <p class="muted">Time on the site (collected in the app).</p>
-        <div class="form-grid">
-          <label>
-            <span>Year</span>
-            <select v-model.number="activityYear">
-              <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}</option>
-            </select>
-          </label>
-        </div>
-        <p v-if="activityLoading" class="muted">Loading…</p>
-        <template v-else-if="myActivity">
-          <p class="muted">Total: {{ Math.round(myActivity.total_seconds / 60) }} min · {{ myActivity.days.length }} active days</p>
-          <div v-if="myActivity.days.length" class="activity-grid">
-            <div v-for="d in myActivity.days.slice(-14)" :key="d.day" class="activity-cell">
-              <span class="activity-day-label">{{ d.day.slice(5) }}</span>
-              <span>{{ Math.round(d.seconds_spent / 60) }}m</span>
-            </div>
-          </div>
-          <p v-else class="muted">No data for this year.</p>
-        </template>
-      </template>
-
-      <template v-else-if="tab === 'privacy' && privacy">
-        <h1>Privacy</h1>
-        <p class="muted">Кто видит профиль, активность и аватар/обои.</p>
-        <div class="form-grid">
-          <label>
-            <span>Profile</span>
-            <select v-model="privacy.profile_visibility">
-              <option value="public">Public</option>
-              <option value="followers">Followers only</option>
-              <option value="private">Only me</option>
-            </select>
-          </label>
-          <label>
-            <span>Activity &amp; location fields</span>
-            <select v-model="privacy.activity_visibility">
-              <option value="public">Public</option>
-              <option value="followers">Followers only</option>
-              <option value="private">Only me</option>
-            </select>
-          </label>
-          <label>
-            <span>Media (avatar, wallpaper, favorites)</span>
-            <select v-model="privacy.media_visibility">
-              <option value="public">Public</option>
-              <option value="followers">Followers only</option>
-              <option value="private">Only me</option>
-            </select>
-          </label>
-          <label class="inline-check">
-            <input v-model="privacy.show_birthday" type="checkbox" />
-            <span>Show birthday when activity is visible</span>
-          </label>
-          <label class="inline-check">
-            <input v-model="privacy.show_country" type="checkbox" />
-            <span>Show country when activity is visible</span>
-          </label>
-        </div>
-        <div class="actions" style="margin-top: 1rem">
-          <button type="button" :disabled="savingPrivacy" @click="savePrivacySettings">
-            {{ savingPrivacy ? "Saving…" : "Save privacy" }}
-          </button>
         </div>
       </template>
 
       <template v-else-if="tab === 'security'">
-        <h1>Security</h1>
-        <p class="muted">Change password. Minimum 8 characters for the new one.</p>
+        <h1>безопасность</h1>
+        <p class="muted">смена пароля · минимум 8 символов</p>
         <div class="form-grid col-one">
           <label class="col-2">
-            <span>Current password</span>
+            <span>текущий пароль</span>
             <input v-model="currentPassword" type="password" autocomplete="current-password" />
           </label>
           <label class="col-2">
-            <span>New password</span>
+            <span>новый пароль</span>
             <input v-model="newPassword" type="password" autocomplete="new-password" />
           </label>
         </div>
         <div class="actions" style="margin-top: 1rem">
           <button type="button" :disabled="changingPassword || !currentPassword || !newPassword" @click="onChangePassword">
-            {{ changingPassword ? "Updating…" : "Update password" }}
-          </button>
-        </div>
-      </template>
-
-      <template v-else-if="tab === 'notifications' && notif">
-        <h1>Notifications</h1>
-        <p class="muted">Preferences (delivery will follow product updates).</p>
-        <div class="form-grid col-one">
-          <label class="inline-check">
-            <input v-model="notif.email_enabled" type="checkbox" />
-            <span>Email</span>
-          </label>
-          <label class="inline-check">
-            <input v-model="notif.push_enabled" type="checkbox" />
-            <span>Push (coming soon)</span>
-          </label>
-          <label class="inline-check">
-            <input v-model="notif.course_updates" type="checkbox" />
-            <span>Course updates</span>
-          </label>
-          <label class="inline-check">
-            <input v-model="notif.assignment_deadlines" type="checkbox" />
-            <span>Assignment deadlines</span>
-          </label>
-          <label class="inline-check">
-            <input v-model="notif.grades_released" type="checkbox" />
-            <span>Grades released</span>
-          </label>
-          <label class="inline-check">
-            <input v-model="notif.new_followers" type="checkbox" />
-            <span>New followers</span>
-          </label>
-          <label class="inline-check">
-            <input v-model="notif.marketing_news" type="checkbox" />
-            <span>News &amp; tips</span>
-          </label>
-        </div>
-        <div class="actions" style="margin-top: 1rem">
-          <button type="button" :disabled="savingNotif" @click="saveNotificationSettings">
-            {{ savingNotif ? "Saving…" : "Save notifications" }}
+            {{ changingPassword ? "…" : "сменить" }}
           </button>
         </div>
       </template>
 
       <template v-else-if="tab === 'invites'">
-        <h1>My invite links</h1>
-        <p class="muted">Ссылки перенесены в Settings и больше не показываются в основном меню.</p>
-        <p v-if="invitesLoading" class="muted">Loading…</p>
-        <p v-else-if="!invites.length" class="muted">Инвайтов пока нет.</p>
+        <h1>инвайты</h1>
+        <p v-if="invitesLoading" class="muted">загрузка</p>
+        <p v-else-if="!invites.length" class="muted">пусто</p>
         <div v-else class="invite-list">
           <div v-for="l in invites" :key="l.id" class="invite-card">
             <div class="invite-code">{{ l.code }}</div>
-            <div class="muted">роль: {{ l.target_role === "teacher" ? "ментор" : "ученик" }}</div>
-            <div class="muted">осталось: {{ l.remaining }} / {{ l.max_uses }}</div>
+            <div class="muted">
+              {{ l.target_role === "teacher" ? "ментор" : "ученик" }} ·
+              {{ l.unlimited ? "без ограничений" : `осталось ${l.remaining} / ${l.max_uses}` }}
+            </div>
             <div class="muted invite-url">{{ fullInviteUrl(l.code) }}</div>
           </div>
         </div>
       </template>
 
       <div v-if="tab === 'profile' || tab === 'account'" class="actions">
-        <button class="secondary" type="button" @click="closeSettings">Cancel</button>
-        <button type="button" :disabled="saving" @click="save">{{ saving ? "Saving..." : "Save" }}</button>
+        <button class="secondary" type="button" @click="closeSettings">отмена</button>
+        <button type="button" :disabled="saving" @click="save">{{ saving ? "…" : "сохранить" }}</button>
       </div>
     </div>
   </section>
@@ -685,18 +502,36 @@ function closeSettings() {
 
 .nav-item {
   width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
   justify-content: flex-start;
   margin-bottom: 0.45rem;
   border-radius: 12px;
   background: transparent;
-  color: var(--text);
+  color: var(--muted);
   border: 1px solid transparent;
-  padding: 0.7rem 0.8rem;
+  padding: 0.65rem 0.75rem;
+  text-align: left;
+}
+
+.nav-item :deep(.app-icon) {
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+
+.nav-item:hover {
+  color: var(--text);
 }
 
 .nav-item.active {
   background: var(--surface2);
   border-color: var(--border);
+  color: var(--text);
+}
+
+.nav-item.active :deep(.app-icon) {
+  opacity: 1;
 }
 
 .settings-main {
@@ -732,21 +567,6 @@ function closeSettings() {
   font-weight: 700;
 }
 
-.wallpaper-box {
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 0.75rem;
-  margin-bottom: 0.95rem;
-}
-
-.wallpaper-preview {
-  width: 100%;
-  max-height: 170px;
-  object-fit: cover;
-  border-radius: 10px;
-  margin-bottom: 0.65rem;
-}
-
 .avatar-actions {
   display: flex;
   gap: 0.6rem;
@@ -775,6 +595,17 @@ function closeSettings() {
 .form-grid label {
   display: grid;
   gap: 0.35rem;
+}
+
+.readme-input {
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.readme-counter {
+  font-size: 0.78rem;
+  text-align: right;
 }
 
 .col-2 {
@@ -808,34 +639,6 @@ function closeSettings() {
   place-items: center;
 }
 
-.favorites {
-  margin-top: 1rem;
-  border-top: 1px solid var(--border);
-  padding-top: 0.85rem;
-}
-
-.favorites ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  max-height: 180px;
-  overflow: auto;
-}
-
-.favorites li {
-  margin-bottom: 0.35rem;
-}
-
-.favorites label {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-}
-
-.favorites input[type="checkbox"] {
-  width: auto;
-}
-
 .col-one {
   grid-template-columns: 1fr;
 }
@@ -852,28 +655,6 @@ function closeSettings() {
   flex-shrink: 0;
 }
 
-.activity-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 0.5rem;
-  margin-top: 0.6rem;
-}
-
-.activity-cell {
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 0.4rem 0.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  font-size: 0.9rem;
-}
-
-.activity-day-label {
-  color: var(--muted);
-  font-size: 0.8rem;
-}
-
 .actions {
   margin-top: 1rem;
   display: flex;
@@ -883,6 +664,36 @@ function closeSettings() {
 
 .ok {
   color: var(--accent);
+}
+
+.nick-block {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  margin-bottom: 1rem;
+}
+.nick-block h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 500;
+}
+.nick-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+.nick-row input {
+  flex: 1;
+  min-width: 0;
+}
+.ok-msg {
+  color: var(--text);
+}
+.small {
+  font-size: 0.82rem;
 }
 
 .invite-list {

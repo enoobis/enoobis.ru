@@ -2,11 +2,13 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import {
+  addCoTeacher,
   createAssignment,
   createCourse,
   createStreamComment,
   createLecture,
   createStreamPost,
+  deleteCourse,
   enrollCourse,
   joinCourseByCode,
   getClassroom,
@@ -15,19 +17,23 @@ import {
   listCourses,
   patchAssignment,
   patchLecture,
+  removeCoTeacher,
   setClosedStudents,
   submitAssignment,
   unenrollCourse,
   uploadLectureAttachment,
+  uploadSubmissionFile,
   type Assignment,
   type AssignmentSubmission,
   type Course,
   type CourseClassroom,
   type Lecture,
+  type SubmissionAttachment,
 } from "../api/courses";
+import AppIcon from "../components/AppIcon.vue";
 import { useAuthStore } from "../stores/auth";
 
-type Tab = "stream" | "lectures" | "assignments" | "people" | "grades" | "calendar";
+type Tab = "lectures" | "assignments" | "stream" | "people" | "grades";
 type GradebookCell = {
   assignment: Assignment;
   submission: AssignmentSubmission | null;
@@ -57,13 +63,18 @@ const router = useRouter();
 const courses = ref<Course[]>([]);
 const classroom = ref<CourseClassroom | null>(null);
 const selectedCourseId = ref("");
-const allowedTabs: readonly Tab[] = ["stream", "lectures", "assignments", "people", "grades", "calendar"];
+const allowedTabs: readonly Tab[] = ["lectures", "assignments", "stream", "people", "grades"];
 function normalizeTab(value: unknown): Tab {
   if (typeof value === "string" && allowedTabs.includes(value as Tab)) return value as Tab;
-  return "stream";
+  return "lectures";
 }
 const tab = ref<Tab>(normalizeTab(route.params.tab));
 const err = ref("");
+
+const creatingCourse = ref(false);
+const addingLecture = ref(false);
+const addingAssignment = ref(false);
+const courseQuery = ref("");
 
 const title = ref("");
 const description = ref("");
@@ -75,13 +86,16 @@ const activeClosedId = ref<string | null>(null);
 const streamBody = ref("");
 const assignmentTitle = ref("");
 const assignmentDescription = ref("");
-const assignmentDueAt = ref("");
 const assignmentMaxPoints = ref(100);
 const submissionBody = ref<Record<string, string>>({});
+const submissionAttachments = ref<Record<string, SubmissionAttachment[]>>({});
+const submissionPending = ref<Record<string, File[]>>({});
+const submissionUploading = ref<Record<string, boolean>>({});
 const streamCommentBody = ref<Record<string, string>>({});
 const submissionsByAssignment = ref<Record<string, AssignmentSubmission[]>>({});
 const grading = ref<Record<string, { points: number; comment: string }>>({});
 const activeAssignmentForGrading = ref<string | null>(null);
+const expandedStudentId = ref<string | null>(null);
 const teacherSubmissionsByAssignment = ref<Record<string, AssignmentSubmission[]>>({});
 const teacherGradebookLoading = ref(false);
 const teacherGradebookError = ref("");
@@ -94,7 +108,6 @@ const lecturePendingFiles = ref<{ file_name: string; url: string }[]>([]);
 const lectureUploading = ref(false);
 const lectureTaskTitle = ref("");
 const lectureTaskDesc = ref("");
-const lectureTaskDue = ref("");
 const lectureTaskMaxPoints = ref(100);
 
 type LectureEditDraft = {
@@ -111,7 +124,6 @@ type AssignEditDraft = {
   id: string;
   title: string;
   description: string;
-  due_at: string;
   max_points: number;
 };
 const editingAssignment = ref<AssignEditDraft | null>(null);
@@ -119,12 +131,53 @@ const editingAssignment = ref<AssignEditDraft | null>(null);
 const addTaskForLectureId = ref<string | null>(null);
 const addTaskTitle = ref("");
 const addTaskDesc = ref("");
-const addTaskDue = ref("");
 const addTaskMaxPoints = ref(100);
 
 const canTeach = computed(() => auth.role === "teacher" || auth.role === "admin");
 const isTeacherInCurrent = computed(() => classroom.value?.is_teacher ?? false);
-const selectedCourseMeta = computed(() => courses.value.find((c) => c.id === selectedCourseId.value) ?? null);
+const isOwnerInCurrent = computed(
+  () => classroom.value?.is_owner || auth.role === "admin",
+);
+
+const coTeacherIds = computed(
+  () => new Set((classroom.value?.co_teachers ?? []).map((c) => c.id)),
+);
+
+const coTeacherNick = ref("");
+const coTeacherBusy = ref(false);
+
+function isCoTeacherOf(c: Course) {
+  return !!auth.user && c.co_teachers.some((co) => co.id === auth.user!.id);
+}
+
+async function onAddCoTeacher() {
+  if (!auth.token || !classroom.value || !isOwnerInCurrent.value) return;
+  const nick = coTeacherNick.value.trim();
+  if (!nick) return;
+  err.value = "";
+  coTeacherBusy.value = true;
+  try {
+    await addCoTeacher(classroom.value.course.id, nick, auth.token);
+    coTeacherNick.value = "";
+    await loadClassroom(classroom.value.course.id);
+  } catch (e) {
+    err.value = e instanceof Error ? e.message : "ошибка";
+  } finally {
+    coTeacherBusy.value = false;
+  }
+}
+
+async function onRemoveCoTeacher(userId: string) {
+  if (!auth.token || !classroom.value || !isOwnerInCurrent.value) return;
+  if (!window.confirm("убрать соучителя?")) return;
+  err.value = "";
+  try {
+    await removeCoTeacher(classroom.value.course.id, userId, auth.token);
+    await loadClassroom(classroom.value.course.id);
+  } catch (e) {
+    err.value = e instanceof Error ? e.message : "ошибка";
+  }
+}
 
 const courseStats = computed(() => ({
   stream: classroom.value?.stream.length ?? 0,
@@ -140,37 +193,63 @@ function roleLabel(role: string): string {
   return role;
 }
 
-function parseDueDate(raw: string): Date | null {
-  const value = raw?.trim();
-  if (!value) return null;
-  const normalized = value.includes("T") ? value : value.replace(" ", "T");
-  const parsed = new Date(normalized);
-  if (Number.isNaN(parsed.getTime())) return null;
-  return parsed;
-}
-
-function formatDateTime(raw: string): string {
-  const parsed = parseDueDate(raw);
-  if (!parsed) return raw || "без дедлайна";
-  return parsed.toLocaleString("ru-RU", {
-    year: "numeric",
-    month: "short",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-const calendarAssignments = computed(() => {
-  if (!classroom.value) return [];
-  return classroom.value.assignments
-    .filter((a) => parseDueDate(a.due_at))
-    .map((a) => ({
-      ...a,
-      dueDate: parseDueDate(a.due_at)!,
-    }))
-    .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime());
+const filteredCourses = computed(() => {
+  const q = courseQuery.value.trim().toLowerCase();
+  if (!q) return courses.value;
+  return courses.value.filter(
+    (c) =>
+      c.title.toLowerCase().includes(q) ||
+      c.teacher_nickname.toLowerCase().includes(q),
+  );
 });
+
+function closeCourse() {
+  classroom.value = null;
+  selectedCourseId.value = "";
+  router.replace({ name: "courses" }).catch(() => undefined);
+}
+
+const gradingAssignment = computed<Assignment | null>(() => {
+  if (!classroom.value || !activeAssignmentForGrading.value) return null;
+  return (
+    classroom.value.assignments.find((a) => a.id === activeAssignmentForGrading.value) ?? null
+  );
+});
+
+const gradingStudents = computed(() => {
+  if (!classroom.value || !activeAssignmentForGrading.value) return [];
+  const subs = submissionsByAssignment.value[activeAssignmentForGrading.value] ?? [];
+  const subByStudent: Record<string, AssignmentSubmission> = {};
+  for (const s of subs) subByStudent[s.student_id] = s;
+  return classroom.value.members
+    .filter((m) => m.role === "student")
+    .map((m) => ({ student: m, submission: subByStudent[m.id] ?? null }))
+    .sort((a, b) => {
+      const aw = a.submission ? (a.submission.grade_points !== null ? 2 : 0) : 1;
+      const bw = b.submission ? (b.submission.grade_points !== null ? 2 : 0) : 1;
+      if (aw !== bw) return aw - bw;
+      return a.student.nickname.localeCompare(b.student.nickname);
+    });
+});
+
+const gradingStats = computed(() => {
+  const list = gradingStudents.value;
+  return {
+    total: list.length,
+    submitted: list.filter((x) => !!x.submission).length,
+    graded: list.filter((x) => x.submission?.grade_points !== null).length,
+  };
+});
+
+function toggleStudentExpand(studentId: string, submission: AssignmentSubmission | null) {
+  if (!submission) return;
+  expandedStudentId.value = expandedStudentId.value === studentId ? null : studentId;
+}
+
+function closeGrading() {
+  activeAssignmentForGrading.value = null;
+  expandedStudentId.value = null;
+}
 
 const teacherGradebookMatrix = computed<Record<string, Record<string, AssignmentSubmission>>>(() => {
   const matrix: Record<string, Record<string, AssignmentSubmission>> = {};
@@ -284,7 +363,7 @@ async function loadTeacherGradebook(force = false) {
     teacherSubmissionsByAssignment.value = Object.fromEntries(pairs);
     teacherGradebookLoadedFor.value = cacheKey;
   } catch (e) {
-    teacherGradebookError.value = e instanceof Error ? e.message : "Ошибка загрузки ведомости";
+    teacherGradebookError.value = e instanceof Error ? e.message : "ошибка";
   } finally {
     teacherGradebookLoading.value = false;
   }
@@ -297,18 +376,13 @@ async function loadCourses() {
     courses.value = await listCourses(auth.token);
     const routeCourseId = typeof route.params.courseId === "string" ? route.params.courseId : "";
     const hasRouteCourse = routeCourseId && courses.value.some((c) => c.id === routeCourseId);
-    const initialCourseId = hasRouteCourse ? routeCourseId : selectedCourseId.value;
-    if (!initialCourseId && courses.value.length) {
-      selectedCourseId.value = courses.value[0].id;
-      await loadClassroom(selectedCourseId.value);
-      syncRouteState(selectedCourseId.value);
-    } else if (initialCourseId) {
-      selectedCourseId.value = initialCourseId;
-      await loadClassroom(initialCourseId);
-      syncRouteState(initialCourseId);
+    if (hasRouteCourse) {
+      selectedCourseId.value = routeCourseId;
+      await loadClassroom(routeCourseId);
+      syncRouteState(routeCourseId);
     }
   } catch (e) {
-    err.value = e instanceof Error ? e.message : "Ошибка";
+    err.value = e instanceof Error ? e.message : "ошибка";
   }
 }
 
@@ -320,7 +394,7 @@ async function loadClassroom(courseId: string) {
     invalidateTeacherGradebook();
     if (tab.value === "grades") await loadTeacherGradebook(true);
   } catch (e) {
-    err.value = e instanceof Error ? e.message : "Ошибка";
+    err.value = e instanceof Error ? e.message : "ошибка";
   }
 }
 
@@ -360,9 +434,10 @@ async function onCreateCourse() {
     });
     title.value = "";
     description.value = "";
+    creatingCourse.value = false;
     await loadCourses();
   } catch (e) {
-    err.value = e instanceof Error ? e.message : "Ошибка";
+    err.value = e instanceof Error ? e.message : "ошибка";
   }
 }
 
@@ -374,7 +449,7 @@ async function onEnroll(courseId: string) {
     await loadCourses();
     await loadClassroom(courseId);
   } catch (e) {
-    err.value = e instanceof Error ? e.message : "Ошибка";
+    err.value = e instanceof Error ? e.message : "ошибка";
   }
 }
 
@@ -385,7 +460,24 @@ async function onUnenroll(courseId: string) {
     await unenrollCourse(courseId, auth.token);
     await loadCourses();
   } catch (e) {
-    err.value = e instanceof Error ? e.message : "Ошибка";
+    err.value = e instanceof Error ? e.message : "ошибка";
+  }
+}
+
+async function onDeleteCourse(courseId: string, courseTitle: string) {
+  if (!auth.token) return;
+  if (!window.confirm(`удалить курс «${courseTitle}»? это необратимо.`)) return;
+  err.value = "";
+  try {
+    await deleteCourse(courseId, auth.token);
+    if (classroom.value?.course.id === courseId) {
+      classroom.value = null;
+      selectedCourseId.value = "";
+      router.replace({ name: "courses" }).catch(() => undefined);
+    }
+    await loadCourses();
+  } catch (e) {
+    err.value = e instanceof Error ? e.message : "ошибка";
   }
 }
 
@@ -400,7 +492,7 @@ async function onJoinByCode() {
     await loadCourses();
     await loadClassroom(joined.id);
   } catch (e) {
-    err.value = e instanceof Error ? e.message : "Ошибка";
+    err.value = e instanceof Error ? e.message : "ошибка";
   }
 }
 
@@ -422,7 +514,7 @@ async function saveClosedStudents() {
     activeClosedId.value = null;
     await loadCourses();
   } catch (e) {
-    err.value = e instanceof Error ? e.message : "Ошибка";
+    err.value = e instanceof Error ? e.message : "ошибка";
   }
 }
 
@@ -436,7 +528,7 @@ async function onCreateStreamPost() {
     streamBody.value = "";
     await loadClassroom(classroom.value.course.id);
   } catch (e) {
-    err.value = e instanceof Error ? e.message : "Ошибка";
+    err.value = e instanceof Error ? e.message : "ошибка";
   }
 }
 
@@ -450,7 +542,7 @@ async function onCreateStreamComment(postId: string) {
     streamCommentBody.value[postId] = "";
     await loadClassroom(classroom.value.course.id);
   } catch (e) {
-    err.value = e instanceof Error ? e.message : "Ошибка";
+    err.value = e instanceof Error ? e.message : "ошибка";
   }
 }
 
@@ -463,32 +555,128 @@ async function onCreateAssignment() {
       {
         title: assignmentTitle.value,
         description: assignmentDescription.value,
-        due_at: assignmentDueAt.value,
         max_points: assignmentMaxPoints.value,
       },
       auth.token,
     );
     assignmentTitle.value = "";
     assignmentDescription.value = "";
-    assignmentDueAt.value = "";
     assignmentMaxPoints.value = 100;
+    addingAssignment.value = false;
     await loadClassroom(classroom.value.course.id);
   } catch (e) {
-    err.value = e instanceof Error ? e.message : "Ошибка";
+    err.value = e instanceof Error ? e.message : "ошибка";
   }
+}
+
+function ensureSubmissionState(a: Assignment) {
+  if (!(a.id in submissionAttachments.value)) {
+    submissionAttachments.value[a.id] = a.my_submission?.attachments
+      ? [...a.my_submission.attachments]
+      : [];
+  }
+  if (!(a.id in submissionPending.value)) {
+    submissionPending.value[a.id] = [];
+  }
+}
+
+function attachmentsFor(a: Assignment): SubmissionAttachment[] {
+  ensureSubmissionState(a);
+  return submissionAttachments.value[a.id];
+}
+
+function pendingFor(a: Assignment): File[] {
+  ensureSubmissionState(a);
+  return submissionPending.value[a.id];
+}
+
+const MAX_SUBMISSION_FILES = 10;
+
+function onPickSubmissionFiles(a: Assignment, ev: Event) {
+  const input = ev.target as HTMLInputElement;
+  const files = Array.from(input.files ?? []);
+  input.value = "";
+  ensureSubmissionState(a);
+  for (const f of files) {
+    const total =
+      submissionAttachments.value[a.id].length +
+      submissionPending.value[a.id].length;
+    if (total >= MAX_SUBMISSION_FILES) {
+      err.value = `можно не более ${MAX_SUBMISSION_FILES} файлов`;
+      break;
+    }
+    if (f.size > 2 * 1024 * 1024) {
+      err.value = `${f.name}: больше 2 мб`;
+      continue;
+    }
+    submissionPending.value[a.id].push(f);
+  }
+}
+
+function removePendingFile(a: Assignment, idx: number) {
+  ensureSubmissionState(a);
+  submissionPending.value[a.id].splice(idx, 1);
+}
+
+function removeSubmissionAttachment(a: Assignment, idx: number) {
+  ensureSubmissionState(a);
+  submissionAttachments.value[a.id].splice(idx, 1);
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} б`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} кб`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} мб`;
 }
 
 async function onSubmitAssignment(a: Assignment) {
   if (!auth.token || !classroom.value) return;
+  ensureSubmissionState(a);
   const content = (submissionBody.value[a.id] || "").trim();
-  if (!content) return;
+  const pending = submissionPending.value[a.id];
+  const existing = submissionAttachments.value[a.id];
+  if (!content && !pending.length && !existing.length) return;
   err.value = "";
+  submissionUploading.value[a.id] = true;
   try {
-    await submitAssignment(classroom.value.course.id, a.id, content, auth.token);
+    const uploaded: SubmissionAttachment[] = [];
+    for (const file of pending) {
+      const r = await uploadSubmissionFile(
+        classroom.value.course.id,
+        a.id,
+        file,
+        auth.token,
+      );
+      uploaded.push({
+        id: "",
+        file_name: r.file_name,
+        url: r.url,
+        size_bytes: r.size_bytes,
+        mime_type: r.mime_type,
+        created_at: "",
+      });
+    }
+    const allAttachments = [...existing, ...uploaded];
+    const fresh = await submitAssignment(
+      classroom.value.course.id,
+      a.id,
+      content,
+      auth.token,
+      allAttachments.map((x) => ({
+        file_name: x.file_name,
+        url: x.url,
+        size_bytes: x.size_bytes,
+        mime_type: x.mime_type,
+      })),
+    );
     submissionBody.value[a.id] = "";
+    submissionPending.value[a.id] = [];
+    submissionAttachments.value[a.id] = fresh.attachments ?? [];
     await loadClassroom(classroom.value.course.id);
   } catch (e) {
-    err.value = e instanceof Error ? e.message : "Ошибка";
+    err.value = e instanceof Error ? e.message : "ошибка";
+  } finally {
+    submissionUploading.value[a.id] = false;
   }
 }
 
@@ -505,8 +693,9 @@ async function openSubmissions(assignmentId: string) {
       };
     }
     activeAssignmentForGrading.value = assignmentId;
+    expandedStudentId.value = null;
   } catch (e) {
-    err.value = e instanceof Error ? e.message : "Ошибка";
+    err.value = e instanceof Error ? e.message : "ошибка";
   }
 }
 
@@ -521,7 +710,7 @@ async function onLectureFileChange(ev: Event) {
     const r = await uploadLectureAttachment(classroom.value.course.id, file, auth.token);
     lecturePendingFiles.value = [...lecturePendingFiles.value, { file_name: r.file_name, url: r.url }];
   } catch (e) {
-    err.value = e instanceof Error ? e.message : "Ошибка";
+    err.value = e instanceof Error ? e.message : "ошибка";
   } finally {
     lectureUploading.value = false;
   }
@@ -549,7 +738,6 @@ async function onCreateLecture() {
           ? {
               title: taskTitle,
               description: lectureTaskDesc.value || undefined,
-              due_at: lectureTaskDue.value || undefined,
               max_points: lectureTaskMaxPoints.value,
             }
           : undefined,
@@ -562,11 +750,11 @@ async function onCreateLecture() {
     lecturePendingFiles.value = [];
     lectureTaskTitle.value = "";
     lectureTaskDesc.value = "";
-    lectureTaskDue.value = "";
     lectureTaskMaxPoints.value = 100;
+    addingLecture.value = false;
     await loadClassroom(classroom.value.course.id);
   } catch (e) {
-    err.value = e instanceof Error ? e.message : "Ошибка";
+    err.value = e instanceof Error ? e.message : "ошибка";
   }
 }
 
@@ -598,7 +786,7 @@ async function onLectureEditFileChange(ev: Event) {
       attachments: [...editingLecture.value.attachments, { file_name: r.file_name, url: r.url }],
     };
   } catch (e) {
-    err.value = e instanceof Error ? e.message : "Ошибка";
+    err.value = e instanceof Error ? e.message : "ошибка";
   } finally {
     lectureEditUploading.value = false;
   }
@@ -633,7 +821,7 @@ async function onSaveLectureEdit() {
     editingLecture.value = null;
     await loadClassroom(classroom.value.course.id);
   } catch (e) {
-    err.value = e instanceof Error ? e.message : "Ошибка";
+    err.value = e instanceof Error ? e.message : "ошибка";
   }
 }
 
@@ -642,7 +830,6 @@ function startEditAssignment(a: Assignment) {
     id: a.id,
     title: a.title,
     description: a.description,
-    due_at: a.due_at,
     max_points: a.max_points,
   };
 }
@@ -660,13 +847,12 @@ async function onSaveAssignmentEdit() {
     await patchAssignment(classroom.value.course.id, d.id, {
       title: d.title.trim(),
       description: d.description,
-      due_at: d.due_at,
       max_points: d.max_points,
     }, auth.token);
     editingAssignment.value = null;
     await loadClassroom(classroom.value.course.id);
   } catch (e) {
-    err.value = e instanceof Error ? e.message : "Ошибка";
+    err.value = e instanceof Error ? e.message : "ошибка";
   }
 }
 
@@ -674,7 +860,6 @@ function openAddTaskForm(lecId: string) {
   addTaskForLectureId.value = lecId;
   addTaskTitle.value = "";
   addTaskDesc.value = "";
-  addTaskDue.value = "";
   addTaskMaxPoints.value = 100;
 }
 
@@ -693,7 +878,6 @@ async function onSaveAddTaskToLecture(lecId: string) {
       {
         title: t,
         description: addTaskDesc.value || undefined,
-        due_at: addTaskDue.value || undefined,
         max_points: addTaskMaxPoints.value,
         lecture_id: lecId,
       },
@@ -702,7 +886,7 @@ async function onSaveAddTaskToLecture(lecId: string) {
     addTaskForLectureId.value = null;
     await loadClassroom(classroom.value.course.id);
   } catch (e) {
-    err.value = e instanceof Error ? e.message : "Ошибка";
+    err.value = e instanceof Error ? e.message : "ошибка";
   }
 }
 
@@ -722,785 +906,1577 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
     await openSubmissions(assignmentId);
     await loadClassroom(classroom.value.course.id);
   } catch (e) {
-    err.value = e instanceof Error ? e.message : "Ошибка";
+    err.value = e instanceof Error ? e.message : "ошибка";
   }
 }
 </script>
 
 <template>
-  <section class="classroom-page">
-    <div class="classroom-hero card">
-      <h1>Курсы</h1>
-      <p class="muted">Classroom-режим: лента, задания, участники, календарь и оценки.</p>
-    </div>
+  <section class="courses">
     <p v-if="err" class="error">{{ err }}</p>
 
-    <div v-if="canTeach" class="card" style="margin-bottom: 1rem">
-      <h2>Создать курс</h2>
-      <input v-model="title" placeholder="Название курса" />
-      <textarea v-model="description" placeholder="Описание курса" rows="3" style="margin-top: 0.5rem" />
-      <label style="display: flex; gap: 0.5rem; align-items: center; margin-top: 0.5rem">
-        <input v-model="isOpen" type="checkbox" style="width: auto" />
-        Открытый курс
-      </label>
-      <button type="button" style="margin-top: 0.75rem" @click="onCreateCourse">Создать</button>
-    </div>
-
-    <div class="card" style="margin-bottom: 1rem">
-      <h2>Вступить по коду курса</h2>
-      <div class="join-by-code">
-        <input v-model="joinCode" placeholder="Введите код курса (например A1B2C3)" @keyup.enter="onJoinByCode" />
-        <button type="button" @click="onJoinByCode">Вступить</button>
+    <!-- список курсов -->
+    <template v-if="!classroom">
+      <div class="board-tools">
+        <input
+          v-model="courseQuery"
+          class="board-search"
+          placeholder="поиск курса"
+        />
+        <input
+          v-model="joinCode"
+          class="board-code"
+          placeholder="код"
+          @keyup.enter="onJoinByCode"
+        />
+        <button v-if="joinCode.trim()" type="button" class="secondary" @click="onJoinByCode">
+          вступить
+        </button>
+        <button
+          v-if="canTeach"
+          type="button"
+          class="secondary"
+          :class="{ active: creatingCourse }"
+          @click="creatingCourse = !creatingCourse"
+        >
+          {{ creatingCourse ? "отмена" : "+ курс" }}
+        </button>
       </div>
-    </div>
 
-    <div class="courses-board card">
-      <div class="courses-board-head">
-        <h2>Мои курсы</h2>
-        <p class="muted">Карточки как в Classroom: быстро открыть курс, записаться или выйти.</p>
+      <div v-if="creatingCourse" class="form-card">
+        <input v-model="title" placeholder="название" />
+        <textarea v-model="description" rows="2" placeholder="описание" />
+        <label class="check">
+          <input v-model="isOpen" type="checkbox" />
+          <span>открытый курс</span>
+        </label>
+        <button type="button" :disabled="!title.trim()" @click="onCreateCourse">
+          создать
+        </button>
       </div>
-      <div class="courses-grid">
-        <article v-for="c in courses" :key="c.id" class="course-tile" :class="{ active: selectedCourseId === c.id }">
-          <button class="course-tile-cover" type="button" @click="openCourse(c.id)">
-            <span class="course-tile-chip">{{ c.is_open ? "открытый" : "закрытый" }}</span>
-            <strong>{{ c.title }}</strong>
-            <span class="muted">Преподаватель: {{ c.teacher_nickname }}</span>
-            <span class="muted">Код: {{ c.course_code }}</span>
-          </button>
-          <div class="course-tile-actions">
-            <button class="secondary" type="button" @click="openCourse(c.id)">
-              {{ selectedCourseId === c.id ? "Открыт" : "Открыть" }}
+
+      <div class="course-grid">
+        <article
+          v-for="c in filteredCourses"
+          :key="c.id"
+          class="course-card"
+          @click="openCourse(c.id)"
+        >
+          <header class="course-card-head">
+            <h3>{{ c.title }}</h3>
+            <span class="dot">·</span>
+            <span class="muted small">{{ c.is_open ? "открытый" : "закрытый" }}</span>
+          </header>
+          <p v-if="c.description" class="muted small course-card-desc">
+            {{ c.description }}
+          </p>
+          <footer class="course-card-foot">
+            <span class="muted small">{{ c.teacher_nickname }}</span>
+            <span class="muted small">код {{ c.course_code }}</span>
+          </footer>
+          <div class="course-card-actions" @click.stop>
+            <button v-if="c.is_open && !c.enrolled" type="button" @click="onEnroll(c.id)">
+              записаться
             </button>
-            <button v-if="c.is_open && !c.enrolled" type="button" @click="onEnroll(c.id)">Записаться</button>
-            <button v-if="c.is_open && c.enrolled" class="secondary" type="button" @click="onUnenroll(c.id)">Покинуть</button>
+            <button
+              v-if="c.is_open && c.enrolled && c.teacher_id !== auth.user?.id && !isCoTeacherOf(c)"
+              type="button"
+              class="secondary"
+              @click="onUnenroll(c.id)"
+            >
+              покинуть
+            </button>
             <button
               v-if="!c.is_open && canTeach && c.teacher_id === auth.user?.id"
-              class="secondary"
               type="button"
+              class="secondary"
               @click="openClosedEditor(c)"
             >
-              Доступ (UUID)
+              доступ
+            </button>
+            <button
+              v-if="canTeach && (c.teacher_id === auth.user?.id || auth.role === 'admin')"
+              type="button"
+              class="icon-btn-sm danger"
+              aria-label="удалить курс"
+              title="удалить курс"
+              @click="onDeleteCourse(c.id, c.title)"
+            >
+              <AppIcon name="delete" :size="14" />
             </button>
           </div>
         </article>
       </div>
-      <p v-if="!courses.length" class="muted">Пока нет доступных курсов.</p>
-    </div>
+      <p v-if="!filteredCourses.length" class="muted center">
+        {{ courseQuery ? "ничего не найдено" : "пусто" }}
+      </p>
+    </template>
 
-    <div class="card classroom-main" v-if="classroom">
-        <header class="classroom-header">
-          <p class="classroom-header-label">Класс</p>
+    <!-- внутри курса -->
+    <template v-else>
+      <header class="course-head">
+        <button class="back" type="button" @click="closeCourse">← к курсам</button>
+        <div class="course-head-row">
           <h2>{{ classroom.course.title }}</h2>
-          <p class="muted">{{ classroom.course.description }}</p>
-          <p v-if="selectedCourseMeta" class="muted">
-            Ведёт:
-            <RouterLink :to="`/u/${selectedCourseMeta.teacher_nickname}`">{{ selectedCourseMeta.teacher_nickname }}</RouterLink>
-          </p>
-          <p class="muted">Код курса: <strong>{{ classroom.course.course_code }}</strong></p>
-        </header>
-        <div class="classroom-meta-row">
-          <span class="badge">Постов: {{ courseStats.stream }}</span>
-          <span class="badge">Материалов: {{ courseStats.lectures }}</span>
-          <span class="badge">Заданий: {{ courseStats.assignments }}</span>
-          <span class="badge">Участников: {{ courseStats.members }}</span>
+          <button
+            v-if="isOwnerInCurrent"
+            type="button"
+            class="icon-btn-sm danger"
+            aria-label="удалить курс"
+            title="удалить курс"
+            @click="onDeleteCourse(classroom.course.id, classroom.course.title)"
+          >
+            <AppIcon name="delete" :size="16" />
+          </button>
         </div>
-        <div class="quick-actions">
-          <button class="secondary" type="button" @click="tab = 'stream'">Написать в ленту</button>
-          <button class="secondary" type="button" @click="tab = 'assignments'">Перейти к заданиям</button>
-          <button class="secondary" type="button" @click="tab = 'people'">Открыть участников</button>
-          <button class="secondary" type="button" @click="tab = 'calendar'">Смотреть дедлайны</button>
+        <p v-if="classroom.course.description" class="muted">
+          {{ classroom.course.description }}
+        </p>
+        <p class="muted small">
+          ведёт
+          <RouterLink :to="`/u/${classroom.course.teacher_nickname}`">
+            {{ classroom.course.teacher_nickname }}
+          </RouterLink>
+          <template v-if="classroom.co_teachers.length">
+            <template v-for="(co, i) in classroom.co_teachers" :key="co.id">
+              <span>{{ i === 0 ? " · соучители " : ", " }}</span>
+              <RouterLink :to="`/u/${co.nickname}`">{{ co.nickname }}</RouterLink>
+            </template>
+          </template>
+          · код <strong>{{ classroom.course.course_code }}</strong>
+        </p>
+      </header>
+
+      <nav class="tabs">
+        <button
+          class="tab"
+          :class="{ active: tab === 'lectures' }"
+          type="button"
+          @click="tab = 'lectures'"
+        >
+          лекции
+          <span class="tab-count">{{ courseStats.lectures }}</span>
+        </button>
+        <button
+          class="tab"
+          :class="{ active: tab === 'assignments' }"
+          type="button"
+          @click="tab = 'assignments'"
+        >
+          задания
+          <span class="tab-count">{{ courseStats.assignments }}</span>
+        </button>
+        <button
+          class="tab"
+          :class="{ active: tab === 'stream' }"
+          type="button"
+          @click="tab = 'stream'"
+        >
+          лента
+        </button>
+        <button
+          class="tab"
+          :class="{ active: tab === 'people' }"
+          type="button"
+          @click="tab = 'people'"
+        >
+          участники
+          <span class="tab-count">{{ courseStats.members }}</span>
+        </button>
+        <button
+          class="tab"
+          :class="{ active: tab === 'grades' }"
+          type="button"
+          @click="tab = 'grades'"
+        >
+          оценки
+        </button>
+      </nav>
+
+      <!-- лекции -->
+      <template v-if="tab === 'lectures'">
+        <div v-if="isTeacherInCurrent" class="add-bar">
+          <button
+            type="button"
+            class="secondary"
+            :class="{ active: addingLecture }"
+            @click="addingLecture = !addingLecture"
+          >
+            {{ addingLecture ? "отмена" : "+ лекция" }}
+          </button>
         </div>
-
-        <div class="tab-row">
-          <button class="tab-pill" :class="{ active: tab === 'stream' }" type="button" @click="tab = 'stream'">Лента</button>
-          <button class="tab-pill" :class="{ active: tab === 'lectures' }" type="button" @click="tab = 'lectures'">Материалы</button>
-          <button class="tab-pill" :class="{ active: tab === 'assignments' }" type="button" @click="tab = 'assignments'">Задания</button>
-          <button class="tab-pill" :class="{ active: tab === 'people' }" type="button" @click="tab = 'people'">Участники</button>
-          <button class="tab-pill" :class="{ active: tab === 'grades' }" type="button" @click="tab = 'grades'">Оценки</button>
-          <button class="tab-pill" :class="{ active: tab === 'calendar' }" type="button" @click="tab = 'calendar'">Календарь</button>
-        </div>
-
-        <template v-if="tab === 'stream'">
-          <div class="card" style="margin-top: 0.7rem">
-            <h3>Новый пост</h3>
-            <textarea v-model="streamBody" rows="3" placeholder="Объявление / сообщение в курс" />
-            <button type="button" style="margin-top: 0.5rem" @click="onCreateStreamPost">Опубликовать</button>
-          </div>
-          <div v-for="post in classroom.stream" :key="post.id" class="card" style="margin-top: 0.7rem">
-            <div class="muted">
-              <RouterLink :to="`/u/${post.author_nickname}`">{{ post.author_nickname }}</RouterLink>
-              · {{ post.created_at.slice(0, 16).replace("T", " ") }}
-            </div>
-            <p style="margin: 0.45rem 0 0">{{ post.body }}</p>
-            <div class="stream-comments">
-              <div v-if="post.comments.length" class="stream-comment-list">
-                <div v-for="comment in post.comments" :key="comment.id" class="stream-comment">
-                  <div class="muted">
-                    <RouterLink :to="`/u/${comment.author_nickname}`">{{ comment.author_nickname }}</RouterLink>
-                    · {{ comment.created_at.slice(0, 16).replace("T", " ") }}
-                  </div>
-                  <p>{{ comment.body }}</p>
-                </div>
-              </div>
-              <div class="stream-comment-form">
-                <input
-                  v-model="streamCommentBody[post.id]"
-                  placeholder="Комментарий к посту"
-                  @keyup.enter="onCreateStreamComment(post.id)"
-                />
-                <button class="secondary" type="button" @click="onCreateStreamComment(post.id)">Ответить</button>
-              </div>
-            </div>
-          </div>
-          <p v-if="!classroom.stream.length" class="muted" style="margin-top: 0.7rem">Лента пока пустая.</p>
-        </template>
-
-        <template v-else-if="tab === 'lectures'">
-          <div v-if="isTeacherInCurrent" class="card" style="margin-top: 0.7rem">
-            <h3>Новая лекция</h3>
-            <input v-model="lectureTitle" placeholder="Название лекции" />
-            <textarea
-              v-model="lectureBody"
-              rows="5"
-              placeholder="Текст лекции (можно оставить пустым, если есть видео, вложения или задание)"
-              style="margin-top: 0.5rem"
-            />
+        <div v-if="isTeacherInCurrent && addingLecture" class="form-card">
+          <input v-model="lectureTitle" placeholder="название" />
+          <textarea v-model="lectureBody" rows="4" placeholder="текст" />
+          <input v-model="lectureVideoUrl" placeholder="ссылка на видео" />
+          <div class="upload-row">
             <input
-              v-model="lectureVideoUrl"
-              placeholder="Ссылка на видео (YouTube, Vimeo или прямой URL mp4/webm)"
-              style="margin-top: 0.5rem; width: 100%"
+              type="file"
+              :disabled="lectureUploading"
+              @change="onLectureFileChange"
             />
-            <div style="margin-top: 0.55rem">
-              <input type="file" :disabled="lectureUploading" @change="onLectureFileChange" />
-              <p class="muted" style="margin: 0.35rem 0 0; font-size: 0.9em">
-                {{ lectureUploading ? "Загрузка…" : "До 20 МБ: pdf, документы, архивы, изображения, аудио, mp4 и др." }}
-              </p>
-              <ul v-if="lecturePendingFiles.length" class="pending-files">
-                <li v-for="(f, i) in lecturePendingFiles" :key="f.url + i">
-                  <span>{{ f.file_name }}</span>
-                  <button class="secondary" type="button" @click="removePendingLectureFile(i)">Убрать</button>
-                </li>
-              </ul>
-            </div>
-            <div class="lecture-task-create" style="margin-top: 0.75rem">
-              <h4 style="margin: 0 0 0.35rem">Задание к лекции (необязательно)</h4>
-              <input v-model="lectureTaskTitle" placeholder="Название задания" />
-              <textarea v-model="lectureTaskDesc" rows="2" placeholder="Описание" style="margin-top: 0.45rem" />
-              <div class="grid-2" style="margin-top: 0.45rem">
-                <input v-model="lectureTaskDue" placeholder="Дедлайн (например 2026-04-20 18:00)" />
-                <input v-model.number="lectureTaskMaxPoints" type="number" min="1" max="1000" placeholder="Баллы" />
-              </div>
-            </div>
-            <button type="button" style="margin-top: 0.65rem" :disabled="lectureUploading" @click="onCreateLecture">
-              Опубликовать лекцию
-            </button>
+            <span class="muted small">
+              {{ lectureUploading ? "загрузка…" : "до 20 мб" }}
+            </span>
           </div>
+          <ul v-if="lecturePendingFiles.length" class="files">
+            <li v-for="(f, i) in lecturePendingFiles" :key="f.url + i">
+              <span>{{ f.file_name }}</span>
+              <button
+                type="button"
+                class="ghost-x"
+                @click="removePendingLectureFile(i)"
+              >
+                ×
+              </button>
+            </li>
+          </ul>
+          <details class="task-extra">
+            <summary>+ задание к лекции</summary>
+            <input v-model="lectureTaskTitle" placeholder="название задания" />
+            <textarea v-model="lectureTaskDesc" rows="2" placeholder="описание" />
+            <input
+              v-model.number="lectureTaskMaxPoints"
+              type="number"
+              min="1"
+              max="1000"
+              placeholder="баллы"
+            />
+          </details>
+          <button
+            type="button"
+            :disabled="lectureUploading || !lectureTitle.trim()"
+            @click="onCreateLecture"
+          >
+            опубликовать
+          </button>
+        </div>
 
-          <div v-for="lec in classroom.lectures" :key="lec.id" class="card lecture-card">
-            <template v-if="editingLecture?.id === lec.id">
-              <h3>Редактирование лекции</h3>
-              <input v-model="editingLecture.title" placeholder="Название" />
-              <textarea v-model="editingLecture.body_text" rows="5" style="margin-top: 0.5rem" />
-              <input v-model="editingLecture.video_url" placeholder="Видео URL" style="margin-top: 0.5rem; width: 100%" />
-              <div style="margin-top: 0.5rem">
-                <input type="file" :disabled="lectureEditUploading" @change="onLectureEditFileChange" />
-                <p class="muted" style="margin: 0.35rem 0 0; font-size: 0.9em">
-                  {{ lectureEditUploading ? "Загрузка…" : "Вложения (список ниже заменится при сохранении)" }}
-                </p>
-                <ul v-if="editingLecture.attachments.length" class="pending-files">
-                  <li v-for="(f, i) in editingLecture.attachments" :key="f.url + i">
-                    <span>{{ f.file_name }}</span>
-                    <button class="secondary" type="button" @click="removeEditLectureFile(i)">Убрать</button>
-                  </li>
-                </ul>
-              </div>
-              <div style="margin-top: 0.55rem; display: flex; gap: 0.5rem; flex-wrap: wrap">
-                <button type="button" :disabled="lectureEditUploading" @click="onSaveLectureEdit">Сохранить</button>
-                <button class="secondary" type="button" @click="cancelEditLecture">Отмена</button>
+        <div v-for="lec in classroom.lectures" :key="lec.id" class="lecture-card">
+          <template v-if="editingLecture?.id === lec.id">
+            <input v-model="editingLecture.title" placeholder="название" />
+            <textarea v-model="editingLecture.body_text" rows="4" placeholder="текст" />
+            <input v-model="editingLecture.video_url" placeholder="видео url" />
+            <div class="upload-row">
+              <input
+                type="file"
+                :disabled="lectureEditUploading"
+                @change="onLectureEditFileChange"
+              />
+              <span class="muted small">
+                {{ lectureEditUploading ? "загрузка…" : "вложения" }}
+              </span>
+            </div>
+            <ul v-if="editingLecture.attachments.length" class="files">
+              <li v-for="(f, i) in editingLecture.attachments" :key="f.url + i">
+                <span>{{ f.file_name }}</span>
+                <button
+                  type="button"
+                  class="ghost-x"
+                  @click="removeEditLectureFile(i)"
+                >
+                  ×
+                </button>
+              </li>
+            </ul>
+            <div class="row-actions">
+              <button
+                type="button"
+                :disabled="lectureEditUploading"
+                @click="onSaveLectureEdit"
+              >
+                сохранить
+              </button>
+              <button type="button" class="secondary" @click="cancelEditLecture">
+                отмена
+              </button>
+            </div>
+          </template>
+          <template v-else>
+            <div class="lecture-head">
+              <h3>{{ lec.title }}</h3>
+              <button
+                v-if="isTeacherInCurrent"
+                type="button"
+                class="icon-btn-sm"
+                aria-label="редактировать"
+                title="редактировать"
+                @click="startEditLecture(lec)"
+              >
+                <AppIcon name="edit" :size="14" />
+              </button>
+            </div>
+            <p class="muted small">
+              <RouterLink :to="`/u/${lec.author_nickname}`">{{ lec.author_nickname }}</RouterLink>
+              · {{ lec.created_at.slice(0, 16).replace("T", " ") }}
+            </p>
+            <template v-for="ev in [lectureVideoEmbed(lec.video_url)]" :key="'v-' + lec.id">
+              <div v-if="ev" class="lecture-video">
+                <iframe
+                  v-if="ev.kind === 'iframe'"
+                  :src="ev.src"
+                  title="video"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowfullscreen
+                />
+                <video v-else-if="ev.kind === 'video'" :src="ev.src" controls />
+                <a
+                  v-else-if="ev.kind === 'link'"
+                  :href="ev.href"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  открыть видео →
+                </a>
               </div>
             </template>
-            <template v-else>
-              <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; flex-wrap: wrap">
-                <h3 style="margin: 0">{{ lec.title }}</h3>
-                <button v-if="isTeacherInCurrent" class="secondary" type="button" @click="startEditLecture(lec)">
-                  Редактировать
-                </button>
-              </div>
-              <p class="muted">
-                <RouterLink :to="`/u/${lec.author_nickname}`">{{ lec.author_nickname }}</RouterLink>
-                · {{ lec.created_at.slice(0, 16).replace("T", " ") }}
-              </p>
-              <template v-for="ev in [lectureVideoEmbed(lec.video_url)]" :key="'v-' + lec.id">
-                <div v-if="ev" class="lecture-video">
-                  <iframe
-                    v-if="ev.kind === 'iframe'"
-                    :src="ev.src"
-                    title="video"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                    allowfullscreen
-                  />
-                  <video v-else-if="ev.kind === 'video'" :src="ev.src" controls />
-                  <a v-else-if="ev.kind === 'link'" :href="ev.href" target="_blank" rel="noopener noreferrer">
-                    Открыть видео
-                  </a>
-                </div>
-              </template>
-              <p v-if="lec.body_text" class="lecture-body">{{ lec.body_text }}</p>
-              <ul v-if="lec.attachments.length" class="attach-list">
-                <li v-for="att in lec.attachments" :key="att.id">
-                  <a :href="att.url" target="_blank" rel="noopener noreferrer">{{ att.file_name }}</a>
-                </li>
-              </ul>
+            <p v-if="lec.body_text" class="lecture-body">{{ lec.body_text }}</p>
+            <ul v-if="lec.attachments.length" class="attach-list">
+              <li v-for="att in lec.attachments" :key="att.id">
+                <a :href="att.url" target="_blank" rel="noopener noreferrer">
+                  {{ att.file_name }}
+                </a>
+              </li>
+            </ul>
 
-              <div v-if="assignmentsForLecture(lec.id).length" class="lecture-assignments">
-                <h4>Задания по лекции</h4>
-                <div v-for="a in assignmentsForLecture(lec.id)" :key="a.id" class="card" style="margin-top: 0.45rem">
-                  <template v-if="editingAssignment?.id === a.id">
-                    <input v-model="editingAssignment.title" placeholder="Название" />
-                    <textarea v-model="editingAssignment.description" rows="2" style="margin-top: 0.35rem" />
-                    <div class="grid-2" style="margin-top: 0.35rem">
-                      <input v-model="editingAssignment.due_at" placeholder="Дедлайн" />
-                      <input v-model.number="editingAssignment.max_points" type="number" min="1" max="1000" />
-                    </div>
-                    <div style="margin-top: 0.45rem; display: flex; gap: 0.45rem">
-                      <button type="button" @click="onSaveAssignmentEdit">Сохранить</button>
-                      <button class="secondary" type="button" @click="cancelEditAssignment">Отмена</button>
+            <div v-if="assignmentsForLecture(lec.id).length" class="lecture-tasks">
+              <div
+                v-for="a in assignmentsForLecture(lec.id)"
+                :key="a.id"
+                class="task-row"
+              >
+                <template v-if="editingAssignment?.id === a.id">
+                  <input v-model="editingAssignment.title" placeholder="название" />
+                  <textarea
+                    v-model="editingAssignment.description"
+                    rows="2"
+                    placeholder="описание"
+                  />
+                  <input
+                    v-model.number="editingAssignment.max_points"
+                    type="number"
+                    min="1"
+                    max="1000"
+                    placeholder="баллы"
+                  />
+                  <div class="row-actions">
+                    <button type="button" @click="onSaveAssignmentEdit">сохранить</button>
+                    <button type="button" class="secondary" @click="cancelEditAssignment">
+                      отмена
+                    </button>
+                  </div>
+                </template>
+                <template v-else>
+                  <div class="task-row-head">
+                    <strong>{{ a.title }}</strong>
+                    <span class="muted small">{{ a.max_points }} б</span>
+                  </div>
+                  <p v-if="a.description" class="muted small">{{ a.description }}</p>
+                  <template v-if="isTeacherInCurrent">
+                    <div class="row-actions">
+                      <button
+                        type="button"
+                        class="secondary"
+                        @click="startEditAssignment(a)"
+                      >
+                        изменить
+                      </button>
+                      <button
+                        type="button"
+                        class="secondary"
+                        @click="openSubmissions(a.id)"
+                      >
+                        проверить
+                      </button>
                     </div>
                   </template>
                   <template v-else>
-                    <strong>{{ a.title }}</strong>
-                    <p class="muted" style="margin: 0.25rem 0">
-                      Дедлайн: {{ a.due_at || "нет" }} · {{ a.max_points }} баллов ·
-                      <RouterLink :to="`/u/${a.author_nickname}`">{{ a.author_nickname }}</RouterLink>
-                    </p>
-                    <p v-if="a.description">{{ a.description }}</p>
-                    <template v-if="isTeacherInCurrent">
-                      <button class="secondary" type="button" style="margin-top: 0.35rem" @click="startEditAssignment(a)">
-                        Изменить задание
+                    <textarea
+                      v-model="submissionBody[a.id]"
+                      rows="2"
+                      placeholder="ответ — текст или ссылка"
+                    />
+                    <ul v-if="attachmentsFor(a).length" class="files">
+                      <li v-for="(f, i) in attachmentsFor(a)" :key="'kept-' + a.id + '-' + i">
+                        <a :href="f.url" target="_blank" rel="noopener noreferrer">
+                          {{ f.file_name }}
+                        </a>
+                        <button
+                          type="button"
+                          class="ghost-x"
+                          @click="removeSubmissionAttachment(a, i)"
+                        >
+                          ×
+                        </button>
+                      </li>
+                    </ul>
+                    <ul v-if="pendingFor(a).length" class="files">
+                      <li v-for="(f, i) in pendingFor(a)" :key="'p-' + a.id + '-' + i">
+                        <span>{{ f.name }} <span class="muted small">{{ formatFileSize(f.size) }}</span></span>
+                        <button
+                          type="button"
+                          class="ghost-x"
+                          @click="removePendingFile(a, i)"
+                        >
+                          ×
+                        </button>
+                      </li>
+                    </ul>
+                    <div class="upload-row">
+                      <label class="attach-label secondary">
+                        <AppIcon name="image" :size="14" />
+                        <span>прикрепить</span>
+                        <input
+                          type="file"
+                          multiple
+                          hidden
+                          @change="onPickSubmissionFiles(a, $event)"
+                        />
+                      </label>
+                      <span class="muted small">до 2 мб · до 10 файлов</span>
+                    </div>
+                    <div class="row-actions">
+                      <button
+                        type="button"
+                        :disabled="submissionUploading[a.id]"
+                        @click="onSubmitAssignment(a)"
+                      >
+                        {{ submissionUploading[a.id] ? "отправка…" : "сдать" }}
                       </button>
-                      <button class="secondary" type="button" style="margin-top: 0.35rem" @click="openSubmissions(a.id)">
-                        Проверить сдачи
-                      </button>
-                    </template>
-                    <template v-else>
-                      <textarea
-                        v-model="submissionBody[a.id]"
-                        rows="2"
-                        placeholder="Ссылка/текст сдачи"
-                        style="margin-top: 0.35rem"
-                      />
-                      <button type="button" style="margin-top: 0.35rem" @click="onSubmitAssignment(a)">Сдать / пересдать</button>
-                      <p v-if="a.my_submission" class="muted" style="margin-top: 0.35rem">
-                        Статус: {{ a.my_submission.status }}
-                        <span v-if="a.my_submission.grade_points !== null"> · Оценка: {{ a.my_submission.grade_points }}</span>
-                      </p>
-                    </template>
-                  </template>
-                </div>
-              </div>
-
-              <div v-if="isTeacherInCurrent" class="lecture-add-task" style="margin-top: 0.65rem">
-                <template v-if="addTaskForLectureId === lec.id">
-                  <h4 style="margin: 0 0 0.35rem">Новое задание к лекции</h4>
-                  <input v-model="addTaskTitle" placeholder="Название" />
-                  <textarea v-model="addTaskDesc" rows="2" placeholder="Описание" style="margin-top: 0.35rem" />
-                  <div class="grid-2" style="margin-top: 0.35rem">
-                    <input v-model="addTaskDue" placeholder="Дедлайн" />
-                    <input v-model.number="addTaskMaxPoints" type="number" min="1" max="1000" />
-                  </div>
-                  <div style="margin-top: 0.45rem; display: flex; gap: 0.45rem">
-                    <button type="button" @click="onSaveAddTaskToLecture(lec.id)">Добавить</button>
-                    <button class="secondary" type="button" @click="cancelAddTask">Отмена</button>
-                  </div>
-                </template>
-                <button v-else class="secondary" type="button" @click="openAddTaskForm(lec.id)">+ Задание к лекции</button>
-              </div>
-            </template>
-          </div>
-          <p v-if="!classroom.lectures.length" class="muted" style="margin-top: 0.7rem">Лекций пока нет.</p>
-        </template>
-
-        <template v-else-if="tab === 'assignments'">
-          <div v-if="isTeacherInCurrent" class="card" style="margin-top: 0.7rem">
-            <h3>Создать задание</h3>
-            <input v-model="assignmentTitle" placeholder="Название задания" />
-            <textarea
-              v-model="assignmentDescription"
-              rows="3"
-              placeholder="Описание задания"
-              style="margin-top: 0.5rem"
-            />
-            <div class="grid-2" style="margin-top: 0.5rem">
-              <input v-model="assignmentDueAt" placeholder="Дедлайн (например 2026-04-20 18:00)" />
-              <input v-model.number="assignmentMaxPoints" type="number" min="1" max="1000" placeholder="Баллы" />
-            </div>
-            <button type="button" style="margin-top: 0.6rem" @click="onCreateAssignment">Создать</button>
-          </div>
-
-          <div v-for="a in classroom.assignments" :key="a.id" class="card" style="margin-top: 0.7rem">
-            <h3>{{ a.title }}</h3>
-            <p class="muted">
-              due: {{ a.due_at || "без дедлайна" }} · max: {{ a.max_points }} ·
-              <RouterLink :to="`/u/${a.author_nickname}`">{{ a.author_nickname }}</RouterLink>
-              <span v-if="a.lecture_id" class="muted"> · к лекции</span>
-            </p>
-            <p>{{ a.description }}</p>
-
-            <template v-if="!isTeacherInCurrent">
-              <textarea
-                v-model="submissionBody[a.id]"
-                rows="2"
-                placeholder="Ссылка/текст вашей сдачи"
-              />
-              <button type="button" style="margin-top: 0.45rem" @click="onSubmitAssignment(a)">Сдать / пересдать</button>
-              <p v-if="a.my_submission" class="muted" style="margin-top: 0.45rem">
-                Статус: {{ a.my_submission.status }}
-                <span v-if="a.my_submission.grade_points !== null"> · Оценка: {{ a.my_submission.grade_points }}</span>
-                <span v-if="a.my_submission.teacher_comment"> · Коммент: {{ a.my_submission.teacher_comment }}</span>
-              </p>
-            </template>
-
-            <template v-else>
-              <button class="secondary" type="button" @click="openSubmissions(a.id)">Проверить сдачи</button>
-            </template>
-          </div>
-          <p v-if="!classroom.assignments.length" class="muted" style="margin-top: 0.7rem">Заданий пока нет.</p>
-        </template>
-
-        <template v-else-if="tab === 'people'">
-          <ul style="list-style: none; padding: 0; margin-top: 0.6rem">
-            <li v-for="m in classroom.members" :key="m.id" class="card" style="margin-bottom: 0.5rem">
-              <strong><RouterLink :to="`/u/${m.nickname}`">{{ m.nickname }}</RouterLink></strong>
-              <span class="muted"> · {{ roleLabel(m.role) }}</span>
-            </li>
-          </ul>
-        </template>
-        <template v-else-if="tab === 'grades'">
-          <div class="card" style="margin-top: 0.7rem">
-            <h3>Сводка оценок</h3>
-            <template v-if="isTeacherInCurrent">
-              <p class="muted">Ведомость строится автоматически по текущим сдачам по каждому заданию.</p>
-              <p v-if="teacherGradebookError" class="error">{{ teacherGradebookError }}</p>
-              <p v-else-if="teacherGradebookLoading" class="muted">Загрузка ведомости…</p>
-              <div v-else-if="teacherGradebookRows.length" class="gradebook-wrap">
-                <table class="gradebook-table">
-                  <thead>
-                    <tr>
-                      <th>Студент</th>
-                      <th v-for="a in classroom.assignments" :key="'h-' + a.id">{{ a.title }}</th>
-                      <th>Итог</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr v-for="row in teacherGradebookRows" :key="row.student.id">
-                      <td class="gradebook-student">{{ row.student.nickname }}</td>
-                      <td v-for="cell in row.cells" :key="row.student.id + '-' + cell.assignment.id">
-                        <span v-if="!cell.submission" class="muted">—</span>
-                        <span v-else-if="cell.submission.grade_points !== null" class="grade-chip grade-chip-ok">
-                          {{ cell.submission.grade_points }} / {{ cell.assignment.max_points }}
+                      <span v-if="a.my_submission" class="muted small">
+                        статус: {{ a.my_submission.status }}
+                        <span v-if="a.my_submission.grade_points !== null">
+                          · {{ a.my_submission.grade_points }} / {{ a.max_points }}
                         </span>
-                        <span v-else class="grade-chip grade-chip-pending">сдано</span>
-                      </td>
-                      <td>
-                        <strong>{{ row.pointsEarned }} / {{ row.pointsTotal }}</strong>
-                        <div class="muted">{{ row.gradedCount }} проверено · {{ row.submittedCount }} сдано</div>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              <p v-else class="muted">Студентов пока нет или задания ещё не созданы.</p>
-            </template>
-            <div v-else class="grades-grid">
-              <div class="grades-head">Студент</div>
-              <div class="grades-head">Прогресс</div>
-              <div class="grades-head">Баллы</div>
-              <template v-for="row in studentGradeRows" :key="row.student.id">
-                <div>{{ row.student.nickname }}</div>
-                <div class="muted">{{ row.progress }}</div>
-                <div>{{ row.pointsEarned }} / {{ row.pointsTotal }}</div>
-              </template>
-            </div>
-          </div>
-        </template>
-        <template v-else-if="tab === 'calendar'">
-          <div class="card" style="margin-top: 0.7rem">
-            <h3>Ближайшие дедлайны</h3>
-            <div v-if="calendarAssignments.length">
-              <div v-for="item in calendarAssignments" :key="item.id" class="calendar-item">
-                <div>
-                  <strong>{{ item.title }}</strong>
-                  <p class="muted" style="margin: 0.2rem 0 0">
-                    {{ item.lecture_id ? "К лекции" : "Общее задание" }} · {{ item.max_points }} баллов
-                  </p>
-                </div>
-                <span class="badge">{{ formatDateTime(item.due_at) }}</span>
+                      </span>
+                    </div>
+                  </template>
+                </template>
               </div>
             </div>
-            <p v-else class="muted">Пока нет заданий с дедлайном.</p>
-          </div>
-        </template>
-      </div>
 
-    <div v-if="activeClosedId" class="card" style="margin-top: 1rem">
-      <h3>Доступ к закрытому курсу</h3>
-      <p class="muted">Введите UUID учеников через пробел или новую строку.</p>
-      <textarea v-model="studentsDraft" rows="4" placeholder="uuid..." />
-      <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem">
-        <button type="button" @click="saveClosedStudents">Сохранить</button>
-        <button class="secondary" type="button" @click="activeClosedId = null">Отмена</button>
+            <div v-if="isTeacherInCurrent" class="lecture-add-task">
+              <template v-if="addTaskForLectureId === lec.id">
+                <input v-model="addTaskTitle" placeholder="название задания" />
+                <textarea v-model="addTaskDesc" rows="2" placeholder="описание" />
+                <input
+                  v-model.number="addTaskMaxPoints"
+                  type="number"
+                  min="1"
+                  max="1000"
+                  placeholder="баллы"
+                />
+                <div class="row-actions">
+                  <button type="button" @click="onSaveAddTaskToLecture(lec.id)">
+                    добавить
+                  </button>
+                  <button type="button" class="secondary" @click="cancelAddTask">
+                    отмена
+                  </button>
+                </div>
+              </template>
+              <button
+                v-else
+                type="button"
+                class="secondary small"
+                @click="openAddTaskForm(lec.id)"
+              >
+                + задание
+              </button>
+            </div>
+          </template>
+        </div>
+        <p v-if="!classroom.lectures.length" class="muted center empty">
+          {{ isTeacherInCurrent ? "опубликуйте первую лекцию" : "лекций пока нет" }}
+        </p>
+      </template>
+
+      <!-- задания -->
+      <template v-else-if="tab === 'assignments'">
+        <div v-if="isTeacherInCurrent" class="add-bar">
+          <button
+            type="button"
+            class="secondary"
+            :class="{ active: addingAssignment }"
+            @click="addingAssignment = !addingAssignment"
+          >
+            {{ addingAssignment ? "отмена" : "+ задание" }}
+          </button>
+        </div>
+        <div v-if="isTeacherInCurrent && addingAssignment" class="form-card">
+          <input v-model="assignmentTitle" placeholder="название" />
+          <textarea v-model="assignmentDescription" rows="3" placeholder="описание" />
+          <input
+            v-model.number="assignmentMaxPoints"
+            type="number"
+            min="1"
+            max="1000"
+            placeholder="баллы"
+          />
+          <button
+            type="button"
+            :disabled="!assignmentTitle.trim()"
+            @click="onCreateAssignment"
+          >
+            создать
+          </button>
+        </div>
+
+        <div
+          v-for="a in classroom.assignments"
+          :key="a.id"
+          class="task-card"
+        >
+          <div class="task-card-head">
+            <h3>{{ a.title }}</h3>
+            <span class="muted small">{{ a.max_points }} б</span>
+          </div>
+          <p class="muted small">
+            <RouterLink :to="`/u/${a.author_nickname}`">{{ a.author_nickname }}</RouterLink>
+            <span v-if="a.lecture_id"> · к лекции</span>
+          </p>
+          <p v-if="a.description" class="lecture-body">{{ a.description }}</p>
+
+          <template v-if="!isTeacherInCurrent">
+            <textarea
+              v-model="submissionBody[a.id]"
+              rows="2"
+              placeholder="ответ — текст или ссылка"
+            />
+            <ul v-if="attachmentsFor(a).length" class="files">
+              <li v-for="(f, i) in attachmentsFor(a)" :key="'kept-' + a.id + '-' + i">
+                <a :href="f.url" target="_blank" rel="noopener noreferrer">
+                  {{ f.file_name }}
+                </a>
+                <button
+                  type="button"
+                  class="ghost-x"
+                  @click="removeSubmissionAttachment(a, i)"
+                >
+                  ×
+                </button>
+              </li>
+            </ul>
+            <ul v-if="pendingFor(a).length" class="files">
+              <li v-for="(f, i) in pendingFor(a)" :key="'p-' + a.id + '-' + i">
+                <span>{{ f.name }} <span class="muted small">{{ formatFileSize(f.size) }}</span></span>
+                <button
+                  type="button"
+                  class="ghost-x"
+                  @click="removePendingFile(a, i)"
+                >
+                  ×
+                </button>
+              </li>
+            </ul>
+            <div class="upload-row">
+              <label class="attach-label secondary">
+                <AppIcon name="image" :size="14" />
+                <span>прикрепить</span>
+                <input
+                  type="file"
+                  multiple
+                  hidden
+                  @change="onPickSubmissionFiles(a, $event)"
+                />
+              </label>
+              <span class="muted small">до 2 мб · до 10 файлов</span>
+            </div>
+            <div class="row-actions">
+              <button
+                type="button"
+                :disabled="submissionUploading[a.id]"
+                @click="onSubmitAssignment(a)"
+              >
+                {{ submissionUploading[a.id] ? "отправка…" : "сдать" }}
+              </button>
+              <span v-if="a.my_submission" class="muted small">
+                {{ a.my_submission.status }}
+                <span v-if="a.my_submission.grade_points !== null">
+                  · {{ a.my_submission.grade_points }} / {{ a.max_points }}
+                </span>
+                <span v-if="a.my_submission.teacher_comment">
+                  · {{ a.my_submission.teacher_comment }}
+                </span>
+              </span>
+            </div>
+          </template>
+          <template v-else>
+            <div class="row-actions">
+              <button type="button" class="secondary" @click="openSubmissions(a.id)">
+                проверить
+              </button>
+            </div>
+          </template>
+        </div>
+        <p v-if="!classroom.assignments.length" class="muted center empty">
+          {{ isTeacherInCurrent ? "создайте первое задание" : "заданий пока нет" }}
+        </p>
+      </template>
+
+      <!-- лента -->
+      <template v-else-if="tab === 'stream'">
+        <div class="form-card">
+          <textarea v-model="streamBody" rows="2" placeholder="написать в ленту" />
+          <button
+            type="button"
+            :disabled="!streamBody.trim()"
+            @click="onCreateStreamPost"
+          >
+            опубликовать
+          </button>
+        </div>
+        <article
+          v-for="post in classroom.stream"
+          :key="post.id"
+          class="stream-post"
+        >
+          <p class="muted small">
+            <RouterLink :to="`/u/${post.author_nickname}`">
+              {{ post.author_nickname }}
+            </RouterLink>
+            · {{ post.created_at.slice(0, 16).replace("T", " ") }}
+          </p>
+          <p class="stream-body">{{ post.body }}</p>
+          <div v-if="post.comments.length" class="stream-comments">
+            <div
+              v-for="comment in post.comments"
+              :key="comment.id"
+              class="stream-comment"
+            >
+              <p class="muted small">
+                <RouterLink :to="`/u/${comment.author_nickname}`">
+                  {{ comment.author_nickname }}
+                </RouterLink>
+                · {{ comment.created_at.slice(0, 16).replace("T", " ") }}
+              </p>
+              <p>{{ comment.body }}</p>
+            </div>
+          </div>
+          <div class="comment-form">
+            <input
+              v-model="streamCommentBody[post.id]"
+              placeholder="ответить"
+              @keyup.enter="onCreateStreamComment(post.id)"
+            />
+          </div>
+        </article>
+        <p v-if="!classroom.stream.length" class="muted center empty">пусто</p>
+      </template>
+
+      <!-- участники -->
+      <template v-else-if="tab === 'people'">
+        <div v-if="isOwnerInCurrent" class="co-teacher-block">
+          <p class="muted small">соучителя могут добавлять лекции и задания</p>
+          <form class="row-actions" @submit.prevent="onAddCoTeacher">
+            <input
+              v-model="coTeacherNick"
+              placeholder="ник ментора"
+              :disabled="coTeacherBusy"
+            />
+            <button type="submit" :disabled="coTeacherBusy || !coTeacherNick.trim()">
+              {{ coTeacherBusy ? "…" : "добавить соучителя" }}
+            </button>
+          </form>
+        </div>
+        <ul class="people-list">
+          <li v-for="m in classroom.members" :key="m.id" class="person">
+            <RouterLink :to="`/u/${m.nickname}`">
+              <strong>{{ m.nickname }}</strong>
+            </RouterLink>
+            <span class="muted small">
+              <template v-if="m.id === classroom.course.teacher_id">учитель</template>
+              <template v-else-if="coTeacherIds.has(m.id)">соучитель</template>
+              <template v-else>{{ roleLabel(m.role) }}</template>
+            </span>
+            <button
+              v-if="isOwnerInCurrent && coTeacherIds.has(m.id)"
+              type="button"
+              class="icon-btn-sm"
+              aria-label="убрать соучителя"
+              title="убрать соучителя"
+              @click="onRemoveCoTeacher(m.id)"
+            >
+              <AppIcon name="delete" :size="14" />
+            </button>
+          </li>
+        </ul>
+      </template>
+
+      <!-- оценки -->
+      <template v-else-if="tab === 'grades'">
+        <template v-if="isTeacherInCurrent">
+          <p v-if="teacherGradebookError" class="error">{{ teacherGradebookError }}</p>
+          <p v-else-if="teacherGradebookLoading" class="muted">загрузка</p>
+          <div v-else-if="teacherGradebookRows.length" class="gradebook-wrap">
+            <table class="gradebook-table">
+              <thead>
+                <tr>
+                  <th>студент</th>
+                  <th
+                    v-for="a in classroom.assignments"
+                    :key="'h-' + a.id"
+                  >
+                    {{ a.title }}
+                  </th>
+                  <th>итог</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="row in teacherGradebookRows"
+                  :key="row.student.id"
+                >
+                  <td class="gradebook-student">{{ row.student.nickname }}</td>
+                  <td
+                    v-for="cell in row.cells"
+                    :key="row.student.id + '-' + cell.assignment.id"
+                  >
+                    <span v-if="!cell.submission" class="muted">—</span>
+                    <span
+                      v-else-if="cell.submission.grade_points !== null"
+                      class="grade-chip ok"
+                    >
+                      {{ cell.submission.grade_points }} / {{ cell.assignment.max_points }}
+                    </span>
+                    <span v-else class="grade-chip pending">сдано</span>
+                  </td>
+                  <td>
+                    <strong>{{ row.pointsEarned }} / {{ row.pointsTotal }}</strong>
+                    <div class="muted small">
+                      {{ row.gradedCount }} проверено · {{ row.submittedCount }} сдано
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p v-else class="muted center empty">нет данных</p>
+        </template>
+        <template v-else>
+          <div v-for="row in studentGradeRows" :key="row.student.id" class="grade-summary">
+            <h3>{{ row.pointsEarned }} / {{ row.pointsTotal }} баллов</h3>
+            <p class="muted small">{{ row.progress }}</p>
+          </div>
+          <p v-if="!studentGradeRows.length" class="muted center empty">пока без оценок</p>
+        </template>
+      </template>
+    </template>
+
+    <!-- модалки/доп секции -->
+    <div v-if="activeClosedId" class="form-card overlay">
+      <h3>доступ</h3>
+      <p class="muted small">uuid через пробел</p>
+      <textarea v-model="studentsDraft" rows="4" placeholder="uuid…" />
+      <div class="row-actions">
+        <button type="button" @click="saveClosedStudents">сохранить</button>
+        <button type="button" class="secondary" @click="activeClosedId = null">
+          отмена
+        </button>
       </div>
     </div>
 
-    <div v-if="activeAssignmentForGrading" class="card" style="margin-top: 1rem">
-      <h3>Проверка сдач</h3>
-      <div
-        v-for="s in submissionsByAssignment[activeAssignmentForGrading] || []"
-        :key="s.id"
-        class="card"
-        style="margin-bottom: 0.55rem"
-      >
-        <div class="muted">{{ s.student_nickname }} · {{ s.updated_at.slice(0, 16).replace("T", " ") }}</div>
-        <p style="margin: 0.35rem 0">{{ s.content }}</p>
-        <div class="grid-2">
-          <input v-model.number="grading[s.id].points" type="number" min="0" placeholder="Оценка" />
-          <input v-model="grading[s.id].comment" placeholder="Комментарий учителя" />
+    <div v-if="activeAssignmentForGrading && gradingAssignment" class="grade-modal">
+      <header class="grade-head">
+        <div>
+          <p class="muted small">проверка</p>
+          <h3>{{ gradingAssignment.title }}</h3>
         </div>
         <button
           type="button"
-          style="margin-top: 0.45rem"
-          @click="onGradeSubmission(activeAssignmentForGrading, s)"
+          class="icon-btn-sm"
+          aria-label="закрыть"
+          title="закрыть"
+          @click="closeGrading"
         >
-          Поставить оценку
+          <AppIcon name="close" :size="16" />
         </button>
-      </div>
-      <button class="secondary" type="button" @click="activeAssignmentForGrading = null">Закрыть</button>
+      </header>
+
+      <p class="muted small grade-stats">
+        {{ gradingStats.graded }} из {{ gradingStats.submitted }} проверено
+        · сдало {{ gradingStats.submitted }} из {{ gradingStats.total }}
+      </p>
+
+      <ul class="grade-list">
+        <li
+          v-for="row in gradingStudents"
+          :key="row.student.id"
+          class="grade-item"
+          :class="{
+            submitted: !!row.submission,
+            graded: row.submission?.grade_points !== null,
+            expanded: expandedStudentId === row.student.id,
+            empty: !row.submission,
+          }"
+        >
+          <button
+            type="button"
+            class="grade-item-head"
+            :disabled="!row.submission"
+            @click="toggleStudentExpand(row.student.id, row.submission)"
+          >
+            <span class="g-name">
+              <span class="g-dot" />
+              <strong>{{ row.student.nickname }}</strong>
+            </span>
+            <span class="g-status">
+              <span v-if="!row.submission" class="muted small">не сдал</span>
+              <span
+                v-else-if="row.submission.grade_points !== null"
+                class="grade-chip ok"
+              >
+                {{ row.submission.grade_points }} / {{ gradingAssignment.max_points }}
+              </span>
+              <span v-else class="grade-chip pending">сдано</span>
+            </span>
+          </button>
+
+          <div
+            v-if="row.submission && expandedStudentId === row.student.id"
+            class="grade-item-body"
+          >
+            <p class="muted small">
+              сдано {{ row.submission.updated_at.slice(0, 16).replace("T", " ") }}
+            </p>
+            <p v-if="row.submission.content" class="lecture-body">
+              {{ row.submission.content }}
+            </p>
+            <ul v-if="row.submission.attachments?.length" class="files">
+              <li v-for="f in row.submission.attachments" :key="f.id">
+                <a :href="f.url" target="_blank" rel="noopener noreferrer">
+                  {{ f.file_name }}
+                  <span class="muted small">{{ formatFileSize(f.size_bytes) }}</span>
+                </a>
+              </li>
+            </ul>
+            <div class="grid-2">
+              <input
+                v-model.number="grading[row.submission.id].points"
+                type="number"
+                min="0"
+                :max="gradingAssignment.max_points"
+                placeholder="баллы"
+              />
+              <input
+                v-model="grading[row.submission.id].comment"
+                placeholder="комментарий"
+              />
+            </div>
+            <div class="row-actions">
+              <button
+                type="button"
+                @click="onGradeSubmission(activeAssignmentForGrading, row.submission)"
+              >
+                {{ row.submission.grade_points !== null ? "обновить" : "поставить" }}
+              </button>
+              <span v-if="row.submission.grade_points !== null" class="muted small">
+                проверено {{ row.submission.updated_at.slice(0, 16).replace("T", " ") }}
+              </span>
+            </div>
+          </div>
+        </li>
+      </ul>
+
+      <p v-if="!gradingStudents.length" class="muted center empty">студентов нет</p>
     </div>
   </section>
 </template>
 
 <style scoped>
-.classroom-page {
+.courses {
   display: grid;
-  gap: 1rem;
+  gap: 0.9rem;
+}
+.center {
+  text-align: center;
+  padding: 1.5rem 0;
+}
+.empty {
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 1.2rem;
+}
+.small {
+  font-size: 0.8rem;
 }
 
-.classroom-hero {
-  background: linear-gradient(135deg, #101010 0%, #151515 100%);
-}
-
-.courses-board {
+.board-tools {
   display: grid;
-  gap: 0.8rem;
-}
-
-.join-by-code {
-  display: grid;
+  grid-template-columns: 1fr auto auto auto;
   gap: 0.5rem;
+  align-items: center;
 }
-
-@media (min-width: 760px) {
-  .join-by-code {
-    grid-template-columns: 1fr auto;
+.board-search {
+  font-size: 0.93rem;
+}
+.board-code {
+  width: 8rem;
+  font-size: 0.93rem;
+}
+@media (max-width: 600px) {
+  .board-tools {
+    grid-template-columns: 1fr 1fr;
+  }
+  .board-code {
+    width: auto;
   }
 }
 
-.courses-board-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-  align-items: baseline;
-}
-
-.courses-grid {
+.form-card {
   display: grid;
-  gap: 0.75rem;
+  gap: 0.55rem;
+  padding: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.form-card input,
+.form-card textarea {
+  width: 100%;
+}
+.form-card.overlay {
+  margin-top: 0.6rem;
+}
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.check input {
+  width: auto;
 }
 
-@media (min-width: 760px) {
-  .courses-grid {
+.course-grid {
+  display: grid;
+  gap: 0.65rem;
+}
+@media (min-width: 720px) {
+  .course-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-.course-tile {
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  background: #0d0d0d;
-  overflow: hidden;
-  display: grid;
-}
-
-.course-tile.active {
-  border-color: #3b3b3b;
-  box-shadow: 0 0 0 1px #3b3b3b inset;
-}
-
-.course-tile-cover {
-  width: 100%;
-  border: 0;
-  border-radius: 0;
-  background: linear-gradient(135deg, #1d1f24 0%, #141517 100%);
-  padding: 0.9rem;
-  min-height: 132px;
-  display: flex;
-  align-items: flex-start;
-  flex-direction: column;
-  justify-content: flex-end;
-  gap: 0.3rem;
-  text-align: left;
-}
-
-.course-tile-cover strong {
-  font-size: 1.02rem;
-}
-
-.course-tile-chip {
-  border: 1px solid #444;
-  border-radius: 999px;
-  font-size: 0.72rem;
-  padding: 0.12rem 0.48rem;
-  margin-bottom: auto;
-  background: #0f0f0f;
-}
-
-.course-tile-actions {
-  padding: 0.65rem;
-  display: flex;
-  gap: 0.45rem;
-  flex-wrap: wrap;
-}
-
-.classroom-header {
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  background: linear-gradient(135deg, #151822 0%, #101318 100%);
-  padding: 0.95rem;
-  margin-bottom: 0.65rem;
-}
-
-.classroom-header-label {
-  margin: 0 0 0.2rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  font-size: 0.76rem;
-  color: var(--muted);
-}
-
-.classroom-main {
-  min-height: 520px;
-}
-
-.tab-row {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-  margin-top: 0.45rem;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 0.55rem;
-}
-
-.tab-pill {
-  background: transparent;
-  border-radius: 999px;
-  border: 1px solid transparent;
-  padding: 0.42rem 0.92rem;
-  min-height: auto;
-}
-
-.tab-pill.active {
-  background: #1f1f1f;
-  border-color: #3a3a3a;
-}
-
-.tab-pill:not(.active) {
-  color: var(--muted);
-}
-
-.course-select {
-  width: 100%;
-  justify-content: flex-start;
-}
-
-.classroom-main {
-  min-height: 520px;
-}
-
-.classroom-meta-row {
-  display: flex;
-  gap: 0.45rem;
-  flex-wrap: wrap;
-  margin: 0.45rem 0 0.6rem;
-}
-
-.quick-actions {
+.course-card {
   display: grid;
   gap: 0.4rem;
-  margin-bottom: 0.5rem;
+  padding: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.course-card:hover {
+  border-color: #3a3a3a;
+  background: var(--surface2);
+}
+.course-card-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+.course-card-head h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 500;
+}
+.course-card-desc {
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.course-card-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.course-card-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+.course-card-actions button {
+  padding: 0.3rem 0.7rem;
+  min-height: 0;
+  font-size: 0.82rem;
+  border-radius: 999px;
+}
+.dot {
+  color: var(--muted);
 }
 
-@media (min-width: 760px) {
-  .quick-actions {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+.course-head {
+  display: grid;
+  gap: 0.3rem;
 }
-
-.pending-files {
-  list-style: none;
-  padding: 0;
-  margin: 0.5rem 0 0;
-}
-
-.pending-files li {
+.course-head-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  padding: 0.35rem 0;
+}
+.course-head h2 {
+  margin: 0;
+  font-size: 1.3rem;
+}
+.back {
+  align-self: flex-start;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  padding: 0;
+  min-height: 0;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.back:hover {
+  color: var(--text);
+}
+
+.tabs {
+  display: flex;
+  gap: 0.2rem;
   border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+}
+.tab {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  padding: 0.55rem 0.9rem;
+  min-height: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  white-space: nowrap;
+}
+.tab:hover {
+  color: var(--text);
+}
+.tab.active {
+  color: var(--text);
+  border-bottom-color: var(--text);
+}
+.tab-count {
+  font-size: 0.72rem;
+  color: var(--muted);
+  background: var(--surface2);
+  border-radius: 999px;
+  padding: 0.05rem 0.4rem;
+  min-width: 1.2rem;
+  text-align: center;
+}
+
+.add-bar {
+  display: flex;
+  justify-content: flex-end;
+}
+.add-bar button.active {
+  background: var(--surface2);
+  color: var(--text);
+}
+
+.upload-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.attach-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.32rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.83rem;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.attach-label:hover {
+  background: var(--surface2);
+  color: var(--text);
+  border-color: #2a2a2a;
+}
+
+.files {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.25rem;
+}
+.files li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.86rem;
+}
+.ghost-x {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  padding: 0;
+  min-height: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  line-height: 1;
+}
+.ghost-x:hover {
+  background: var(--surface2);
+  color: var(--text);
+}
+
+.task-extra {
+  border-top: 1px solid var(--border);
+  padding-top: 0.5rem;
+  display: grid;
+  gap: 0.45rem;
+}
+.task-extra summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.86rem;
+  list-style: none;
+}
+.task-extra summary::-webkit-details-marker {
+  display: none;
+}
+.task-extra[open] summary {
+  margin-bottom: 0.3rem;
+}
+.task-extra input,
+.task-extra textarea {
+  width: 100%;
 }
 
 .lecture-card {
-  margin-top: 0.7rem;
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
 }
-
-.lecture-video {
-  margin-top: 0.55rem;
+.lecture-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.lecture-head h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 500;
+}
+.icon-btn-sm {
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.icon-btn-sm:hover {
+  background: var(--surface2);
+  color: var(--text);
+}
+.icon-btn-sm.danger:hover {
+  background: #2a1414;
+  color: #ff8b8b;
 }
 
 .lecture-video iframe {
   width: 100%;
-  max-width: 720px;
+  max-width: 100%;
   aspect-ratio: 16 / 9;
   border: 0;
   border-radius: 8px;
 }
-
 .lecture-video video {
   width: 100%;
-  max-width: 720px;
   border-radius: 8px;
 }
 
 .lecture-body {
-  margin: 0.55rem 0 0;
+  margin: 0;
   white-space: pre-wrap;
-  line-height: 1.45;
+  line-height: 1.5;
+  font-size: 0.93rem;
 }
 
 .attach-list {
-  margin: 0.5rem 0 0;
-  padding-left: 1.1rem;
-}
-
-.stream-comments {
-  margin-top: 0.65rem;
-  border-top: 1px solid var(--border);
-  padding-top: 0.55rem;
-}
-
-.stream-comment-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
   display: grid;
-  gap: 0.45rem;
+  gap: 0.25rem;
+}
+.attach-list a {
+  font-size: 0.88rem;
 }
 
-.stream-comment {
+.lecture-tasks {
+  display: grid;
+  gap: 0.5rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.6rem;
+}
+.task-row {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.55rem 0.7rem;
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 0.45rem 0.55rem;
-  background: #0f0f0f;
+  background: var(--surface2);
+}
+.task-row-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+.task-row-head strong {
+  font-weight: 500;
 }
 
-.stream-comment p {
-  margin: 0.15rem 0 0;
-  white-space: pre-wrap;
-}
-
-.stream-comment-form {
-  margin-top: 0.55rem;
+.lecture-add-task {
   display: grid;
   gap: 0.4rem;
 }
-
-@media (min-width: 760px) {
-  .stream-comment-form {
-    grid-template-columns: 1fr auto;
-  }
+.lecture-add-task button.small {
+  padding: 0.25rem 0.7rem;
+  min-height: 0;
+  font-size: 0.8rem;
+  border-radius: 999px;
+  align-self: flex-start;
 }
 
-.grades-grid {
-  margin-top: 0.65rem;
+.task-card {
   display: grid;
-  grid-template-columns: 1.2fr 1fr 1fr;
+  gap: 0.4rem;
+  padding: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.task-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  align-items: baseline;
+}
+.task-card-head h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.row-actions {
+  display: flex;
   gap: 0.45rem;
+  flex-wrap: wrap;
   align-items: center;
 }
-
-.grades-head {
+.row-actions button {
+  padding: 0.32rem 0.85rem;
+  min-height: 0;
   font-size: 0.85rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--muted);
+  border-radius: 999px;
+}
+.grid-2 {
+  display: grid;
+  gap: 0.4rem;
+  grid-template-columns: 1fr 1fr;
+}
+
+.stream-post {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.stream-body {
+  margin: 0;
+  white-space: pre-wrap;
+}
+.stream-comments {
+  display: grid;
+  gap: 0.4rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.5rem;
+}
+.stream-comment {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.4rem 0.55rem;
+  border-radius: 8px;
+  background: var(--surface2);
+}
+.stream-comment p {
+  margin: 0;
+  font-size: 0.9rem;
+}
+.comment-form {
+  display: grid;
+}
+.comment-form input {
+  width: 100%;
+}
+
+.co-teacher-block {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  margin-bottom: 0.6rem;
+}
+.co-teacher-block .row-actions {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+.co-teacher-block input {
+  flex: 1;
+  min-width: 0;
+}
+
+.people-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+.person {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.person strong {
+  font-weight: 500;
 }
 
 .gradebook-wrap {
   overflow-x: auto;
-  margin-top: 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
 }
-
 .gradebook-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 760px;
+  min-width: 600px;
 }
-
 .gradebook-table th,
 .gradebook-table td {
-  border: 1px solid var(--border);
-  padding: 0.55rem;
+  border-bottom: 1px solid var(--border);
+  padding: 0.5rem 0.7rem;
   text-align: left;
   vertical-align: top;
+  font-size: 0.86rem;
 }
-
 .gradebook-table th {
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
+  font-weight: 500;
   color: var(--muted);
+  background: var(--surface2);
 }
-
 .gradebook-student {
   white-space: nowrap;
-  font-weight: 600;
+  font-weight: 500;
 }
-
 .grade-chip {
   display: inline-flex;
   border-radius: 999px;
   border: 1px solid var(--border);
-  padding: 0.15rem 0.45rem;
-  font-size: 0.8rem;
+  padding: 0.1rem 0.45rem;
+  font-size: 0.78rem;
+}
+.grade-chip.ok {
+  background: var(--surface2);
+  color: var(--text);
+}
+.grade-chip.pending {
+  background: transparent;
+  color: var(--muted);
 }
 
-.grade-chip-ok {
-  background: #162315;
-  border-color: #294126;
-}
-
-.grade-chip-pending {
-  background: #21211a;
-  border-color: #3d3d2b;
-}
-
-.calendar-item {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.75rem;
-  align-items: center;
+.grade-summary {
+  display: grid;
+  gap: 0.2rem;
+  padding: 1rem;
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 0.65rem;
-  margin-top: 0.55rem;
+  border-radius: var(--radius);
+  background: var(--surface);
+  text-align: center;
+}
+.grade-summary h3 {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 500;
+}
+
+.submission {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.7rem;
+  border-top: 1px solid var(--border);
+}
+.submission:first-of-type {
+  border-top: none;
+}
+
+.grade-modal {
+  margin-top: 0.6rem;
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.grade-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+.grade-head h3 {
+  margin: 0.1rem 0 0;
+  font-size: 1rem;
+  font-weight: 500;
+}
+.grade-stats {
+  margin: 0;
+}
+.grade-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.3rem;
+}
+.grade-item {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+  transition: border-color 0.15s ease;
+}
+.grade-item.expanded {
+  border-color: var(--text);
+}
+.grade-item-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  background: transparent;
+  border: 0;
+  text-align: left;
+  cursor: pointer;
+  color: var(--text);
+  min-height: 0;
+  border-radius: 0;
+}
+.grade-item-head:hover:not([disabled]) {
+  background: var(--surface2);
+}
+.grade-item-head[disabled] {
+  cursor: default;
+  opacity: 0.6;
+}
+.g-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.g-name strong {
+  font-weight: 500;
+}
+.g-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--border);
+  flex-shrink: 0;
+}
+.grade-item.submitted .g-dot {
+  background: var(--text);
+}
+.grade-item.graded .g-dot {
+  background: transparent;
+  border: 1px solid var(--text);
+}
+.grade-item-body {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.6rem 0.7rem 0.75rem;
+  border-top: 1px solid var(--border);
+  background: var(--surface2);
+}
+.grade-item-body .row-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.empty.center {
+  text-align: center;
+  padding: 0.8rem 0;
+}
+.icon-btn-sm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  min-height: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+.icon-btn-sm:hover {
+  background: var(--surface2);
 }
 </style>

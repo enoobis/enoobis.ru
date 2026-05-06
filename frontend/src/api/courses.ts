@@ -1,5 +1,10 @@
 import { api } from "./http";
 
+export type CoTeacher = {
+  id: string;
+  nickname: string;
+};
+
 export type Course = {
   id: string;
   course_code: string;
@@ -8,6 +13,8 @@ export type Course = {
   is_open: boolean;
   teacher_id: string;
   teacher_nickname: string;
+  co_teachers: CoTeacher[];
+  is_owner: boolean;
   created_at: string;
   enrolled: boolean;
 };
@@ -38,6 +45,15 @@ export type CourseStreamComment = {
   created_at: string;
 };
 
+export type SubmissionAttachment = {
+  id: string;
+  file_name: string;
+  url: string;
+  size_bytes: number;
+  mime_type: string;
+  created_at: string;
+};
+
 export type AssignmentSubmissionMine = {
   id: string;
   content: string;
@@ -46,6 +62,7 @@ export type AssignmentSubmissionMine = {
   teacher_comment: string;
   created_at: string;
   updated_at: string;
+  attachments: SubmissionAttachment[];
 };
 
 export type Assignment = {
@@ -55,7 +72,6 @@ export type Assignment = {
   author_nickname: string;
   title: string;
   description: string;
-  due_at: string;
   max_points: number;
   created_at: string;
   lecture_id: string | null;
@@ -73,6 +89,7 @@ export type AssignmentSubmission = {
   teacher_comment: string;
   created_at: string;
   updated_at: string;
+  attachments: SubmissionAttachment[];
 };
 
 export type LectureAttachment = {
@@ -97,10 +114,12 @@ export type Lecture = {
 export type CourseClassroom = {
   course: Course;
   is_teacher: boolean;
+  is_owner: boolean;
   stream: CourseStreamPost[];
   assignments: Assignment[];
   lectures: Lecture[];
   members: CourseMember[];
+  co_teachers: CoTeacher[];
 };
 
 export function listCourses(token: string) {
@@ -132,6 +151,29 @@ export function joinCourseByCode(code: string, token: string) {
 
 export function unenrollCourse(id: string, token: string) {
   return api<{ ok: boolean }>(`/api/courses/${id}/enroll`, { method: "DELETE", token });
+}
+
+export function deleteCourse(id: string, token: string) {
+  return api<{ ok: boolean }>(`/api/courses/${id}`, { method: "DELETE", token });
+}
+
+export function listCoTeachers(courseId: string, token: string) {
+  return api<CoTeacher[]>(`/api/courses/${courseId}/co-teachers`, { token });
+}
+
+export function addCoTeacher(courseId: string, nickname: string, token: string) {
+  return api<CoTeacher>(`/api/courses/${courseId}/co-teachers`, {
+    method: "POST",
+    token,
+    body: JSON.stringify({ nickname }),
+  });
+}
+
+export function removeCoTeacher(courseId: string, userId: string, token: string) {
+  return api<{ ok: boolean }>(`/api/courses/${courseId}/co-teachers/${userId}`, {
+    method: "DELETE",
+    token,
+  });
 }
 
 export function setClosedStudents(courseId: string, student_ids: string[], token: string) {
@@ -167,7 +209,6 @@ export function createAssignment(
   payload: {
     title: string;
     description?: string;
-    due_at?: string;
     max_points?: number;
     lecture_id?: string;
   },
@@ -183,7 +224,7 @@ export function createAssignment(
 export function patchAssignment(
   courseId: string,
   assignmentId: string,
-  payload: { title?: string; description?: string; due_at?: string; max_points?: number },
+  payload: { title?: string; description?: string; max_points?: number },
   token: string,
 ) {
   return api<Assignment>(`/api/courses/${courseId}/assignments/${assignmentId}`, {
@@ -193,12 +234,46 @@ export function patchAssignment(
   });
 }
 
-export function submitAssignment(courseId: string, assignmentId: string, content: string, token: string) {
+export function submitAssignment(
+  courseId: string,
+  assignmentId: string,
+  content: string,
+  token: string,
+  attachments: { file_name: string; url: string; size_bytes?: number; mime_type?: string }[] = [],
+) {
   return api<AssignmentSubmissionMine>(`/api/courses/${courseId}/assignments/${assignmentId}/submit`, {
     method: "POST",
     token,
-    body: JSON.stringify({ content }),
+    body: JSON.stringify({ content, attachments }),
   });
+}
+
+export async function uploadSubmissionFile(
+  courseId: string,
+  assignmentId: string,
+  file: File,
+  token: string,
+) {
+  const fd = new FormData();
+  fd.append("file", file);
+  const res = await fetch(
+    `/api/courses/${courseId}/assignments/${assignmentId}/upload-submission`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: fd,
+    },
+  );
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data?.error ?? "upload error");
+  }
+  return (await res.json()) as {
+    url: string;
+    file_name: string;
+    size_bytes: number;
+    mime_type: string;
+  };
 }
 
 export function listAssignmentSubmissions(courseId: string, assignmentId: string, token: string) {
@@ -257,7 +332,7 @@ export function createLecture(
     body_text?: string;
     video_url?: string;
     attachments?: { file_name: string; url: string }[];
-    task?: { title: string; description?: string; due_at?: string; max_points?: number };
+    task?: { title: string; description?: string; max_points?: number };
   },
   token: string,
 ) {

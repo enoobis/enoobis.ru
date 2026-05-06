@@ -2,6 +2,7 @@ import express from "express";
 import { v4 as uuidv4 } from "uuid";
 import { all, get, nowIso, run } from "../db.js";
 import { authRequired } from "../auth.js";
+import { awardAchievement } from "../utils/achievements.js";
 
 const router = express.Router();
 
@@ -40,6 +41,135 @@ router.post("/admin/users/:id/role", (req, res) => {
   const role = String(req.body?.role ?? "");
   if (!["student", "teacher", "admin"].includes(role)) return res.status(400).json({ error: "bad role" });
   run("UPDATE users SET role = ? WHERE id = ?", role, req.params.id);
+  if (role === "teacher" || role === "admin") {
+    awardAchievement(req.params.id, "mentor");
+  }
+  return res.json({ ok: true });
+});
+
+function purgeUserCourses(userId) {
+  const owned = all("SELECT id FROM courses WHERE teacher_id = ?", userId);
+  for (const c of owned) {
+    const lectures = all("SELECT id FROM course_lectures WHERE course_id = ?", c.id);
+    for (const l of lectures) {
+      run("DELETE FROM course_lecture_attachments WHERE lecture_id = ?", l.id);
+    }
+    run(
+      "DELETE FROM course_submission_attachments WHERE submission_id IN (SELECT s.id FROM course_assignment_submissions s JOIN course_assignments a ON a.id = s.assignment_id WHERE a.course_id = ?)",
+      c.id,
+    );
+    run(
+      "DELETE FROM course_assignment_submissions WHERE assignment_id IN (SELECT id FROM course_assignments WHERE course_id = ?)",
+      c.id,
+    );
+    run("DELETE FROM course_assignments WHERE course_id = ?", c.id);
+    run("DELETE FROM course_lectures WHERE course_id = ?", c.id);
+    run(
+      "DELETE FROM course_stream_comments WHERE post_id IN (SELECT id FROM course_stream_posts WHERE course_id = ?)",
+      c.id,
+    );
+    run("DELETE FROM course_stream_posts WHERE course_id = ?", c.id);
+    run("DELETE FROM course_students WHERE course_id = ?", c.id);
+    run("DELETE FROM course_co_teachers WHERE course_id = ?", c.id);
+    run("DELETE FROM user_favorite_courses WHERE course_id = ?", c.id);
+    run("DELETE FROM courses WHERE id = ?", c.id);
+  }
+}
+
+router.delete("/admin/users/:id", (req, res) => {
+  const id = req.params.id;
+  if (id === req.user.id) {
+    return res.status(400).json({ error: "нельзя удалить самого себя" });
+  }
+  const u = get("SELECT id, role FROM users WHERE id = ?", id);
+  if (!u) return res.status(404).json({ error: "не найдено" });
+  if (u.role === "admin") {
+    return res.status(400).json({ error: "нельзя удалить другого админа" });
+  }
+
+  purgeUserCourses(id);
+
+  try {
+    run(
+      "DELETE FROM course_assignment_submissions WHERE student_id = ?",
+      id,
+    );
+  } catch {}
+  try {
+    run("DELETE FROM course_students WHERE student_id = ?", id);
+  } catch {}
+  try {
+    run("DELETE FROM course_co_teachers WHERE user_id = ?", id);
+  } catch {}
+  try {
+    run("DELETE FROM user_favorite_courses WHERE user_id = ?", id);
+  } catch {}
+
+  try {
+    run(
+      "DELETE FROM micropost_likes WHERE user_id = ? OR micropost_id IN (SELECT id FROM microposts WHERE author_id = ?)",
+      id,
+      id,
+    );
+  } catch {}
+  try {
+    run("DELETE FROM microposts WHERE author_id = ?", id);
+  } catch {}
+
+  try {
+    run("DELETE FROM blog_post_likes WHERE user_id = ?", id);
+  } catch {}
+  try {
+    run("DELETE FROM blog_post_bookmarks WHERE user_id = ?", id);
+  } catch {}
+  try {
+    run("DELETE FROM blog_comments WHERE author_id = ?", id);
+  } catch {}
+  try {
+    run("DELETE FROM blog_posts WHERE author_id = ?", id);
+  } catch {}
+  try {
+    run("DELETE FROM blog_reports WHERE reporter_id = ?", id);
+  } catch {}
+
+  try {
+    run("DELETE FROM chat_messages WHERE thread_id IN (SELECT id FROM chat_threads WHERE user_a_id = ? OR user_b_id = ?)", id, id);
+  } catch {}
+  try {
+    run("DELETE FROM chat_threads WHERE user_a_id = ? OR user_b_id = ?", id, id);
+  } catch {}
+
+  try {
+    run(
+      "DELETE FROM user_follows WHERE follower_user_id = ? OR following_user_id = ?",
+      id,
+      id,
+    );
+  } catch {}
+
+  try {
+    run("DELETE FROM invite_links WHERE owner_user_id = ?", id);
+  } catch {}
+  try {
+    run("DELETE FROM user_files WHERE owner_id = ?", id);
+  } catch {}
+  try {
+    run("DELETE FROM user_notes WHERE owner_id = ?", id);
+  } catch {}
+  try {
+    run("DELETE FROM share_links WHERE owner_id = ?", id);
+  } catch {}
+  try {
+    run("DELETE FROM library_books WHERE uploaded_by = ?", id);
+  } catch {}
+  try {
+    run("DELETE FROM user_privacy_settings WHERE user_id = ?", id);
+  } catch {}
+  try {
+    run("DELETE FROM user_notification_settings WHERE user_id = ?", id);
+  } catch {}
+
+  run("DELETE FROM users WHERE id = ?", id);
   return res.json({ ok: true });
 });
 
