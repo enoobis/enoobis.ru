@@ -143,8 +143,8 @@ async function save(targetStatus: "draft" | "published") {
       slug: slug.value || undefined,
       status: targetStatus,
       tags: parseCsv(tagsText.value),
-      categories: [],
-    } as const;
+      categories: [] as string[],
+    };
 
     if (isEdit.value) {
       const updated = await updatePost(editId.value, auth.token, payload);
