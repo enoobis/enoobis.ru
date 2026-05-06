@@ -4,11 +4,6 @@ Private project repository.
 Built in a low-latency style: fast, minimal, and direct every time.
 Code comments follow the same rule: short, clear, and only when needed.
 
-## Admin Access
-
-- Login: `REDACTED`
-- Password: `REDACTED`
-
 ## Run Locally
 
 Frontend:
