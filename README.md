@@ -1,6 +1,6 @@
 # enoobis.ru
 
-Frontend:
+frontend :
 
 ```bash
 cd frontend
@@ -8,7 +8,7 @@ npm install
 npm run dev
 ```
 
-Backend :
+backend :
 
 ```bash
 cd backend
@@ -16,7 +16,7 @@ npm install
 npm run dev
 ```
 
-Deploy 
+deploy :
 
 ```bash
 cd `the/dir`
@@ -25,14 +25,14 @@ git reset --hard origin/main
 sudo bash deploy.sh `the.domname`
 ```
 
-TLS once DNS points to the server:
+TLS once DNS points to the server :
 
 ```bash
 sudo apt install -y certbot python3-certbot-nginx
 sudo certbot --nginx -d `the.domname`
 ```
 
-If you changed
+if changed :
 
 ```bash
 ssh `theusr@theserv`
@@ -41,7 +41,7 @@ git pull
 sudo bash deploy.sh `thewebst`
 ```
 
-Sanity check:
+sanity check :
 
 ```bash
 systemctl status enoobis-backend --no-pager
