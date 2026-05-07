@@ -22,13 +22,18 @@ export type ListBooksParams = {
   sort?: "new" | "title";
 };
 
+export type LibraryListResponse = {
+  items: LibraryBook[];
+  storage_bytes_used: number;
+};
+
 export function listBooks(token: string, params: ListBooksParams = {}) {
   const qs = new URLSearchParams();
   if (params.q) qs.set("q", params.q);
   if (params.category) qs.set("category", params.category);
   if (params.sort) qs.set("sort", params.sort);
   const suffix = qs.toString() ? `?${qs.toString()}` : "";
-  return api<{ items: LibraryBook[] }>(`/api/library${suffix}`, { token });
+  return api<LibraryListResponse>(`/api/library${suffix}`, { token });
 }
 
 export function listCategories(token: string) {
@@ -67,6 +72,18 @@ export async function uploadBook(
 
 export function deleteBook(token: string, id: string) {
   return api<{ ok: boolean }>(`/api/library/${id}`, { method: "DELETE", token });
+}
+
+export function updateBookMetadata(
+  token: string,
+  id: string,
+  payload: { title: string; author: string; description: string; category: string },
+) {
+  return api<LibraryBook>(`/api/library/${id}`, {
+    method: "PATCH",
+    token,
+    body: JSON.stringify(payload),
+  });
 }
 
 function parseFilenameFromContentDisposition(header: string | null): string | null {

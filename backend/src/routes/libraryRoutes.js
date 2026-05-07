@@ -61,7 +61,9 @@ router.get("/library", authRequired, (req, res) => {
      ${orderSql}`,
     ...params,
   );
-  res.json({ items: rows });
+  const usage = get("SELECT COALESCE(SUM(size_bytes), 0) AS total FROM library_books");
+  const storageBytesUsed = Number(usage?.total ?? 0);
+  res.json({ items: rows, storage_bytes_used: storageBytesUsed });
 });
 
 router.get("/library/categories", authRequired, (_req, res) => {
@@ -140,6 +142,40 @@ function isPdfMime(mime, originalName) {
   if (m.includes("pdf")) return true;
   return path.extname(String(originalName ?? "")).toLowerCase() === ".pdf";
 }
+
+router.patch("/library/:id", authRequired, staffOnly, (req, res) => {
+  const book = get(
+    "SELECT id, uploaded_by FROM library_books WHERE id = ?",
+    req.params.id,
+  );
+  if (!book) return res.status(404).json({ error: "not_found" });
+  if (book.uploaded_by !== req.user.id && req.user.role !== "admin") {
+    return res.status(403).json({ error: "forbidden" });
+  }
+  const title = String(req.body?.title ?? "").trim().slice(0, 200);
+  const author = String(req.body?.author ?? "").trim().slice(0, 200);
+  const description = String(req.body?.description ?? "").trim().slice(0, 4000);
+  const category = String(req.body?.category ?? "").trim().slice(0, 80);
+  if (!title) return res.status(400).json({ error: "title_required" });
+  run(
+    "UPDATE library_books SET title = ?, author = ?, description = ?, category = ? WHERE id = ?",
+    title,
+    author,
+    description,
+    category,
+    req.params.id,
+  );
+  const updated = get(
+    `SELECT b.id, b.title, b.author, b.description, b.category, b.original_name,
+            b.mime_type, b.size_bytes, b.uploaded_by, b.created_at,
+            u.nickname AS uploader_nickname
+     FROM library_books b
+     LEFT JOIN users u ON u.id = b.uploaded_by
+     WHERE b.id = ?`,
+    req.params.id,
+  );
+  res.json(updated);
+});
 
 router.get("/library/:id/read", authRequired, (req, res) => {
   const book = get(

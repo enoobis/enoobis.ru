@@ -6,10 +6,13 @@ import {
   fetchBookReadBlob,
   listBooks,
   listCategories,
+  updateBookMetadata,
   uploadBook,
   type LibraryBook,
   type LibraryCategory,
 } from "../api/library";
+
+const LIBRARY_QUOTA_BYTES = 5 * 1024 * 1024 * 1024;
 import { useAuthStore } from "../stores/auth";
 import { toastError, toastSuccess } from "../utils/toast";
 import AppIcon from "../components/AppIcon.vue";
@@ -37,11 +40,24 @@ const newFile = ref<File | null>(null);
 const uploading = ref(false);
 
 const totalCount = computed(() => books.value.length);
+const storageBytesUsed = ref(0);
+
+const libraryQuotaLabel = computed(() => {
+  const gb = LIBRARY_QUOTA_BYTES / 1024 ** 3;
+  return `${gb} гб`;
+});
 
 function fmt(n: number) {
   if (n < 1024) return `${n} б`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} кб`;
   return `${(n / 1024 / 1024).toFixed(1)} мб`;
+}
+
+function fmtUsed(bytes: number) {
+  if (bytes >= 1024 ** 3 * 0.05) return `${(bytes / 1024 ** 3).toFixed(2)} гб`;
+  if (bytes >= 1024 ** 2) return `${(bytes / 1024 ** 2).toFixed(1)} мб`;
+  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} кб`;
+  return `${bytes} б`;
 }
 
 function describe(code: string) {
@@ -62,6 +78,14 @@ const readerOpen = ref(false);
 const readerUrl = ref<string | null>(null);
 const readerTitle = ref("");
 
+const editOpen = ref(false);
+const editingId = ref<string | null>(null);
+const editTitle = ref("");
+const editAuthor = ref("");
+const editDescription = ref("");
+const editCategory = ref("");
+const savingEdit = ref(false);
+
 async function load() {
   if (!auth.token) return;
   loading.value = true;
@@ -73,6 +97,7 @@ async function load() {
       sort: sort.value,
     });
     books.value = r.items;
+    storageBytesUsed.value = Number(r.storage_bytes_used) || 0;
   } catch (e) {
     err.value = describe(e instanceof Error ? e.message : "ошибка");
   } finally {
@@ -168,19 +193,68 @@ function closeReader() {
   readerTitle.value = "";
 }
 
-async function onRemove(b: LibraryBook) {
-  if (!auth.token) return;
-  if (!confirm(`удалить "${b.title}"?`)) return;
+function openEdit(b: LibraryBook) {
+  editingId.value = b.id;
+  editTitle.value = b.title;
+  editAuthor.value = b.author;
+  editDescription.value = b.description;
+  editCategory.value = b.category;
+  editOpen.value = true;
+}
+
+function closeEdit() {
+  editOpen.value = false;
+  editingId.value = null;
+  editTitle.value = "";
+  editAuthor.value = "";
+  editDescription.value = "";
+  editCategory.value = "";
+}
+
+async function saveEdit() {
+  if (!auth.token || !editingId.value || savingEdit.value) return;
+  if (!editTitle.value.trim()) {
+    err.value = describe("title_required");
+    return;
+  }
+  savingEdit.value = true;
+  err.value = "";
   try {
-    await deleteBook(auth.token, b.id);
+    await updateBookMetadata(auth.token, editingId.value, {
+      title: editTitle.value.trim(),
+      author: editAuthor.value.trim(),
+      description: editDescription.value.trim(),
+      category: editCategory.value.trim(),
+    });
+    toastSuccess("сохранено");
+    closeEdit();
     await Promise.all([load(), loadCategories()]);
   } catch (e) {
     err.value = describe(e instanceof Error ? e.message : "ошибка");
+    toastError(e);
+  } finally {
+    savingEdit.value = false;
   }
 }
 
-function canDelete(b: LibraryBook) {
-  return auth.role === "admin" || b.uploaded_by === auth.user?.id;
+async function removeFromEdit() {
+  if (!auth.token || !editingId.value) return;
+  const b = books.value.find((x) => x.id === editingId.value);
+  if (!b || !confirm(`удалить «${b.title}»?`)) return;
+  try {
+    await deleteBook(auth.token, editingId.value);
+    closeEdit();
+    await Promise.all([load(), loadCategories()]);
+  } catch (e) {
+    err.value = describe(e instanceof Error ? e.message : "ошибка");
+    toastError(e);
+  }
+}
+
+function canManageBook(b: LibraryBook) {
+  if (auth.role === "admin") return true;
+  if (!(auth.role === "teacher")) return false;
+  return b.uploaded_by === auth.user?.id;
 }
 
 onMounted(() => {
@@ -196,6 +270,7 @@ watch([activeCategory, sort], () => {
 
 onBeforeUnmount(() => {
   closeReader();
+  closeEdit();
 });
 </script>
 
@@ -296,14 +371,17 @@ onBeforeUnmount(() => {
                   читать
                 </button>
                 <button class="secondary" type="button" @click="onDownload(b)">скачать</button>
-                <button v-if="canDelete(b)" class="secondary" type="button" @click="onRemove(b)">
-                  удалить
+                <button v-if="canManageBook(b)" class="secondary" type="button" @click="openEdit(b)">
+                  изменить
                 </button>
               </div>
             </li>
           </ul>
 
-          <p class="muted small total">{{ totalCount }} книг</p>
+          <div class="footer-stats muted small">
+            <span>{{ totalCount }} книг</span>
+            <span>{{ libraryQuotaLabel }} · занято {{ fmtUsed(storageBytesUsed) }}</span>
+          </div>
         </div>
       </div>
 
@@ -316,6 +394,37 @@ onBeforeUnmount(() => {
             </button>
           </header>
           <iframe v-if="readerUrl" class="reader-frame" title="документ" :src="readerUrl" />
+        </div>
+      </div>
+
+      <div v-if="editOpen" class="edit-overlay" role="dialog" aria-modal="true" @click.self="closeEdit">
+        <div class="edit-panel card" @click.stop>
+          <header class="edit-head">
+            <span class="muted">изменить</span>
+            <button class="reader-close" type="button" aria-label="закрыть" @click="closeEdit">
+              <AppIcon name="close" :size="18" />
+            </button>
+          </header>
+          <form class="edit-form" @submit.prevent="saveEdit">
+            <input v-model="editTitle" placeholder="название" maxlength="200" required />
+            <div class="form-row">
+              <input v-model="editAuthor" placeholder="автор" maxlength="200" />
+              <input v-model="editCategory" placeholder="категория" maxlength="80" list="cat-suggest-edit" />
+              <datalist id="cat-suggest-edit">
+                <option v-for="c in categories" :key="c.category" :value="c.category" />
+              </datalist>
+            </div>
+            <textarea v-model="editDescription" rows="3" placeholder="описание" maxlength="4000" />
+            <div class="edit-actions">
+              <button class="secondary" type="button" @click="closeEdit">отмена</button>
+              <button type="submit" :disabled="savingEdit">
+                {{ savingEdit ? "…" : "сохранить" }}
+              </button>
+            </div>
+          </form>
+          <div class="edit-foot">
+            <button class="edit-delete" type="button" @click="removeFromEdit">удалить</button>
+          </div>
         </div>
       </div>
     </template>
@@ -497,9 +606,76 @@ onBeforeUnmount(() => {
   font-size: 0.82rem;
 }
 
-.total {
+.footer-stats {
   margin-top: 0.5rem;
+  display: flex;
+  justify-content: flex-end;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.65rem 1rem;
   text-align: right;
+}
+
+.edit-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 85;
+  background: rgba(0, 0, 0, 0.72);
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.edit-panel {
+  width: min(420px, 100%);
+  padding: 1rem;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.edit-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.edit-head .muted {
+  font-size: 0.88rem;
+}
+
+.edit-form {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.edit-actions {
+  display: flex;
+  gap: 0.4rem;
+  justify-content: flex-end;
+  margin-top: 0.25rem;
+}
+
+.edit-foot {
+  border-top: 1px solid var(--border);
+  padding-top: 0.75rem;
+}
+
+.edit-delete {
+  width: 100%;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--danger);
+  padding: 0.45rem 0.75rem;
+  font: inherit;
+  font-size: 0.88rem;
+  cursor: pointer;
+  text-transform: lowercase;
+}
+
+.edit-delete:hover {
+  background: var(--surface2);
 }
 
 .reader-overlay {
