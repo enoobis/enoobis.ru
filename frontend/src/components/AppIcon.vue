@@ -42,7 +42,14 @@ const props = withDefaults(
       | "copy"
       | "image"
       | "pin"
-      | "trophy";
+      | "trophy"
+      | "bold"
+      | "italic"
+      | "code"
+      | "heading"
+      | "list"
+      | "quote"
+      | "link";
     size?: number;
   }>(),
   { size: 16 },
@@ -130,6 +137,20 @@ const d = computed(() => {
       return "M9 4h6l-1 5 3 4H7l3-4-1-5zM12 13v7";
     case "trophy":
       return "M7 4h10v4a5 5 0 01-10 0V4zM5 5H3v2a3 3 0 003 3M19 5h2v2a3 3 0 01-3 3M10 13h4v3h-4zM8 17h8l1 3H7l1-3z";
+    case "bold":
+      return "M6 4.5h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6V4.5zm0 8.5h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6v-8z";
+    case "italic":
+      return "M18 4.5h-8M13 19.5L9.5 4.5M9.5 19.5H18";
+    case "code":
+      return "M8.5 9.5L4.5 12l4 2.5M15.5 9.5L19.5 12l-4 2.5";
+    case "heading":
+      return "M5.5 4.5v15M5.5 8.5h5M13.5 4.5v15M17.5 7l2.5 5 2.5-5M20 9.5v8";
+    case "list":
+      return "M6 8h2v2H6V8zm0 5h2v2H6v-2zm0 5h2v2H6v-2M11 9h9M11 14h9M11 19h9";
+    case "quote":
+      return "M7 8h5v6.5H7V8zm10 0h5v6.5h-5V8z";
+    case "link":
+      return "M10.5 13.5a4.5 4.5 0 0 1 6.36 0l1.8-1.8a4.5 4.5 0 0 0-6.36-6.36l-1 1M13.5 10.5a4.5 4.5 0 0 0-6.36 0l-1.8 1.8a4.5 4.5 0 0 0 6.36 6.36l1-1";
     default:
       return "";
   }

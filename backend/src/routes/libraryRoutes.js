@@ -11,7 +11,7 @@ const router = express.Router();
 const LIBRARY_ROOT = path.resolve(process.env.LIBRARY_DIR ?? "./data/library");
 fs.mkdirSync(LIBRARY_ROOT, { recursive: true });
 
-const BOOK_MAX_BYTES = 50 * 1024 * 1024;
+const BOOK_MAX_BYTES = 150 * 1024 * 1024;
 
 function staffOnly(req, res, next) {
   if (req.user?.role !== "admin" && req.user?.role !== "teacher") {

@@ -112,6 +112,8 @@ server {
     listen [::]:80 default_server;
     server_name $DOMAIN;
 
+    client_max_body_size 200m;
+
     root $FRONTEND/dist;
     index index.html;
 
@@ -140,6 +142,8 @@ server {
     listen [::]:443 ssl default_server;
     server_name $DOMAIN;
 $ssl_lines
+
+    client_max_body_size 200m;
 
     root $FRONTEND/dist;
     index index.html;
@@ -170,6 +174,8 @@ server {
     listen 80 default_server;
     listen [::]:80 default_server;
     server_name $DOMAIN;
+
+    client_max_body_size 200m;
 
     root $FRONTEND/dist;
     index index.html;

@@ -35,6 +35,8 @@ const viewMode = ref<ViewMode>("split");
 const autosaveStatus = ref<"" | "saving" | "saved">("");
 const showSettings = ref(false);
 
+const toolbarIconSize = 20;
+
 const bodyInput = ref<HTMLTextAreaElement | null>(null);
 const editorRoot = ref<HTMLElement | null>(null);
 
@@ -388,7 +390,7 @@ onBeforeUnmount(() => {
             type="button"
             @click="viewMode = 'split'"
           >
-            split
+            сплит
           </button>
           <button
             class="seg-btn"
@@ -446,26 +448,44 @@ onBeforeUnmount(() => {
       />
     </div>
 
-    <div class="toolbar">
-      <button class="tool" type="button" title="жирный · ctrl+b" @click="insertWrap('**')">b</button>
-      <button class="tool" type="button" title="курсив · ctrl+i" @click="insertWrap('*')"><i>i</i></button>
-      <button class="tool mono" type="button" title="код · ctrl+e" @click="insertWrap('`', '`', 'code')">`</button>
-      <span class="tool-sep" />
-      <button class="tool" type="button" title="заголовок" @click="insertLine('## ')">h</button>
-      <button class="tool" type="button" title="список" @click="insertLine('- ')">•</button>
-      <button class="tool" type="button" title="цитата" @click="insertLine('> ')">»</button>
-      <span class="tool-sep" />
-      <button class="tool" type="button" title="ссылка · ctrl+k" @click="addLink">link</button>
-      <label class="tool" title="картинка">
-        <input
-          type="file"
-          accept="image/png,image/jpeg,image/webp,image/gif"
-          hidden
-          @change="uploadImageFile"
-        />
-        img
-      </label>
-      <span v-if="uploading" class="muted small upload-hint">загрузка…</span>
+    <div class="toolbar" role="toolbar" aria-label="разметка">
+      <div class="toolbar-group">
+        <button class="tool-icon" type="button" title="жирный · ctrl+b" @click="insertWrap('**')">
+          <AppIcon name="bold" :size="toolbarIconSize" />
+        </button>
+        <button class="tool-icon" type="button" title="курсив · ctrl+i" @click="insertWrap('*')">
+          <AppIcon name="italic" :size="toolbarIconSize" />
+        </button>
+        <button class="tool-icon" type="button" title="код · ctrl+e" @click="insertWrap('`', '`', 'code')">
+          <AppIcon name="code" :size="toolbarIconSize" />
+        </button>
+      </div>
+      <div class="toolbar-group">
+        <button class="tool-icon" type="button" title="заголовок" @click="insertLine('## ')">
+          <AppIcon name="heading" :size="toolbarIconSize" />
+        </button>
+        <button class="tool-icon" type="button" title="список" @click="insertLine('- ')">
+          <AppIcon name="list" :size="toolbarIconSize" />
+        </button>
+        <button class="tool-icon" type="button" title="цитата" @click="insertLine('> ')">
+          <AppIcon name="quote" :size="toolbarIconSize" />
+        </button>
+      </div>
+      <div class="toolbar-group toolbar-group-end">
+        <button class="tool-icon" type="button" title="ссылка · ctrl+k" @click="addLink">
+          <AppIcon name="link" :size="toolbarIconSize" />
+        </button>
+        <label class="tool-icon" title="картинка">
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            hidden
+            @change="uploadImageFile"
+          />
+          <AppIcon name="image" :size="toolbarIconSize" />
+        </label>
+        <span v-if="uploading" class="muted small upload-hint">загрузка…</span>
+      </div>
     </div>
 
     <div class="editor-body" :class="`mode-${viewMode}`">
@@ -481,7 +501,7 @@ onBeforeUnmount(() => {
           ref="bodyInput"
           v-model="body"
           spellcheck="false"
-          placeholder="markdown · перетащи картинку или вставь из буфера"
+          placeholder="markdown"
           @keydown="onKeydown"
           @paste="onPaste"
         />
@@ -590,16 +610,16 @@ onBeforeUnmount(() => {
 }
 
 .title-bar {
-  margin-top: 0.1rem;
+  margin-top: 0.35rem;
 }
 
 .title-input {
   width: 100%;
   border: none;
   background: transparent;
-  font-size: 1.5rem;
+  font-size: 1.65rem;
   font-weight: 600;
-  padding: 0.4rem 0;
+  padding: 0.5rem 0;
   color: var(--text);
 }
 
@@ -633,47 +653,47 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 0.1rem;
-  padding-bottom: 0.5rem;
+  gap: 0.85rem;
+  padding: 0.65rem 0 0.75rem;
+  margin-top: 0.15rem;
   border-bottom: 1px solid var(--border);
 }
 
-.tool-sep {
-  width: 1px;
-  height: 16px;
-  background: var(--border);
-  margin: 0 0.4rem;
+.toolbar-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
 }
 
-.tool {
+.toolbar-group-end {
+  margin-left: auto;
+  flex-wrap: wrap;
+  row-gap: 0.35rem;
+}
+
+.tool-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 30px;
-  height: 28px;
-  min-height: 28px;
-  padding: 0 0.5rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  min-width: 2.5rem;
+  min-height: 2.5rem;
+  padding: 0;
   background: transparent;
   border: none;
+  border-radius: var(--radius);
   color: var(--muted);
-  border-radius: 5px;
-  font-weight: 400;
-  font-size: 0.85rem;
   cursor: pointer;
-  text-transform: lowercase;
 }
 
-.tool.mono {
-  font-family: var(--mono);
-}
-
-.tool:hover {
+.tool-icon:hover {
   background: var(--surface);
   color: var(--text);
 }
 
 .upload-hint {
-  margin-left: auto;
+  margin-left: 0.35rem;
 }
 
 .editor-body {
