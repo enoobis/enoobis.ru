@@ -5,6 +5,7 @@ import fs from "node:fs";
 import { v4 as uuidv4 } from "uuid";
 import { all, get, nowIso, run } from "../db.js";
 import { authRequired } from "../auth.js";
+import { contentDispositionAttachment, contentDispositionInline } from "../utils/contentDisposition.js";
 
 const router = express.Router();
 
@@ -124,15 +125,59 @@ router.post("/library", authRequired, staffOnly, (req, res, next) => {
   });
 });
 
+function resolveMime(stored, originalName) {
+  const s = String(stored ?? "").trim();
+  if (s) return s;
+  const ext = path.extname(String(originalName ?? "")).toLowerCase();
+  if (ext === ".pdf") return "application/pdf";
+  if (ext === ".epub") return "application/epub+zip";
+  if (ext === ".txt") return "text/plain; charset=utf-8";
+  return "application/octet-stream";
+}
+
+function isPdfMime(mime, originalName) {
+  const m = String(mime ?? "").toLowerCase();
+  if (m.includes("pdf")) return true;
+  return path.extname(String(originalName ?? "")).toLowerCase() === ".pdf";
+}
+
+router.get("/library/:id/read", authRequired, (req, res) => {
+  const book = get(
+    "SELECT storage_path, original_name, mime_type FROM library_books WHERE id = ?",
+    req.params.id,
+  );
+  if (!book) return res.status(404).json({ error: "not_found" });
+  if (!isPdfMime(book.mime_type, book.original_name)) {
+    return res.status(415).json({ error: "read_only_pdf" });
+  }
+  const abs = path.join(LIBRARY_ROOT, book.storage_path);
+  if (!fs.existsSync(abs)) return res.status(404).json({ error: "not_found" });
+  const mime = resolveMime(book.mime_type, book.original_name);
+  res.setHeader("Content-Type", mime);
+  res.setHeader("Content-Disposition", contentDispositionInline(book.original_name));
+  fs.createReadStream(abs)
+    .on("error", () => {
+      if (!res.headersSent) res.sendStatus(500);
+    })
+    .pipe(res);
+});
+
 router.get("/library/:id/download", authRequired, (req, res) => {
   const book = get(
-    "SELECT storage_path, original_name FROM library_books WHERE id = ?",
+    "SELECT storage_path, original_name, mime_type FROM library_books WHERE id = ?",
     req.params.id,
   );
   if (!book) return res.status(404).json({ error: "not_found" });
   const abs = path.join(LIBRARY_ROOT, book.storage_path);
   if (!fs.existsSync(abs)) return res.status(404).json({ error: "not_found" });
-  res.download(abs, book.original_name);
+  const mime = resolveMime(book.mime_type, book.original_name);
+  res.setHeader("Content-Type", mime);
+  res.setHeader("Content-Disposition", contentDispositionAttachment(book.original_name));
+  fs.createReadStream(abs)
+    .on("error", () => {
+      if (!res.headersSent) res.sendStatus(500);
+    })
+    .pipe(res);
 });
 
 router.delete("/library/:id", authRequired, staffOnly, (req, res) => {

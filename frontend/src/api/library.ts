@@ -69,11 +69,46 @@ export function deleteBook(token: string, id: string) {
   return api<{ ok: boolean }>(`/api/library/${id}`, { method: "DELETE", token });
 }
 
-export async function downloadBook(token: string, id: string, name: string) {
+function parseFilenameFromContentDisposition(header: string | null): string | null {
+  if (!header) return null;
+  const star = /filename\*=(?:UTF-8''|utf-8'')([^;\n]+)/i.exec(header);
+  if (star) {
+    try {
+      return decodeURIComponent(star[1].trim().replace(/^["']|["']$/g, ""));
+    } catch {
+      /* ignore */
+    }
+  }
+  const quoted = /filename="((?:\\"|[^"])*)"/i.exec(header);
+  if (quoted) return quoted[1].replace(/\\"/g, '"');
+  const plain = /filename=([^;\n]+)/i.exec(header);
+  if (plain) return plain[1].trim().replace(/^["']|["']$/g, "");
+  return null;
+}
+
+export async function fetchBookReadBlob(token: string, id: string): Promise<Blob> {
+  const res = await fetch(`/api/library/${id}/read`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  let errCode = "";
+  if (!res.ok) {
+    try {
+      const j = (await res.json()) as { error?: string };
+      errCode = j?.error ?? "";
+    } catch {
+      /* ignore */
+    }
+    throw new Error(errCode || res.statusText);
+  }
+  return res.blob();
+}
+
+export async function downloadBook(token: string, id: string, fallbackName: string) {
   const res = await fetch(`/api/library/${id}/download`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) throw new Error(res.statusText);
+  const name = parseFilenameFromContentDisposition(res.headers.get("Content-Disposition")) ?? fallbackName;
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");

@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import {
   deleteBook,
   downloadBook,
+  fetchBookReadBlob,
   listBooks,
   listCategories,
   uploadBook,
@@ -11,6 +12,7 @@ import {
 } from "../api/library";
 import { useAuthStore } from "../stores/auth";
 import { toastError, toastSuccess } from "../utils/toast";
+import AppIcon from "../components/AppIcon.vue";
 
 const auth = useAuthStore();
 
@@ -46,8 +48,19 @@ function describe(code: string) {
   if (code === "file_too_large") return "файл слишком большой";
   if (code === "title_required") return "нужно название";
   if (code === "no_file") return "нужен файл";
+  if (code === "read_only_pdf") return "чтение в браузере только для pdf";
   return code || "ошибка";
 }
+
+function isPdfBook(b: LibraryBook) {
+  const m = (b.mime_type || "").toLowerCase();
+  if (m.includes("pdf")) return true;
+  return b.original_name.toLowerCase().endsWith(".pdf");
+}
+
+const readerOpen = ref(false);
+const readerUrl = ref<string | null>(null);
+const readerTitle = ref("");
 
 async function load() {
   if (!auth.token) return;
@@ -132,6 +145,29 @@ async function onDownload(b: LibraryBook) {
   }
 }
 
+async function openReader(b: LibraryBook) {
+  if (!auth.token || !isPdfBook(b)) return;
+  err.value = "";
+  try {
+    const blob = await fetchBookReadBlob(auth.token, b.id);
+    readerTitle.value = b.title;
+    readerUrl.value = URL.createObjectURL(blob);
+    readerOpen.value = true;
+  } catch (e) {
+    toastError(e);
+    err.value = describe(e instanceof Error ? e.message : "ошибка");
+  }
+}
+
+function closeReader() {
+  readerOpen.value = false;
+  if (readerUrl.value) {
+    URL.revokeObjectURL(readerUrl.value);
+    readerUrl.value = null;
+  }
+  readerTitle.value = "";
+}
+
 async function onRemove(b: LibraryBook) {
   if (!auth.token) return;
   if (!confirm(`удалить "${b.title}"?`)) return;
@@ -156,6 +192,10 @@ onMounted(() => {
 
 watch([activeCategory, sort], () => {
   void load();
+});
+
+onBeforeUnmount(() => {
+  closeReader();
 });
 </script>
 
@@ -247,6 +287,14 @@ watch([activeCategory, sort], () => {
                 </span>
               </div>
               <div class="row-actions">
+                <button
+                  v-if="isPdfBook(b)"
+                  class="secondary"
+                  type="button"
+                  @click="openReader(b)"
+                >
+                  читать
+                </button>
                 <button class="secondary" type="button" @click="onDownload(b)">скачать</button>
                 <button v-if="canDelete(b)" class="secondary" type="button" @click="onRemove(b)">
                   удалить
@@ -256,6 +304,18 @@ watch([activeCategory, sort], () => {
           </ul>
 
           <p class="muted small total">{{ totalCount }} книг</p>
+        </div>
+      </div>
+
+      <div v-if="readerOpen" class="reader-overlay" role="dialog" aria-modal="true">
+        <div class="reader-shell">
+          <header class="reader-top">
+            <span class="reader-label muted">{{ readerTitle }}</span>
+            <button class="reader-close" type="button" aria-label="закрыть" @click="closeReader">
+              <AppIcon name="close" :size="18" />
+            </button>
+          </header>
+          <iframe v-if="readerUrl" class="reader-frame" title="документ" :src="readerUrl" />
         </div>
       </div>
     </template>
@@ -440,5 +500,69 @@ watch([activeCategory, sort], () => {
 .total {
   margin-top: 0.5rem;
   text-align: right;
+}
+
+.reader-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  padding: 0.5rem;
+}
+
+.reader-shell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-width: 960px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.reader-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.35rem 0 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.reader-label {
+  font-size: 0.88rem;
+  text-transform: lowercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reader-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.reader-close:hover {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.reader-frame {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  border: none;
+  margin-top: 0.5rem;
 }
 </style>
