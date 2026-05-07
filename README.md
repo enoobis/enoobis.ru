@@ -8,7 +8,7 @@ npm install
 npm run dev
 ```
 
-Backend (JS):
+Backend :
 
 ```bash
 cd backend
@@ -31,6 +31,17 @@ TLS once DNS points to the server:
 sudo apt install -y certbot python3-certbot-nginx
 sudo certbot --nginx -d `the.domname`
 ```
+
+If you changed something, ship it and test:
+
+```bash
+ssh user@your-server
+cd /path/thewebst
+git pull
+sudo bash deploy.sh enoobis.ru
+```
+
+Then run the sanity check below.
 
 Sanity check:
 
