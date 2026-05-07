@@ -201,7 +201,7 @@ watch(
 <template>
   <div class="layout">
     <header class="nav">
-      <RouterLink v-if="!onHome" to="/" class="nav-link brand-link">
+      <RouterLink v-if="onHome" to="/" class="nav-link brand-link">
         <span>enoobis</span>
       </RouterLink>
       <RouterLink v-if="!onBlogs" to="/blogs" class="nav-link"><span>блоги</span></RouterLink>
