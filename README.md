@@ -35,10 +35,10 @@ sudo certbot --nginx -d `the.domname`
 if changed :
 
 ```bash
-ssh `theusr@theserv`
-cd `/path/thewebst`
+ssh user@your-server
+cd /path/to/enoobis.ru
 git pull
-sudo bash deploy.sh `thewebst`
+sudo bash deploy.sh enoobis.ru
 ```
 
 sanity check :
