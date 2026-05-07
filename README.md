@@ -35,10 +35,10 @@ sudo certbot --nginx -d `the.domname`
 If you changed
 
 ```bash
-ssh theusr@theserv
-cd /path/thewebst
+ssh `theusr@theserv`
+cd `/path/thewebst`
 git pull
-sudo bash deploy.sh thewebst
+sudo bash deploy.sh `thewebst`
 ```
 
 Sanity check:
