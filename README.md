@@ -32,16 +32,14 @@ sudo apt install -y certbot python3-certbot-nginx
 sudo certbot --nginx -d `the.domname`
 ```
 
-If you changed something, ship it and test:
+If you changed
 
 ```bash
-ssh user@your-server
+ssh theusr@theserv
 cd /path/thewebst
 git pull
-sudo bash deploy.sh enoobis.ru
+sudo bash deploy.sh thewebst
 ```
-
-Then run the sanity check below.
 
 Sanity check:
 
