@@ -46,6 +46,72 @@ let messagesTimer: ReturnType<typeof setInterval> | null = null;
 
 const activeChat = computed(() => chats.value.find((c) => c.id === activeId.value) ?? null);
 
+const MONTHS_GEN = [
+  "января",
+  "февраля",
+  "марта",
+  "апреля",
+  "мая",
+  "июня",
+  "июля",
+  "августа",
+  "сентября",
+  "октября",
+  "ноября",
+  "декабря",
+] as const;
+
+function calendarDayKey(d: Date): string {
+  const y = d.getFullYear();
+  const mo = d.getMonth() + 1;
+  const da = d.getDate();
+  return `${y}-${String(mo).padStart(2, "0")}-${String(da).padStart(2, "0")}`;
+}
+
+function utcDayStart(d: Date): number {
+  return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+function relativeDayLabel(msg: Date, now: Date): string {
+  const diffDays = Math.round((utcDayStart(now) - utcDayStart(msg)) / 86400000);
+  if (diffDays < 0) return "";
+  if (diffDays === 0) return "сегодня";
+  if (diffDays === 1) return "вчера";
+  if (diffDays === 2) return "позавчера";
+  return "";
+}
+
+function formatMessageCalendarDate(d: Date): string {
+  return `${d.getDate()} ${MONTHS_GEN[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+type MessageRow =
+  | { kind: "day"; id: string; line: string }
+  | { kind: "msg"; m: ChatMessage; id: string };
+
+const messageRows = computed((): MessageRow[] => {
+  const rows: MessageRow[] = [];
+  let prevKey = "";
+  const now = new Date();
+  for (const m of messages.value) {
+    const d = new Date(m.created_at);
+    if (Number.isNaN(d.getTime())) {
+      rows.push({ kind: "msg", m, id: m.id });
+      continue;
+    }
+    const key = calendarDayKey(d);
+    if (key !== prevKey) {
+      prevKey = key;
+      const rel = relativeDayLabel(d, now);
+      const dateStr = formatMessageCalendarDate(d);
+      const line = rel ? `${rel} · ${dateStr}` : dateStr;
+      rows.push({ kind: "day", id: `day-${key}`, line });
+    }
+    rows.push({ kind: "msg", m, id: m.id });
+  }
+  return rows;
+});
+
 async function loadChats() {
   if (!auth.token) return;
   loadingChats.value = true;
@@ -364,66 +430,71 @@ onUnmounted(() => {
         <div class="messages">
           <p v-if="loadingMessages && !messages.length" class="muted small pad">загрузка</p>
           <p v-else-if="!messages.length" class="muted small pad">напишите первое сообщение</p>
-          <div v-for="m in messages" :key="m.id" class="msg" :class="{ me: m.from_me }">
-            <span class="bubble">
-              <img
-                v-if="m.image_url"
-                :src="m.image_url"
-                class="msg-img"
-                alt=""
-                @click="lightboxUrl = m.image_url ?? ''"
-              />
-              <template v-if="editingId === m.id">
-                <textarea
-                  v-model="editingDraft"
-                  class="edit-area"
-                  rows="2"
-                  :maxlength="4000"
-                  @keydown="(e) => onEditKey(e, m)"
+          <template v-for="row in messageRows" :key="row.id">
+            <div v-if="row.kind === 'day'" class="day-mark muted small">
+              {{ row.line }}
+            </div>
+            <div v-else class="msg" :class="{ me: row.m.from_me }">
+              <span class="bubble">
+                <img
+                  v-if="row.m.image_url"
+                  :src="row.m.image_url"
+                  class="msg-img"
+                  alt=""
+                  @click="lightboxUrl = row.m.image_url ?? ''"
                 />
-                <span class="edit-actions">
-                  <button type="button" class="ghost" @click="cancelEdit">отмена</button>
-                  <button type="button" @click="saveEdit(m)">сохранить</button>
-                </span>
-              </template>
-              <template v-else>
-                <span v-if="m.body" class="text">{{ m.body }}</span>
-                <span class="meta muted small">
-                  <span v-if="m.edited_at" class="muted">изменено</span>
-                  <span>{{ timeFor(m.created_at) }}</span>
-                  <span
-                    v-if="m.from_me && m.read"
-                    class="msg-seen"
-                    title="прочитано"
-                    aria-label="прочитано"
-                  >
-                    <AppIcon name="seen" :size="12" />
+                <template v-if="editingId === row.m.id">
+                  <textarea
+                    v-model="editingDraft"
+                    class="edit-area"
+                    rows="2"
+                    :maxlength="4000"
+                    @keydown="(e) => onEditKey(e, row.m)"
+                  />
+                  <span class="edit-actions">
+                    <button type="button" class="ghost" @click="cancelEdit">отмена</button>
+                    <button type="button" @click="saveEdit(row.m)">сохранить</button>
                   </span>
-                </span>
-              </template>
-            </span>
-            <span v-if="m.from_me && editingId !== m.id" class="msg-actions">
-              <button
-                v-if="m.body"
-                type="button"
-                class="msg-act"
-                aria-label="изменить"
-                title="изменить"
-                @click="startEdit(m)"
-              >
-                <AppIcon name="edit" :size="14" />
-              </button>
-              <button
-                type="button"
-                class="msg-act"
-                aria-label="удалить"
-                title="удалить"
-                @click="removeMessage(m)"
-              >
-                <AppIcon name="delete" :size="14" />
-              </button>
-            </span>
-          </div>
+                </template>
+                <template v-else>
+                  <span v-if="row.m.body" class="text">{{ row.m.body }}</span>
+                  <span class="meta muted small">
+                    <span v-if="row.m.edited_at" class="muted">изменено</span>
+                    <span>{{ timeFor(row.m.created_at) }}</span>
+                    <span
+                      v-if="row.m.from_me && row.m.read"
+                      class="msg-seen"
+                      title="прочитано"
+                      aria-label="прочитано"
+                    >
+                      <AppIcon name="seen" :size="12" />
+                    </span>
+                  </span>
+                </template>
+              </span>
+              <span v-if="row.m.from_me && editingId !== row.m.id" class="msg-actions">
+                <button
+                  v-if="row.m.body"
+                  type="button"
+                  class="msg-act"
+                  aria-label="изменить"
+                  title="изменить"
+                  @click="startEdit(row.m)"
+                >
+                  <AppIcon name="edit" :size="14" />
+                </button>
+                <button
+                  type="button"
+                  class="msg-act"
+                  aria-label="удалить"
+                  title="удалить"
+                  @click="removeMessage(row.m)"
+                >
+                  <AppIcon name="delete" :size="14" />
+                </button>
+              </span>
+            </div>
+          </template>
           <div ref="messagesEnd" />
         </div>
 
@@ -661,6 +732,13 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
+}
+.day-mark {
+  text-align: center;
+  padding: 0.35rem 0 0.05rem;
+  align-self: center;
+  max-width: 100%;
+  line-height: 1.35;
 }
 .msg {
   display: flex;
