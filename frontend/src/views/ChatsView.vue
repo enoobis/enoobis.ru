@@ -36,6 +36,7 @@ const loadingMessages = ref(false);
 const err = ref("");
 const messagesEnd = ref<HTMLElement | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
+const composerTextarea = ref<HTMLTextAreaElement | null>(null);
 const pendingFile = ref<File | null>(null);
 const pendingPreview = ref("");
 const lightboxUrl = ref("");
@@ -318,6 +319,25 @@ function onKey(e: KeyboardEvent) {
   }
 }
 
+function adjustComposerHeight() {
+  const el = composerTextarea.value;
+  if (!el) return;
+  const maxPx = parseFloat(getComputedStyle(el).maxHeight);
+  const cap = Number.isFinite(maxPx) ? maxPx : 220;
+  el.style.height = "";
+  const sh = el.scrollHeight;
+  const h = Math.min(sh, cap);
+  el.style.height = `${h}px`;
+  el.style.overflowY = sh > cap ? "auto" : "hidden";
+}
+
+function scheduleComposerResize() {
+  void nextTick(() => adjustComposerHeight());
+}
+
+watch(draft, () => scheduleComposerResize());
+watch(activeId, () => scheduleComposerResize());
+
 function timeAgo(iso: string | null) {
   if (!iso) return "";
   const d = Date.parse(iso);
@@ -373,6 +393,7 @@ onMounted(async () => {
   }
   chatsTimer = setInterval(() => void loadChats(), 30000);
   messagesTimer = setInterval(() => void pollMessages(), 5000);
+  scheduleComposerResize();
 });
 
 onUnmounted(() => {
@@ -522,6 +543,7 @@ onUnmounted(() => {
               @change="onFileChange"
             />
             <textarea
+              ref="composerTextarea"
               v-model="draft"
               rows="1"
               placeholder="сообщение"
@@ -892,6 +914,7 @@ onUnmounted(() => {
   grid-template-columns: auto 1fr auto;
   gap: 0.5rem;
   padding: 0.7rem 1rem;
+  align-items: end;
 }
 .attach {
   width: 40px;
@@ -912,14 +935,16 @@ onUnmounted(() => {
 .composer textarea {
   resize: none;
   min-height: 40px;
-  max-height: 120px;
+  max-height: min(220px, 45vh);
   border: 1px solid var(--border);
   border-radius: 999px;
   padding: 0.55rem 0.9rem;
   font: inherit;
   font-size: 0.92rem;
+  line-height: 1.4;
   background: transparent;
   color: var(--text);
+  overflow-y: hidden;
 }
 .composer textarea:focus {
   outline: none;
