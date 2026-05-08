@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
-import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
+import { RouterLink, RouterView, useRouter } from "vue-router";
 import { api } from "./api/http";
 import { useAuthStore } from "./stores/auth";
 import { useChatStore } from "./stores/chat";
@@ -9,16 +9,8 @@ import AppToast from "./components/AppToast.vue";
 import { applyUserPreferences } from "./utils/preferences";
 
 const router = useRouter();
-const route = useRoute();
 
 const auth = useAuthStore();
-
-const onHome = computed(() => route.path === "/");
-const onBlogs = computed(() => route.path === "/blogs" || route.path.startsWith("/blogs/"));
-const onMicroblogs = computed(() => route.path === "/microblogs" || route.path.startsWith("/microblogs/"));
-const onCourses = computed(() => route.path === "/courses" || route.path.startsWith("/courses/"));
-const onLibrary = computed(() => route.path === "/library" || route.path.startsWith("/library/"));
-const onAdminNav = computed(() => route.path === "/admin" || route.path.startsWith("/admin/"));
 const chatStore = useChatStore();
 const isOnline = ref(typeof navigator !== "undefined" ? navigator.onLine : true);
 const profileMenuOpen = ref(false);
@@ -201,22 +193,18 @@ watch(
 <template>
   <div class="layout">
     <header class="nav">
-      <RouterLink v-if="onHome" to="/" class="nav-link brand-link">
+      <RouterLink to="/" class="nav-link brand-link">
         <span>enoobis</span>
       </RouterLink>
-      <RouterLink v-if="!onBlogs" to="/blogs" class="nav-link"><span>блоги</span></RouterLink>
-      <RouterLink v-if="!onMicroblogs" to="/microblogs" class="nav-link"><span>микроблоги</span></RouterLink>
-      <RouterLink v-if="auth.token && !onCourses" to="/courses" class="nav-link desktop-only">
+      <RouterLink to="/blogs" class="nav-link"><span>блоги</span></RouterLink>
+      <RouterLink to="/microblogs" class="nav-link"><span>микроблоги</span></RouterLink>
+      <RouterLink v-if="auth.token" to="/courses" class="nav-link desktop-only">
         <span>курсы</span>
       </RouterLink>
-      <RouterLink v-if="auth.token && !onLibrary" to="/library" class="nav-link desktop-only">
+      <RouterLink v-if="auth.token" to="/library" class="nav-link desktop-only">
         <span>библиотека</span>
       </RouterLink>
-      <RouterLink
-        v-if="auth.token && auth.role === 'admin' && !onAdminNav"
-        to="/admin"
-        class="nav-link desktop-only"
-      >
+      <RouterLink v-if="auth.token && auth.role === 'admin'" to="/admin" class="nav-link desktop-only">
         <span>админ</span>
       </RouterLink>
       <span class="nav-spacer" />
