@@ -37,6 +37,7 @@ const err = ref("");
 const messagesEnd = ref<HTMLElement | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
 const composerTextarea = ref<HTMLTextAreaElement | null>(null);
+const composerTall = ref(false);
 const pendingFile = ref<File | null>(null);
 const pendingPreview = ref("");
 const lightboxUrl = ref("");
@@ -332,6 +333,7 @@ function adjustComposerHeight() {
   const h = Math.min(Math.max(sh, 40), cap);
   el.style.height = `${h}px`;
   el.style.overflowY = sh > cap ? "auto" : "hidden";
+  composerTall.value = sh > 52;
 }
 
 function scheduleComposerResize() {
@@ -560,6 +562,8 @@ onUnmounted(() => {
             <textarea
               ref="composerTextarea"
               v-model="draft"
+              class="composer-ta"
+              :class="{ 'composer-ta--tall': composerTall }"
               rows="1"
               placeholder="сообщение"
               :maxlength="4000"
@@ -949,13 +953,13 @@ onUnmounted(() => {
 .attach:hover {
   color: var(--text);
 }
-.composer textarea {
+.composer .composer-ta {
   resize: none;
   min-height: 40px;
   max-height: 220px;
   border: 1px solid var(--border);
   border-radius: 999px;
-  padding: 0.55rem 0.9rem;
+  padding: 0.55rem 1rem;
   font: inherit;
   font-size: 0.92rem;
   line-height: 1.4;
@@ -963,7 +967,10 @@ onUnmounted(() => {
   color: var(--text);
   overflow-y: hidden;
 }
-.composer textarea:focus {
+.composer .composer-ta.composer-ta--tall {
+  border-radius: 14px;
+}
+.composer .composer-ta:focus {
   outline: none;
   border-color: #3a3a3a;
 }
