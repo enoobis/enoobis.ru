@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
-import { RouterLink, RouterView, useRouter } from "vue-router";
+import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
 import { api } from "./api/http";
 import { useAuthStore } from "./stores/auth";
 import { useChatStore } from "./stores/chat";
@@ -9,6 +9,8 @@ import AppToast from "./components/AppToast.vue";
 import { applyUserPreferences } from "./utils/preferences";
 
 const router = useRouter();
+const route = useRoute();
+const onHome = computed(() => route.path === "/");
 
 const auth = useAuthStore();
 const chatStore = useChatStore();
@@ -193,7 +195,7 @@ watch(
 <template>
   <div class="layout">
     <header class="nav">
-      <RouterLink to="/" class="nav-link brand-link">
+      <RouterLink v-if="onHome" to="/" class="nav-link brand-link">
         <span>enoobis</span>
       </RouterLink>
       <RouterLink to="/blogs" class="nav-link"><span>блоги</span></RouterLink>
