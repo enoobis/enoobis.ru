@@ -11,7 +11,12 @@ const router = express.Router();
 const FILES_ROOT = path.resolve(process.env.PRIVATE_FILES_DIR ?? "./data/private-files");
 fs.mkdirSync(FILES_ROOT, { recursive: true });
 
-export const QUOTA_BYTES = 100 * 1024 * 1024;
+const TEACHER_QUOTA_BYTES = 100 * 1024 * 1024;
+const ADMIN_QUOTA_BYTES = 3 * 1024 * 1024 * 1024;
+
+function quotaBytesForRole(role) {
+  return role === "admin" ? ADMIN_QUOTA_BYTES : TEACHER_QUOTA_BYTES;
+}
 
 function staffOnly(req, res, next) {
   if (req.user?.role !== "admin" && req.user?.role !== "teacher") {
@@ -20,15 +25,12 @@ function staffOnly(req, res, next) {
   next();
 }
 
-const upload = multer({
-  storage: multer.diskStorage({
-    destination: (_req, _file, cb) => cb(null, FILES_ROOT),
-    filename: (req, file, cb) => {
-      const ext = (path.extname(file.originalname) || ".bin").toLowerCase();
-      cb(null, `${req.user.id}-${uuidv4().replace(/-/g, "")}${ext}`);
-    },
-  }),
-  limits: { fileSize: QUOTA_BYTES },
+const diskStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, FILES_ROOT),
+  filename: (req, file, cb) => {
+    const ext = (path.extname(file.originalname) || ".bin").toLowerCase();
+    cb(null, `${req.user.id}-${uuidv4().replace(/-/g, "")}${ext}`);
+  },
 });
 
 function totalUsed(userId) {
@@ -48,12 +50,16 @@ router.get("/files", authRequired, staffOnly, (req, res) => {
   res.json({
     items,
     used: totalUsed(req.user.id),
-    quota: QUOTA_BYTES,
+    quota: quotaBytesForRole(req.user.role),
   });
 });
 
 router.post("/files", authRequired, staffOnly, (req, res, next) => {
-  upload.single("file")(req, res, (err) => {
+  const cap = quotaBytesForRole(req.user.role);
+  multer({
+    storage: diskStorage,
+    limits: { fileSize: cap },
+  }).single("file")(req, res, (err) => {
     if (err) {
       if (err.code === "LIMIT_FILE_SIZE") {
         return res.status(413).json({ error: "file_too_large" });
@@ -62,7 +68,7 @@ router.post("/files", authRequired, staffOnly, (req, res, next) => {
     }
     if (!req.file) return res.status(400).json({ error: "no_file" });
     const used = totalUsed(req.user.id);
-    if (used + req.file.size > QUOTA_BYTES) {
+    if (used + req.file.size > cap) {
       try {
         fs.unlinkSync(req.file.path);
       } catch {

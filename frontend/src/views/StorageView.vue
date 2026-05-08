@@ -56,7 +56,8 @@ const usedPercent = computed(() =>
 function fmt(n: number) {
   if (n < 1024) return `${n} б`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} кб`;
-  return `${(n / 1024 / 1024).toFixed(1)} мб`;
+  if (n < 1024 * 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} мб`;
+  return `${(n / (1024 * 1024 * 1024)).toFixed(2)} гб`;
 }
 
 function describe(code: string) {
