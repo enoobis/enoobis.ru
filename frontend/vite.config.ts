@@ -7,6 +7,32 @@ export default defineConfig(({ mode }) => {
   const apiPort = env.VITE_API_PORT || "3000";
   return {
     plugins: [vue()],
+    build: {
+      target: "es2022",
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            const norm = id.replace(/\\/g, "/");
+            if (!norm.includes("node_modules")) return;
+            if (
+              norm.includes("marked") ||
+              norm.includes("dompurify") ||
+              norm.includes("highlight.js")
+            ) {
+              return "md";
+            }
+            if (
+              norm.includes("node_modules/vue/") ||
+              norm.includes("node_modules/vue-router") ||
+              norm.includes("node_modules/pinia")
+            ) {
+              return "vue-vendor";
+            }
+            return undefined;
+          },
+        },
+      },
+    },
     server: {
       port: 5173,
       proxy: {

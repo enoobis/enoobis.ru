@@ -117,6 +117,17 @@ server {
     root $FRONTEND/dist;
     index index.html;
 
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 256;
+    gzip_comp_level 5;
+    gzip_types text/plain text/css application/javascript application/json image/svg+xml application/xml;
+
+    location /assets/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
     location /api/ {
         proxy_pass http://127.0.0.1:3000;
         proxy_http_version 1.1;
@@ -147,6 +158,17 @@ $ssl_lines
 
     root $FRONTEND/dist;
     index index.html;
+
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 256;
+    gzip_comp_level 5;
+    gzip_types text/plain text/css application/javascript application/json image/svg+xml application/xml;
+
+    location /assets/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
 
     location /api/ {
         proxy_pass http://127.0.0.1:3000;
@@ -179,6 +201,17 @@ server {
 
     root $FRONTEND/dist;
     index index.html;
+
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 256;
+    gzip_comp_level 5;
+    gzip_types text/plain text/css application/javascript application/json image/svg+xml application/xml;
+
+    location /assets/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
 
     location /api/ {
         proxy_pass http://127.0.0.1:3000;
