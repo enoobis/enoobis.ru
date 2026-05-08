@@ -179,6 +179,25 @@ router.get("/chats/:id/messages", authRequired, (req, res) => {
   });
 });
 
+router.get("/chats/:id/outgoing-read", authRequired, (req, res) => {
+  const thread = get(
+    "SELECT id, user_a_id, user_b_id FROM chat_threads WHERE id = ?",
+    req.params.id,
+  );
+  if (!thread) return res.status(404).json({ error: "not found" });
+  if (thread.user_a_id !== req.user.id && thread.user_b_id !== req.user.id) {
+    return res.status(403).json({ error: "forbidden" });
+  }
+  const rows = all(
+    "SELECT id, read_at FROM chat_messages WHERE thread_id = ? AND sender_id = ?",
+    req.params.id,
+    req.user.id,
+  );
+  res.json({
+    items: rows.map((r) => ({ id: r.id, read: !!r.read_at })),
+  });
+});
+
 router.post("/chats/:id/messages", authRequired, (req, res) => {
   const thread = get(
     "SELECT id, user_a_id, user_b_id FROM chat_threads WHERE id = ?",

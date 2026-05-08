@@ -49,7 +49,8 @@ const props = withDefaults(
       | "heading"
       | "list"
       | "quote"
-      | "link";
+      | "link"
+      | "seen";
     size?: number;
   }>(),
   { size: 16 },
@@ -151,6 +152,8 @@ const d = computed(() => {
       return "M7 8h5v6.5H7V8zm10 0h5v6.5h-5V8z";
     case "link":
       return "M10.5 13.5a4.5 4.5 0 0 1 6.36 0l1.8-1.8a4.5 4.5 0 0 0-6.36-6.36l-1 1M13.5 10.5a4.5 4.5 0 0 0-6.36 0l-1.8 1.8a4.5 4.5 0 0 0 6.36 6.36l1-1";
+    case "seen":
+      return "M2 12c2.2-4.2 5.6-6.5 10-6.5S19.8 7.8 22 12c-2.2 4.2-5.6 6.5-10 6.5S4.2 16.2 2 12z";
     default:
       return "";
   }
@@ -171,6 +174,14 @@ const d = computed(() => {
     aria-hidden="true"
   >
     <path :d="d" />
+    <circle
+      v-if="name === 'seen'"
+      cx="12"
+      cy="12"
+      r="2.25"
+      fill="currentColor"
+      stroke="none"
+    />
     <path v-if="name === 'liked' || name === 'bookmarked'" :d="d" fill="currentColor" stroke="none" />
   </svg>
 </template>

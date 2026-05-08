@@ -6,6 +6,7 @@ import {
   editMessage,
   listChats,
   listMessages,
+  listOutgoingReadFlags,
   markChatRead,
   openChatWith,
   sendMessage,
@@ -81,6 +82,19 @@ async function loadMessages(scrollEnd = true) {
   }
 }
 
+async function syncOutgoingReads() {
+  if (!auth.token || !activeId.value) return;
+  try {
+    const { items } = await listOutgoingReadFlags(activeId.value, auth.token);
+    const byId = new Map(items.map((x) => [x.id, x.read] as const));
+    messages.value = messages.value.map((m) =>
+      m.from_me && byId.has(m.id) ? { ...m, read: byId.get(m.id)! } : m,
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
 async function pollMessages() {
   if (!auth.token || !activeId.value) return;
   const last = messages.value.at(-1)?.created_at;
@@ -94,6 +108,7 @@ async function pollMessages() {
       void chatStore.refresh();
       void loadChats();
     }
+    await syncOutgoingReads();
   } catch {
     /* ignore poll errors */
   }
@@ -376,6 +391,14 @@ onUnmounted(() => {
                 <span class="meta muted small">
                   <span v-if="m.edited_at" class="muted">изменено</span>
                   <span>{{ timeFor(m.created_at) }}</span>
+                  <span
+                    v-if="m.from_me && m.read"
+                    class="msg-seen"
+                    title="прочитано"
+                    aria-label="прочитано"
+                  >
+                    <AppIcon name="seen" :size="12" />
+                  </span>
                 </span>
               </template>
             </span>
@@ -686,6 +709,12 @@ onUnmounted(() => {
   gap: 0.3rem;
   white-space: nowrap;
   opacity: 0.7;
+}
+.msg-seen {
+  display: inline-flex;
+  align-items: center;
+  line-height: 0;
+  color: var(--muted);
 }
 
 .msg-actions {

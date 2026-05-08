@@ -47,6 +47,13 @@ export function listMessages(threadId: string, token: string, after?: string) {
   return api<ChatMessages>(url, { token });
 }
 
+export function listOutgoingReadFlags(threadId: string, token: string) {
+  return api<{ items: { id: string; read: boolean }[] }>(
+    `/api/chats/${threadId}/outgoing-read`,
+    { token },
+  );
+}
+
 export function sendMessage(
   threadId: string,
   token: string,
