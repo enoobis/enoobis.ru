@@ -312,6 +312,8 @@ function onEditKey(e: KeyboardEvent, m: ChatMessage) {
   }
 }
 
+const COMPOSER_MAX_H = 220;
+
 function onKey(e: KeyboardEvent) {
   if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
     e.preventDefault();
@@ -322,21 +324,34 @@ function onKey(e: KeyboardEvent) {
 function adjustComposerHeight() {
   const el = composerTextarea.value;
   if (!el) return;
-  const maxPx = parseFloat(getComputedStyle(el).maxHeight);
-  const cap = Number.isFinite(maxPx) ? maxPx : 220;
-  el.style.height = "";
+  const cap = Math.min(COMPOSER_MAX_H, Math.round(window.innerHeight * 0.45));
+  el.style.maxHeight = `${cap}px`;
+  el.style.height = "0";
+  void el.offsetHeight;
   const sh = el.scrollHeight;
-  const h = Math.min(sh, cap);
+  const h = Math.min(Math.max(sh, 40), cap);
   el.style.height = `${h}px`;
   el.style.overflowY = sh > cap ? "auto" : "hidden";
 }
 
 function scheduleComposerResize() {
-  void nextTick(() => adjustComposerHeight());
+  requestAnimationFrame(() => adjustComposerHeight());
 }
 
-watch(draft, () => scheduleComposerResize());
-watch(activeId, () => scheduleComposerResize());
+watch(
+  draft,
+  () => {
+    scheduleComposerResize();
+  },
+  { flush: "post" },
+);
+watch(
+  activeId,
+  () => {
+    scheduleComposerResize();
+  },
+  { flush: "post" },
+);
 
 function timeAgo(iso: string | null) {
   if (!iso) return "";
@@ -549,7 +564,9 @@ onUnmounted(() => {
               placeholder="сообщение"
               :maxlength="4000"
               @keydown="onKey"
+              @input="scheduleComposerResize"
               @paste="onPaste"
+              @compositionend="scheduleComposerResize"
             />
             <button
               type="button"
@@ -935,7 +952,7 @@ onUnmounted(() => {
 .composer textarea {
   resize: none;
   min-height: 40px;
-  max-height: min(220px, 45vh);
+  max-height: 220px;
   border: 1px solid var(--border);
   border-radius: 999px;
   padding: 0.55rem 0.9rem;
