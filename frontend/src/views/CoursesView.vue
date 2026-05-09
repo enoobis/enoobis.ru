@@ -1059,22 +1059,12 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
           @click="openCourse(c.id)"
         >
           <header class="course-card-head">
-            <h3>{{ c.title }}</h3>
-            <span class="dot">·</span>
-            <span class="muted small">{{ c.is_open ? "открытый" : "закрытый" }}</span>
-          </header>
-          <p v-if="c.description" class="muted small course-card-desc">
-            {{ c.description }}
-          </p>
-          <footer class="course-card-foot">
-            <span class="muted small">{{ c.teacher_nickname }}</span>
-            <span class="muted small">код {{ c.course_code }}</span>
-          </footer>
-          <div class="course-card-actions" @click.stop>
-            <button v-if="c.is_open && !c.enrolled" type="button" @click="onEnroll(c.id)">
-              записаться
-            </button>
-            <details class="course-menu" @click.stop>
+            <div class="course-card-title">
+              <h3>{{ c.title }}</h3>
+              <span class="dot">·</span>
+              <span class="muted small">{{ c.is_open ? "открытый" : "закрытый" }}</span>
+            </div>
+            <details class="course-menu course-menu--card" @click.stop>
               <summary class="course-menu-trigger icon-btn-sm" aria-label="ещё">
                 <AppIcon name="menu" :size="14" />
               </summary>
@@ -1120,8 +1110,28 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
                 >
                   копировать код
                 </button>
+                <button
+                  v-if="canTeach && (c.teacher_id === auth.user?.id || auth.role === 'admin')"
+                  type="button"
+                  class="course-menu-item course-menu-item--danger"
+                  @click="onDeleteCourse(c.id, c.title); closeCourseMenu($event)"
+                >
+                  удалить курс
+                </button>
               </div>
             </details>
+          </header>
+          <p v-if="c.description" class="muted small course-card-desc">
+            {{ c.description }}
+          </p>
+          <footer class="course-card-foot">
+            <span class="muted small">{{ c.teacher_nickname }}</span>
+            <span class="muted small">код {{ c.course_code }}</span>
+          </footer>
+          <div class="course-card-actions" @click.stop>
+            <button v-if="c.is_open && !c.enrolled" type="button" @click="onEnroll(c.id)">
+              записаться
+            </button>
             <button
               v-if="!c.is_open && canTeach && (c.teacher_id === auth.user?.id || auth.role === 'admin')"
               type="button"
@@ -1129,16 +1139,6 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
               @click="openClosedEditor(c)"
             >
               доступ
-            </button>
-            <button
-              v-if="canTeach && (c.teacher_id === auth.user?.id || auth.role === 'admin')"
-              type="button"
-              class="icon-btn-sm danger"
-              aria-label="удалить курс"
-              title="удалить курс"
-              @click="onDeleteCourse(c.id, c.title)"
-            >
-              <AppIcon name="delete" :size="14" />
             </button>
           </div>
         </article>
@@ -1185,18 +1185,19 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
                 >
                   копировать код
                 </button>
+                <button
+                  v-if="isOwnerInCurrent"
+                  type="button"
+                  class="course-menu-item course-menu-item--danger"
+                  @click="
+                    onDeleteCourse(classroom.course.id, classroom.course.title);
+                    closeCourseMenu($event)
+                  "
+                >
+                  удалить курс
+                </button>
               </div>
             </details>
-            <button
-              v-if="isOwnerInCurrent"
-              type="button"
-              class="icon-btn-sm danger"
-              aria-label="удалить курс"
-              title="удалить курс"
-              @click="onDeleteCourse(classroom.course.id, classroom.course.title)"
-            >
-              <AppIcon name="delete" :size="16" />
-            </button>
           </div>
         </div>
         <p v-if="classroom.course.description" class="muted">
@@ -2056,9 +2057,21 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 }
 .course-card-head {
   display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.course-card-title {
+  display: flex;
   align-items: baseline;
   gap: 0.4rem;
   flex-wrap: wrap;
+  min-width: 0;
+  flex: 1;
+}
+.course-menu--card {
+  flex-shrink: 0;
+  align-self: flex-start;
 }
 .course-card-head h3 {
   margin: 0;
@@ -2130,6 +2143,13 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 }
 .course-menu-item:hover {
   background: var(--surface2);
+}
+.course-menu-item--danger {
+  color: #ff8b8b;
+}
+.course-menu-item--danger:hover {
+  background: #2a1414;
+  color: #ff8b8b;
 }
 .dot {
   color: var(--muted);
