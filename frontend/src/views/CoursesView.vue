@@ -1064,10 +1064,19 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
               <span class="dot">·</span>
               <span class="muted small">{{ c.is_open ? "открытый" : "закрытый" }}</span>
             </div>
-            <details class="course-menu course-menu--card" @click.stop>
-              <summary class="course-menu-trigger icon-btn-sm" aria-label="ещё">
-                <AppIcon name="menu" :size="14" />
-              </summary>
+            <div class="course-card-head-tools" @click.stop>
+              <span
+                v-if="c.is_pinned"
+                class="course-card-pin"
+                title="закреплён"
+                aria-label="закреплён"
+              >
+                <AppIcon name="pinned" :size="14" />
+              </span>
+              <details class="course-menu course-menu--card">
+                <summary class="course-menu-trigger icon-btn-sm" aria-label="ещё">
+                  <AppIcon name="menu" :size="14" />
+                </summary>
               <div class="course-menu-panel">
                 <button
                   v-if="c.is_open && !c.enrolled"
@@ -1120,6 +1129,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
                 </button>
               </div>
             </details>
+            </div>
           </header>
           <p v-if="c.description" class="muted small course-card-desc">
             {{ c.description }}
@@ -1155,6 +1165,14 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
         <div class="course-head-row">
           <h2>{{ classroom.course.title }}</h2>
           <div class="course-head-actions">
+            <span
+              v-if="classroom.course.is_pinned"
+              class="course-card-pin"
+              title="закреплён"
+              aria-label="закреплён"
+            >
+              <AppIcon name="pinned" :size="16" />
+            </span>
             <details class="course-menu">
               <summary class="course-menu-trigger icon-btn-sm" aria-label="ещё">
                 <AppIcon name="menu" :size="16" />
@@ -2069,9 +2087,19 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   min-width: 0;
   flex: 1;
 }
+.course-card-head-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  flex-shrink: 0;
+}
+.course-card-pin {
+  display: inline-flex;
+  color: var(--text);
+  line-height: 0;
+}
 .course-menu--card {
   flex-shrink: 0;
-  align-self: flex-start;
 }
 .course-card-head h3 {
   margin: 0;
