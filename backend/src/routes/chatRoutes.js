@@ -92,6 +92,27 @@ function previewOf(msg) {
   return "";
 }
 
+function messageRowDto(r, meId) {
+  const reply_to = r.r_id
+    ? {
+        id: r.r_id,
+        from_me: r.r_sender_id === meId,
+        body: r.r_body ?? "",
+        image_url: (r.r_image_url && String(r.r_image_url)) || "",
+      }
+    : null;
+  return {
+    id: r.id,
+    from_me: r.sender_id === meId,
+    body: r.body,
+    image_url: r.image_url || "",
+    created_at: r.created_at,
+    edited_at: r.edited_at ?? null,
+    read: !!r.read_at,
+    reply_to,
+  };
+}
+
 function threadDto(row, meId) {
   const other = otherUser(row, meId);
   const last = lastMessageOf(row.id);
@@ -110,8 +131,13 @@ router.get("/chats", authRequired, (req, res) => {
   const rows = all(
     `SELECT id, user_a_id, user_b_id, last_message_at
      FROM chat_threads
-     WHERE user_a_id = ? OR user_b_id = ?
+     WHERE (user_a_id = ? OR user_b_id = ?)
+       AND NOT EXISTS (
+         SELECT 1 FROM chat_thread_hidden h
+         WHERE h.thread_id = chat_threads.id AND h.user_id = ?
+       )
      ORDER BY COALESCE(last_message_at, created_at) DESC`,
+    req.user.id,
     req.user.id,
     req.user.id,
   );
@@ -141,6 +167,7 @@ router.post("/chats/with/:nickname", authRequired, (req, res) => {
   if (!other) return res.status(404).json({ error: "user not found" });
   if (other.id === req.user.id) return res.status(400).json({ error: "cannot chat with yourself" });
   const thread = ensureThread(req.user.id, other.id);
+  run("DELETE FROM chat_thread_hidden WHERE user_id = ? AND thread_id = ?", req.user.id, thread.id);
   res.json(threadDto(thread, req.user.id));
 });
 
@@ -154,29 +181,44 @@ router.get("/chats/:id/messages", authRequired, (req, res) => {
     return res.status(403).json({ error: "forbidden" });
   }
   const after = req.query.after ? String(req.query.after) : null;
+  const sel = `m.id, m.sender_id, m.body, m.image_url, m.read_at, m.created_at, m.edited_at, m.reply_to_id,
+     r.id as r_id, r.sender_id as r_sender_id, r.body as r_body, r.image_url as r_image_url`;
   const rows = after
     ? all(
-        "SELECT id, sender_id, body, image_url, read_at, created_at, edited_at FROM chat_messages WHERE thread_id = ? AND created_at > ? ORDER BY created_at",
+        `SELECT ${sel}
+         FROM chat_messages m
+         LEFT JOIN chat_messages r ON r.id = m.reply_to_id
+         WHERE m.thread_id = ? AND m.created_at > ?
+         ORDER BY m.created_at`,
         req.params.id,
         after,
       )
     : all(
-        "SELECT id, sender_id, body, image_url, read_at, created_at, edited_at FROM chat_messages WHERE thread_id = ? ORDER BY created_at DESC LIMIT 200",
+        `SELECT ${sel}
+         FROM chat_messages m
+         LEFT JOIN chat_messages r ON r.id = m.reply_to_id
+         WHERE m.thread_id = ?
+         ORDER BY m.created_at DESC LIMIT 200`,
         req.params.id,
       );
   const ordered = after ? rows : rows.reverse();
   res.json({
-    items: ordered.map((r) => ({
-      id: r.id,
-      from_me: r.sender_id === req.user.id,
-      body: r.body,
-      image_url: r.image_url || "",
-      created_at: r.created_at,
-      edited_at: r.edited_at ?? null,
-      read: !!r.read_at,
-    })),
+    items: ordered.map((r) => messageRowDto(r, req.user.id)),
     other: otherUser(thread, req.user.id),
   });
+});
+
+router.delete("/chats/:id", authRequired, (req, res) => {
+  const thread = get(
+    "SELECT id, user_a_id, user_b_id FROM chat_threads WHERE id = ?",
+    req.params.id,
+  );
+  if (!thread) return res.status(404).json({ error: "not found" });
+  if (thread.user_a_id !== req.user.id && thread.user_b_id !== req.user.id) {
+    return res.status(403).json({ error: "forbidden" });
+  }
+  run("INSERT OR IGNORE INTO chat_thread_hidden (user_id, thread_id) VALUES (?, ?)", req.user.id, thread.id);
+  res.json({ ok: true });
 });
 
 router.get("/chats/:id/outgoing-read", authRequired, (req, res) => {
@@ -211,18 +253,44 @@ router.post("/chats/:id/messages", authRequired, (req, res) => {
   const imageUrl = String(req.body?.image_url ?? "").trim();
   if (!body && !imageUrl) return res.status(400).json({ error: "empty" });
   if (body.length > MAX_BODY) return res.status(400).json({ error: "too long" });
+  const replyTo = req.body?.reply_to ? String(req.body.reply_to).trim() : "";
+  if (replyTo) {
+    const parent = get(
+      "SELECT id, thread_id FROM chat_messages WHERE id = ?",
+      replyTo,
+    );
+    if (!parent || parent.thread_id !== thread.id) {
+      return res.status(400).json({ error: "bad reply" });
+    }
+  }
   const id = uuidv4();
   const now = nowIso();
   run(
-    "INSERT INTO chat_messages (id, thread_id, sender_id, body, image_url, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+    "INSERT INTO chat_messages (id, thread_id, sender_id, body, image_url, created_at, reply_to_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
     id,
     thread.id,
     req.user.id,
     body,
     imageUrl,
     now,
+    replyTo || null,
   );
   run("UPDATE chat_threads SET last_message_at = ? WHERE id = ?", now, thread.id);
+  let replyPayload = null;
+  if (replyTo) {
+    const pr = get(
+      "SELECT id, sender_id, body, image_url FROM chat_messages WHERE id = ?",
+      replyTo,
+    );
+    if (pr) {
+      replyPayload = {
+        id: pr.id,
+        from_me: pr.sender_id === req.user.id,
+        body: pr.body ?? "",
+        image_url: pr.image_url || "",
+      };
+    }
+  }
   res.status(201).json({
     id,
     from_me: true,
@@ -230,6 +298,7 @@ router.post("/chats/:id/messages", authRequired, (req, res) => {
     image_url: imageUrl,
     created_at: now,
     read: false,
+    reply_to: replyPayload,
   });
 });
 
@@ -292,18 +361,14 @@ router.patch("/chats/messages/:id", authRequired, (req, res) => {
     msg.id,
   );
   const fresh = get(
-    "SELECT id, sender_id, body, image_url, read_at, created_at, edited_at FROM chat_messages WHERE id = ?",
+    `SELECT m.id, m.sender_id, m.body, m.image_url, m.read_at, m.created_at, m.edited_at, m.reply_to_id,
+     r.id as r_id, r.sender_id as r_sender_id, r.body as r_body, r.image_url as r_image_url
+     FROM chat_messages m
+     LEFT JOIN chat_messages r ON r.id = m.reply_to_id
+     WHERE m.id = ?`,
     msg.id,
   );
-  res.json({
-    id: fresh.id,
-    from_me: true,
-    body: fresh.body,
-    image_url: fresh.image_url || "",
-    created_at: fresh.created_at,
-    edited_at: fresh.edited_at ?? null,
-    read: !!fresh.read_at,
-  });
+  res.json(messageRowDto(fresh, req.user.id));
 });
 
 router.delete("/chats/messages/:id", authRequired, (req, res) => {
@@ -323,6 +388,7 @@ router.delete("/chats/messages/:id", authRequired, (req, res) => {
       // ignore missing file
     }
   }
+  run("UPDATE chat_messages SET reply_to_id = NULL WHERE reply_to_id = ?", msg.id);
   run("DELETE FROM chat_messages WHERE id = ?", msg.id);
   const last = lastMessageOf(msg.thread_id);
   run(

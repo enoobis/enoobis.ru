@@ -2,6 +2,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import {
+  deleteChatThread,
   deleteMessage,
   editMessage,
   listChats,
@@ -43,10 +44,9 @@ const pendingPreview = ref("");
 const lightboxUrl = ref("");
 const editingId = ref("");
 const editingDraft = ref("");
+const replyTarget = ref<ChatMessage | null>(null);
 let chatsTimer: ReturnType<typeof setInterval> | null = null;
 let messagesTimer: ReturnType<typeof setInterval> | null = null;
-
-const activeChat = computed(() => chats.value.find((c) => c.id === activeId.value) ?? null);
 
 const MONTHS_GEN = [
   "января",
@@ -113,6 +113,55 @@ const messageRows = computed((): MessageRow[] => {
   }
   return rows;
 });
+
+function messageSnippetForReply(m: ChatMessage): string {
+  if (m.image_url && !m.body.trim()) return "фото";
+  const t = m.body.trim();
+  return t.length > 120 ? `${t.slice(0, 117)}…` : t;
+}
+
+function replyPreviewLines(m: ChatMessage): string {
+  const r = m.reply_to;
+  if (!r) return "";
+  if (r.image_url && !r.body.trim()) return "фото";
+  const t = r.body.trim();
+  return t.length > 120 ? `${t.slice(0, 117)}…` : t;
+}
+
+function replyAuthorLabel(fromMe: boolean): string {
+  return fromMe ? "вы" : otherNickname.value || "собеседник";
+}
+
+async function removeChatFromList(c: ChatThread) {
+  if (!auth.token) return;
+  if (!window.confirm("убрать чат из списка?")) return;
+  try {
+    await deleteChatThread(c.id, auth.token);
+    chats.value = chats.value.filter((x) => x.id !== c.id);
+    replyTarget.value = null;
+    if (activeId.value === c.id) {
+      activeId.value = "";
+      messages.value = [];
+      router.replace({ name: "chats" });
+    }
+    void chatStore.refresh();
+  } catch (e) {
+    toastError(e);
+  }
+}
+
+function setReplyTo(m: ChatMessage) {
+  replyTarget.value = m;
+}
+
+function clearReplyTarget() {
+  replyTarget.value = null;
+}
+
+function removeCurrentChat() {
+  const c = chats.value.find((x) => x.id === activeId.value);
+  if (c) void removeChatFromList(c);
+}
 
 async function loadChats() {
   if (!auth.token) return;
@@ -243,9 +292,11 @@ async function send() {
     const m = await sendMessage(activeId.value, auth.token, {
       body: text || undefined,
       image_url: imageUrl || undefined,
+      ...(replyTarget.value ? { reply_to: replyTarget.value.id } : {}),
     });
     messages.value = [...messages.value, m];
     draft.value = "";
+    replyTarget.value = null;
     clearPending();
     await nextTick();
     messagesEnd.value?.scrollIntoView({ block: "end", behavior: "smooth" });
@@ -379,6 +430,7 @@ watch(
     if (id !== activeId.value) {
       activeId.value = id;
       messages.value = [];
+      replyTarget.value = null;
       if (id) await loadMessages();
     }
   },
@@ -427,29 +479,40 @@ onUnmounted(() => {
       </div>
       <p v-if="loadingChats && !chats.length" class="muted small pad">загрузка</p>
       <p v-else-if="!chats.length" class="muted small pad">пусто</p>
-      <button
+      <div
         v-for="c in chats"
         :key="c.id"
-        class="chat-row"
+        class="chat-row-outer"
         :class="{ on: c.id === activeId, unread: c.unread > 0 }"
-        type="button"
-        @click="selectChat(c.id)"
       >
-        <span class="avatar">
-          <img v-if="c.other_avatar" :src="c.other_avatar" alt="" />
-          <span v-else>{{ c.other_nickname.slice(0, 2) }}</span>
-        </span>
-        <span class="row-text">
-          <span class="row-line">
-            <span class="nick">{{ c.other_nickname }}</span>
-            <span class="time muted">{{ timeAgo(c.last_at) }}</span>
+        <button class="chat-row" type="button" @click="selectChat(c.id)">
+          <span class="avatar">
+            <img v-if="c.other_avatar" :src="c.other_avatar" alt="" />
+            <span v-else>{{ c.other_nickname.slice(0, 2) }}</span>
           </span>
-          <span class="last muted small">
-            <span v-if="c.last_from_me" class="muted">вы: </span>{{ c.last_body || "—" }}
+          <span class="row-text">
+            <span class="row-line">
+              <span class="nick">{{ c.other_nickname }}</span>
+              <span class="time muted">{{ timeAgo(c.last_at) }}</span>
+            </span>
+            <span class="last muted small">
+              <span v-if="c.last_from_me" class="muted">вы: </span>{{ c.last_body || "—" }}
+            </span>
           </span>
+        </button>
+        <span class="chat-row-side">
+          <button
+            type="button"
+            class="chat-row-del"
+            aria-label="убрать чат"
+            title="убрать чат"
+            @click="removeChatFromList(c)"
+          >
+            <AppIcon name="delete" :size="14" />
+          </button>
+          <span v-if="c.unread" class="badge">{{ c.unread > 9 ? "9+" : c.unread }}</span>
         </span>
-        <span v-if="c.unread" class="badge">{{ c.unread > 9 ? "9+" : c.unread }}</span>
-      </button>
+      </div>
     </aside>
 
     <main class="thread" :class="{ hidden: !activeId }">
@@ -463,6 +526,16 @@ onUnmounted(() => {
             </span>
             <span>{{ otherNickname }}</span>
           </RouterLink>
+          <button
+            v-if="otherNickname"
+            type="button"
+            class="thread-hide"
+            aria-label="убрать чат из списка"
+            title="убрать чат"
+            @click="removeCurrentChat"
+          >
+            <AppIcon name="delete" :size="16" />
+          </button>
         </header>
 
         <div class="messages">
@@ -473,7 +546,25 @@ onUnmounted(() => {
               {{ row.line }}
             </div>
             <div v-else class="msg" :class="{ me: row.m.from_me }">
+              <span
+                v-if="!row.m.from_me && editingId !== row.m.id"
+                class="msg-actions msg-actions--peer"
+              >
+                <button
+                  type="button"
+                  class="msg-act"
+                  aria-label="ответить"
+                  title="ответить"
+                  @click="setReplyTo(row.m)"
+                >
+                  <AppIcon name="reply" :size="14" />
+                </button>
+              </span>
               <span class="bubble">
+                <div v-if="row.m.reply_to" class="msg-reply muted small">
+                  <span class="msg-reply-author">{{ replyAuthorLabel(row.m.reply_to.from_me) }}</span>
+                  <span class="msg-reply-snippet">{{ replyPreviewLines(row.m) }}</span>
+                </div>
                 <img
                   v-if="row.m.image_url"
                   :src="row.m.image_url"
@@ -512,6 +603,15 @@ onUnmounted(() => {
               </span>
               <span v-if="row.m.from_me && editingId !== row.m.id" class="msg-actions">
                 <button
+                  type="button"
+                  class="msg-act"
+                  aria-label="ответить"
+                  title="ответить"
+                  @click="setReplyTo(row.m)"
+                >
+                  <AppIcon name="reply" :size="14" />
+                </button>
+                <button
                   v-if="row.m.body"
                   type="button"
                   class="msg-act"
@@ -537,6 +637,15 @@ onUnmounted(() => {
         </div>
 
         <div class="composer-wrap">
+          <div v-if="replyTarget" class="reply-bar">
+            <span class="reply-bar-lines muted small">
+              <span class="reply-bar-who">{{ replyAuthorLabel(replyTarget.from_me) }}</span>
+              <span class="reply-bar-snippet">{{ messageSnippetForReply(replyTarget) }}</span>
+            </span>
+            <button type="button" class="reply-bar-x" aria-label="отменить" @click="clearReplyTarget">
+              ×
+            </button>
+          </div>
           <div v-if="pendingPreview" class="pending">
             <img :src="pendingPreview" alt="" />
             <button type="button" class="pending-x" @click="clearPending">×</button>
@@ -635,13 +744,13 @@ onUnmounted(() => {
 
 .chat-row {
   display: grid;
-  grid-template-columns: 36px 1fr auto;
+  grid-template-columns: 36px 1fr;
   gap: 0.6rem;
   align-items: center;
   width: 100%;
+  min-width: 0;
   padding: 0.7rem 0.9rem;
   border: none;
-  border-bottom: 1px solid var(--border);
   border-radius: 0;
   background: transparent;
   text-align: left;
@@ -652,7 +761,7 @@ onUnmounted(() => {
 .chat-row:hover {
   background: var(--surface);
 }
-.chat-row.on {
+.chat-row-outer.on .chat-row:hover {
   background: var(--surface2);
 }
 
@@ -712,8 +821,46 @@ onUnmounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.unread .nick,
-.unread .last {
+.chat-row-outer {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: stretch;
+  border-bottom: 1px solid var(--border);
+}
+.chat-row-outer.on .chat-row {
+  background: var(--surface2);
+}
+.chat-row-side {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0 0.4rem 0 0;
+}
+.chat-row-del {
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.chat-row-outer:hover .chat-row-del {
+  opacity: 1;
+}
+.chat-row-del:hover {
+  color: var(--text);
+  background: var(--surface2);
+}
+.chat-row-outer.unread .nick,
+.chat-row-outer.unread .last {
   color: var(--text);
 }
 .badge {
@@ -747,6 +894,26 @@ onUnmounted(() => {
   padding: 0.65rem 1rem;
   border-bottom: 1px solid var(--border);
 }
+.thread-hide {
+  margin-left: auto;
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.thread-hide:hover {
+  color: var(--text);
+  background: var(--surface2);
+}
 .back {
   display: none;
   background: transparent;
@@ -763,6 +930,8 @@ onUnmounted(() => {
   gap: 0.5rem;
   color: var(--text);
   text-transform: lowercase;
+  flex: 1;
+  min-width: 0;
 }
 .who:hover {
   text-decoration: none;
@@ -812,6 +981,23 @@ onUnmounted(() => {
 }
 .bubble > .msg-img {
   flex-basis: 100%;
+}
+.msg-reply {
+  flex-basis: 100%;
+  border-left: 2px solid var(--border);
+  padding: 0.1rem 0 0.15rem 0.45rem;
+  margin-bottom: 0.15rem;
+  display: grid;
+  gap: 0.08rem;
+}
+.msg-reply-author {
+  font-size: 0.72rem;
+}
+.msg-reply-snippet {
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
 }
 .text {
   white-space: pre-wrap;
@@ -901,6 +1087,46 @@ onUnmounted(() => {
 
 .composer-wrap {
   border-top: 1px solid var(--border);
+}
+.reply-bar {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.45rem 1rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.reply-bar-lines {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 0.12rem;
+}
+.reply-bar-who {
+  font-size: 0.75rem;
+}
+.reply-bar-snippet {
+  font-size: 0.82rem;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.reply-bar-x {
+  width: 26px;
+  height: 26px;
+  min-height: 26px;
+  padding: 0;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.reply-bar-x:hover {
+  color: var(--text);
+  background: var(--surface2);
 }
 .pending {
   position: relative;

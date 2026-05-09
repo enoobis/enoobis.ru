@@ -302,6 +302,31 @@ try {
 }
 
 try {
+  db.prepare("SELECT reply_to_id FROM chat_messages LIMIT 1").get();
+} catch {
+  try {
+    db.exec("ALTER TABLE chat_messages ADD COLUMN reply_to_id TEXT");
+  } catch {
+    // ignore
+  }
+}
+
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS chat_thread_hidden (
+      user_id TEXT NOT NULL,
+      thread_id TEXT NOT NULL,
+      PRIMARY KEY (user_id, thread_id),
+      FOREIGN KEY (user_id) REFERENCES users(id),
+      FOREIGN KEY (thread_id) REFERENCES chat_threads(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_chat_thread_hidden_user ON chat_thread_hidden(user_id);
+  `);
+} catch {
+  // ignore
+}
+
+try {
   db.prepare("SELECT nickname_change_count FROM users LIMIT 1").get();
 } catch {
   try {
@@ -417,11 +442,21 @@ db.exec(`
     body TEXT NOT NULL,
     read_at TEXT,
     created_at TEXT NOT NULL,
+    reply_to_id TEXT,
     FOREIGN KEY (thread_id) REFERENCES chat_threads(id),
     FOREIGN KEY (sender_id) REFERENCES users(id)
   );
   CREATE INDEX IF NOT EXISTS idx_chat_messages_thread ON chat_messages(thread_id, created_at);
   CREATE INDEX IF NOT EXISTS idx_chat_messages_unread ON chat_messages(thread_id, read_at);
+
+  CREATE TABLE IF NOT EXISTS chat_thread_hidden (
+    user_id TEXT NOT NULL,
+    thread_id TEXT NOT NULL,
+    PRIMARY KEY (user_id, thread_id),
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (thread_id) REFERENCES chat_threads(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_chat_thread_hidden_user ON chat_thread_hidden(user_id);
 
   CREATE TABLE IF NOT EXISTS user_files (
     id TEXT PRIMARY KEY,

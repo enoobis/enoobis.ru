@@ -10,6 +10,13 @@ export type ChatThread = {
   unread: number;
 };
 
+export type ChatReplyRef = {
+  id: string;
+  from_me: boolean;
+  body: string;
+  image_url: string;
+};
+
 export type ChatMessage = {
   id: string;
   from_me: boolean;
@@ -18,6 +25,7 @@ export type ChatMessage = {
   created_at: string;
   edited_at?: string | null;
   read: boolean;
+  reply_to?: ChatReplyRef | null;
 };
 
 export type ChatMessages = {
@@ -57,7 +65,7 @@ export function listOutgoingReadFlags(threadId: string, token: string) {
 export function sendMessage(
   threadId: string,
   token: string,
-  payload: { body?: string; image_url?: string },
+  payload: { body?: string; image_url?: string; reply_to?: string },
 ) {
   return api<ChatMessage>(`/api/chats/${threadId}/messages`, {
     method: "POST",
@@ -84,6 +92,13 @@ export async function uploadChatImage(threadId: string, token: string, file: Fil
 export function markChatRead(threadId: string, token: string) {
   return api<{ ok: boolean }>(`/api/chats/${threadId}/read`, {
     method: "POST",
+    token,
+  });
+}
+
+export function deleteChatThread(threadId: string, token: string) {
+  return api<{ ok: boolean }>(`/api/chats/${threadId}`, {
+    method: "DELETE",
     token,
   });
 }

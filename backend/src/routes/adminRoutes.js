@@ -308,6 +308,14 @@ router.delete("/admin/users/:id", (req, res) => {
   } catch {}
 
   try {
+    run(
+      "DELETE FROM chat_thread_hidden WHERE user_id = ? OR thread_id IN (SELECT id FROM chat_threads WHERE user_a_id = ? OR user_b_id = ?)",
+      id,
+      id,
+      id,
+    );
+  } catch {}
+  try {
     run("DELETE FROM chat_messages WHERE thread_id IN (SELECT id FROM chat_threads WHERE user_a_id = ? OR user_b_id = ?)", id, id);
   } catch {}
   try {
