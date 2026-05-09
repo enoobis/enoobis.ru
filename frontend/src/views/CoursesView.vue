@@ -13,6 +13,7 @@ import {
   joinCourseByCode,
   getClassroom,
   setCoursePinned,
+  setCourseHidden,
   gradeSubmission,
   listAssignmentSubmissions,
   listCourses,
@@ -82,6 +83,8 @@ const description = ref("");
 const isOpen = ref(true);
 const studentsDraft = ref("");
 const joinCode = ref("");
+const showHiddenCourses = ref(false);
+const hiddenCount = ref(0);
 const activeClosedId = ref<string | null>(null);
 
 const streamBody = ref("");
@@ -155,6 +158,23 @@ const coTeacherBusy = ref(false);
 
 function isCoTeacherOf(c: Course) {
   return !!auth.user && c.co_teachers.some((co) => co.id === auth.user!.id);
+}
+
+function canLeaveFromCourse(c: Course): boolean {
+  if (!auth.user) return false;
+  return (
+    c.enrolled && c.teacher_id !== auth.user.id && !isCoTeacherOf(c)
+  );
+}
+
+function closeCourseMenu(ev: Event) {
+  const el = ev.currentTarget as HTMLElement | null;
+  el?.closest("details.course-menu")?.removeAttribute("open");
+}
+
+function copyCourseCode(c: Course, ev: Event) {
+  closeCourseMenu(ev);
+  void navigator.clipboard?.writeText(c.course_code);
 }
 
 async function onAddCoTeacher() {
@@ -400,10 +420,13 @@ async function loadCourses() {
   err.value = "";
   if (!auth.token) return;
   try {
-    courses.value = await listCourses(auth.token);
+    const res = await listCourses(auth.token, {
+      include_hidden: showHiddenCourses.value,
+    });
+    courses.value = res.courses;
+    hiddenCount.value = res.hidden_count;
     const routeCourseId = typeof route.params.courseId === "string" ? route.params.courseId : "";
-    const hasRouteCourse = routeCourseId && courses.value.some((c) => c.id === routeCourseId);
-    if (hasRouteCourse) {
+    if (routeCourseId) {
       selectedCourseId.value = routeCourseId;
       await loadClassroom(routeCourseId);
       syncRouteState(routeCourseId);
@@ -439,9 +462,7 @@ watch(
   async (next) => {
     const nextCourse = typeof next === "string" ? next : "";
     if (!nextCourse || nextCourse === selectedCourseId.value || !auth.token) return;
-    if (courses.value.some((c) => c.id === nextCourse)) {
-      await loadClassroom(nextCourse);
-    }
+    await loadClassroom(nextCourse);
   },
 );
 
@@ -518,6 +539,33 @@ async function onTogglePin(c: Course) {
   } catch (e) {
     err.value = e instanceof Error ? e.message : "ошибка";
   }
+}
+
+async function onCourseHide(c: Course, hidden: boolean) {
+  if (!auth.token) return;
+  err.value = "";
+  try {
+    await setCourseHidden(c.id, hidden, auth.token);
+    if (classroom.value?.course.id === c.id && hidden) {
+      classroom.value = null;
+      selectedCourseId.value = "";
+      await router.replace({ name: "courses" }).catch(() => undefined);
+    }
+    await loadCourses();
+    if (classroom.value?.course.id === c.id) await loadClassroom(c.id);
+  } catch (e) {
+    err.value = e instanceof Error ? e.message : "ошибка";
+  }
+}
+
+function onMenuHideClick(c: Course) {
+  if (showHiddenCourses.value && (c.is_hidden ?? false)) void onCourseHide(c, false);
+  else void onCourseHide(c, true);
+}
+
+async function toggleShowHidden() {
+  showHiddenCourses.value = !showHiddenCourses.value;
+  await loadCourses();
 }
 
 async function onJoinByCode() {
@@ -971,6 +1019,15 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
           вступить
         </button>
         <button
+          v-if="hiddenCount > 0"
+          type="button"
+          class="secondary board-show-hidden"
+          :class="{ active: showHiddenCourses }"
+          @click="toggleShowHidden"
+        >
+          скрытые · {{ hiddenCount }}
+        </button>
+        <button
           v-if="canTeach"
           type="button"
           class="secondary"
@@ -998,6 +1055,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
           v-for="c in filteredCourses"
           :key="c.id"
           class="course-card"
+          :class="{ 'course-card--hidden': c.is_hidden }"
           @click="openCourse(c.id)"
         >
           <header class="course-card-head">
@@ -1016,14 +1074,54 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
             <button v-if="c.is_open && !c.enrolled" type="button" @click="onEnroll(c.id)">
               записаться
             </button>
-            <button
-              v-if="c.is_open && c.enrolled && c.teacher_id !== auth.user?.id && !isCoTeacherOf(c)"
-              type="button"
-              class="secondary"
-              @click="onUnenroll(c.id)"
-            >
-              покинуть
-            </button>
+            <details class="course-menu" @click.stop>
+              <summary class="course-menu-trigger icon-btn-sm" aria-label="ещё">
+                <AppIcon name="menu" :size="14" />
+              </summary>
+              <div class="course-menu-panel">
+                <button
+                  v-if="c.is_open && !c.enrolled"
+                  type="button"
+                  class="course-menu-item"
+                  @click="onEnroll(c.id); closeCourseMenu($event)"
+                >
+                  записаться
+                </button>
+                <button
+                  v-if="c.enrolled"
+                  type="button"
+                  class="course-menu-item"
+                  @click="onTogglePin(c); closeCourseMenu($event)"
+                >
+                  {{ c.is_pinned ? "снять закреп" : "закрепить" }}
+                </button>
+                <button
+                  type="button"
+                  class="course-menu-item"
+                  @click="onMenuHideClick(c); closeCourseMenu($event)"
+                >
+                  {{
+                    showHiddenCourses && c.is_hidden ? "вернуть в список" : "скрыть из списка"
+                  }}
+                </button>
+                <button
+                  v-if="canLeaveFromCourse(c)"
+                  type="button"
+                  class="course-menu-item"
+                  @click="onUnenroll(c.id); closeCourseMenu($event)"
+                >
+                  покинуть
+                </button>
+                <button
+                  v-else
+                  type="button"
+                  class="course-menu-item"
+                  @click="copyCourseCode(c, $event)"
+                >
+                  копировать код
+                </button>
+              </div>
+            </details>
             <button
               v-if="!c.is_open && canTeach && (c.teacher_id === auth.user?.id || auth.role === 'admin')"
               type="button"
@@ -1031,17 +1129,6 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
               @click="openClosedEditor(c)"
             >
               доступ
-            </button>
-            <button
-              v-if="c.enrolled"
-              type="button"
-              class="icon-btn-sm course-pin"
-              :class="{ pinned: c.is_pinned, 'pin-idle': !c.is_pinned }"
-              :aria-label="c.is_pinned ? 'снять закреп' : 'закрепить'"
-              :title="c.is_pinned ? 'снять закреп' : 'закрепить'"
-              @click="onTogglePin(c)"
-            >
-              <AppIcon :name="c.is_pinned ? 'pinned' : 'pin'" :size="14" />
             </button>
             <button
               v-if="canTeach && (c.teacher_id === auth.user?.id || auth.role === 'admin')"
@@ -1068,16 +1155,38 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
         <div class="course-head-row">
           <h2>{{ classroom.course.title }}</h2>
           <div class="course-head-actions">
-            <button
-              type="button"
-              class="icon-btn-sm course-pin"
-              :class="{ pinned: classroom.course.is_pinned, 'pin-idle': !classroom.course.is_pinned }"
-              :aria-label="classroom.course.is_pinned ? 'снять закреп' : 'закрепить'"
-              :title="classroom.course.is_pinned ? 'снять закреп' : 'закрепить'"
-              @click="onTogglePin(classroom.course)"
-            >
-              <AppIcon :name="classroom.course.is_pinned ? 'pinned' : 'pin'" :size="16" />
-            </button>
+            <details class="course-menu">
+              <summary class="course-menu-trigger icon-btn-sm" aria-label="ещё">
+                <AppIcon name="menu" :size="16" />
+              </summary>
+              <div class="course-menu-panel">
+                <button
+                  type="button"
+                  class="course-menu-item"
+                  @click="onTogglePin(classroom.course); closeCourseMenu($event)"
+                >
+                  {{ classroom.course.is_pinned ? "снять закреп" : "закрепить" }}
+                </button>
+                <button
+                  type="button"
+                  class="course-menu-item"
+                  @click="onMenuHideClick(classroom.course); closeCourseMenu($event)"
+                >
+                  {{
+                    showHiddenCourses && classroom.course.is_hidden
+                      ? "вернуть в список"
+                      : "скрыть из списка"
+                  }}
+                </button>
+                <button
+                  type="button"
+                  class="course-menu-item"
+                  @click="copyCourseCode(classroom.course, $event)"
+                >
+                  копировать код
+                </button>
+              </div>
+            </details>
             <button
               v-if="isOwnerInCurrent"
               type="button"
@@ -1979,6 +2088,49 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   font-size: 0.82rem;
   border-radius: 999px;
 }
+.course-card--hidden {
+  opacity: 0.52;
+}
+.course-menu {
+  position: relative;
+}
+.course-menu-trigger {
+  list-style: none;
+  cursor: pointer;
+  color: var(--muted);
+}
+.course-menu-trigger::-webkit-details-marker {
+  display: none;
+}
+.course-menu-panel {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  margin-top: 0.2rem;
+  min-width: 10.5rem;
+  padding: 0.2rem;
+  display: grid;
+  gap: 0.05rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  z-index: 8;
+}
+.course-menu-item {
+  width: 100%;
+  margin: 0;
+  padding: 0.45rem 0.55rem;
+  text-align: left;
+  font-size: 0.82rem;
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+.course-menu-item:hover {
+  background: var(--surface2);
+}
 .dot {
   color: var(--muted);
 }
@@ -2159,18 +2311,6 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 }
 .icon-btn-sm:hover {
   background: var(--surface2);
-  color: var(--text);
-}
-.icon-btn-sm.pinned {
-  color: var(--text);
-  background: var(--surface2);
-}
-.icon-btn-sm.course-pin.pin-idle {
-  color: var(--muted);
-  opacity: 0.42;
-}
-.icon-btn-sm.course-pin.pin-idle:hover {
-  opacity: 1;
   color: var(--text);
 }
 .icon-btn-sm.danger:hover {

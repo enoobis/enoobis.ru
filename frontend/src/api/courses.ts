@@ -18,6 +18,12 @@ export type Course = {
   created_at: string;
   enrolled: boolean;
   is_pinned?: boolean;
+  is_hidden?: boolean;
+};
+
+export type CourseListResponse = {
+  courses: Course[];
+  hidden_count: number;
 };
 
 export type CourseMember = {
@@ -123,8 +129,9 @@ export type CourseClassroom = {
   co_teachers: CoTeacher[];
 };
 
-export function listCourses(token: string) {
-  return api<Course[]>("/api/courses", { token });
+export function listCourses(token: string, opts?: { include_hidden?: boolean }) {
+  const q = opts?.include_hidden === true ? "?include_hidden=1" : "";
+  return api<CourseListResponse>(`/api/courses${q}`, { token });
 }
 
 export function createCourse(
@@ -159,6 +166,14 @@ export function setCoursePinned(courseId: string, pinned: boolean, token: string
     method: "POST",
     token,
     body: JSON.stringify({ pinned }),
+  });
+}
+
+export function setCourseHidden(courseId: string, hidden: boolean, token: string) {
+  return api<Course>(`/api/courses/${courseId}/hide`, {
+    method: "POST",
+    token,
+    body: JSON.stringify({ hidden }),
   });
 }
 

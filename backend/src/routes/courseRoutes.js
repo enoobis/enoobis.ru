@@ -72,6 +72,15 @@ function setPinnedCourseIds(userId, ids) {
   run("UPDATE users SET pinned_course_ids = ? WHERE id = ?", JSON.stringify(ids), userId);
 }
 
+function getHiddenCourseIds(userId) {
+  const row = get("SELECT hidden_course_ids FROM users WHERE id = ?", userId);
+  return parsePinnedCourseIds(row?.hidden_course_ids);
+}
+
+function setHiddenCourseIds(userId, ids) {
+  run("UPDATE users SET hidden_course_ids = ? WHERE id = ?", JSON.stringify(ids), userId);
+}
+
 function courseToDto(row, viewerId) {
   if (!row) return null;
   const teacher = get("SELECT nickname FROM users WHERE id = ?", row.teacher_id);
@@ -116,17 +125,33 @@ router.get("/courses", authRequired, (req, res) => {
         req.user.id,
       );
   const visibleIds = new Set(rows.map((r) => r.id));
+  let hiddenRaw = getHiddenCourseIds(req.user.id);
+  let hiddenPruned = hiddenRaw.filter((id) => visibleIds.has(id));
+  if (hiddenPruned.length !== hiddenRaw.length) {
+    setHiddenCourseIds(req.user.id, hiddenPruned);
+    hiddenRaw = hiddenPruned;
+  }
+  const hiddenSet = new Set(hiddenRaw);
+  const hiddenCount = rows.filter((r) => hiddenSet.has(r.id)).length;
+  const includeHidden =
+    req.query.include_hidden === "1" || req.query.include_hidden === "true";
+  const listRows = includeHidden ? rows : rows.filter((r) => !hiddenSet.has(r.id));
+
   let pinsRaw = getPinnedCourseIds(req.user.id);
-  const pruned = pinsRaw.filter((id) => visibleIds.has(id));
-  if (pruned.length !== pinsRaw.length) {
-    setPinnedCourseIds(req.user.id, pruned);
-    pinsRaw = pruned;
+  const pinsPruned = pinsRaw.filter((id) => visibleIds.has(id));
+  if (pinsPruned.length !== pinsRaw.length) {
+    setPinnedCourseIds(req.user.id, pinsPruned);
+    pinsRaw = pinsPruned;
   }
   const pinRank = new Map(pinsRaw.map((id, i) => [id, i]));
   const pinSet = new Set(pinsRaw);
-  const list = rows.map((r) => {
+  const list = listRows.map((r) => {
     const dto = courseToDto(r, req.user.id);
-    return { ...dto, is_pinned: pinSet.has(dto.id) };
+    return {
+      ...dto,
+      is_pinned: pinSet.has(dto.id),
+      is_hidden: hiddenSet.has(dto.id),
+    };
   });
   list.sort((a, b) => {
     const ap = pinRank.has(a.id) ? pinRank.get(a.id) : 9999;
@@ -134,7 +159,7 @@ router.get("/courses", authRequired, (req, res) => {
     if (ap !== bp) return ap - bp;
     return String(b.created_at ?? "").localeCompare(String(a.created_at ?? ""));
   });
-  return res.json(list);
+  return res.json({ courses: list, hidden_count: hiddenCount });
 });
 
 router.post("/courses", authRequired, (req, res) => {
@@ -179,6 +204,8 @@ router.delete("/courses/:id/enroll", authRequired, (req, res) => {
     req.params.id,
     req.user.id,
   );
+  const hid = getHiddenCourseIds(req.user.id).filter((id) => id !== req.params.id);
+  setHiddenCourseIds(req.user.id, hid);
   return res.json({ ok: true });
 });
 
@@ -432,9 +459,14 @@ router.get("/courses/:id/classroom", authRequired, (req, res) => {
   const { course, isTeacher, isOwner } = access;
   const isAdmin = req.user.role === "admin";
   const pinSet = new Set(getPinnedCourseIds(req.user.id));
+  const hiddenSet = new Set(getHiddenCourseIds(req.user.id));
   const cDto = courseToDto(course, req.user.id);
   return res.json({
-    course: { ...cDto, is_pinned: pinSet.has(cDto.id) },
+    course: {
+      ...cDto,
+      is_pinned: pinSet.has(cDto.id),
+      is_hidden: hiddenSet.has(cDto.id),
+    },
     is_teacher: isTeacher || isAdmin,
     is_owner: isOwner || isAdmin,
     stream: streamFor(course),
@@ -461,7 +493,37 @@ router.post("/courses/:id/pin", authRequired, (req, res) => {
   }
   setPinnedCourseIds(req.user.id, ids);
   const dto = courseToDto(course, req.user.id);
-  return res.json({ ...dto, is_pinned: wantPin });
+  const hiddenSet = new Set(getHiddenCourseIds(req.user.id));
+  return res.json({
+    ...dto,
+    is_pinned: wantPin,
+    is_hidden: hiddenSet.has(dto.id),
+  });
+});
+
+router.post("/courses/:id/hide", authRequired, (req, res) => {
+  const access = ensureCourseAccess(req.params.id, req.user);
+  if (access.error === 404) return res.status(404).json({ error: "not found" });
+  if (access.error === 403) return res.status(403).json({ error: "forbidden" });
+  const { course } = access;
+  const wantHide = req.body?.hidden === true;
+  let hidden = getHiddenCourseIds(req.user.id);
+  if (wantHide) {
+    if (!hidden.includes(course.id)) hidden = [...hidden, course.id];
+    let pins = getPinnedCourseIds(req.user.id).filter((id) => id !== course.id);
+    setPinnedCourseIds(req.user.id, pins);
+  } else {
+    hidden = hidden.filter((id) => id !== course.id);
+  }
+  hidden = hidden.slice(0, 200);
+  setHiddenCourseIds(req.user.id, hidden);
+  const dto = courseToDto(course, req.user.id);
+  const pinSet = new Set(getPinnedCourseIds(req.user.id));
+  return res.json({
+    ...dto,
+    is_pinned: pinSet.has(dto.id),
+    is_hidden: wantHide,
+  });
 });
 
 router.post("/courses/:id/stream", authRequired, (req, res) => {
