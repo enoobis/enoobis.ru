@@ -82,17 +82,20 @@ function courseToDto(row, viewerId) {
 }
 
 router.get("/courses", authRequired, (req, res) => {
-  const rows = all(
-    `SELECT c.* FROM courses c
-     WHERE c.is_open = 1
-        OR c.teacher_id = ?
-        OR EXISTS (SELECT 1 FROM course_students s WHERE s.course_id = c.id AND s.student_id = ?)
-        OR EXISTS (SELECT 1 FROM course_co_teachers ct WHERE ct.course_id = c.id AND ct.user_id = ?)
-     ORDER BY c.created_at DESC`,
-    req.user.id,
-    req.user.id,
-    req.user.id,
-  );
+  const isAdmin = req.user.role === "admin";
+  const rows = isAdmin
+    ? all(`SELECT c.* FROM courses c ORDER BY c.created_at DESC`)
+    : all(
+        `SELECT c.* FROM courses c
+         WHERE c.is_open = 1
+            OR c.teacher_id = ?
+            OR EXISTS (SELECT 1 FROM course_students s WHERE s.course_id = c.id AND s.student_id = ?)
+            OR EXISTS (SELECT 1 FROM course_co_teachers ct WHERE ct.course_id = c.id AND ct.user_id = ?)
+         ORDER BY c.created_at DESC`,
+        req.user.id,
+        req.user.id,
+        req.user.id,
+      );
   return res.json(rows.map((r) => courseToDto(r, req.user.id)));
 });
 
@@ -389,10 +392,11 @@ router.get("/courses/:id/classroom", authRequired, (req, res) => {
   const access = ensureCourseAccess(req.params.id, req.user);
   if (access.error) return res.status(access.error).json({ error: "no access" });
   const { course, isTeacher, isOwner } = access;
+  const isAdmin = req.user.role === "admin";
   return res.json({
     course: courseToDto(course, req.user.id),
-    is_teacher: isTeacher,
-    is_owner: isOwner,
+    is_teacher: isTeacher || isAdmin,
+    is_owner: isOwner || isAdmin,
     stream: streamFor(course),
     assignments: assignmentsFor(course, req.user.id),
     lectures: lecturesFor(course),

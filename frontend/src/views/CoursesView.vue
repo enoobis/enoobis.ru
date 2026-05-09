@@ -497,7 +497,8 @@ async function onJoinByCode() {
 }
 
 function openClosedEditor(c: Course) {
-  if (!canTeach.value || c.teacher_id !== auth.user?.id) return;
+  if (!canTeach.value) return;
+  if (c.teacher_id !== auth.user?.id && auth.role !== "admin") return;
   activeClosedId.value = c.id;
   studentsDraft.value = "";
 }
@@ -987,7 +988,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
               покинуть
             </button>
             <button
-              v-if="!c.is_open && canTeach && c.teacher_id === auth.user?.id"
+              v-if="!c.is_open && canTeach && (c.teacher_id === auth.user?.id || auth.role === 'admin')"
               type="button"
               class="secondary"
               @click="openClosedEditor(c)"
