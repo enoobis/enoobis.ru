@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
-import { RouterLink, useRoute } from "vue-router";
+import { RouterLink, useRoute, useRouter } from "vue-router";
 import {
   bookmarkPost,
   createComment,
   deleteComment,
+  deletePost,
   getMyPostState,
   getPost,
   likePost,
@@ -24,13 +25,14 @@ import { addRecentPost, updateRecentPostProgress } from "../utils/recentPosts";
 import { toast, toastError, toastSuccess } from "../utils/toast";
 
 const route = useRoute();
+const router = useRouter();
 const auth = useAuthStore();
 const post = ref<BlogPost | null>(null);
 const comments = ref<CommentItem[]>([]);
 const err = ref("");
 const commentBody = ref("");
 const working = ref(false);
-const myState = ref({ liked: false, bookmarked: false, can_edit: false });
+const myState = ref({ liked: false, bookmarked: false, can_edit: false, can_delete: false });
 
 const postId = computed(() => String(route.params.id || ""));
 const renderedBody = computed(() => renderMarkdown(post.value?.body ?? ""));
@@ -53,7 +55,7 @@ async function load() {
     if (auth.token) {
       myState.value = await getMyPostState(postId.value, auth.token);
     } else {
-      myState.value = { liked: false, bookmarked: false, can_edit: false };
+      myState.value = { liked: false, bookmarked: false, can_edit: false, can_delete: false };
     }
   } catch (e) {
     err.value = e instanceof Error ? e.message : "ошибка";
@@ -112,6 +114,20 @@ async function pinThis() {
     toastSuccess("закреплено в профиле");
   } catch (e) {
     toastError(e);
+  }
+}
+
+async function removePost() {
+  if (!auth.token || !post.value || working.value) return;
+  if (!window.confirm("удалить этот пост?")) return;
+  working.value = true;
+  try {
+    await deletePost(post.value.id, auth.token);
+    await router.replace({ name: "blog" });
+  } catch (e) {
+    toastError(e);
+  } finally {
+    working.value = false;
   }
 }
 
@@ -221,6 +237,16 @@ watch(() => route.params.id, load);
       <RouterLink v-if="myState.can_edit" :to="`/blogs/${post.id}/edit`" class="icon-action" title="редактировать">
         <AppIcon name="edit" />
       </RouterLink>
+      <button
+        v-if="myState.can_delete"
+        class="icon-action icon-action--danger"
+        type="button"
+        title="удалить пост"
+        :disabled="working"
+        @click="removePost"
+      >
+        <AppIcon name="delete" />
+      </button>
       <button v-if="auth.token" class="icon-action" type="button" title="пожаловаться" @click="sendPostReport">
         <AppIcon name="report" />
       </button>
@@ -358,6 +384,10 @@ h1 {
 .icon-action:hover {
   color: var(--text);
   background: var(--surface);
+}
+.icon-action--danger:hover {
+  color: var(--text);
+  background: rgba(180, 60, 60, 0.12);
 }
 
 .comments {

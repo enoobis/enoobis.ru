@@ -70,6 +70,7 @@ export type MyPostState = {
   liked: boolean;
   bookmarked: boolean;
   can_edit: boolean;
+  can_delete: boolean;
 };
 
 export type BlogReport = {

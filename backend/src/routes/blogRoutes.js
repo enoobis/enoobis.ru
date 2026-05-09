@@ -278,10 +278,13 @@ router.get("/blog/:id/me", authRequired, (req, res) => {
     req.params.id,
   );
   const post = get("SELECT author_id FROM blog_posts WHERE id = ?", req.params.id);
+  const isAuthor = !!post && post.author_id === req.user.id;
   return res.json({
     liked,
     bookmarked,
-    can_edit: !!post && post.author_id === req.user.id,
+    can_edit: isAuthor,
+    can_delete:
+      !!post && (isAuthor || req.user.role === "admin"),
   });
 });
 
