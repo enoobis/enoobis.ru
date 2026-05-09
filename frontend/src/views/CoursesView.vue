@@ -106,9 +106,6 @@ const lectureBody = ref("");
 const lectureVideoUrl = ref("");
 const lecturePendingFiles = ref<{ file_name: string; url: string }[]>([]);
 const lectureUploading = ref(false);
-const lectureTaskTitle = ref("");
-const lectureTaskDesc = ref("");
-const lectureTaskMaxPoints = ref(100);
 
 type LectureEditDraft = {
   id: string;
@@ -142,6 +139,14 @@ const isOwnerInCurrent = computed(
 const coTeacherIds = computed(
   () => new Set((classroom.value?.co_teachers ?? []).map((c) => c.id)),
 );
+
+/** участники курса без владельца и соучителей — кто сдаёт работы (не по users.role). */
+const classroomLearners = computed(() => {
+  if (!classroom.value) return [];
+  const tid = classroom.value.course.teacher_id;
+  const co = new Set(classroom.value.co_teachers.map((c) => c.id));
+  return classroom.value.members.filter((m) => m.id !== tid && !co.has(m.id));
+});
 
 const coTeacherNick = ref("");
 const coTeacherBusy = ref(false);
@@ -221,8 +226,7 @@ const gradingStudents = computed(() => {
   const subs = submissionsByAssignment.value[activeAssignmentForGrading.value] ?? [];
   const subByStudent: Record<string, AssignmentSubmission> = {};
   for (const s of subs) subByStudent[s.student_id] = s;
-  return classroom.value.members
-    .filter((m) => m.role === "student")
+  return classroomLearners.value
     .map((m) => ({ student: m, submission: subByStudent[m.id] ?? null }))
     .sort((a, b) => {
       const aw = a.submission ? (a.submission.grade_points !== null ? 2 : 0) : 1;
@@ -240,6 +244,14 @@ const gradingStats = computed(() => {
     graded: list.filter((x) => x.submission?.grade_points !== null).length,
   };
 });
+
+function submissionSnippet(s: AssignmentSubmission): string {
+  const t = (s.content ?? "").trim();
+  if (t) return t.length > 220 ? `${t.slice(0, 220)}…` : t;
+  const n = s.attachments?.length ?? 0;
+  if (n > 0) return `вложения · ${n}`;
+  return "без текста";
+}
 
 function toggleStudentExpand(studentId: string, submission: AssignmentSubmission | null) {
   if (!submission) return;
@@ -265,7 +277,7 @@ const teacherGradebookMatrix = computed<Record<string, Record<string, Assignment
 const teacherGradebookRows = computed(() => {
   if (!classroom.value || !isTeacherInCurrent.value) return [];
   const assignments = classroom.value.assignments;
-  const students = classroom.value.members.filter((m) => m.role === "student");
+  const students = classroomLearners.value;
   const maxTotal = assignments.reduce((sum, a) => sum + a.max_points, 0);
   return students.map((student) => {
     const cells: GradebookCell[] = assignments.map((assignment) => ({
@@ -694,7 +706,8 @@ async function openSubmissions(assignmentId: string) {
       };
     }
     activeAssignmentForGrading.value = assignmentId;
-    expandedStudentId.value = null;
+    expandedStudentId.value =
+      list.find((s) => s.grade_points === null)?.student_id ?? list[0]?.student_id ?? null;
   } catch (e) {
     err.value = e instanceof Error ? e.message : "ошибка";
   }
@@ -727,7 +740,6 @@ async function onCreateLecture() {
   if (!t) return;
   err.value = "";
   try {
-    const taskTitle = lectureTaskTitle.value.trim();
     await createLecture(
       classroom.value.course.id,
       {
@@ -735,13 +747,6 @@ async function onCreateLecture() {
         body_text: lectureBody.value,
         video_url: lectureVideoUrl.value,
         attachments: lecturePendingFiles.value.length ? lecturePendingFiles.value : undefined,
-        task: taskTitle
-          ? {
-              title: taskTitle,
-              description: lectureTaskDesc.value || undefined,
-              max_points: lectureTaskMaxPoints.value,
-            }
-          : undefined,
       },
       auth.token,
     );
@@ -749,9 +754,6 @@ async function onCreateLecture() {
     lectureBody.value = "";
     lectureVideoUrl.value = "";
     lecturePendingFiles.value = [];
-    lectureTaskTitle.value = "";
-    lectureTaskDesc.value = "";
-    lectureTaskMaxPoints.value = 100;
     addingLecture.value = false;
     await loadClassroom(classroom.value.course.id);
   } catch (e) {
@@ -1132,18 +1134,6 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
               </button>
             </li>
           </ul>
-          <details class="task-extra">
-            <summary>+ задание к лекции</summary>
-            <input v-model="lectureTaskTitle" placeholder="название задания" />
-            <textarea v-model="lectureTaskDesc" rows="2" placeholder="описание" />
-            <input
-              v-model.number="lectureTaskMaxPoints"
-              type="number"
-              min="1"
-              max="1000"
-              placeholder="баллы"
-            />
-          </details>
           <button
             type="button"
             :disabled="lectureUploading || !lectureTitle.trim()"
@@ -1717,20 +1707,23 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
             :disabled="!row.submission"
             @click="toggleStudentExpand(row.student.id, row.submission)"
           >
-            <span class="g-name">
-              <span class="g-dot" />
-              <strong>{{ row.student.nickname }}</strong>
-            </span>
-            <span class="g-status">
-              <span v-if="!row.submission" class="muted small">не сдал</span>
-              <span
-                v-else-if="row.submission.grade_points !== null"
-                class="grade-chip ok"
-              >
-                {{ row.submission.grade_points }} / {{ gradingAssignment.max_points }}
+            <span class="grade-item-head-row">
+              <span class="g-name">
+                <span class="g-dot" />
+                <strong>{{ row.student.nickname }}</strong>
               </span>
-              <span v-else class="grade-chip pending">сдано</span>
+              <span class="g-status">
+                <span v-if="!row.submission" class="muted small">не сдал</span>
+                <span
+                  v-else-if="row.submission.grade_points !== null"
+                  class="grade-chip ok"
+                >
+                  {{ row.submission.grade_points }} / {{ gradingAssignment.max_points }}
+                </span>
+                <span v-else class="grade-chip pending">сдано</span>
+              </span>
             </span>
+            <span v-if="row.submission" class="g-snippet">{{ submissionSnippet(row.submission) }}</span>
           </button>
 
           <div
@@ -2045,29 +2038,6 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 .ghost-x:hover {
   background: var(--surface2);
   color: var(--text);
-}
-
-.task-extra {
-  border-top: 1px solid var(--border);
-  padding-top: 0.5rem;
-  display: grid;
-  gap: 0.45rem;
-}
-.task-extra summary {
-  cursor: pointer;
-  color: var(--muted);
-  font-size: 0.86rem;
-  list-style: none;
-}
-.task-extra summary::-webkit-details-marker {
-  display: none;
-}
-.task-extra[open] summary {
-  margin-bottom: 0.3rem;
-}
-.task-extra input,
-.task-extra textarea {
-  width: 100%;
 }
 
 .lecture-card {
@@ -2403,9 +2373,9 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 }
 .grade-item-head {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.6rem;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.35rem;
   width: 100%;
   padding: 0.55rem 0.7rem;
   background: transparent;
@@ -2415,6 +2385,24 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   color: var(--text);
   min-height: 0;
   border-radius: 0;
+}
+.grade-item-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  width: 100%;
+}
+.g-snippet {
+  font-size: 0.8rem;
+  color: var(--muted);
+  line-height: 1.35;
+  white-space: pre-wrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
 }
 .grade-item-head:hover:not([disabled]) {
   background: var(--surface2);
