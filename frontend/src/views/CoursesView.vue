@@ -96,6 +96,7 @@ const submissionsByAssignment = ref<Record<string, AssignmentSubmission[]>>({});
 const grading = ref<Record<string, { points: number; comment: string }>>({});
 const activeAssignmentForGrading = ref<string | null>(null);
 const expandedStudentId = ref<string | null>(null);
+const gradingSearch = ref("");
 const teacherSubmissionsByAssignment = ref<Record<string, AssignmentSubmission[]>>({});
 const teacherGradebookLoading = ref(false);
 const teacherGradebookError = ref("");
@@ -245,23 +246,36 @@ const gradingStats = computed(() => {
   };
 });
 
-function submissionSnippet(s: AssignmentSubmission): string {
-  const t = (s.content ?? "").trim();
-  if (t) return t.length > 220 ? `${t.slice(0, 220)}…` : t;
-  const n = s.attachments?.length ?? 0;
-  if (n > 0) return `вложения · ${n}`;
-  return "без текста";
-}
+const gradingStudentsFiltered = computed(() => {
+  const q = gradingSearch.value.trim().toLowerCase();
+  const list = gradingStudents.value;
+  if (!q) return list;
+  return list.filter((r) => r.student.nickname.toLowerCase().includes(q));
+});
 
-function toggleStudentExpand(studentId: string, submission: AssignmentSubmission | null) {
-  if (!submission) return;
-  expandedStudentId.value = expandedStudentId.value === studentId ? null : studentId;
+const selectedGradingRow = computed(() => {
+  const id = expandedStudentId.value;
+  if (!id) return null;
+  return gradingStudents.value.find((r) => r.student.id === id) ?? null;
+});
+
+function selectGradingStudent(studentId: string) {
+  expandedStudentId.value = studentId;
 }
 
 function closeGrading() {
   activeAssignmentForGrading.value = null;
   expandedStudentId.value = null;
+  gradingSearch.value = "";
 }
+
+watch(gradingSearch, () => {
+  const f = gradingStudentsFiltered.value;
+  const id = expandedStudentId.value;
+  if (!id) return;
+  if (f.some((r) => r.student.id === id)) return;
+  expandedStudentId.value = f.find((r) => r.submission)?.student.id ?? null;
+});
 
 const teacherGradebookMatrix = computed<Record<string, Record<string, AssignmentSubmission>>>(() => {
   const matrix: Record<string, Record<string, AssignmentSubmission>> = {};
@@ -693,7 +707,10 @@ async function onSubmitAssignment(a: Assignment) {
   }
 }
 
-async function openSubmissions(assignmentId: string) {
+async function openSubmissions(
+  assignmentId: string,
+  opts?: { keepStudentId?: string | null },
+) {
   if (!auth.token || !classroom.value || !isTeacherInCurrent.value) return;
   err.value = "";
   try {
@@ -706,8 +723,13 @@ async function openSubmissions(assignmentId: string) {
       };
     }
     activeAssignmentForGrading.value = assignmentId;
-    expandedStudentId.value =
-      list.find((s) => s.grade_points === null)?.student_id ?? list[0]?.student_id ?? null;
+    const keep = opts?.keepStudentId;
+    if (keep && list.some((s) => s.student_id === keep)) {
+      expandedStudentId.value = keep;
+    } else {
+      expandedStudentId.value =
+        list.find((s) => s.grade_points === null)?.student_id ?? list[0]?.student_id ?? null;
+    }
   } catch (e) {
     err.value = e instanceof Error ? e.message : "ошибка";
   }
@@ -906,7 +928,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
       { grade_points: Number(draft.points), teacher_comment: draft.comment },
       auth.token,
     );
-    await openSubmissions(assignmentId);
+    await openSubmissions(assignmentId, { keepStudentId: s.student_id });
     await loadClassroom(classroom.value.course.id);
   } catch (e) {
     err.value = e instanceof Error ? e.message : "ошибка";
@@ -1689,55 +1711,68 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
         · сдало {{ gradingStats.submitted }} из {{ gradingStats.total }}
       </p>
 
-      <ul class="grade-list">
-        <li
-          v-for="row in gradingStudents"
-          :key="row.student.id"
-          class="grade-item"
-          :class="{
-            submitted: !!row.submission,
-            graded: row.submission?.grade_points !== null,
-            expanded: expandedStudentId === row.student.id,
-            empty: !row.submission,
-          }"
-        >
-          <button
-            type="button"
-            class="grade-item-head"
-            :disabled="!row.submission"
-            @click="toggleStudentExpand(row.student.id, row.submission)"
-          >
-            <span class="grade-item-head-row">
-              <span class="g-name">
-                <span class="g-dot" />
-                <strong>{{ row.student.nickname }}</strong>
-              </span>
-              <span class="g-status">
-                <span v-if="!row.submission" class="muted small">не сдал</span>
-                <span
-                  v-else-if="row.submission.grade_points !== null"
-                  class="grade-chip ok"
-                >
-                  {{ row.submission.grade_points }} / {{ gradingAssignment.max_points }}
-                </span>
-                <span v-else class="grade-chip pending">сдано</span>
-              </span>
-            </span>
-            <span v-if="row.submission" class="g-snippet">{{ submissionSnippet(row.submission) }}</span>
-          </button>
+      <p v-if="!gradingStudents.length" class="muted center empty">студентов нет</p>
 
-          <div
-            v-if="row.submission && expandedStudentId === row.student.id"
-            class="grade-item-body"
-          >
+      <div v-else class="grade-modal-split">
+        <div class="grade-picker-wrap">
+          <input
+            v-model="gradingSearch"
+            class="grade-search"
+            type="search"
+            autocomplete="off"
+            placeholder="ник…"
+          />
+          <ul class="grade-picker-list">
+            <li v-for="row in gradingStudentsFiltered" :key="row.student.id">
+              <button
+                type="button"
+                class="grade-picker-row"
+                :class="{
+                  active: expandedStudentId === row.student.id,
+                  submitted: !!row.submission,
+                  graded: row.submission?.grade_points !== null,
+                  empty: !row.submission,
+                }"
+                :disabled="!row.submission"
+                @click="selectGradingStudent(row.student.id)"
+              >
+                <span class="g-name">
+                  <span class="g-dot" />
+                  <strong>{{ row.student.nickname }}</strong>
+                </span>
+                <span class="g-status">
+                  <span v-if="!row.submission" class="muted small">—</span>
+                  <span
+                    v-else-if="row.submission.grade_points !== null"
+                    class="grade-chip ok"
+                  >
+                    {{ row.submission.grade_points }} / {{ gradingAssignment.max_points }}
+                  </span>
+                  <span v-else class="grade-chip pending">···</span>
+                </span>
+              </button>
+            </li>
+          </ul>
+        </div>
+
+        <div class="grade-detail-panel">
+          <template v-if="selectedGradingRow?.submission">
             <p class="muted small">
-              сдано {{ row.submission.updated_at.slice(0, 16).replace("T", " ") }}
+              {{ selectedGradingRow.student.nickname }}
+              · сдано
+              {{ selectedGradingRow.submission.updated_at.slice(0, 16).replace("T", " ") }}
             </p>
-            <p v-if="row.submission.content" class="lecture-body">
-              {{ row.submission.content }}
+            <p v-if="(selectedGradingRow.submission.content ?? '').trim()" class="lecture-body">
+              {{ selectedGradingRow.submission.content }}
             </p>
-            <ul v-if="row.submission.attachments?.length" class="files">
-              <li v-for="f in row.submission.attachments" :key="f.id">
+            <p
+              v-else-if="!selectedGradingRow.submission.attachments?.length"
+              class="muted small"
+            >
+              без текста
+            </p>
+            <ul v-if="selectedGradingRow.submission.attachments?.length" class="files">
+              <li v-for="f in selectedGradingRow.submission.attachments" :key="f.id">
                 <a :href="f.url" target="_blank" rel="noopener noreferrer">
                   {{ f.file_name }}
                   <span class="muted small">{{ formatFileSize(f.size_bytes) }}</span>
@@ -1746,33 +1781,40 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
             </ul>
             <div class="grid-2">
               <input
-                v-model.number="grading[row.submission.id].points"
+                v-model.number="grading[selectedGradingRow.submission.id].points"
                 type="number"
                 min="0"
                 :max="gradingAssignment.max_points"
                 placeholder="баллы"
               />
               <input
-                v-model="grading[row.submission.id].comment"
+                v-model="grading[selectedGradingRow.submission.id].comment"
                 placeholder="комментарий"
               />
             </div>
             <div class="row-actions">
               <button
                 type="button"
-                @click="onGradeSubmission(activeAssignmentForGrading, row.submission)"
+                @click="onGradeSubmission(activeAssignmentForGrading, selectedGradingRow.submission)"
               >
-                {{ row.submission.grade_points !== null ? "обновить" : "поставить" }}
+                {{
+                  selectedGradingRow.submission.grade_points !== null ? "обновить" : "поставить"
+                }}
               </button>
-              <span v-if="row.submission.grade_points !== null" class="muted small">
-                проверено {{ row.submission.updated_at.slice(0, 16).replace("T", " ") }}
+              <span
+                v-if="selectedGradingRow.submission.grade_points !== null"
+                class="muted small"
+              >
+                проверено
+                {{ selectedGradingRow.submission.updated_at.slice(0, 16).replace("T", " ") }}
               </span>
             </div>
-          </div>
-        </li>
-      </ul>
-
-      <p v-if="!gradingStudents.length" class="muted center empty">студентов нет</p>
+          </template>
+          <p v-else class="muted small grade-detail-placeholder">
+            выберите ученика со сдачей слева
+          </p>
+        </div>
+      </div>
     </div>
   </section>
 </template>
@@ -2333,18 +2375,22 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 
 .grade-modal {
   margin-top: 0.6rem;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 0.55rem;
   padding: 0.85rem;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
+  max-height: min(92vh, 44rem);
+  min-height: 0;
 }
 .grade-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 0.6rem;
+  flex-shrink: 0;
 }
 .grade-head h3 {
   margin: 0.1rem 0 0;
@@ -2353,72 +2399,103 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 }
 .grade-stats {
   margin: 0;
+  flex-shrink: 0;
 }
-.grade-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 0.3rem;
-}
-.grade-item {
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-  overflow: hidden;
-  transition: border-color 0.15s ease;
-}
-.grade-item.expanded {
-  border-color: var(--text);
-}
-.grade-item-head {
+.grade-modal-split {
   display: flex;
   flex-direction: column;
-  align-items: stretch;
-  gap: 0.35rem;
-  width: 100%;
-  padding: 0.55rem 0.7rem;
-  background: transparent;
-  border: 0;
-  text-align: left;
-  cursor: pointer;
-  color: var(--text);
+  gap: 0.65rem;
+  flex: 1;
   min-height: 0;
-  border-radius: 0;
+  overflow: hidden;
 }
-.grade-item-head-row {
+@media (min-width: 640px) {
+  .grade-modal-split {
+    flex-direction: row;
+    align-items: stretch;
+  }
+}
+.grade-picker-wrap {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 0 0 auto;
+  max-height: min(36vh, 14rem);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--surface2);
+}
+@media (min-width: 640px) {
+  .grade-picker-wrap {
+    flex: 0 0 minmax(10.5rem, 30%);
+    max-height: none;
+    min-height: 11rem;
+  }
+}
+.grade-search {
+  flex-shrink: 0;
+  width: 100%;
+  margin: 0;
+  padding: 0.45rem 0.55rem;
+  font-size: 0.9rem;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: var(--surface);
+  color: var(--text);
+}
+.grade-picker-list {
+  list-style: none;
+  margin: 0;
+  padding: 0.3rem;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  gap: 0.15rem;
+}
+.grade-picker-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.6rem;
+  gap: 0.45rem;
   width: 100%;
+  padding: 0.42rem 0.5rem;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  text-align: left;
+  cursor: pointer;
+  color: var(--text);
+  font-size: 0.88rem;
+  min-height: 0;
 }
-.g-snippet {
-  font-size: 0.8rem;
-  color: var(--muted);
-  line-height: 1.35;
-  white-space: pre-wrap;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  word-break: break-word;
+.grade-picker-row:hover:not([disabled]) {
+  background: var(--surface);
 }
-.grade-item-head:hover:not([disabled]) {
-  background: var(--surface2);
+.grade-picker-row.active {
+  background: var(--surface);
+  border-color: var(--text);
 }
-.grade-item-head[disabled] {
+.grade-picker-row[disabled] {
   cursor: default;
-  opacity: 0.6;
+  opacity: 0.55;
 }
 .g-name {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.45rem;
   min-width: 0;
 }
 .g-name strong {
   font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.g-status {
+  flex-shrink: 0;
 }
 .g-dot {
   width: 6px;
@@ -2427,25 +2504,46 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   background: var(--border);
   flex-shrink: 0;
 }
-.grade-item.submitted .g-dot {
+.grade-picker-row.submitted .g-dot {
   background: var(--text);
 }
-.grade-item.graded .g-dot {
+.grade-picker-row.graded .g-dot {
   background: transparent;
   border: 1px solid var(--text);
 }
-.grade-item-body {
+.grade-detail-panel {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   display: grid;
   gap: 0.5rem;
-  padding: 0.6rem 0.7rem 0.75rem;
-  border-top: 1px solid var(--border);
-  background: var(--surface2);
+  align-content: start;
+  padding: 0.15rem 0.1rem 0.5rem;
 }
-.grade-item-body .row-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  flex-wrap: wrap;
+@media (max-width: 639px) {
+  .grade-detail-panel {
+    max-height: 48vh;
+  }
+}
+@media (min-width: 640px) {
+  .grade-detail-panel {
+    min-height: 12rem;
+    padding-right: 0.35rem;
+  }
+}
+.grade-detail-panel .grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem;
+}
+@media (max-width: 480px) {
+  .grade-detail-panel .grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+.grade-detail-placeholder {
+  margin: 0;
+  padding: 0.5rem 0;
 }
 .empty.center {
   text-align: center;
