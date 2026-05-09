@@ -42,6 +42,7 @@ const props = withDefaults(
       | "copy"
       | "image"
       | "pin"
+      | "pinned"
       | "trophy"
       | "bold"
       | "italic"
@@ -137,6 +138,8 @@ const d = computed(() => {
       return "M4 5h16v14H4V5zm0 11l5-5 4 4 3-3 4 4M9 10a1.5 1.5 0 100-3 1.5 1.5 0 000 3z";
     case "pin":
       return "M9 4h6l-1 5 3 4H7l3-4-1-5zM12 13v7";
+    case "pinned":
+      return "";
     case "trophy":
       return "M7 4h10v4a5 5 0 01-10 0V4zM5 5H3v2a3 3 0 003 3M19 5h2v2a3 3 0 01-3 3M10 13h4v3h-4zM8 17h8l1 3H7l1-3z";
     case "bold":
@@ -176,7 +179,11 @@ const d = computed(() => {
     stroke-linejoin="round"
     aria-hidden="true"
   >
-    <path :d="d" />
+    <g v-if="name === 'pinned'" fill="currentColor" stroke="none">
+      <path d="M9 4h6l-1 5 3 4H7l3-4-1-5z" />
+      <path d="M11 13h2v8H11z" />
+    </g>
+    <path v-if="name !== 'pinned' && name !== 'liked' && name !== 'bookmarked'" :d="d" />
     <circle
       v-if="name === 'seen'"
       cx="12"

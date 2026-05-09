@@ -1035,13 +1035,13 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
             <button
               v-if="c.enrolled"
               type="button"
-              class="icon-btn-sm"
-              :class="{ pinned: c.is_pinned }"
-              aria-label="закрепить"
-              title="закрепить"
+              class="icon-btn-sm course-pin"
+              :class="{ pinned: c.is_pinned, 'pin-idle': !c.is_pinned }"
+              :aria-label="c.is_pinned ? 'снять закреп' : 'закрепить'"
+              :title="c.is_pinned ? 'снять закреп' : 'закрепить'"
               @click="onTogglePin(c)"
             >
-              <AppIcon name="pin" :size="14" />
+              <AppIcon :name="c.is_pinned ? 'pinned' : 'pin'" :size="14" />
             </button>
             <button
               v-if="canTeach && (c.teacher_id === auth.user?.id || auth.role === 'admin')"
@@ -1070,13 +1070,13 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
           <div class="course-head-actions">
             <button
               type="button"
-              class="icon-btn-sm"
-              :class="{ pinned: classroom.course.is_pinned }"
-              aria-label="закрепить"
-              title="закрепить"
+              class="icon-btn-sm course-pin"
+              :class="{ pinned: classroom.course.is_pinned, 'pin-idle': !classroom.course.is_pinned }"
+              :aria-label="classroom.course.is_pinned ? 'снять закреп' : 'закрепить'"
+              :title="classroom.course.is_pinned ? 'снять закреп' : 'закрепить'"
               @click="onTogglePin(classroom.course)"
             >
-              <AppIcon name="pin" :size="16" />
+              <AppIcon :name="classroom.course.is_pinned ? 'pinned' : 'pin'" :size="16" />
             </button>
             <button
               v-if="isOwnerInCurrent"
@@ -2164,6 +2164,14 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 .icon-btn-sm.pinned {
   color: var(--text);
   background: var(--surface2);
+}
+.icon-btn-sm.course-pin.pin-idle {
+  color: var(--muted);
+  opacity: 0.42;
+}
+.icon-btn-sm.course-pin.pin-idle:hover {
+  opacity: 1;
+  color: var(--text);
 }
 .icon-btn-sm.danger:hover {
   background: #2a1414;
