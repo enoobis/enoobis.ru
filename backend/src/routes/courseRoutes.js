@@ -385,7 +385,7 @@ function lecturesFor(course) {
             l.title, l.body_text, l.video_url, l.created_at
      FROM course_lectures l JOIN users u ON u.id = l.author_id
      WHERE l.course_id = ?
-     ORDER BY l.created_at`,
+     ORDER BY l.created_at DESC`,
     course.id,
   );
   return rows.map((r) => ({ ...r, attachments: attachmentsFor(r.id) }));
@@ -397,7 +397,7 @@ function assignmentsFor(course, viewerId) {
             a.title, a.description, a.max_points, a.created_at, a.lecture_id
      FROM course_assignments a JOIN users u ON u.id = a.author_id
      WHERE a.course_id = ?
-     ORDER BY a.created_at`,
+     ORDER BY a.created_at DESC`,
     course.id,
   );
   return rows.map((row) => {
