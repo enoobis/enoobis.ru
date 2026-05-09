@@ -3,7 +3,7 @@ import multer from "multer";
 import path from "node:path";
 import fs from "node:fs";
 import { v4 as uuidv4 } from "uuid";
-import { nowIso, run } from "../db.js";
+import { nowIso, run, get } from "../db.js";
 import { authRequired } from "../auth.js";
 
 const router = express.Router();
@@ -63,15 +63,23 @@ router.post("/me/avatar", authRequired, uploadSingle(avatarUpload, "file"), (req
 router.post("/blog/upload-image", authRequired, uploadSingle(blogUpload, "file"), (req, res) => {
   if (!req.file) return res.status(400).json({ error: "no file" });
   const url = `/uploads/blog/${req.file.filename}`;
-  const id = uuidv4();
-  run(
-    "INSERT INTO blog_post_images (id, post_id, uploader_user_id, url, created_at) VALUES (?, ?, ?, ?, ?)",
-    id,
-    req.body?.post_id ? String(req.body.post_id) : null,
-    req.user.id,
-    url,
-    nowIso(),
-  );
+  const postId = req.body?.post_id ? String(req.body.post_id).trim() : "";
+  if (postId) {
+    const post = get("SELECT id, author_id FROM blog_posts WHERE id = ?", postId);
+    if (
+      post &&
+      (post.author_id === req.user.id || req.user.role === "admin")
+    ) {
+      run(
+        "INSERT INTO blog_post_images (id, post_id, uploader_user_id, url, created_at) VALUES (?, ?, ?, ?, ?)",
+        uuidv4(),
+        postId,
+        req.user.id,
+        url,
+        nowIso(),
+      );
+    }
+  }
   return res.json({ url });
 });
 
