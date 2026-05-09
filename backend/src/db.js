@@ -360,6 +360,18 @@ try {
   }
 }
 
+try {
+  db.prepare("SELECT pinned_course_ids FROM users LIMIT 1").get();
+} catch {
+  try {
+    db.exec(
+      "ALTER TABLE users ADD COLUMN pinned_course_ids TEXT NOT NULL DEFAULT '[]'",
+    );
+  } catch {
+    // ignore
+  }
+}
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS course_submission_attachments (
     id TEXT PRIMARY KEY,

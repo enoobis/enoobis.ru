@@ -17,6 +17,7 @@ export type Course = {
   is_owner: boolean;
   created_at: string;
   enrolled: boolean;
+  is_pinned?: boolean;
 };
 
 export type CourseMember = {
@@ -151,6 +152,14 @@ export function joinCourseByCode(code: string, token: string) {
 
 export function unenrollCourse(id: string, token: string) {
   return api<{ ok: boolean }>(`/api/courses/${id}/enroll`, { method: "DELETE", token });
+}
+
+export function setCoursePinned(courseId: string, pinned: boolean, token: string) {
+  return api<Course>(`/api/courses/${courseId}/pin`, {
+    method: "POST",
+    token,
+    body: JSON.stringify({ pinned }),
+  });
 }
 
 export function deleteCourse(id: string, token: string) {

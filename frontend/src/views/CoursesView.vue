@@ -12,6 +12,7 @@ import {
   enrollCourse,
   joinCourseByCode,
   getClassroom,
+  setCoursePinned,
   gradeSubmission,
   listAssignmentSubmissions,
   listCourses,
@@ -502,6 +503,18 @@ async function onDeleteCourse(courseId: string, courseTitle: string) {
       router.replace({ name: "courses" }).catch(() => undefined);
     }
     await loadCourses();
+  } catch (e) {
+    err.value = e instanceof Error ? e.message : "ошибка";
+  }
+}
+
+async function onTogglePin(c: Course) {
+  if (!auth.token) return;
+  err.value = "";
+  try {
+    await setCoursePinned(c.id, !(c.is_pinned ?? false), auth.token);
+    await loadCourses();
+    if (classroom.value?.course.id === c.id) await loadClassroom(c.id);
   } catch (e) {
     err.value = e instanceof Error ? e.message : "ошибка";
   }
@@ -1020,6 +1033,17 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
               доступ
             </button>
             <button
+              v-if="c.enrolled"
+              type="button"
+              class="icon-btn-sm"
+              :class="{ pinned: c.is_pinned }"
+              aria-label="закрепить"
+              title="закрепить"
+              @click="onTogglePin(c)"
+            >
+              <AppIcon name="pin" :size="14" />
+            </button>
+            <button
               v-if="canTeach && (c.teacher_id === auth.user?.id || auth.role === 'admin')"
               type="button"
               class="icon-btn-sm danger"
@@ -1043,16 +1067,28 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
         <button class="back" type="button" @click="closeCourse">← к курсам</button>
         <div class="course-head-row">
           <h2>{{ classroom.course.title }}</h2>
-          <button
-            v-if="isOwnerInCurrent"
-            type="button"
-            class="icon-btn-sm danger"
-            aria-label="удалить курс"
-            title="удалить курс"
-            @click="onDeleteCourse(classroom.course.id, classroom.course.title)"
-          >
-            <AppIcon name="delete" :size="16" />
-          </button>
+          <div class="course-head-actions">
+            <button
+              type="button"
+              class="icon-btn-sm"
+              :class="{ pinned: classroom.course.is_pinned }"
+              aria-label="закрепить"
+              title="закрепить"
+              @click="onTogglePin(classroom.course)"
+            >
+              <AppIcon name="pin" :size="16" />
+            </button>
+            <button
+              v-if="isOwnerInCurrent"
+              type="button"
+              class="icon-btn-sm danger"
+              aria-label="удалить курс"
+              title="удалить курс"
+              @click="onDeleteCourse(classroom.course.id, classroom.course.title)"
+            >
+              <AppIcon name="delete" :size="16" />
+            </button>
+          </div>
         </div>
         <p v-if="classroom.course.description" class="muted">
           {{ classroom.course.description }}
@@ -1957,6 +1993,12 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   justify-content: space-between;
   gap: 0.5rem;
 }
+.course-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
 .course-head h2 {
   margin: 0;
   font-size: 1.3rem;
@@ -2118,6 +2160,10 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 .icon-btn-sm:hover {
   background: var(--surface2);
   color: var(--text);
+}
+.icon-btn-sm.pinned {
+  color: var(--text);
+  background: var(--surface2);
 }
 .icon-btn-sm.danger:hover {
   background: #2a1414;

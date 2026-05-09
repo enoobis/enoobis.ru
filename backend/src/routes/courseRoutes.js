@@ -53,6 +53,25 @@ function isCoTeacher(courseId, userId) {
   );
 }
 
+function parsePinnedCourseIds(raw) {
+  if (!raw || typeof raw !== "string") return [];
+  try {
+    const a = JSON.parse(raw);
+    return Array.isArray(a) ? a.filter((x) => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function getPinnedCourseIds(userId) {
+  const row = get("SELECT pinned_course_ids FROM users WHERE id = ?", userId);
+  return parsePinnedCourseIds(row?.pinned_course_ids);
+}
+
+function setPinnedCourseIds(userId, ids) {
+  run("UPDATE users SET pinned_course_ids = ? WHERE id = ?", JSON.stringify(ids), userId);
+}
+
 function courseToDto(row, viewerId) {
   if (!row) return null;
   const teacher = get("SELECT nickname FROM users WHERE id = ?", row.teacher_id);
@@ -96,7 +115,26 @@ router.get("/courses", authRequired, (req, res) => {
         req.user.id,
         req.user.id,
       );
-  return res.json(rows.map((r) => courseToDto(r, req.user.id)));
+  const visibleIds = new Set(rows.map((r) => r.id));
+  let pinsRaw = getPinnedCourseIds(req.user.id);
+  const pruned = pinsRaw.filter((id) => visibleIds.has(id));
+  if (pruned.length !== pinsRaw.length) {
+    setPinnedCourseIds(req.user.id, pruned);
+    pinsRaw = pruned;
+  }
+  const pinRank = new Map(pinsRaw.map((id, i) => [id, i]));
+  const pinSet = new Set(pinsRaw);
+  const list = rows.map((r) => {
+    const dto = courseToDto(r, req.user.id);
+    return { ...dto, is_pinned: pinSet.has(dto.id) };
+  });
+  list.sort((a, b) => {
+    const ap = pinRank.has(a.id) ? pinRank.get(a.id) : 9999;
+    const bp = pinRank.has(b.id) ? pinRank.get(b.id) : 9999;
+    if (ap !== bp) return ap - bp;
+    return String(b.created_at ?? "").localeCompare(String(a.created_at ?? ""));
+  });
+  return res.json(list);
 });
 
 router.post("/courses", authRequired, (req, res) => {
@@ -393,8 +431,10 @@ router.get("/courses/:id/classroom", authRequired, (req, res) => {
   if (access.error) return res.status(access.error).json({ error: "no access" });
   const { course, isTeacher, isOwner } = access;
   const isAdmin = req.user.role === "admin";
+  const pinSet = new Set(getPinnedCourseIds(req.user.id));
+  const cDto = courseToDto(course, req.user.id);
   return res.json({
-    course: courseToDto(course, req.user.id),
+    course: { ...cDto, is_pinned: pinSet.has(cDto.id) },
     is_teacher: isTeacher || isAdmin,
     is_owner: isOwner || isAdmin,
     stream: streamFor(course),
@@ -403,6 +443,25 @@ router.get("/courses/:id/classroom", authRequired, (req, res) => {
     members: membersFor(course),
     co_teachers: coTeachersFor(course.id),
   });
+});
+
+router.post("/courses/:id/pin", authRequired, (req, res) => {
+  const access = ensureCourseAccess(req.params.id, req.user);
+  if (access.error === 404) return res.status(404).json({ error: "not found" });
+  if (access.error === 403) return res.status(403).json({ error: "forbidden" });
+  const { course } = access;
+  const wantPin = req.body?.pinned === true;
+  let ids = getPinnedCourseIds(req.user.id);
+  if (wantPin) {
+    ids = ids.filter((id) => id !== course.id);
+    ids.unshift(course.id);
+    ids = ids.slice(0, 40);
+  } else {
+    ids = ids.filter((id) => id !== course.id);
+  }
+  setPinnedCourseIds(req.user.id, ids);
+  const dto = courseToDto(course, req.user.id);
+  return res.json({ ...dto, is_pinned: wantPin });
 });
 
 router.post("/courses/:id/stream", authRequired, (req, res) => {
