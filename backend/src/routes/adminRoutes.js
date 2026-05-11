@@ -3,7 +3,7 @@ import multer from "multer";
 import path from "node:path";
 import fs from "node:fs";
 import { v4 as uuidv4 } from "uuid";
-import { all, get, nowIso, run } from "../db.js";
+import { all, db, get, nowIso, run } from "../db.js";
 import { authRequired, hashPassword } from "../auth.js";
 import { awardAchievement } from "../utils/achievements.js";
 import { saveIdenticon } from "../utils/identicon.js";
@@ -18,6 +18,8 @@ function adminOnly(req, res, next) {
 router.use(authRequired, adminOnly);
 
 const UPLOAD_ROOT = path.resolve(process.env.UPLOADS_DIR ?? "./data/uploads");
+const PRIVATE_FILES_ROOT = path.resolve(process.env.PRIVATE_FILES_DIR ?? "./data/private-files");
+const LIBRARY_ROOT = path.resolve(process.env.LIBRARY_DIR ?? "./data/library");
 const IMAGE_MIMES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
 fs.mkdirSync(path.join(UPLOAD_ROOT, "avatars"), { recursive: true });
 
@@ -222,9 +224,39 @@ router.post("/admin/users/:id/role", (req, res) => {
   return res.json({ ok: true });
 });
 
+function unlinkIfUploadsUrl(url) {
+  if (!url || typeof url !== "string") return;
+  const m = url.trim().match(/^\/uploads\/(.+)$/);
+  if (!m) return;
+  const rel = m[1].replace(/\.\./g, "");
+  const abs = path.join(UPLOAD_ROOT, rel);
+  if (!abs.startsWith(UPLOAD_ROOT)) return;
+  try {
+    fs.unlinkSync(abs);
+  } catch {
+    /* ignore */
+  }
+}
+
 function purgeUserCourses(userId) {
   const owned = all("SELECT id FROM courses WHERE teacher_id = ?", userId);
   for (const c of owned) {
+    const lecAttachUrls = all(
+      `SELECT url FROM course_lecture_attachments WHERE lecture_id IN
+       (SELECT id FROM course_lectures WHERE course_id = ?)`,
+      c.id,
+    );
+    for (const row of lecAttachUrls) unlinkIfUploadsUrl(row.url);
+
+    const subAttachUrls = all(
+      `SELECT sa.url FROM course_submission_attachments sa
+       JOIN course_assignment_submissions s ON s.id = sa.submission_id
+       JOIN course_assignments a ON a.id = s.assignment_id
+       WHERE a.course_id = ?`,
+      c.id,
+    );
+    for (const row of subAttachUrls) unlinkIfUploadsUrl(row.url);
+
     const lectures = all("SELECT id FROM course_lectures WHERE course_id = ?", c.id);
     for (const l of lectures) {
       run("DELETE FROM course_lecture_attachments WHERE lecture_id = ?", l.id);
@@ -251,6 +283,163 @@ function purgeUserCourses(userId) {
   }
 }
 
+function purgeUserBlogAndMicro(userId) {
+  const postIds = all("SELECT id FROM blog_posts WHERE author_id = ?", userId).map((r) => r.id);
+
+  const covers = all(
+    "SELECT cover_image_url FROM blog_posts WHERE author_id = ? AND COALESCE(cover_image_url, '') <> ''",
+    userId,
+  );
+  for (const row of covers) unlinkIfUploadsUrl(row.cover_image_url);
+
+  if (postIds.length) {
+    const ph = postIds.map(() => "?").join(",");
+    const blogImgUrls = all(`SELECT url FROM blog_post_images WHERE post_id IN (${ph})`, ...postIds);
+    for (const row of blogImgUrls) unlinkIfUploadsUrl(row.url);
+
+    run(`DELETE FROM blog_reports WHERE target_post_id IN (${ph})`, ...postIds);
+    run(`DELETE FROM blog_comments WHERE post_id IN (${ph})`, ...postIds);
+    run(`DELETE FROM blog_post_likes WHERE post_id IN (${ph})`, ...postIds);
+    run(`DELETE FROM blog_post_bookmarks WHERE post_id IN (${ph})`, ...postIds);
+    run(`DELETE FROM blog_post_tags WHERE post_id IN (${ph})`, ...postIds);
+    run(`DELETE FROM blog_post_categories WHERE post_id IN (${ph})`, ...postIds);
+    run(`DELETE FROM blog_post_images WHERE post_id IN (${ph})`, ...postIds);
+  }
+
+  const commentIds = all("SELECT id FROM blog_comments WHERE user_id = ?", userId).map((r) => r.id);
+  if (commentIds.length) {
+    const ch = commentIds.map(() => "?").join(",");
+    run(`DELETE FROM blog_reports WHERE target_comment_id IN (${ch})`, ...commentIds);
+    run(`DELETE FROM blog_comments WHERE id IN (${ch})`, ...commentIds);
+  }
+
+  run(
+    "DELETE FROM blog_reports WHERE reporter_user_id = ? OR resolved_by = ?",
+    userId,
+    userId,
+  );
+  run("DELETE FROM blog_post_likes WHERE user_id = ?", userId);
+  run("DELETE FROM blog_post_bookmarks WHERE user_id = ?", userId);
+  run("DELETE FROM blog_posts WHERE author_id = ?", userId);
+}
+
+function purgeUserMicroposts(userId) {
+  const microImages = all(
+    "SELECT image_url FROM microposts WHERE author_id = ? AND COALESCE(image_url, '') <> ''",
+    userId,
+  );
+  for (const row of microImages) unlinkIfUploadsUrl(row.image_url);
+
+  run(
+    "UPDATE users SET pinned_post_id = NULL, pinned_post_type = '' WHERE pinned_post_id IN (SELECT id FROM microposts WHERE author_id = ?)",
+    userId,
+  );
+  run(
+    "UPDATE microposts SET parent_id = NULL WHERE parent_id IN (SELECT id FROM microposts WHERE author_id = ?)",
+    userId,
+  );
+  const authorPostIds = all("SELECT id FROM microposts WHERE author_id = ?", userId).map((r) => r.id);
+  if (authorPostIds.length) {
+    const ph = authorPostIds.map(() => "?").join(",");
+    run(`DELETE FROM micropost_likes WHERE micropost_id IN (${ph}) OR user_id = ?`, ...authorPostIds, userId);
+    run(
+      `DELETE FROM micropost_bookmarks WHERE micropost_id IN (${ph}) OR user_id = ?`,
+      ...authorPostIds,
+      userId,
+    );
+  } else {
+    run("DELETE FROM micropost_likes WHERE user_id = ?", userId);
+    run("DELETE FROM micropost_bookmarks WHERE user_id = ?", userId);
+  }
+  run("DELETE FROM microposts WHERE author_id = ?", userId);
+}
+
+const deleteUserFully = db.transaction((userId) => {
+  const userRow = get("SELECT avatar_url FROM users WHERE id = ?", userId);
+  const avatarUrl = userRow?.avatar_url ?? "";
+
+  purgeUserCourses(userId);
+
+  const studentSubAttach = all(
+    `SELECT sa.url FROM course_submission_attachments sa
+     JOIN course_assignment_submissions s ON s.id = sa.submission_id
+     WHERE s.student_id = ?`,
+    userId,
+  );
+  for (const row of studentSubAttach) unlinkIfUploadsUrl(row.url);
+  run(
+    "DELETE FROM course_submission_attachments WHERE submission_id IN (SELECT id FROM course_assignment_submissions WHERE student_id = ?)",
+    userId,
+  );
+
+  run("DELETE FROM course_assignment_submissions WHERE student_id = ?", userId);
+  run("DELETE FROM course_students WHERE student_id = ?", userId);
+  run("DELETE FROM course_co_teachers WHERE user_id = ?", userId);
+  run("DELETE FROM user_favorite_courses WHERE user_id = ?", userId);
+
+  purgeUserBlogAndMicro(userId);
+  purgeUserMicroposts(userId);
+
+  run(
+    "DELETE FROM chat_thread_hidden WHERE user_id = ? OR thread_id IN (SELECT id FROM chat_threads WHERE user_a_id = ? OR user_b_id = ?)",
+    userId,
+    userId,
+    userId,
+  );
+  run(
+    "DELETE FROM chat_messages WHERE thread_id IN (SELECT id FROM chat_threads WHERE user_a_id = ? OR user_b_id = ?)",
+    userId,
+    userId,
+  );
+  run("DELETE FROM chat_threads WHERE user_a_id = ? OR user_b_id = ?", userId, userId);
+
+  run(
+    "DELETE FROM user_follows WHERE follower_user_id = ? OR following_user_id = ?",
+    userId,
+    userId,
+  );
+
+  run("DELETE FROM invite_links WHERE owner_user_id = ?", userId);
+
+  run("DELETE FROM inbox_notifications WHERE user_id = ? OR actor_id = ?", userId, userId);
+  run("DELETE FROM user_achievements WHERE user_id = ?", userId);
+  run("DELETE FROM user_daily_activity WHERE user_id = ?", userId);
+
+  const fileRows = all("SELECT storage_path FROM user_files WHERE owner_id = ?", userId);
+  const bookRows = all("SELECT storage_path FROM library_books WHERE uploaded_by = ?", userId);
+
+  run("DELETE FROM user_files WHERE owner_id = ?", userId);
+  run("DELETE FROM user_notes WHERE owner_id = ?", userId);
+  run("DELETE FROM share_links WHERE owner_id = ?", userId);
+  run("DELETE FROM library_books WHERE uploaded_by = ?", userId);
+
+  run("DELETE FROM user_privacy_settings WHERE user_id = ?", userId);
+  run("DELETE FROM user_notification_settings WHERE user_id = ?", userId);
+
+  run("DELETE FROM users WHERE id = ?", userId);
+  return { fileRows, bookRows, avatarUrl };
+});
+
+function removeDeletedUserFiles(fileRows, bookRows, avatarUrl) {
+  if (avatarUrl) unlinkIfUploadsUrl(String(avatarUrl));
+  for (const f of fileRows) {
+    try {
+      const abs = path.join(PRIVATE_FILES_ROOT, f.storage_path);
+      if (abs.startsWith(PRIVATE_FILES_ROOT)) fs.unlinkSync(abs);
+    } catch {
+      /* ignore */
+    }
+  }
+  for (const b of bookRows) {
+    try {
+      const abs = path.join(LIBRARY_ROOT, b.storage_path);
+      if (abs.startsWith(LIBRARY_ROOT)) fs.unlinkSync(abs);
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
 router.delete("/admin/users/:id", (req, res) => {
   const id = req.params.id;
   if (id === req.user.id) {
@@ -261,99 +450,14 @@ router.delete("/admin/users/:id", (req, res) => {
   if (u.role === "admin") {
     return res.status(400).json({ error: "нельзя удалить другого админа" });
   }
-
-  purgeUserCourses(id);
-
   try {
-    run(
-      "DELETE FROM course_assignment_submissions WHERE student_id = ?",
-      id,
-    );
-  } catch {}
-  try {
-    run("DELETE FROM course_students WHERE student_id = ?", id);
-  } catch {}
-  try {
-    run("DELETE FROM course_co_teachers WHERE user_id = ?", id);
-  } catch {}
-  try {
-    run("DELETE FROM user_favorite_courses WHERE user_id = ?", id);
-  } catch {}
-
-  try {
-    run(
-      "DELETE FROM micropost_likes WHERE user_id = ? OR micropost_id IN (SELECT id FROM microposts WHERE author_id = ?)",
-      id,
-      id,
-    );
-  } catch {}
-  try {
-    run("DELETE FROM microposts WHERE author_id = ?", id);
-  } catch {}
-
-  try {
-    run("DELETE FROM blog_post_likes WHERE user_id = ?", id);
-  } catch {}
-  try {
-    run("DELETE FROM blog_post_bookmarks WHERE user_id = ?", id);
-  } catch {}
-  try {
-    run("DELETE FROM blog_comments WHERE user_id = ?", id);
-  } catch {}
-  try {
-    run("DELETE FROM blog_posts WHERE author_id = ?", id);
-  } catch {}
-  try {
-    run("DELETE FROM blog_reports WHERE reporter_id = ?", id);
-  } catch {}
-
-  try {
-    run(
-      "DELETE FROM chat_thread_hidden WHERE user_id = ? OR thread_id IN (SELECT id FROM chat_threads WHERE user_a_id = ? OR user_b_id = ?)",
-      id,
-      id,
-      id,
-    );
-  } catch {}
-  try {
-    run("DELETE FROM chat_messages WHERE thread_id IN (SELECT id FROM chat_threads WHERE user_a_id = ? OR user_b_id = ?)", id, id);
-  } catch {}
-  try {
-    run("DELETE FROM chat_threads WHERE user_a_id = ? OR user_b_id = ?", id, id);
-  } catch {}
-
-  try {
-    run(
-      "DELETE FROM user_follows WHERE follower_user_id = ? OR following_user_id = ?",
-      id,
-      id,
-    );
-  } catch {}
-
-  try {
-    run("DELETE FROM invite_links WHERE owner_user_id = ?", id);
-  } catch {}
-  try {
-    run("DELETE FROM user_files WHERE owner_id = ?", id);
-  } catch {}
-  try {
-    run("DELETE FROM user_notes WHERE owner_id = ?", id);
-  } catch {}
-  try {
-    run("DELETE FROM share_links WHERE owner_id = ?", id);
-  } catch {}
-  try {
-    run("DELETE FROM library_books WHERE uploaded_by = ?", id);
-  } catch {}
-  try {
-    run("DELETE FROM user_privacy_settings WHERE user_id = ?", id);
-  } catch {}
-  try {
-    run("DELETE FROM user_notification_settings WHERE user_id = ?", id);
-  } catch {}
-
-  run("DELETE FROM users WHERE id = ?", id);
-  return res.json({ ok: true });
+    const { fileRows, bookRows, avatarUrl } = deleteUserFully(id);
+    removeDeletedUserFiles(fileRows, bookRows, avatarUrl);
+    return res.json({ ok: true });
+  } catch (e) {
+    console.error("admin delete user", e);
+    return res.status(500).json({ error: "internal error" });
+  }
 });
 
 router.post("/admin/users/:id/invites", (req, res) => {
