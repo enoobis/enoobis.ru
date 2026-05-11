@@ -130,6 +130,23 @@ type AssignEditDraft = {
 };
 const editingAssignment = ref<AssignEditDraft | null>(null);
 
+type AssignmentHandInFilter = "all" | "done" | "undone";
+const assignmentHandInFilter = ref<AssignmentHandInFilter>("all");
+
+function assignmentIsHandedIn(a: Assignment): boolean {
+  const s = a.my_submission;
+  if (!s) return false;
+  return s.status === "submitted" || s.status === "graded";
+}
+
+const visibleCourseAssignments = computed(() => {
+  if (!classroom.value) return [];
+  const list = classroom.value.assignments;
+  if (isTeacherInCurrent.value || assignmentHandInFilter.value === "all") return list;
+  if (assignmentHandInFilter.value === "done") return list.filter(assignmentIsHandedIn);
+  return list.filter((a) => !assignmentIsHandedIn(a));
+});
+
 const addTaskForLectureId = ref<string | null>(null);
 const addTaskTitle = ref("");
 const addTaskDesc = ref("");
@@ -368,6 +385,13 @@ function assignmentsForLecture(lecId: string): Assignment[] {
   if (!classroom.value) return [];
   return classroom.value.assignments.filter((a) => a.lecture_id === lecId);
 }
+
+watch(
+  () => classroom.value?.course.id,
+  () => {
+    assignmentHandInFilter.value = "all";
+  },
+);
 
 function syncRouteState(courseId: string, nextTab: Tab = tab.value) {
   if (!courseId) return;
@@ -1570,15 +1594,51 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 
       <!-- задания -->
       <template v-else-if="tab === 'assignments'">
-        <div v-if="isTeacherInCurrent" class="add-bar">
-          <button
-            type="button"
-            class="secondary"
-            :class="{ active: addingAssignment }"
-            @click="addingAssignment = !addingAssignment"
+        <div
+          v-if="isTeacherInCurrent || (!isTeacherInCurrent && classroom.assignments.length)"
+          class="assignments-toolbar"
+        >
+          <div
+            v-if="!isTeacherInCurrent && classroom.assignments.length"
+            class="submission-filter"
+            role="group"
+            aria-label="фильтр сдачи"
           >
-            {{ addingAssignment ? "отмена" : "+ задание" }}
-          </button>
+            <button
+              type="button"
+              class="secondary small"
+              :class="{ active: assignmentHandInFilter === 'all' }"
+              @click="assignmentHandInFilter = 'all'"
+            >
+              все
+            </button>
+            <button
+              type="button"
+              class="secondary small"
+              :class="{ active: assignmentHandInFilter === 'done' }"
+              @click="assignmentHandInFilter = 'done'"
+            >
+              сдано
+            </button>
+            <button
+              type="button"
+              class="secondary small"
+              :class="{ active: assignmentHandInFilter === 'undone' }"
+              @click="assignmentHandInFilter = 'undone'"
+            >
+              не сдано
+            </button>
+          </div>
+          <div v-if="isTeacherInCurrent" class="add-bar">
+            <button
+              type="button"
+              class="secondary"
+              :class="{ active: addingAssignment }"
+              @click="addingAssignment = !addingAssignment"
+            >
+              {{ addingAssignment ? "отмена" : "+ задание" }}
+            </button>
+          </div>
         </div>
         <div v-if="isTeacherInCurrent && addingAssignment" class="form-card">
           <input v-model="assignmentTitle" placeholder="название" />
@@ -1600,7 +1660,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
         </div>
 
         <div
-          v-for="a in classroom.assignments"
+          v-for="a in visibleCourseAssignments"
           :key="a.id"
           class="task-card"
         >
@@ -1685,9 +1745,15 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
               </button>
             </div>
           </template>
-        </div>
+         </div>
         <p v-if="!classroom.assignments.length" class="muted center empty">
           {{ isTeacherInCurrent ? "создайте первое задание" : "заданий пока нет" }}
+        </p>
+        <p
+          v-else-if="!visibleCourseAssignments.length"
+          class="muted center empty"
+        >
+          нет заданий по фильтру
         </p>
       </template>
 
@@ -2255,11 +2321,32 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   text-align: center;
 }
 
+.assignments-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.35rem;
+}
+.submission-filter {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
 .add-bar {
   display: flex;
   justify-content: flex-end;
+  margin-left: auto;
+}
+.assignments-toolbar .add-bar {
+  margin-left: auto;
 }
 .add-bar button.active {
+  background: var(--surface2);
+  color: var(--text);
+}
+.submission-filter button.active {
   background: var(--surface2);
   color: var(--text);
 }
