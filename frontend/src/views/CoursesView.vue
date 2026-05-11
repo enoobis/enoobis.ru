@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import {
   addCoTeacher,
@@ -306,6 +306,25 @@ function closeGrading() {
   expandedStudentId.value = null;
   gradingSearch.value = "";
 }
+
+function onGradingEscape(e: KeyboardEvent) {
+  if (e.key === "Escape") closeGrading();
+}
+
+watch(activeAssignmentForGrading, (id) => {
+  if (id) {
+    document.addEventListener("keydown", onGradingEscape);
+    document.body.style.overflow = "hidden";
+  } else {
+    document.removeEventListener("keydown", onGradingEscape);
+    document.body.style.overflow = "";
+  }
+});
+
+onUnmounted(() => {
+  document.removeEventListener("keydown", onGradingEscape);
+  document.body.style.overflow = "";
+});
 
 watch(gradingSearch, () => {
   const f = gradingStudentsFiltered.value;
@@ -1919,11 +1938,20 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
       </div>
     </div>
 
-    <div v-if="activeAssignmentForGrading && gradingAssignment" class="grade-modal">
+    <Teleport to="body">
+      <div
+        v-if="activeAssignmentForGrading && gradingAssignment"
+        class="grade-modal-root"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="grade-modal-title"
+      >
+        <div class="grade-modal-backdrop" aria-hidden="true" @click="closeGrading" />
+        <div class="grade-modal">
       <header class="grade-head">
         <div>
           <p class="muted small">проверка</p>
-          <h3>{{ gradingAssignment.title }}</h3>
+          <h3 id="grade-modal-title">{{ gradingAssignment.title }}</h3>
         </div>
         <button
           type="button"
@@ -2046,6 +2074,8 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
         </div>
       </div>
     </div>
+    </div>
+    </Teleport>
   </section>
 </template>
 
@@ -2702,8 +2732,29 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   border-top: none;
 }
 
+.grade-modal-root {
+  position: fixed;
+  inset: 0;
+  z-index: 4000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(0.65rem, env(safe-area-inset-top)) max(0.65rem, env(safe-area-inset-right))
+    max(0.65rem, env(safe-area-inset-bottom)) max(0.65rem, env(safe-area-inset-left));
+  box-sizing: border-box;
+}
+.grade-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
+  cursor: pointer;
+}
 .grade-modal {
-  margin-top: 0.6rem;
+  position: relative;
+  z-index: 1;
+  width: min(100%, 40rem);
+  margin: 0;
   display: flex;
   flex-direction: column;
   gap: 0.55rem;
@@ -2713,6 +2764,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   background: var(--surface);
   max-height: min(92vh, 44rem);
   min-height: 0;
+  overflow: hidden;
 }
 .grade-head {
   display: flex;
