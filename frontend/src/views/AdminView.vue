@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import { api } from "../api/http";
 import {
@@ -59,6 +59,47 @@ const modInvites = ref<AdminInviteRow[]>([]);
 const modMsg = ref("");
 const modBusy = ref(false);
 
+const ADMIN_POLL_MS = 12000;
+let adminModeratePoll: ReturnType<typeof setInterval> | null = null;
+
+function normAdminSocialJson(links: SocialRow[] | AdminUserDetail["social_links"]) {
+  const arr = Array.isArray(links) ? links : [];
+  return JSON.stringify(
+    arr.map((s) => ({ name: String(s.name ?? "").trim(), url: String(s.url ?? "").trim() })),
+  );
+}
+
+function applyModerateMerge(old: AdminUserDetail, fresh: AdminUserDetail) {
+  if (moderateNick.value === old.nickname) moderateNick.value = fresh.nickname;
+  if (moderateFullName.value === (old.full_name ?? "")) moderateFullName.value = fresh.full_name ?? "";
+  if (moderateWebsite.value === (old.website_url ?? "")) moderateWebsite.value = fresh.website_url ?? "";
+  if (moderateBio.value === (old.bio ?? "")) moderateBio.value = fresh.bio ?? "";
+  if (moderateReadme.value === (old.readme_md ?? "")) moderateReadme.value = fresh.readme_md ?? "";
+  if (normAdminSocialJson(moderateSocial.value) === normAdminSocialJson(old.social_links)) {
+    moderateSocial.value = Array.isArray(fresh.social_links)
+      ? fresh.social_links.map((s) => ({ name: s.name ?? "", url: s.url ?? "" }))
+      : [];
+  }
+  moderateDetail.value = fresh;
+}
+
+async function refreshModerateOpen() {
+  if (!auth.token || document.visibilityState === "hidden") return;
+  const id = moderateUserId.value;
+  const oldDetail = moderateDetail.value;
+  if (!id || !oldDetail || modBusy.value) return;
+  try {
+    const fresh = await getAdminUserDetail(auth.token, id);
+    applyModerateMerge(oldDetail, fresh);
+    modInvites.value = await listAdminUserInvites(auth.token, id);
+  } catch {
+  }
+}
+
+function onAdminModerateVisibility() {
+  if (document.visibilityState === "visible") void refreshModerateOpen();
+}
+
 const filteredUsers = computed(() => {
   const q = usersQuery.value.trim().toLowerCase();
   if (!q) return users.value;
@@ -103,7 +144,19 @@ async function load() {
   }
 }
 
-onMounted(load);
+onMounted(() => {
+  void load();
+  document.addEventListener("visibilitychange", onAdminModerateVisibility);
+  adminModeratePoll = setInterval(() => void refreshModerateOpen(), ADMIN_POLL_MS);
+});
+
+onUnmounted(() => {
+  document.removeEventListener("visibilitychange", onAdminModerateVisibility);
+  if (adminModeratePoll) {
+    clearInterval(adminModeratePoll);
+    adminModeratePoll = null;
+  }
+});
 
 async function approve(id: string) {
   await api(`/api/admin/users/${id}/approve`, { method: "POST", token: auth.token });

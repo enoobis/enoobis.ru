@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import { api } from "../api/http";
 import { listAuthorPosts, type BlogListItem } from "../api/blog";
@@ -144,7 +144,39 @@ async function unpinFromProfile() {
   }
 }
 
-onMounted(load);
+const POLL_MS = 12000;
+let profilePoll: ReturnType<typeof setInterval> | null = null;
+
+async function refreshPublicProfile() {
+  if (document.visibilityState === "hidden" || !nick.value) return;
+  try {
+    const p = await api<Profile>(`/api/profile/${nick.value}`);
+    profile.value = p;
+    avatarBroken.value = false;
+    const microData = await listMicroByAuthor(nick.value, auth.token);
+    micro.value = microData.items;
+  } catch {
+  }
+}
+
+function onProfileVisibility() {
+  if (document.visibilityState === "visible") void refreshPublicProfile();
+}
+
+onMounted(() => {
+  void load();
+  document.addEventListener("visibilitychange", onProfileVisibility);
+  profilePoll = setInterval(() => void refreshPublicProfile(), POLL_MS);
+});
+
+onUnmounted(() => {
+  document.removeEventListener("visibilitychange", onProfileVisibility);
+  if (profilePoll) {
+    clearInterval(profilePoll);
+    profilePoll = null;
+  }
+});
+
 watch(nick, load);
 </script>
 

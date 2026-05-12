@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { api } from "../api/http";
 import { uploadAvatar } from "../api/uploadAvatar";
@@ -79,6 +79,67 @@ const nickStatus = ref<"idle" | "checking" | "ok" | "err">("idle");
 const nickMessage = ref("");
 const changingNick = ref(false);
 let nickTimer: ReturnType<typeof setTimeout> | null = null;
+
+const POLL_MS = 12000;
+let mePoll: ReturnType<typeof setInterval> | null = null;
+
+function normStr(s: string | undefined | null) {
+  return s ?? "";
+}
+
+function normSocialJson(links: SocialLink[]) {
+  return JSON.stringify(
+    links.map((s) => ({ name: String(s.name ?? "").trim(), url: String(s.url ?? "").trim() })),
+  );
+}
+
+function applyMeMerge(oldMe: Me, fresh: Me) {
+  if (bio.value === normStr(oldMe.bio)) bio.value = normStr(fresh.bio);
+  if (readmeMd.value === normStr(oldMe.readme_md)) readmeMd.value = normStr(fresh.readme_md);
+  if (languagePreference.value === oldMe.language_preference) {
+    languagePreference.value = fresh.language_preference;
+  }
+  if (fullName.value === normStr(oldMe.full_name)) fullName.value = normStr(fresh.full_name);
+  if (websiteUrl.value === normStr(oldMe.website_url)) websiteUrl.value = normStr(fresh.website_url);
+  if (birthday.value === normStr(oldMe.birthday)) birthday.value = normStr(fresh.birthday);
+  if (country.value === normStr(oldMe.country)) country.value = normStr(fresh.country);
+  if (normSocialJson(socialLinks.value) === normSocialJson(Array.isArray(oldMe.social_links) ? oldMe.social_links : [])) {
+    socialLinks.value = Array.isArray(fresh.social_links) ? [...fresh.social_links] : [];
+  }
+  me.value = fresh;
+  applyUserPreferences({ language_preference: fresh.language_preference });
+  if (auth.token && auth.user && fresh.nickname !== auth.user.nickname) {
+    auth.applySession(auth.token, { ...auth.user, nickname: fresh.nickname });
+  }
+}
+
+async function refreshMeFromServer() {
+  if (!auth.token || document.visibilityState === "hidden") return;
+  if (saving.value || uploadingAvatar.value || changingNick.value || changingPassword.value) return;
+  try {
+    const fresh = await api<Me>("/api/me", { token: auth.token });
+    const old = me.value;
+    if (!old) {
+      me.value = fresh;
+      bio.value = fresh.bio;
+      readmeMd.value = fresh.readme_md ?? "";
+      languagePreference.value = fresh.language_preference;
+      fullName.value = fresh.full_name ?? "";
+      websiteUrl.value = fresh.website_url ?? "";
+      socialLinks.value = Array.isArray(fresh.social_links) ? [...fresh.social_links] : [];
+      birthday.value = fresh.birthday ?? "";
+      country.value = fresh.country ?? "";
+      applyUserPreferences({ language_preference: fresh.language_preference });
+      return;
+    }
+    applyMeMerge(old, fresh);
+  } catch {
+  }
+}
+
+function onMeVisibility() {
+  if (document.visibilityState === "visible") void refreshMeFromServer();
+}
 
 const nickChangesLeft = computed(() => {
   if (!me.value) return MAX_NICK_CHANGES;
@@ -201,8 +262,18 @@ onMounted(async () => {
     applyUserPreferences({ language_preference: me.value.language_preference });
     avatarMsg.value = "";
     await loadInvites();
+    document.addEventListener("visibilitychange", onMeVisibility);
+    mePoll = setInterval(() => void refreshMeFromServer(), POLL_MS);
   } catch (e) {
     err.value = e instanceof Error ? e.message : "ошибка";
+  }
+});
+
+onUnmounted(() => {
+  document.removeEventListener("visibilitychange", onMeVisibility);
+  if (mePoll) {
+    clearInterval(mePoll);
+    mePoll = null;
   }
 });
 

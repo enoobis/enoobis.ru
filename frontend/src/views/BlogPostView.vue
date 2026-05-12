@@ -44,6 +44,9 @@ const readingMinutes = computed(() => {
   return Math.max(1, Math.round(words / 200));
 });
 
+const POLL_MS = 12000;
+let postPoll: ReturnType<typeof setInterval> | null = null;
+
 async function load() {
   err.value = "";
   post.value = null;
@@ -60,6 +63,26 @@ async function load() {
   } catch (e) {
     err.value = e instanceof Error ? e.message : "ошибка";
   }
+}
+
+async function softRefreshPost() {
+  if (document.visibilityState === "hidden" || !postId.value) return;
+  try {
+    const [p, c] = await Promise.all([getPost(postId.value), listComments(postId.value)]);
+    post.value = p;
+    comments.value = c;
+    addRecentPost(p);
+    if (auth.token) {
+      myState.value = await getMyPostState(postId.value, auth.token);
+    } else {
+      myState.value = { liked: false, bookmarked: false, can_edit: false, can_delete: false };
+    }
+  } catch {
+  }
+}
+
+function onPostVisibility() {
+  if (document.visibilityState === "visible") void softRefreshPost();
 }
 
 function readingProgress() {
@@ -189,11 +212,18 @@ async function sendCommentReport(commentId: string) {
 
 onMounted(() => {
   window.addEventListener("scroll", persistProgress, { passive: true });
+  document.addEventListener("visibilitychange", onPostVisibility);
+  postPoll = setInterval(() => void softRefreshPost(), POLL_MS);
   load();
 });
 onUnmounted(() => {
   persistProgress();
   window.removeEventListener("scroll", persistProgress);
+  document.removeEventListener("visibilitychange", onPostVisibility);
+  if (postPoll) {
+    clearInterval(postPoll);
+    postPoll = null;
+  }
 });
 watch(() => route.params.id, load);
 </script>
