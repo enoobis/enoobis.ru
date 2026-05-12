@@ -11,6 +11,7 @@ import {
   checkMicroLikeMilestone,
 } from "../utils/achievements.js";
 import { assertMicroPublish } from "../utils/contentLimits.js";
+import { optimizeUploadedFile } from "../utils/imageOptimize.js";
 
 const router = express.Router();
 const MAX_BODY = 480;
@@ -274,8 +275,10 @@ router.post(
       next();
     });
   },
-  (req, res) => {
+  async (req, res) => {
     if (!req.file) return res.status(400).json({ error: "no file" });
+    const r = await optimizeUploadedFile(req.file.path, "micro");
+    if (r.ok) req.file.filename = r.filename;
     return res.json({ url: `/uploads/micro/${req.file.filename}` });
   },
 );

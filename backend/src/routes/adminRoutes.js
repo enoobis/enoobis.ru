@@ -8,6 +8,7 @@ import { authRequired, hashPassword } from "../auth.js";
 import { awardAchievement } from "../utils/achievements.js";
 import { saveIdenticon } from "../utils/identicon.js";
 import { limitsFromAdminBody, limitsToJson, parseContentLimits } from "../utils/contentLimits.js";
+import { optimizeUploadedFile } from "../utils/imageOptimize.js";
 
 const router = express.Router();
 
@@ -205,10 +206,12 @@ router.patch("/admin/users/:id/publish-limits", (req, res) => {
 router.post(
   "/admin/users/:id/avatar",
   uploadSingle(adminAvatarUpload, "file"),
-  (req, res) => {
+  async (req, res) => {
     if (!req.file) return res.status(400).json({ error: "no file" });
     const target = get("SELECT id FROM users WHERE id = ?", req.params.id);
     if (!target) return res.status(404).json({ error: "not found" });
+    const r = await optimizeUploadedFile(req.file.path, "avatar");
+    if (r.ok) req.file.filename = r.filename;
     const url = `/uploads/avatars/${req.file.filename}`;
     run("UPDATE users SET avatar_url = ? WHERE id = ?", url, req.params.id);
     return res.json({ avatar_url: url });

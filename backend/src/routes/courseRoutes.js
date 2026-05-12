@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from "uuid";
 import { all, get, nowIso, run } from "../db.js";
 import { authRequired } from "../auth.js";
 import { awardAchievement } from "../utils/achievements.js";
+import { isRasterImageMimetype, optimizeUploadedFile } from "../utils/imageOptimize.js";
 
 const router = express.Router();
 
@@ -739,7 +740,7 @@ router.post(
       next();
     });
   },
-  (req, res) => {
+  async (req, res) => {
     const access = ensureCourseAccess(req.params.id, req.user);
     if (access.error) {
       if (req.file?.path) {
@@ -750,12 +751,21 @@ router.post(
       return res.status(access.error).json({ error: "no access" });
     }
     if (!req.file) return res.status(400).json({ error: "no file" });
+    let mime = req.file.mimetype;
+    if (isRasterImageMimetype(req.file.mimetype)) {
+      const opt = await optimizeUploadedFile(req.file.path, "submission");
+      if (opt.ok) {
+        req.file.filename = opt.filename;
+        mime = "image/webp";
+      }
+    }
     const url = `/uploads/submissions/${req.file.filename}`;
+    const st = fs.statSync(path.join(UPLOAD_ROOT, "submissions", req.file.filename));
     return res.json({
       url,
       file_name: req.file.originalname,
-      size_bytes: req.file.size,
-      mime_type: req.file.mimetype,
+      size_bytes: st.size,
+      mime_type: mime,
     });
   },
 );

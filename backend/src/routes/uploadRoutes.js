@@ -5,6 +5,7 @@ import fs from "node:fs";
 import { v4 as uuidv4 } from "uuid";
 import { nowIso, run, get } from "../db.js";
 import { authRequired } from "../auth.js";
+import { isRasterImageMimetype, optimizeUploadedFile } from "../utils/imageOptimize.js";
 
 const router = express.Router();
 
@@ -53,15 +54,23 @@ const lectureUpload = multer({
   limits: { fileSize: 32 * 1024 * 1024 },
 });
 
-router.post("/me/avatar", authRequired, uploadSingle(avatarUpload, "file"), (req, res) => {
+router.post("/me/avatar", authRequired, uploadSingle(avatarUpload, "file"), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: "no file" });
+  if (isRasterImageMimetype(req.file.mimetype)) {
+    const r = await optimizeUploadedFile(req.file.path, "avatar");
+    if (r.ok) req.file.filename = r.filename;
+  }
   const url = `/uploads/avatars/${req.file.filename}`;
   run("UPDATE users SET avatar_url = ? WHERE id = ?", url, req.user.id);
   return res.json({ avatar_url: url });
 });
 
-router.post("/blog/upload-image", authRequired, uploadSingle(blogUpload, "file"), (req, res) => {
+router.post("/blog/upload-image", authRequired, uploadSingle(blogUpload, "file"), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: "no file" });
+  if (isRasterImageMimetype(req.file.mimetype)) {
+    const r = await optimizeUploadedFile(req.file.path, "blog");
+    if (r.ok) req.file.filename = r.filename;
+  }
   const url = `/uploads/blog/${req.file.filename}`;
   const postId = req.body?.post_id ? String(req.body.post_id).trim() : "";
   if (postId) {
@@ -87,8 +96,12 @@ router.post(
   "/courses/:id/lectures/upload",
   authRequired,
   lectureUpload.single("file"),
-  (req, res) => {
+  async (req, res) => {
     if (!req.file) return res.status(400).json({ error: "no file" });
+    if (isRasterImageMimetype(req.file.mimetype)) {
+      const r = await optimizeUploadedFile(req.file.path, "lecture");
+      if (r.ok) req.file.filename = r.filename;
+    }
     const url = `/uploads/course-lectures/${req.file.filename}`;
     return res.json({ url, file_name: req.file.originalname });
   },

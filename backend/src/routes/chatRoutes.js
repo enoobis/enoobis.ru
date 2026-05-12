@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from "uuid";
 import { all, get, nowIso, run } from "../db.js";
 import { authRequired } from "../auth.js";
 import { assertChatOutgoing } from "../utils/contentLimits.js";
+import { optimizeUploadedFile } from "../utils/imageOptimize.js";
 
 const router = express.Router();
 const MAX_BODY = 4000;
@@ -330,7 +331,7 @@ router.post(
       next();
     });
   },
-  (req, res) => {
+  async (req, res) => {
     const thread = get(
       "SELECT id, user_a_id, user_b_id FROM chat_threads WHERE id = ?",
       req.params.id,
@@ -360,6 +361,8 @@ router.post(
       return;
     }
     if (!req.file) return res.status(400).json({ error: "no file" });
+    const r = await optimizeUploadedFile(req.file.path, "chat");
+    if (r.ok) req.file.filename = r.filename;
     const url = `/uploads/chat/${req.file.filename}`;
     res.json({ url });
   },
