@@ -558,11 +558,14 @@ router.post("/blog/:id/report", authRequired, (req, res) => {
 });
 
 router.post("/blog/comments/:id/report", authRequired, (req, res) => {
+  const comment = get("SELECT post_id FROM blog_comments WHERE id = ?", req.params.id);
+  if (!comment) return res.status(404).json({ error: "not found" });
   const id = uuidv4();
   run(
     `INSERT INTO blog_reports (id, target_type, target_post_id, target_comment_id, reporter_user_id, reason, status, created_at)
-     VALUES (?, 'comment', NULL, ?, ?, ?, 'open', ?)`,
+     VALUES (?, 'comment', ?, ?, ?, ?, 'open', ?)`,
     id,
+    comment.post_id,
     req.params.id,
     req.user.id,
     String(req.body?.reason ?? ""),

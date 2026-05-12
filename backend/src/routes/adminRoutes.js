@@ -481,11 +481,66 @@ router.post("/admin/users/:id/invites", (req, res) => {
   return res.json({ ok: true, created });
 });
 
+function enrichBlogReportRow(r) {
+  const reporter = get("SELECT nickname FROM users WHERE id = ?", r.reporter_user_id);
+  const out = {
+    ...r,
+    reporter_nickname: reporter?.nickname ?? "",
+    related_post_id: r.target_post_id,
+    post_title: null,
+    post_author_nickname: null,
+    comment_preview: null,
+    comment_author_nickname: null,
+  };
+  if (r.target_type === "post" && r.target_post_id) {
+    const p = get(
+      `SELECT p.title, u.nickname AS author_nickname FROM blog_posts p
+       JOIN users u ON u.id = p.author_id WHERE p.id = ?`,
+      r.target_post_id,
+    );
+    if (p) {
+      out.post_title = p.title;
+      out.post_author_nickname = p.author_nickname;
+    }
+    return out;
+  }
+  if (r.target_type === "comment" && r.target_comment_id) {
+    const c = get(
+      `SELECT c.body, c.post_id, u.nickname AS author_nickname
+       FROM blog_comments c JOIN users u ON u.id = c.user_id WHERE c.id = ?`,
+      r.target_comment_id,
+    );
+    if (c) {
+      const raw = String(c.body).replace(/\s+/g, " ").trim();
+      out.comment_preview = raw.length > 220 ? `${raw.slice(0, 220)}…` : raw;
+      out.comment_author_nickname = c.author_nickname;
+      out.related_post_id = c.post_id;
+    }
+    const pid = out.related_post_id;
+    if (pid) {
+      const p = get(
+        `SELECT p.title, u.nickname AS author_nickname FROM blog_posts p
+         JOIN users u ON u.id = p.author_id WHERE p.id = ?`,
+        pid,
+      );
+      if (p) {
+        out.post_title = p.title;
+        out.post_author_nickname = p.author_nickname;
+      }
+    }
+  }
+  return out;
+}
+
 router.get("/admin/blog/reports", (_req, res) => {
-  const rows = all(
-    "SELECT * FROM blog_reports ORDER BY created_at DESC",
-  );
-  return res.json(rows);
+  const rows = all("SELECT * FROM blog_reports ORDER BY created_at DESC");
+  return res.json(rows.map(enrichBlogReportRow));
+});
+
+router.delete("/admin/blog/reports/:id", (req, res) => {
+  const info = run("DELETE FROM blog_reports WHERE id = ?", req.params.id);
+  if (info.changes === 0) return res.status(404).json({ error: "not found" });
+  return res.json({ ok: true });
 });
 
 router.post("/admin/blog/reports/:id/resolve", (req, res) => {

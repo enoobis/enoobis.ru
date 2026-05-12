@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import { RouterLink } from "vue-router";
 import { api } from "../api/http";
 import {
+  deleteBlogReport,
   hideCommentByAdmin,
   hidePostByAdmin,
   listBlogReports,
@@ -276,6 +278,21 @@ async function resolveReport(id: string, status: "resolved" | "dismissed") {
   reports.value = await listBlogReports(auth.token);
 }
 
+async function deleteReport(id: string) {
+  if (!auth.token) return;
+  if (!window.confirm("удалить жалобу?")) return;
+  try {
+    await deleteBlogReport(id, auth.token);
+    reports.value = await listBlogReports(auth.token);
+  } catch (e) {
+    err.value = e instanceof Error ? e.message : "ошибка";
+  }
+}
+
+function reportPostId(r: BlogReport): string | null {
+  return r.related_post_id ?? r.target_post_id;
+}
+
 async function hidePost(id: string | null) {
   if (!auth.token || !id) return;
   await hidePostByAdmin(id, auth.token);
@@ -457,21 +474,42 @@ async function restoreComment(id: string | null) {
         <li v-for="r in reports" :key="r.id">
           <div>
             <span class="badge">{{ r.target_type === "post" ? "пост" : "коммент" }}</span>
-            <span class="muted small"> · {{ r.status }}</span>
+            <span class="muted small">
+              · {{ r.status }} · {{ r.created_at.slice(0, 16).replace("T", " ") }}
+            </span>
           </div>
-          <p class="reason">{{ r.reason }}</p>
+          <p class="muted small report-meta">
+            от <strong>{{ r.reporter_nickname || r.reporter_user_id }}</strong>
+          </p>
+          <p v-if="reportPostId(r) && r.post_title" class="report-target">
+            <RouterLink :to="`/blogs/${reportPostId(r)}`">{{ r.post_title }}</RouterLink>
+            <span v-if="r.post_author_nickname" class="muted small"> · {{ r.post_author_nickname }}</span>
+          </p>
+          <p v-else-if="r.target_type === 'post'" class="muted small">пост не найден</p>
+          <p v-else-if="r.target_type === 'comment' && !reportPostId(r)" class="muted small">пост не найден</p>
+          <p v-if="r.target_type === 'comment' && r.comment_preview" class="reason comment-excerpt">
+            «{{ r.comment_preview }}»
+            <span v-if="r.comment_author_nickname" class="muted small"> · {{ r.comment_author_nickname }}</span>
+          </p>
+          <p v-if="r.reason.trim()" class="reason"><strong>текст жалобы:</strong> {{ r.reason }}</p>
           <div class="row-actions">
             <button class="secondary" type="button" @click="resolveReport(r.id, 'resolved')">решено</button>
             <button class="secondary" type="button" @click="resolveReport(r.id, 'dismissed')">отклонить</button>
-            <button v-if="r.target_type === 'post'" class="secondary" type="button" @click="hidePost(r.target_post_id)">
-              скрыть
+            <button
+              v-if="r.target_type === 'post' && reportPostId(r)"
+              class="secondary"
+              type="button"
+              @click="hidePost(reportPostId(r))"
+            >
+              скрыть пост
             </button>
             <button v-if="r.target_type === 'comment'" class="secondary" type="button" @click="hideComment(r.target_comment_id)">
-              скрыть
+              скрыть коммент
             </button>
             <button v-if="r.target_type === 'comment'" class="secondary" type="button" @click="restoreComment(r.target_comment_id)">
-              вернуть
+              вернуть коммент
             </button>
+            <button class="secondary danger" type="button" @click="deleteReport(r.id)">удалить</button>
           </div>
         </li>
       </ul>
@@ -537,6 +575,13 @@ async function restoreComment(id: string | null) {
 .row-actions .danger:hover {
   background: var(--danger, #c44);
   color: var(--bg);
+}
+.report-target {
+  margin: 0;
+  font-size: 0.9rem;
+}
+.comment-excerpt {
+  font-size: 0.85rem;
 }
 .reason {
   margin: 0;

@@ -312,6 +312,19 @@ try {
 }
 
 try {
+  db.prepare(`
+    UPDATE blog_reports SET target_post_id = (
+      SELECT post_id FROM blog_comments WHERE blog_comments.id = blog_reports.target_comment_id
+    )
+    WHERE target_type = 'comment'
+      AND target_comment_id IS NOT NULL
+      AND (target_post_id IS NULL OR target_post_id = '')
+  `).run();
+} catch {
+  // ignore
+}
+
+try {
   db.exec(`
     CREATE TABLE IF NOT EXISTS chat_thread_hidden (
       user_id TEXT NOT NULL,

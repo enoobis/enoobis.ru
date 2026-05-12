@@ -79,11 +79,18 @@ export type BlogReport = {
   target_post_id: string | null;
   target_comment_id: string | null;
   reporter_user_id: string;
+  reporter_nickname?: string;
   reason: string;
   status: "open" | "resolved" | "dismissed";
   created_at: string;
   resolved_at: string | null;
   resolved_by: string | null;
+  /** пост для ссылки / скрытия (для коммента подставляется из comment.post_id) */
+  related_post_id?: string | null;
+  post_title?: string | null;
+  post_author_nickname?: string | null;
+  comment_preview?: string | null;
+  comment_author_nickname?: string | null;
 };
 
 type BlogListQuery = {
@@ -271,6 +278,10 @@ export function resolveBlogReport(id: string, status: "resolved" | "dismissed", 
     token,
     body: JSON.stringify({ status }),
   });
+}
+
+export function deleteBlogReport(id: string, token: string) {
+  return api<{ ok: boolean }>(`/api/admin/blog/reports/${id}`, { method: "DELETE", token });
 }
 
 export function hidePostByAdmin(id: string, token: string) {
