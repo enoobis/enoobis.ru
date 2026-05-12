@@ -15,10 +15,14 @@ import {
   deleteAdminUserInvite,
   getAdminUserDetail,
   listAdminUserInvites,
+  patchAdminPublishLimits,
   patchAdminUserProfile,
   uploadAdminUserAvatar,
   type AdminInviteRow,
   type AdminUserDetail,
+  type PublishChannelLimits,
+  type PublishLimitsPatchBody,
+  type PublishPeriod,
 } from "../api/adminUsers";
 import { useAuthStore } from "../stores/auth";
 
@@ -81,6 +85,7 @@ function applyModerateMerge(old: AdminUserDetail, fresh: AdminUserDetail) {
       : [];
   }
   moderateDetail.value = fresh;
+  syncLimitsFromDetail(fresh.publish_limits);
 }
 
 async function refreshModerateOpen() {
@@ -122,6 +127,115 @@ function syncModerateFromDetail() {
   moderateSocial.value = Array.isArray(d.social_links)
     ? d.social_links.map((s) => ({ name: s.name ?? "", url: s.url ?? "" }))
     : [];
+  syncLimitsFromDetail(d.publish_limits);
+}
+
+type ModLimForm = {
+  ban_forever: boolean;
+  ban_until: string;
+  max_per_period: string;
+  period: PublishPeriod;
+  min_interval_hours: string;
+};
+
+const modLimBlog = ref<ModLimForm>({
+  ban_forever: false,
+  ban_until: "",
+  max_per_period: "",
+  period: "day",
+  min_interval_hours: "",
+});
+const modLimMicro = ref<ModLimForm>({
+  ban_forever: false,
+  ban_until: "",
+  max_per_period: "",
+  period: "day",
+  min_interval_hours: "",
+});
+const modLimComment = ref<ModLimForm>({
+  ban_forever: false,
+  ban_until: "",
+  max_per_period: "",
+  period: "day",
+  min_interval_hours: "",
+});
+const modLimChat = ref<ModLimForm>({
+  ban_forever: false,
+  ban_until: "",
+  max_per_period: "",
+  period: "day",
+  min_interval_hours: "",
+});
+
+function hoursFromSeconds(sec: number | null): string {
+  if (sec == null) return "";
+  const h = sec / 3600;
+  if (Number.isInteger(h)) return String(h);
+  return h.toFixed(1).replace(/\.0$/, "");
+}
+
+function syncLimitsFromDetail(pl: AdminUserDetail["publish_limits"] | undefined) {
+  if (!pl) return;
+  const row = (c: PublishChannelLimits): ModLimForm => ({
+    ban_forever: !!c.ban_forever,
+    ban_until: c.ban_until ? c.ban_until.slice(0, 16) : "",
+    max_per_period: c.max_per_period != null ? String(c.max_per_period) : "",
+    period: c.period ?? "day",
+    min_interval_hours: hoursFromSeconds(c.min_interval_seconds),
+  });
+  modLimBlog.value = row(pl.blog);
+  modLimMicro.value = row(pl.micro);
+  modLimComment.value = row(pl.blog_comment);
+  modLimChat.value = row(pl.chat);
+}
+
+function limToPayload(l: ModLimForm): PublishLimitsPatchBody["blog"] {
+  const max = l.max_per_period.trim();
+  const hrs = l.min_interval_hours.trim().replace(",", ".");
+  return {
+    ban_forever: l.ban_forever,
+    ban_until: l.ban_forever ? "" : l.ban_until.trim() ? new Date(l.ban_until).toISOString() : "",
+    max_per_period: max ? Number(max) : "",
+    period: l.period,
+    min_interval_hours: hrs ? Number(hrs) : "",
+  };
+}
+
+async function saveModerateLimits() {
+  const id = moderateUserId.value;
+  if (!auth.token || !id) return;
+  modBusy.value = true;
+  modMsg.value = "";
+  try {
+    const r = await patchAdminPublishLimits(auth.token, id, {
+      blog: limToPayload(modLimBlog.value),
+      micro: limToPayload(modLimMicro.value),
+      blog_comment: limToPayload(modLimComment.value),
+      chat: limToPayload(modLimChat.value),
+    });
+    if (moderateDetail.value) moderateDetail.value.publish_limits = r.publish_limits;
+    modMsg.value = "лимиты сохранены";
+  } catch (e) {
+    modMsg.value = e instanceof Error ? e.message : "ошибка";
+  } finally {
+    modBusy.value = false;
+  }
+}
+
+function presetBan(target: "blog" | "micro" | "comment" | "chat", unit: "day" | "month" | "year") {
+  const box =
+    target === "blog"
+      ? modLimBlog
+      : target === "micro"
+        ? modLimMicro
+        : target === "comment"
+          ? modLimComment
+          : modLimChat;
+  const d = new Date();
+  if (unit === "day") d.setUTCDate(d.getUTCDate() + 1);
+  else if (unit === "month") d.setUTCMonth(d.getUTCMonth() + 1);
+  else d.setUTCFullYear(d.getUTCFullYear() + 1);
+  box.value = { ...box.value, ban_forever: false, ban_until: d.toISOString().slice(0, 16) };
 }
 
 async function load() {
@@ -467,6 +581,130 @@ async function restoreComment(id: string | null) {
             <button class="secondary" type="button" :disabled="modBusy" @click="resetModerateAvatar">сбросить аватар</button>
             <button class="secondary" type="button" :disabled="modBusy" @click="closeModerate">закрыть</button>
           </div>
+          <div class="mod-limits">
+            <p class="muted small">лимиты (показываются в профиле красным)</p>
+            <div class="lim-block">
+              <span class="lim-title">блог</span>
+              <label class="lim-row">
+                <input v-model="modLimBlog.ban_forever" type="checkbox" />
+                <span>навсегда</span>
+              </label>
+              <label class="lim-row lim-grow">
+                <span class="muted small">до</span>
+                <input v-model="modLimBlog.ban_until" type="datetime-local" :disabled="modLimBlog.ban_forever" />
+              </label>
+              <div class="lim-presets">
+                <button class="secondary small" type="button" :disabled="modBusy || modLimBlog.ban_forever" @click="presetBan('blog', 'day')">+день</button>
+                <button class="secondary small" type="button" :disabled="modBusy || modLimBlog.ban_forever" @click="presetBan('blog', 'month')">+месяц</button>
+                <button class="secondary small" type="button" :disabled="modBusy || modLimBlog.ban_forever" @click="presetBan('blog', 'year')">+год</button>
+              </div>
+              <label class="lim-row">
+                <span class="muted small">макс</span>
+                <input v-model="modLimBlog.max_per_period" class="lim-num" type="number" min="1" step="1" />
+              </label>
+              <select v-model="modLimBlog.period" class="lim-select">
+                <option value="day">день</option>
+                <option value="month">месяц</option>
+                <option value="year">год</option>
+                <option value="all">всё время</option>
+              </select>
+              <label class="lim-row">
+                <span class="muted small">ч между</span>
+                <input v-model="modLimBlog.min_interval_hours" class="lim-num" type="text" inputmode="decimal" />
+              </label>
+            </div>
+            <div class="lim-block">
+              <span class="lim-title">микро</span>
+              <label class="lim-row">
+                <input v-model="modLimMicro.ban_forever" type="checkbox" />
+                <span>навсегда</span>
+              </label>
+              <label class="lim-row lim-grow">
+                <span class="muted small">до</span>
+                <input v-model="modLimMicro.ban_until" type="datetime-local" :disabled="modLimMicro.ban_forever" />
+              </label>
+              <div class="lim-presets">
+                <button class="secondary small" type="button" :disabled="modBusy || modLimMicro.ban_forever" @click="presetBan('micro', 'day')">+день</button>
+                <button class="secondary small" type="button" :disabled="modBusy || modLimMicro.ban_forever" @click="presetBan('micro', 'month')">+месяц</button>
+                <button class="secondary small" type="button" :disabled="modBusy || modLimMicro.ban_forever" @click="presetBan('micro', 'year')">+год</button>
+              </div>
+              <label class="lim-row">
+                <span class="muted small">макс</span>
+                <input v-model="modLimMicro.max_per_period" class="lim-num" type="number" min="1" step="1" />
+              </label>
+              <select v-model="modLimMicro.period" class="lim-select">
+                <option value="day">день</option>
+                <option value="month">месяц</option>
+                <option value="year">год</option>
+                <option value="all">всё время</option>
+              </select>
+              <label class="lim-row">
+                <span class="muted small">ч между</span>
+                <input v-model="modLimMicro.min_interval_hours" class="lim-num" type="text" inputmode="decimal" />
+              </label>
+            </div>
+            <div class="lim-block">
+              <span class="lim-title">комменты</span>
+              <label class="lim-row">
+                <input v-model="modLimComment.ban_forever" type="checkbox" />
+                <span>навсегда</span>
+              </label>
+              <label class="lim-row lim-grow">
+                <span class="muted small">до</span>
+                <input v-model="modLimComment.ban_until" type="datetime-local" :disabled="modLimComment.ban_forever" />
+              </label>
+              <div class="lim-presets">
+                <button class="secondary small" type="button" :disabled="modBusy || modLimComment.ban_forever" @click="presetBan('comment', 'day')">+день</button>
+                <button class="secondary small" type="button" :disabled="modBusy || modLimComment.ban_forever" @click="presetBan('comment', 'month')">+месяц</button>
+                <button class="secondary small" type="button" :disabled="modBusy || modLimComment.ban_forever" @click="presetBan('comment', 'year')">+год</button>
+              </div>
+              <label class="lim-row">
+                <span class="muted small">макс</span>
+                <input v-model="modLimComment.max_per_period" class="lim-num" type="number" min="1" step="1" />
+              </label>
+              <select v-model="modLimComment.period" class="lim-select">
+                <option value="day">день</option>
+                <option value="month">месяц</option>
+                <option value="year">год</option>
+                <option value="all">всё время</option>
+              </select>
+              <label class="lim-row">
+                <span class="muted small">ч между</span>
+                <input v-model="modLimComment.min_interval_hours" class="lim-num" type="text" inputmode="decimal" />
+              </label>
+            </div>
+            <div class="lim-block">
+              <span class="lim-title">чаты</span>
+              <label class="lim-row">
+                <input v-model="modLimChat.ban_forever" type="checkbox" />
+                <span>навсегда</span>
+              </label>
+              <label class="lim-row lim-grow">
+                <span class="muted small">до</span>
+                <input v-model="modLimChat.ban_until" type="datetime-local" :disabled="modLimChat.ban_forever" />
+              </label>
+              <div class="lim-presets">
+                <button class="secondary small" type="button" :disabled="modBusy || modLimChat.ban_forever" @click="presetBan('chat', 'day')">+день</button>
+                <button class="secondary small" type="button" :disabled="modBusy || modLimChat.ban_forever" @click="presetBan('chat', 'month')">+месяц</button>
+                <button class="secondary small" type="button" :disabled="modBusy || modLimChat.ban_forever" @click="presetBan('chat', 'year')">+год</button>
+              </div>
+              <label class="lim-row">
+                <span class="muted small">макс</span>
+                <input v-model="modLimChat.max_per_period" class="lim-num" type="number" min="1" step="1" />
+              </label>
+              <select v-model="modLimChat.period" class="lim-select">
+                <option value="day">день</option>
+                <option value="month">месяц</option>
+                <option value="year">год</option>
+                <option value="all">всё время</option>
+              </select>
+              <label class="lim-row">
+                <span class="muted small">ч между</span>
+                <input v-model="modLimChat.min_interval_hours" class="lim-num" type="text" inputmode="decimal" />
+              </label>
+            </div>
+            <button type="button" :disabled="modBusy" @click="saveModerateLimits">сохранить лимиты</button>
+          </div>
           <div class="mod-invites">
             <p class="muted small">инвайты пользователя</p>
             <ul v-if="modInvites.length" class="invite-list">
@@ -758,5 +996,65 @@ strong {
 }
 .file-label.secondary:hover {
   background: var(--surface);
+}
+.mod-limits {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+  display: grid;
+  gap: 0.65rem;
+}
+.lim-block {
+  display: grid;
+  gap: 0.35rem;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+}
+.lim-title {
+  grid-column: 1 / -1;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.lim-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+}
+.lim-grow {
+  grid-column: 1 / -1;
+}
+.lim-grow input[type="datetime-local"] {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  padding: 0.3rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+}
+.lim-presets {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+.lim-num {
+  width: 4rem;
+  font: inherit;
+  padding: 0.25rem 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+}
+.lim-select {
+  font: inherit;
+  padding: 0.25rem 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
 }
 </style>

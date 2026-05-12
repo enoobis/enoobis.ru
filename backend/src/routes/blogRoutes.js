@@ -7,8 +7,13 @@ import {
   awardAchievement,
   checkBlogLikeMilestone,
 } from "../utils/achievements.js";
+import { assertBlogComment, assertBlogPublish } from "../utils/contentLimits.js";
 
 const router = express.Router();
+
+function userLimitsJson(userId) {
+  return get("SELECT content_limits_json FROM users WHERE id = ?", userId)?.content_limits_json ?? "{}";
+}
 
 function slugify(text) {
   const s = (text || "")
@@ -341,9 +346,14 @@ router.post("/blog", authRequired, (req, res) => {
   if (!body.title || !body.body) {
     return res.status(400).json({ error: "нужны заголовок и текст" });
   }
+  const status = body.status === "published" ? "published" : "draft";
+  if (status === "published") {
+    const lim = userLimitsJson(req.user.id);
+    const a = assertBlogPublish(req.user.id, lim);
+    if (!a.ok) return res.status(403).json({ error: a.error });
+  }
   const id = uuidv4();
   const now = nowIso();
-  const status = body.status === "published" ? "published" : "draft";
   const slug = slugify(body.slug || body.title);
   run(
     `INSERT INTO blog_posts
@@ -388,6 +398,11 @@ router.patch("/blog/:id", authRequired, (req, res) => {
     run("UPDATE blog_posts SET slug = ? WHERE id = ?", slugify(body.slug), req.params.id);
   }
   if (typeof body.status === "string" && ["draft", "published", "archived"].includes(body.status)) {
+    if (body.status === "published" && row.status !== "published") {
+      const lim = userLimitsJson(row.author_id);
+      const a = assertBlogPublish(row.author_id, lim);
+      if (!a.ok) return res.status(403).json({ error: a.error });
+    }
     run("UPDATE blog_posts SET status = ? WHERE id = ?", body.status, req.params.id);
     if (body.status === "published" && !row.published_at) {
       run("UPDATE blog_posts SET published_at = ? WHERE id = ?", nowIso(), req.params.id);
@@ -400,10 +415,15 @@ router.patch("/blog/:id", authRequired, (req, res) => {
 });
 
 router.post("/blog/:id/publish", authRequired, (req, res) => {
-  const row = get("SELECT author_id FROM blog_posts WHERE id = ?", req.params.id);
+  const row = get("SELECT author_id, status FROM blog_posts WHERE id = ?", req.params.id);
   if (!row) return res.status(404).json({ error: "not found" });
   if (row.author_id !== req.user.id && req.user.role !== "admin")
     return res.status(403).json({ error: "forbidden" });
+  if (row.status !== "published") {
+    const lim = userLimitsJson(row.author_id);
+    const a = assertBlogPublish(row.author_id, lim);
+    if (!a.ok) return res.status(403).json({ error: a.error });
+  }
   run(
     "UPDATE blog_posts SET status = 'published', published_at = COALESCE(published_at, ?), updated_at = ? WHERE id = ?",
     nowIso(),
@@ -455,6 +475,9 @@ router.get("/blog/:id/comments", (req, res) => {
 router.post("/blog/:id/comments", authRequired, (req, res) => {
   const body = String(req.body?.body ?? "").trim();
   if (!body) return res.status(400).json({ error: "empty comment" });
+  const lim = userLimitsJson(req.user.id);
+  const ac = assertBlogComment(req.user.id, lim);
+  if (!ac.ok) return res.status(403).json({ error: ac.error });
   const id = uuidv4();
   const now = nowIso();
   run(

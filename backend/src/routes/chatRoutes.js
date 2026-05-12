@@ -5,9 +5,23 @@ import fs from "node:fs";
 import { v4 as uuidv4 } from "uuid";
 import { all, get, nowIso, run } from "../db.js";
 import { authRequired } from "../auth.js";
+import { assertChatOutgoing } from "../utils/contentLimits.js";
 
 const router = express.Router();
 const MAX_BODY = 4000;
+
+function userLimitsJson(userId) {
+  return get("SELECT content_limits_json FROM users WHERE id = ?", userId)?.content_limits_json ?? "{}";
+}
+
+function guardChatOutgoing(req, res) {
+  const a = assertChatOutgoing(req.user.id, userLimitsJson(req.user.id));
+  if (!a.ok) {
+    res.status(403).json({ error: a.error });
+    return false;
+  }
+  return true;
+}
 
 const UPLOAD_ROOT = path.resolve(process.env.UPLOADS_DIR ?? "./data/uploads");
 const CHAT_DIR = path.join(UPLOAD_ROOT, "chat");
@@ -160,6 +174,7 @@ router.get("/chats/unread-count", authRequired, (req, res) => {
 });
 
 router.post("/chats/with/:nickname", authRequired, (req, res) => {
+  if (!guardChatOutgoing(req, res)) return;
   const other = get(
     "SELECT id FROM users WHERE nickname = ?",
     req.params.nickname,
@@ -249,6 +264,7 @@ router.post("/chats/:id/messages", authRequired, (req, res) => {
   if (thread.user_a_id !== req.user.id && thread.user_b_id !== req.user.id) {
     return res.status(403).json({ error: "forbidden" });
   }
+  if (!guardChatOutgoing(req, res)) return;
   const body = String(req.body?.body ?? "").trim();
   const imageUrl = String(req.body?.image_url ?? "").trim();
   if (!body && !imageUrl) return res.status(400).json({ error: "empty" });
@@ -335,6 +351,14 @@ router.post(
       }
       return res.status(403).json({ error: "forbidden" });
     }
+    if (!guardChatOutgoing(req, res)) {
+      if (req.file?.path) {
+        try {
+          fs.unlinkSync(req.file.path);
+        } catch {}
+      }
+      return;
+    }
     if (!req.file) return res.status(400).json({ error: "no file" });
     const url = `/uploads/chat/${req.file.filename}`;
     res.json({ url });
@@ -350,6 +374,7 @@ router.patch("/chats/messages/:id", authRequired, (req, res) => {
   if (msg.sender_id !== req.user.id) {
     return res.status(403).json({ error: "forbidden" });
   }
+  if (!guardChatOutgoing(req, res)) return;
   const body = String(req.body?.body ?? "").trim();
   if (!body && !msg.image_url) return res.status(400).json({ error: "empty" });
   if (body.length > MAX_BODY) return res.status(400).json({ error: "too long" });

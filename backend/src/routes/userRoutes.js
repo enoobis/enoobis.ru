@@ -7,6 +7,7 @@ import {
   listAchievementsForUser,
   checkFollowerMilestones,
 } from "../utils/achievements.js";
+import { buildModerationNotices, parseContentLimits } from "../utils/contentLimits.js";
 
 const JWT_SECRET = process.env.JWT_SECRET ?? "dev-secret-change-me";
 
@@ -60,6 +61,7 @@ function buildMe(row) {
     nickname_change_count: Number(row.nickname_change_count ?? 0),
     pinned_post_id: row.pinned_post_id ?? null,
     pinned_post_type: row.pinned_post_type ?? "",
+    moderation_notices: buildModerationNotices(parseContentLimits(row.content_limits_json ?? "{}")),
   };
 }
 
@@ -70,7 +72,7 @@ router.get("/me", authRequired, (req, res) => {
     `SELECT id, email, nickname, role, status, bio, wallpaper_url, avatar_url,
             theme_preference, language_preference, font_preference, full_name, website_url,
             social_links_json, birthday, country, readme_md, created_at, last_seen_at,
-            nickname_change_count, pinned_post_id, pinned_post_type
+            nickname_change_count, pinned_post_id, pinned_post_type, content_limits_json
      FROM users WHERE id = ?`,
     req.user.id,
   );
@@ -471,7 +473,7 @@ router.get("/profile/:nickname", (req, res) => {
   const p = get(
     `SELECT id, nickname, role, bio, wallpaper_url, avatar_url, theme_preference,
             language_preference, font_preference, full_name, website_url, social_links_json,
-            birthday, country, readme_md, created_at, last_seen_at
+            birthday, country, readme_md, created_at, last_seen_at, content_limits_json
      FROM users WHERE nickname = ?`,
     req.params.nickname,
   );
@@ -521,6 +523,7 @@ router.get("/profile/:nickname", (req, res) => {
     following_count,
     grade_overview: gradeOverviewFor(p.id),
     pinned_post: fetchPinnedPost(p.id),
+    moderation_notices: buildModerationNotices(parseContentLimits(p.content_limits_json ?? "{}")),
   });
 });
 

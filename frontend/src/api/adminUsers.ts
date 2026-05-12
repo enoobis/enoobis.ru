@@ -1,5 +1,22 @@
 import { api } from "./http";
 
+export type PublishPeriod = "day" | "month" | "year" | "all";
+
+export type PublishChannelLimits = {
+  ban_until: string | null;
+  ban_forever: boolean;
+  max_per_period: number | null;
+  period: PublishPeriod;
+  min_interval_seconds: number | null;
+};
+
+export type PublishLimitsPayload = {
+  blog: PublishChannelLimits;
+  micro: PublishChannelLimits;
+  blog_comment: PublishChannelLimits;
+  chat: PublishChannelLimits;
+};
+
 export type AdminUserDetail = {
   id: string;
   email: string;
@@ -14,6 +31,7 @@ export type AdminUserDetail = {
   avatar_url: string;
   nickname_change_count: number;
   created_at: string;
+  publish_limits: PublishLimitsPayload;
 };
 
 export type AdminInviteRow = {
@@ -28,6 +46,49 @@ export type AdminInviteRow = {
 
 export async function getAdminUserDetail(token: string, userId: string): Promise<AdminUserDetail> {
   return api(`/api/admin/users/${userId}`, { token });
+}
+
+export type PublishLimitsPatchBody = {
+  blog: {
+    ban_forever?: boolean;
+    ban_until?: string;
+    max_per_period?: number | "";
+    period?: PublishPeriod;
+    min_interval_hours?: number | "";
+  };
+  micro: {
+    ban_forever?: boolean;
+    ban_until?: string;
+    max_per_period?: number | "";
+    period?: PublishPeriod;
+    min_interval_hours?: number | "";
+  };
+  blog_comment: {
+    ban_forever?: boolean;
+    ban_until?: string;
+    max_per_period?: number | "";
+    period?: PublishPeriod;
+    min_interval_hours?: number | "";
+  };
+  chat: {
+    ban_forever?: boolean;
+    ban_until?: string;
+    max_per_period?: number | "";
+    period?: PublishPeriod;
+    min_interval_hours?: number | "";
+  };
+};
+
+export async function patchAdminPublishLimits(
+  token: string,
+  userId: string,
+  body: PublishLimitsPatchBody,
+): Promise<{ ok: boolean; publish_limits: PublishLimitsPayload }> {
+  return api(`/api/admin/users/${userId}/publish-limits`, {
+    method: "PATCH",
+    token,
+    body: JSON.stringify(body),
+  });
 }
 
 export async function patchAdminUserProfile(

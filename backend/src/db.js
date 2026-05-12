@@ -28,7 +28,8 @@ db.exec(`
     last_seen_at TEXT,
     nickname_change_count INTEGER NOT NULL DEFAULT 0,
     pinned_post_id TEXT,
-    pinned_post_type TEXT NOT NULL DEFAULT ''
+    pinned_post_type TEXT NOT NULL DEFAULT '',
+    content_limits_json TEXT NOT NULL DEFAULT '{}'
   );
 
   CREATE TABLE IF NOT EXISTS blog_posts (
@@ -579,6 +580,16 @@ try {
       );
       CREATE INDEX IF NOT EXISTS idx_user_achievements_user ON user_achievements(user_id, earned_at DESC);
     `);
+  } catch {
+    // ignore
+  }
+}
+
+try {
+  db.prepare("SELECT content_limits_json FROM users LIMIT 1").get();
+} catch {
+  try {
+    db.exec("ALTER TABLE users ADD COLUMN content_limits_json TEXT NOT NULL DEFAULT '{}'");
   } catch {
     // ignore
   }

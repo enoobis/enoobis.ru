@@ -7,6 +7,7 @@ import { all, db, get, nowIso, run } from "../db.js";
 import { authRequired, hashPassword } from "../auth.js";
 import { awardAchievement } from "../utils/achievements.js";
 import { saveIdenticon } from "../utils/identicon.js";
+import { limitsFromAdminBody, limitsToJson, parseContentLimits } from "../utils/contentLimits.js";
 
 const router = express.Router();
 
@@ -65,7 +66,7 @@ router.get("/admin/users", (_req, res) => {
 router.get("/admin/users/:id", (req, res) => {
   const row = get(
     `SELECT id, email, nickname, role, status, bio, full_name, website_url, readme_md,
-            social_links_json, avatar_url, nickname_change_count, created_at
+            social_links_json, avatar_url, nickname_change_count, created_at, content_limits_json
      FROM users WHERE id = ?`,
     req.params.id,
   );
@@ -91,6 +92,7 @@ router.get("/admin/users/:id", (req, res) => {
     avatar_url: row.avatar_url ?? "",
     nickname_change_count: Number(row.nickname_change_count ?? 0),
     created_at: row.created_at ?? "",
+    publish_limits: parseContentLimits(row.content_limits_json ?? "{}"),
   });
 });
 
@@ -189,6 +191,15 @@ router.patch("/admin/users/:id/profile", async (req, res) => {
     console.error(e);
     return res.status(500).json({ error: "internal error" });
   }
+});
+
+router.patch("/admin/users/:id/publish-limits", (req, res) => {
+  const id = req.params.id;
+  const target = get("SELECT id, content_limits_json FROM users WHERE id = ?", id);
+  if (!target) return res.status(404).json({ error: "not found" });
+  const next = limitsFromAdminBody(req.body ?? {}, target.content_limits_json ?? "{}");
+  run("UPDATE users SET content_limits_json = ? WHERE id = ?", limitsToJson(next), id);
+  return res.json({ ok: true, publish_limits: next });
 });
 
 router.post(

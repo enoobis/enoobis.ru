@@ -45,6 +45,7 @@ type Profile = {
   following_count: number;
   achievements: Achievement[];
   pinned_post: PinnedPost | null;
+  moderation_notices?: string[];
 };
 
 type Tab = "blog" | "micro";
@@ -127,6 +128,8 @@ function onMicroUpdated(updated: MicroPost) {
 const earnedAchievements = computed(() =>
   (profile.value?.achievements ?? []).filter((a) => a.earned),
 );
+
+const moderationNotices = computed(() => profile.value?.moderation_notices ?? []);
 
 const pinBusy = ref(false);
 
@@ -241,6 +244,10 @@ watch(nick, load);
       </div>
     </header>
 
+    <ul v-if="moderationNotices.length" class="mod-notes">
+      <li v-for="(line, i) in moderationNotices" :key="i">{{ line }}</li>
+    </ul>
+
     <article v-if="profile.readme_md" class="readme markdown-body" v-html="renderedReadme" />
 
     <section v-if="profile.pinned_post" class="pinned">
@@ -339,6 +346,17 @@ watch(nick, load);
 .profile {
   max-width: 640px;
   margin: 0 auto;
+}
+.mod-notes {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1rem;
+  color: var(--danger, #c44);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+.mod-notes li + li {
+  margin-top: 0.35rem;
 }
 .socials {
   list-style: none;

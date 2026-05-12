@@ -10,6 +10,7 @@ import {
   awardAchievement,
   checkMicroLikeMilestone,
 } from "../utils/achievements.js";
+import { assertMicroPublish } from "../utils/contentLimits.js";
 
 const router = express.Router();
 const MAX_BODY = 480;
@@ -42,6 +43,10 @@ function authorizeBearer(req) {
   } catch {
     return null;
   }
+}
+
+function userLimitsJson(userId) {
+  return get("SELECT content_limits_json FROM users WHERE id = ?", userId)?.content_limits_json ?? "{}";
 }
 
 function likeCount(id) {
@@ -227,6 +232,9 @@ router.post("/micro", authRequired, (req, res) => {
   if (req.user.status !== "approved" && req.user.role !== "admin") {
     return res.status(403).json({ error: "not approved" });
   }
+  const lim = userLimitsJson(req.user.id);
+  const a = assertMicroPublish(req.user.id, lim);
+  if (!a.ok) return res.status(403).json({ error: a.error });
   const body = String(req.body?.body ?? "").trim();
   const imageUrl = String(req.body?.image_url ?? "").trim();
   const parentId = req.body?.parent_id ? String(req.body.parent_id) : null;

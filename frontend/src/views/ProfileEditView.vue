@@ -32,6 +32,7 @@ type Me = {
   birthday: string;
   country: string;
   nickname_change_count: number;
+  moderation_notices?: string[];
 };
 
 const MAX_NICK_CHANGES = 3;
@@ -383,6 +384,9 @@ function closeSettings() {
 
       <template v-if="tab === 'profile'">
         <h1>профиль</h1>
+        <ul v-if="me.moderation_notices?.length" class="mod-notes">
+          <li v-for="(line, i) in me.moderation_notices" :key="i">{{ line }}</li>
+        </ul>
         <div class="avatar-header">
           <div v-if="me.avatar_url" class="avatar-preview-wrap">
             <img :src="me.avatar_url" alt="" class="avatar-preview" />
@@ -552,6 +556,17 @@ function closeSettings() {
 </template>
 
 <style scoped>
+.mod-notes {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1rem;
+  color: var(--danger, #c44);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+.mod-notes li + li {
+  margin-top: 0.35rem;
+}
 .settings-shell {
   display: grid;
   grid-template-columns: 260px minmax(0, 1fr);
