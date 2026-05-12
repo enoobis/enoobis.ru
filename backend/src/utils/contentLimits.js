@@ -122,9 +122,7 @@ export function buildModerationNotices(limits) {
     const b = banBlocks(ch);
     if (b.blocks) {
       if (ch.ban_forever) {
-        out.push(
-          `${label}: ${key === "chat" ? "отправка запрещена" : "публикация временно недоступна"} по решению модерации (без срока).`,
-        );
+        out.push(`${label}: бессрочное ограничение модерации.`);
       } else {
         out.push(`${label}: ограничение до ${fmtUntil(b.until)}.`);
       }

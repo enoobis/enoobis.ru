@@ -419,7 +419,7 @@ function closeSettings() {
             <input v-model="websiteUrl" />
           </label>
           <label class="col-2">
-            <span>readme · markdown, отображается в профиле</span>
+            <span>readme · markdown</span>
             <textarea
               v-model="readmeMd"
               rows="10"

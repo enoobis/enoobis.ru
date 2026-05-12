@@ -547,7 +547,7 @@ async function restoreComment(id: string | null) {
               <textarea v-model="moderateReadme" rows="4" :maxlength="README_MAX" />
             </label>
             <label class="mod-field mod-field-wide">
-              <span class="muted small">новый пароль (оставь пустым, если не менять)</span>
+              <span class="muted small">новый пароль</span>
               <input v-model="moderatePassword" type="password" autocomplete="new-password" />
             </label>
           </div>
@@ -582,7 +582,7 @@ async function restoreComment(id: string | null) {
             <button class="secondary" type="button" :disabled="modBusy" @click="closeModerate">закрыть</button>
           </div>
           <div class="mod-limits">
-            <p class="muted small">лимиты (показываются в профиле красным)</p>
+            <p class="muted small">лимиты</p>
             <div class="lim-block">
               <span class="lim-title">блог</span>
               <label class="lim-row">
