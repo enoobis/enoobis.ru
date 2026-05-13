@@ -75,6 +75,16 @@ const MAX_NICK_CHANGES = 3;
 
 const PASSIVE_COIN_EVERY_MS = 10 * 60 * 1000;
 const PASSIVE_COIN_AMOUNT = 5;
+/** больше этого времени активности за календарный день (utc) → 7 дней без пассивных монет */
+const DAILY_ONLINE_CAP_SEC = 16 * 3600;
+const PENALTY_DAYS = 7;
+
+function isoAddDays(isoStr, days) {
+  const d = new Date(isoStr);
+  if (Number.isNaN(d.getTime())) return nowIso();
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString();
+}
 
 router.get("/me", authRequired, (req, res) => {
   const row = get(
@@ -194,7 +204,14 @@ router.post("/me/activity", authRequired, (req, res) => {
   const now = nowIso();
   const nowMs = Date.now();
 
+  let beforeSec = 0;
   if (seconds > 0) {
+    const rowBefore = get(
+      "SELECT seconds_spent FROM user_daily_activity WHERE user_id = ? AND day = ?",
+      userId,
+      day,
+    );
+    beforeSec = Number(rowBefore?.seconds_spent ?? 0);
     run(
       `INSERT INTO user_daily_activity (user_id, day, seconds_spent, updated_at)
        VALUES (?, ?, ?, ?)
@@ -209,15 +226,43 @@ router.post("/me/activity", authRequired, (req, res) => {
   }
 
   run("UPDATE users SET last_seen_at = ? WHERE id = ?", now, userId);
-  run("UPDATE users SET coins_penalty_until = NULL WHERE id = ? AND coins_penalty_until IS NOT NULL", userId);
-
-  const passiveRow = get("SELECT last_passive_coin_at FROM users WHERE id = ?", userId);
 
   if (seconds > 0) {
-    if (!passiveRow?.last_passive_coin_at) {
+    const rowAfter = get(
+      "SELECT seconds_spent FROM user_daily_activity WHERE user_id = ? AND day = ?",
+      userId,
+      day,
+    );
+    const afterSec = Number(rowAfter?.seconds_spent ?? beforeSec);
+    if (afterSec > DAILY_ONLINE_CAP_SEC && beforeSec <= DAILY_ONLINE_CAP_SEC) {
+      run(
+        "UPDATE users SET coins_penalty_until = ? WHERE id = ?",
+        isoAddDays(now, PENALTY_DAYS),
+        userId,
+      );
+    }
+  }
+
+  let u = get(
+    "SELECT coins, coins_penalty_until, last_passive_coin_at FROM users WHERE id = ?",
+    userId,
+  );
+  if (u?.coins_penalty_until && new Date(u.coins_penalty_until) <= new Date(now)) {
+    run("UPDATE users SET coins_penalty_until = NULL WHERE id = ?", userId);
+    u = get(
+      "SELECT coins, coins_penalty_until, last_passive_coin_at FROM users WHERE id = ?",
+      userId,
+    );
+  }
+
+  const penalized =
+    !!u?.coins_penalty_until && new Date(u.coins_penalty_until) > new Date(now);
+
+  if (!penalized && seconds > 0) {
+    if (!u?.last_passive_coin_at) {
       run("UPDATE users SET last_passive_coin_at = ? WHERE id = ?", now, userId);
     } else {
-      const lastMs = new Date(passiveRow.last_passive_coin_at).getTime();
+      const lastMs = new Date(u.last_passive_coin_at).getTime();
       if (nowMs - lastMs >= PASSIVE_COIN_EVERY_MS) {
         run(
           "UPDATE users SET coins = coins + ?, last_passive_coin_at = ? WHERE id = ?",
