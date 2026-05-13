@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
 import { api } from "./api/http";
 import { useAuthStore } from "./stores/auth";
@@ -17,6 +17,9 @@ const chatStore = useChatStore();
 const isOnline = ref(typeof navigator !== "undefined" ? navigator.onLine : true);
 const profileMenuOpen = ref(false);
 const profileMenuRoot = ref<HTMLElement | null>(null);
+const navDrawerOpen = ref(false);
+const navBurgerRef = ref<HTMLButtonElement | null>(null);
+const drawerPanelPos = ref({ top: "0px", left: "0px" });
 const profileAvatarUrl = ref("");
 const profileAvatarBroken = ref(false);
 const initials = computed(() => (auth.nickname || "U").slice(0, 2).toUpperCase());
@@ -30,17 +33,23 @@ function syncOnlineStatus() {
 }
 
 function onDocumentClick(event: MouseEvent) {
-  if (!profileMenuOpen.value) return;
-  const root = profileMenuRoot.value;
-  if (!root) return;
-  const target = event.target as Node | null;
-  if (!target || root.contains(target)) return;
-  profileMenuOpen.value = false;
+  const target = event.target as HTMLElement | null;
+  if (target?.closest?.(".nav-burger")) return;
+  if (profileMenuOpen.value) {
+    const root = profileMenuRoot.value;
+    if (root && target && root.contains(target)) return;
+    profileMenuOpen.value = false;
+  }
+  if (navDrawerOpen.value) {
+    if (target?.closest?.(".nav-drawer-panel")) return;
+    navDrawerOpen.value = false;
+  }
 }
 
 function onEscape(event: KeyboardEvent) {
   if (event.key === "Escape") {
     profileMenuOpen.value = false;
+    navDrawerOpen.value = false;
   }
 }
 
@@ -65,6 +74,35 @@ function onGlobalKey(event: KeyboardEvent) {
 
 function refreshPage() {
   window.location.reload();
+}
+
+function syncDrawerPanelPos() {
+  const el = navBurgerRef.value;
+  if (!el) return;
+  const r = el.getBoundingClientRect();
+  const pad = 6;
+  const panelW = 208;
+  let left = Math.round(r.left);
+  const margin = 8;
+  const maxLeft = Math.max(margin, window.innerWidth - panelW - margin);
+  if (left > maxLeft) left = maxLeft;
+  drawerPanelPos.value = {
+    top: `${Math.round(r.bottom + pad)}px`,
+    left: `${left}px`,
+  };
+}
+
+function onLayoutScrollResize() {
+  if (navDrawerOpen.value) syncDrawerPanelPos();
+}
+
+function toggleNavDrawer() {
+  navDrawerOpen.value = !navDrawerOpen.value;
+  if (navDrawerOpen.value) void nextTick(() => syncDrawerPanelPos());
+}
+
+function closeNavDrawer() {
+  navDrawerOpen.value = false;
 }
 
 function toggleProfileMenu() {
@@ -158,6 +196,8 @@ function onVisibilityChange() {
 onMounted(async () => {
   window.addEventListener("online", syncOnlineStatus);
   window.addEventListener("offline", syncOnlineStatus);
+  window.addEventListener("resize", onLayoutScrollResize);
+  window.addEventListener("scroll", onLayoutScrollResize, true);
   window.addEventListener("keydown", onEscape);
   window.addEventListener("keydown", onGlobalKey);
   document.addEventListener("visibilitychange", onVisibilityChange);
@@ -171,6 +211,8 @@ onMounted(async () => {
 onUnmounted(() => {
   window.removeEventListener("online", syncOnlineStatus);
   window.removeEventListener("offline", syncOnlineStatus);
+  window.removeEventListener("resize", onLayoutScrollResize);
+  window.removeEventListener("scroll", onLayoutScrollResize, true);
   window.removeEventListener("keydown", onEscape);
   window.removeEventListener("keydown", onGlobalKey);
   document.removeEventListener("visibilitychange", onVisibilityChange);
@@ -181,8 +223,20 @@ onUnmounted(() => {
 });
 
 watch(
+  () => route.path,
+  () => {
+    closeNavDrawer();
+  },
+);
+
+watch(navDrawerOpen, (open) => {
+  if (open) void nextTick(() => syncDrawerPanelPos());
+});
+
+watch(
   () => auth.token,
-  async () => {
+  async (tok) => {
+    if (!tok) closeNavDrawer();
     await loadMePresentation();
     startActivityTracking();
     if (!auth.token) chatStore.reset();
@@ -195,20 +249,25 @@ watch(
 <template>
   <div class="layout">
     <header class="nav">
+      <button
+        v-if="auth.token"
+        ref="navBurgerRef"
+        type="button"
+        class="icon-btn nav-burger"
+        :aria-expanded="navDrawerOpen"
+        aria-controls="nav-drawer"
+        aria-label="меню"
+        @click.stop="toggleNavDrawer"
+      >
+        <AppIcon name="menu" :size="18" />
+      </button>
       <RouterLink v-if="onHome" to="/" class="nav-link brand-link">
         <span>enoobis</span>
       </RouterLink>
-      <RouterLink to="/blogs" class="nav-link"><span>блоги</span></RouterLink>
-      <RouterLink to="/microblogs" class="nav-link"><span>микроблоги</span></RouterLink>
-      <RouterLink v-if="auth.token" to="/courses" class="nav-link desktop-only">
-        <span>курсы</span>
-      </RouterLink>
-      <RouterLink v-if="auth.token" to="/library" class="nav-link desktop-only">
-        <span>библиотека</span>
-      </RouterLink>
-      <RouterLink v-if="auth.token && auth.role === 'admin'" to="/admin" class="nav-link desktop-only">
-        <span>админ</span>
-      </RouterLink>
+      <template v-if="!auth.token">
+        <RouterLink to="/blogs" class="nav-link"><span>блоги</span></RouterLink>
+        <RouterLink to="/microblogs" class="nav-link"><span>микроблоги</span></RouterLink>
+      </template>
       <span class="nav-spacer" />
       <template v-if="auth.token">
         <div class="nav-actions">
@@ -304,6 +363,51 @@ watch(
         <RouterLink to="/register" class="nav-link"><span>регистрация</span></RouterLink>
       </template>
     </header>
+    <Teleport to="body">
+      <template v-if="navDrawerOpen">
+        <div class="nav-drawer-backdrop" aria-hidden="true" @click="closeNavDrawer" />
+        <aside
+          id="nav-drawer"
+          class="nav-drawer-panel card"
+          role="dialog"
+          aria-modal="true"
+          aria-label="разделы"
+          :style="{ top: drawerPanelPos.top, left: drawerPanelPos.left }"
+          @click.stop
+        >
+          <nav class="nav-drawer-inner">
+            <RouterLink to="/blogs" class="nav-drawer-link" @click="closeNavDrawer">блоги</RouterLink>
+            <RouterLink to="/microblogs" class="nav-drawer-link" @click="closeNavDrawer">
+              микроблоги
+            </RouterLink>
+            <RouterLink
+              v-if="auth.token"
+              to="/courses"
+              class="nav-drawer-link"
+              @click="closeNavDrawer"
+            >
+              курсы
+            </RouterLink>
+            <RouterLink
+              v-if="auth.token"
+              to="/library"
+              class="nav-drawer-link"
+              @click="closeNavDrawer"
+            >
+              библиотека
+            </RouterLink>
+            <RouterLink
+              v-if="auth.role === 'admin'"
+              to="/admin"
+              class="nav-drawer-link"
+              @click="closeNavDrawer"
+            >
+              админ
+            </RouterLink>
+          </nav>
+        </aside>
+      </template>
+    </Teleport>
     <RouterView v-slot="{ Component, route }">
       <Transition name="page" mode="out-in">
         <component :is="Component" :key="route.path" />
@@ -342,6 +446,56 @@ watch(
 
 .offline-card p {
   color: var(--muted);
+}
+
+.nav-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.nav-drawer-panel {
+  position: fixed;
+  z-index: 91;
+  margin: 0;
+  min-width: 13rem;
+  max-width: min(16rem, calc(100vw - 1rem));
+  max-height: min(70vh, calc(100vh - 3.5rem));
+  padding: 0.45rem 0.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  overflow-y: auto;
+  border-radius: var(--radius);
+}
+
+.nav-drawer-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+}
+
+.nav-drawer-link {
+  display: block;
+  padding: 0.52rem 0.62rem;
+  border-radius: 6px;
+  color: var(--muted);
+  text-transform: lowercase;
+  font-size: 0.92rem;
+  font-weight: 500;
+  border: none;
+  background: transparent;
+}
+
+.nav-drawer-link:hover {
+  background: var(--surface2);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.nav-drawer-link.router-link-active {
+  color: var(--text);
 }
 
 .profile-menu-wrap {
