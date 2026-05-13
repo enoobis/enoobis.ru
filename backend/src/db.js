@@ -29,7 +29,10 @@ db.exec(`
     nickname_change_count INTEGER NOT NULL DEFAULT 0,
     pinned_post_id TEXT,
     pinned_post_type TEXT NOT NULL DEFAULT '',
-    content_limits_json TEXT NOT NULL DEFAULT '{}'
+    content_limits_json TEXT NOT NULL DEFAULT '{}',
+    coins INTEGER NOT NULL DEFAULT 0,
+    coins_penalty_until TEXT,
+    last_passive_coin_at TEXT
   );
 
   CREATE TABLE IF NOT EXISTS blog_posts (
@@ -267,6 +270,36 @@ try {
 } catch {
   try {
     db.exec("ALTER TABLE users ADD COLUMN readme_md TEXT NOT NULL DEFAULT ''");
+  } catch {
+    // ignore
+  }
+}
+
+try {
+  db.prepare("SELECT coins FROM users LIMIT 1").get();
+} catch {
+  try {
+    db.exec("ALTER TABLE users ADD COLUMN coins INTEGER NOT NULL DEFAULT 0");
+  } catch {
+    // ignore
+  }
+}
+
+try {
+  db.prepare("SELECT coins_penalty_until FROM users LIMIT 1").get();
+} catch {
+  try {
+   db.exec("ALTER TABLE users ADD COLUMN coins_penalty_until TEXT");
+  } catch {
+    // ignore
+  }
+}
+
+try {
+  db.prepare("SELECT last_passive_coin_at FROM users LIMIT 1").get();
+} catch {
+  try {
+    db.exec("ALTER TABLE users ADD COLUMN last_passive_coin_at TEXT");
   } catch {
     // ignore
   }

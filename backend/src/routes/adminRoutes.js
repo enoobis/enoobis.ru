@@ -58,16 +58,21 @@ router.get("/admin/pending", (_req, res) => {
 
 router.get("/admin/users", (_req, res) => {
   const rows = all(
-    `SELECT id, email, nickname, role, status, created_at, bio, avatar_url
+    `SELECT id, email, nickname, role, status, created_at, bio, avatar_url, coins
      FROM users ORDER BY created_at DESC`,
   );
-  return res.json(rows);
+  return res.json(
+    rows.map((r) => ({
+      ...r,
+      coins: Math.max(0, Math.floor(Number(r.coins ?? 0))),
+    })),
+  );
 });
 
 router.get("/admin/users/:id", (req, res) => {
   const row = get(
     `SELECT id, email, nickname, role, status, bio, full_name, website_url, readme_md,
-            social_links_json, avatar_url, nickname_change_count, created_at, content_limits_json
+            social_links_json, avatar_url, nickname_change_count, created_at, content_limits_json, coins
      FROM users WHERE id = ?`,
     req.params.id,
   );
@@ -93,8 +98,26 @@ router.get("/admin/users/:id", (req, res) => {
     avatar_url: row.avatar_url ?? "",
     nickname_change_count: Number(row.nickname_change_count ?? 0),
     created_at: row.created_at ?? "",
+    coins: Math.max(0, Math.floor(Number(row.coins ?? 0))),
     publish_limits: parseContentLimits(row.content_limits_json ?? "{}"),
   });
+});
+
+const ADMIN_COIN_GRANT_MIN = 1;
+const ADMIN_COIN_GRANT_MAX = 100_000;
+
+router.post("/admin/users/:id/coins", (req, res) => {
+  const id = req.params.id;
+  const target = get("SELECT id FROM users WHERE id = ?", id);
+  if (!target) return res.status(404).json({ error: "not found" });
+  const n = Number(req.body?.amount);
+  if (!Number.isFinite(n) || !Number.isInteger(n) || n < ADMIN_COIN_GRANT_MIN || n > ADMIN_COIN_GRANT_MAX) {
+    return res.status(400).json({ error: "bad amount" });
+  }
+  run("UPDATE users SET coins = coins + ? WHERE id = ?", n, id);
+  const after = get("SELECT coins FROM users WHERE id = ?", id);
+  const coins = Math.max(0, Math.floor(Number(after?.coins ?? 0)));
+  return res.json({ ok: true, coins });
 });
 
 router.get("/admin/users/:id/invites", (req, res) => {

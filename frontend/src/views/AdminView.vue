@@ -17,6 +17,7 @@ import {
   listAdminUserInvites,
   patchAdminPublishLimits,
   patchAdminUserProfile,
+  postAdminUserCoins,
   uploadAdminUserAvatar,
   type AdminInviteRow,
   type AdminUserDetail,
@@ -40,6 +41,7 @@ type AdminUser = {
   created_at: string;
   bio: string;
   avatar_url: string;
+  coins?: number;
 };
 type Tab = "pending" | "users" | "reports";
 
@@ -59,6 +61,7 @@ const moderateBio = ref("");
 const moderateReadme = ref("");
 const moderateSocial = ref<SocialRow[]>([]);
 const moderatePassword = ref("");
+const moderateGemInput = ref("");
 const modInvites = ref<AdminInviteRow[]>([]);
 const modMsg = ref("");
 const modBusy = ref(false);
@@ -329,6 +332,7 @@ async function openModerate(u: AdminUser) {
   modMsg.value = "";
   modBusy.value = true;
   moderatePassword.value = "";
+  moderateGemInput.value = "";
   try {
     moderateDetail.value = await getAdminUserDetail(auth.token, u.id);
     syncModerateFromDetail();
@@ -347,6 +351,30 @@ function closeModerate() {
   modInvites.value = [];
   modMsg.value = "";
   moderatePassword.value = "";
+  moderateGemInput.value = "";
+}
+
+async function giveModerateGems() {
+  const id = moderateUserId.value;
+  if (!auth.token || !id || !moderateDetail.value) return;
+  const n = Math.floor(Number(String(moderateGemInput.value).trim()));
+  if (!Number.isFinite(n) || n < 1 || n > 100_000) {
+    modMsg.value = "число от 1 до 100000";
+    return;
+  }
+  modBusy.value = true;
+  modMsg.value = "";
+  try {
+    const r = await postAdminUserCoins(auth.token, id, n);
+    moderateDetail.value.coins = r.coins;
+    moderateGemInput.value = "";
+    await load();
+    modMsg.value = "начислено";
+  } catch (e) {
+    modMsg.value = e instanceof Error ? e.message : "ошибка";
+  } finally {
+    modBusy.value = false;
+  }
 }
 
 async function saveModerateProfile() {
@@ -522,6 +550,19 @@ async function restoreComment(id: string | null) {
             <strong>{{ moderateDetail.nickname }}</strong>
             <span class="muted small"> · {{ moderateDetail.email }}</span>
           </p>
+          <div class="mod-gems">
+            <span class="muted small">монеты · {{ moderateDetail.coins ?? 0 }}</span>
+            <input
+              v-model="moderateGemInput"
+              type="number"
+              min="1"
+              max="100000"
+              step="1"
+              class="gem-in"
+              placeholder="сколько"
+            />
+            <button type="button" class="secondary" :disabled="modBusy" @click="giveModerateGems">выдать</button>
+          </div>
           <div v-if="moderateDetail.avatar_url" class="mod-avatar">
             <img :src="moderateDetail.avatar_url" alt="" />
           </div>
@@ -735,7 +776,7 @@ async function restoreComment(id: string | null) {
         <li v-for="u in filteredUsers" :key="u.id">
           <div>
             <strong>{{ u.nickname }}</strong>
-            <span class="muted small"> · {{ u.role }} · {{ u.status }} · {{ u.email }}</span>
+            <span class="muted small"> · {{ u.role }} · {{ u.status }} · {{ u.coins ?? 0 }} · {{ u.email }}</span>
           </div>
           <div class="row-actions">
             <button class="secondary" type="button" :disabled="modBusy" @click="openModerate(u)">модерация</button>
@@ -894,6 +935,23 @@ strong {
 }
 .mod-title {
   margin: 0;
+}
+.mod-gems {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+.gem-in {
+  width: 5.5rem;
+  min-height: 2rem;
+  box-sizing: border-box;
+  font: inherit;
+  padding: 0.35rem 0.45rem;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  border-radius: var(--radius);
 }
 .mod-avatar img {
   width: 48px;

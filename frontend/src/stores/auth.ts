@@ -11,6 +11,7 @@ type User = {
   nickname: string;
   role: string;
   status: string;
+  coins?: number;
 };
 
 export const useAuthStore = defineStore("auth", () => {

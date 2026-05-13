@@ -793,13 +793,35 @@ router.post("/courses/:id/assignments/:aid/submissions/:sid/grade", authRequired
   if (access.error) return res.status(access.error).json({ error: "no access" });
   if (!access.isTeacher && req.user.role !== "admin")
     return res.status(403).json({ error: "forbidden" });
+  const prev = get(
+    `SELECT s.student_id, s.grade_points
+     FROM course_assignment_submissions s
+     JOIN course_assignments a ON a.id = s.assignment_id
+     WHERE s.id = ? AND s.assignment_id = ? AND a.course_id = ?`,
+    req.params.sid,
+    req.params.aid,
+    req.params.id,
+  );
+  if (!prev) return res.status(404).json({ error: "not found" });
+  const oldPts =
+    prev.grade_points != null && prev.grade_points !== ""
+      ? Number(prev.grade_points)
+      : null;
+  const oldInt = Math.floor(oldPts ?? 0);
+  const newPts = Math.max(0, Number(req.body?.grade_points ?? 0) || 0);
+  const newInt = Math.floor(newPts);
+  const delta = newInt - oldInt;
+
   run(
     "UPDATE course_assignment_submissions SET grade_points = ?, teacher_comment = ?, status = 'graded', updated_at = ? WHERE id = ?",
-    Number(req.body?.grade_points ?? 0) || 0,
+    newPts,
     String(req.body?.teacher_comment ?? ""),
     nowIso(),
     req.params.sid,
   );
+  if (delta !== 0) {
+    run("UPDATE users SET coins = MAX(0, coins + ?) WHERE id = ?", delta, prev.student_id);
+  }
   const sub = get(
     `SELECT s.id, s.assignment_id, s.student_id, u.nickname as student_nickname,
             s.content, s.status, s.grade_points, s.teacher_comment, s.created_at, s.updated_at

@@ -22,6 +22,7 @@ const navBurgerRef = ref<HTMLButtonElement | null>(null);
 const drawerPanelPos = ref({ top: "0px", left: "0px" });
 const profileAvatarUrl = ref("");
 const profileAvatarBroken = ref(false);
+const profileCoins = ref(0);
 const initials = computed(() => (auth.nickname || "U").slice(0, 2).toUpperCase());
 const chatBadge = computed(() => (chatStore.unread > 9 ? "9+" : String(chatStore.unread)));
 let activityTickStart = Date.now();
@@ -113,6 +114,7 @@ function logoutFromMenu() {
   profileMenuOpen.value = false;
   profileAvatarUrl.value = "";
   profileAvatarBroken.value = false;
+  profileCoins.value = 0;
   stopActivityTracking();
   auth.logout();
 }
@@ -121,6 +123,7 @@ async function loadMePresentation() {
   if (!auth.token) {
     profileAvatarUrl.value = "";
     profileAvatarBroken.value = false;
+    profileCoins.value = 0;
     return;
   }
   try {
@@ -129,9 +132,11 @@ async function loadMePresentation() {
       language_preference: string;
       font_preference: string;
       avatar_url: string;
+      coins?: number;
     }>("/api/me", { token: auth.token });
     profileAvatarUrl.value = me.avatar_url || "";
     profileAvatarBroken.value = false;
+    profileCoins.value = Math.max(0, Math.floor(Number(me.coins ?? 0)));
     applyUserPreferences(me);
   } catch {
     // ignore preference/profile load failures
@@ -146,11 +151,12 @@ async function flushActivity(force = false) {
   activityTickStart = now;
   if (elapsed <= 0) return;
   try {
-    await api("/api/me/activity", {
+    const data = await api<{ ok?: boolean; coins?: number }>("/api/me/activity", {
       method: "POST",
       token: auth.token,
       body: JSON.stringify({ seconds: Math.min(elapsed, 600) }),
     });
+    if (typeof data.coins === "number") profileCoins.value = data.coins;
   } catch {
     // ignore tracking errors
   }
@@ -312,8 +318,21 @@ watch(
           </button>
           <div v-if="profileMenuOpen" class="profile-menu card">
             <div class="profile-menu-head">
-              <span class="profile-menu-name">@{{ auth.nickname }}</span>
-              <span v-if="auth.role" class="profile-menu-role muted">{{ auth.role }}</span>
+              <div class="profile-menu-head-main">
+                <span class="profile-menu-name">@{{ auth.nickname }}</span>
+                <span v-if="auth.role" class="profile-menu-role muted">{{ auth.role }}</span>
+              </div>
+              <div class="profile-menu-coins" title="монеты">
+                <img
+                  src="/coin-gem.png"
+                  alt=""
+                  width="18"
+                  height="18"
+                  class="profile-coin-img"
+                  loading="lazy"
+                />
+                <span>{{ profileCoins }}</span>
+              </div>
             </div>
             <RouterLink :to="`/u/${auth.nickname}`" class="profile-menu-item" @click="profileMenuOpen = false">
               <AppIcon name="profile" :size="16" /><span>профиль</span>
@@ -586,11 +605,34 @@ watch(
 
 .profile-menu-head {
   display: flex;
-  align-items: baseline;
-  gap: 0.4rem;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.65rem;
   padding: 0.45rem 0.6rem 0.55rem;
   border-bottom: 1px solid var(--border);
   margin-bottom: 0.25rem;
+}
+.profile-menu-head-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  min-width: 0;
+}
+.profile-menu-coins {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-shrink: 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.profile-coin-img {
+  display: block;
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  flex-shrink: 0;
 }
 .profile-menu-name {
   color: var(--text);

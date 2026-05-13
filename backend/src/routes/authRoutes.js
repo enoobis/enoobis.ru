@@ -63,7 +63,7 @@ router.post("/register", async (req, res) => {
     return res.json({
       pending: false,
       token,
-      user: { id, email, nickname, role, status: "approved" },
+      user: { id, email, nickname, role, status: "approved", coins: 0 },
       message: null,
     });
   } catch {
@@ -74,7 +74,7 @@ router.post("/register", async (req, res) => {
 router.post("/login", async (req, res) => {
   const { email = "", password = "" } = req.body ?? {};
   const row = get(
-    "SELECT id, email, nickname, role, status, password_hash FROM users WHERE email = ?",
+    "SELECT id, email, nickname, role, status, password_hash, coins FROM users WHERE email = ?",
     email,
   );
   if (!row) return res.status(401).json({ error: "unauthorized" });
@@ -90,6 +90,7 @@ router.post("/login", async (req, res) => {
       nickname: row.nickname,
       role: row.role,
       status: row.status,
+      coins: Math.max(0, Math.floor(Number(row.coins ?? 0))),
     },
   });
 });

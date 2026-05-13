@@ -31,6 +31,7 @@ export type AdminUserDetail = {
   avatar_url: string;
   nickname_change_count: number;
   created_at: string;
+  coins: number;
   publish_limits: PublishLimitsPayload;
 };
 
@@ -88,6 +89,18 @@ export async function patchAdminPublishLimits(
     method: "PATCH",
     token,
     body: JSON.stringify(body),
+  });
+}
+
+export async function postAdminUserCoins(
+  token: string,
+  userId: string,
+  amount: number,
+): Promise<{ ok: boolean; coins: number }> {
+  return api(`/api/admin/users/${userId}/coins`, {
+    method: "POST",
+    token,
+    body: JSON.stringify({ amount }),
   });
 }
 

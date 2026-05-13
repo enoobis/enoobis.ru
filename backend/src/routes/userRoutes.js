@@ -62,17 +62,31 @@ function buildMe(row) {
     pinned_post_id: row.pinned_post_id ?? null,
     pinned_post_type: row.pinned_post_type ?? "",
     moderation_notices: buildModerationNotices(parseContentLimits(row.content_limits_json ?? "{}")),
+    coins: Math.max(0, Math.floor(Number(row.coins ?? 0))),
   };
 }
 
 const MAX_NICK_CHANGES = 3;
+
+const PASSIVE_COIN_EVERY_MS = 10 * 60 * 1000;
+const PASSIVE_COIN_AMOUNT = 5;
+/** больше этого времени активности за календарный день (utc) → 7 дней без пассивных монет */
+const DAILY_ONLINE_CAP_SEC = 16 * 3600;
+const PENALTY_DAYS = 7;
+
+function isoAddDays(isoStr, days) {
+  const d = new Date(isoStr);
+  if (Number.isNaN(d.getTime())) return nowIso();
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString();
+}
 
 router.get("/me", authRequired, (req, res) => {
   const row = get(
     `SELECT id, email, nickname, role, status, bio, wallpaper_url, avatar_url,
             theme_preference, language_preference, font_preference, full_name, website_url,
             social_links_json, birthday, country, readme_md, created_at, last_seen_at,
-            nickname_change_count, pinned_post_id, pinned_post_type, content_limits_json
+            nickname_change_count, pinned_post_id, pinned_post_type, content_limits_json, coins
      FROM users WHERE id = ?`,
     req.user.id,
   );
@@ -177,22 +191,84 @@ router.patch("/me", authRequired, (req, res) => {
 
 router.post("/me/activity", authRequired, (req, res) => {
   const seconds = Math.max(0, Math.min(3600, Number(req.body?.seconds ?? 0) | 0));
-  if (!seconds) return res.json({ ok: true });
+  const userId = req.user.id;
   const day = new Date().toISOString().slice(0, 10);
   const now = nowIso();
-  run(
-    `INSERT INTO user_daily_activity (user_id, day, seconds_spent, updated_at)
-     VALUES (?, ?, ?, ?)
-     ON CONFLICT(user_id, day) DO UPDATE SET
-       seconds_spent = seconds_spent + excluded.seconds_spent,
-       updated_at = excluded.updated_at`,
-    req.user.id,
-    day,
-    seconds,
-    now,
+  const nowMs = Date.now();
+
+  let beforeSec = 0;
+  if (seconds > 0) {
+    const rowBefore = get(
+      "SELECT seconds_spent FROM user_daily_activity WHERE user_id = ? AND day = ?",
+      userId,
+      day,
+    );
+    beforeSec = Number(rowBefore?.seconds_spent ?? 0);
+    run(
+      `INSERT INTO user_daily_activity (user_id, day, seconds_spent, updated_at)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(user_id, day) DO UPDATE SET
+         seconds_spent = seconds_spent + excluded.seconds_spent,
+         updated_at = excluded.updated_at`,
+      userId,
+      day,
+      seconds,
+      now,
+    );
+  }
+
+  run("UPDATE users SET last_seen_at = ? WHERE id = ?", now, userId);
+
+  if (seconds > 0) {
+    const rowAfter = get(
+      "SELECT seconds_spent FROM user_daily_activity WHERE user_id = ? AND day = ?",
+      userId,
+      day,
+    );
+    const afterSec = Number(rowAfter?.seconds_spent ?? beforeSec);
+    if (afterSec > DAILY_ONLINE_CAP_SEC && beforeSec <= DAILY_ONLINE_CAP_SEC) {
+      run(
+        "UPDATE users SET coins_penalty_until = ? WHERE id = ?",
+        isoAddDays(now, PENALTY_DAYS),
+        userId,
+      );
+    }
+  }
+
+  let u = get(
+    "SELECT coins, coins_penalty_until, last_passive_coin_at FROM users WHERE id = ?",
+    userId,
   );
-  run("UPDATE users SET last_seen_at = ? WHERE id = ?", now, req.user.id);
-  return res.json({ ok: true });
+  if (u?.coins_penalty_until && new Date(u.coins_penalty_until) <= new Date(now)) {
+    run("UPDATE users SET coins_penalty_until = NULL WHERE id = ?", userId);
+    u = get(
+      "SELECT coins, coins_penalty_until, last_passive_coin_at FROM users WHERE id = ?",
+      userId,
+    );
+  }
+
+  const penalized =
+    !!u?.coins_penalty_until && new Date(u.coins_penalty_until) > new Date(now);
+
+  if (!penalized && seconds > 0) {
+    if (!u?.last_passive_coin_at) {
+      run("UPDATE users SET last_passive_coin_at = ? WHERE id = ?", now, userId);
+    } else {
+      const lastMs = new Date(u.last_passive_coin_at).getTime();
+      if (nowMs - lastMs >= PASSIVE_COIN_EVERY_MS) {
+        run(
+          "UPDATE users SET coins = coins + ?, last_passive_coin_at = ? WHERE id = ?",
+          PASSIVE_COIN_AMOUNT,
+          now,
+          userId,
+        );
+      }
+    }
+  }
+
+  const finalRow = get("SELECT coins FROM users WHERE id = ?", userId);
+  const coins = Math.max(0, Math.floor(Number(finalRow?.coins ?? 0)));
+  return res.json({ ok: true, coins });
 });
 
 router.get("/me/invites", authRequired, (req, res) => {
