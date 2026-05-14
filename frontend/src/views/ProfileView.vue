@@ -188,7 +188,7 @@ watch(nick, load);
 </script>
 
 <template>
-  <template v-if="profile">
+  <div v-if="profile" class="profile-wrap">
     <div
       v-if="profile.wallpaper_url"
       class="profile-bg-layer"
@@ -367,7 +367,7 @@ watch(nick, load);
       <p v-else class="muted empty">записей нет</p>
     </template>
     </section>
-  </template>
+  </div>
   <p v-else-if="err" class="error">{{ err }}</p>
   <p v-else class="muted">загрузка</p>
 </template>
@@ -459,8 +459,9 @@ watch(nick, load);
 }
 .head {
   display: grid;
-  grid-template-columns: 64px 1fr auto;
-  gap: 1rem;
+  grid-template-columns: auto 1fr auto;
+  column-gap: var(--profile-head-gap);
+  row-gap: 1rem;
   align-items: start;
   padding-bottom: 2rem;
   border-bottom: 1px solid var(--border);
@@ -741,7 +742,8 @@ watch(nick, load);
 
 @media (max-width: 600px) {
   .head {
-    grid-template-columns: 56px 1fr;
+    grid-template-columns: auto 1fr;
+    column-gap: 1.25rem;
   }
   .actions {
     grid-column: 1 / -1;

@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from "vue-router";
 import { useAuthStore } from "../stores/auth";
+import { routeNavPending } from "../sync/routeNavPending";
 
 const router = createRouter({
   history: createWebHistory(),
@@ -135,10 +136,19 @@ const router = createRouter({
 });
 
 router.beforeEach((to) => {
+  routeNavPending.value = true;
   const auth = useAuthStore();
   if (to.meta.requiresAuth && !auth.token) return { name: "login", query: { next: to.fullPath } };
   if (to.meta.requiresAdmin && auth.role !== "admin") return { name: "home" };
   return true;
+});
+
+router.afterEach(() => {
+  routeNavPending.value = false;
+});
+
+router.onError(() => {
+  routeNavPending.value = false;
 });
 
 export default router;

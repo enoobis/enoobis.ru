@@ -7,6 +7,7 @@ import { useChatStore } from "./stores/chat";
 import AppIcon from "./components/AppIcon.vue";
 import AppToast from "./components/AppToast.vue";
 import { applyUserPreferences } from "./utils/preferences";
+import { routeNavPending } from "./sync/routeNavPending";
 
 const router = useRouter();
 const route = useRoute();
@@ -132,10 +133,6 @@ async function loadMePresentation() {
       theme_preference: string;
       language_preference: string;
       font_preference: string;
-      ui_font_slug: string;
-      ui_ink_hex: string;
-      ui_accent_hex: string;
-      ui_radius_slug: string;
       avatar_url: string;
       coins?: number;
     }>("/api/me", { token: auth.token });
@@ -266,6 +263,7 @@ watch(
 <template>
   <div class="layout">
     <header class="nav">
+      <span v-if="routeNavPending" class="nav-route-loading muted" aria-live="polite">загрузка…</span>
       <button
         v-if="auth.token"
         ref="navBurgerRef"

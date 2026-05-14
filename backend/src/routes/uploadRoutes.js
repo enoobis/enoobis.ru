@@ -6,7 +6,7 @@ import { v4 as uuidv4 } from "uuid";
 import { nowIso, run, get } from "../db.js";
 import { authRequired } from "../auth.js";
 import { isRasterImageMimetype, optimizeUploadedFile } from "../utils/imageOptimize.js";
-import { SHOP_KINDS, PRESET_SHOP_KINDS, validatePresetForKind } from "../utils/shopPresets.js";
+import { SHOP_KINDS } from "../utils/shopPresets.js";
 
 const router = express.Router();
 
@@ -188,49 +188,6 @@ router.post("/admin/shop/items", authRequired, uploadSingle(shopItemUpload, "fil
     nowIso(),
   );
   return res.json({ ok: true, id, url, name, price, kind, is_animated: isAnimated, stock_limit: stockLimit });
-});
-
-router.post("/admin/shop/preset-item", authRequired, (req, res) => {
-  if (req.user.role !== "admin") return res.status(403).json({ error: "forbidden" });
-  const kind = String(req.body?.kind ?? "").trim();
-  if (!PRESET_SHOP_KINDS.has(kind)) return res.status(400).json({ error: "bad kind" });
-  const presetNorm = validatePresetForKind(kind, req.body?.preset_value ?? req.body?.preset);
-  if (!presetNorm) return res.status(400).json({ error: "bad preset" });
-  const name = String(req.body?.name ?? "").trim();
-  if (!name) return res.status(400).json({ error: "bad name" });
-  const price = Math.max(0, parseInt(req.body?.price ?? "0", 10) || 0);
-  const rawStock = req.body?.stock_limit;
-  /** @type {number | null} */
-  let stockLimit = null;
-  if (rawStock !== undefined && rawStock !== null && String(rawStock).trim() !== "") {
-    const n = parseInt(String(rawStock), 10);
-    if (!Number.isFinite(n) || n < 1) return res.status(400).json({ error: "bad stock_limit" });
-    stockLimit = n;
-  }
-  const id = uuidv4();
-  run(
-    `INSERT INTO shop_items (id, kind, name, url, price, is_animated, stock_limit, preset_value, added_by, created_at)
-     VALUES (?, ?, ?, '#', ?, 0, ?, ?, ?, ?)`,
-    id,
-    kind,
-    name,
-    price,
-    stockLimit,
-    presetNorm,
-    req.user.id,
-    nowIso(),
-  );
-  return res.json({
-    ok: true,
-    id,
-    url: "#",
-    name,
-    price,
-    kind,
-    is_animated: 0,
-    stock_limit: stockLimit,
-    preset_value: presetNorm,
-  });
 });
 
 router.delete("/admin/shop/items/:id", authRequired, (req, res) => {

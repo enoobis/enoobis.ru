@@ -18,60 +18,22 @@ const loading = ref(true);
 const busy = ref<string | null>(null);
 const profileCoins = ref(0);
 
-/** порядок: рамка → обложка → фон → аватар → оформление */
-const KIND_ORDER: ShopItemKind[] = [
-  "frame",
-  "cover",
-  "wallpaper",
-  "avatar",
-  "font",
-  "ink",
-  "accent",
-  "radius",
-];
+const KIND_ORDER: ShopItemKind[] = ["frame", "cover", "wallpaper", "avatar"];
 
 type Cosmetics = {
   avatar_url: string;
   wallpaper_url: string;
   avatar_frame_url: string;
   profile_cover_url: string;
-  ui_font_slug: string;
-  ui_ink_hex: string;
-  ui_accent_hex: string;
-  ui_radius_slug: string;
 };
 
 const cosmetics = ref<Cosmetics | null>(null);
-
-const FONT_PREVIEW: Record<string, string> = {
-  outfit: '"Outfit", system-ui, sans-serif',
-  system: "system-ui, sans-serif",
-  serif: 'ui-serif, Georgia, "Times New Roman", serif',
-  mono: 'ui-monospace, "JetBrains Mono", monospace',
-  readable: 'Georgia, "Palatino Linotype", Palatino, serif',
-  dm: '"DM Sans", system-ui, sans-serif',
-};
-
-function fontPreviewFamily(slug: string | null): string {
-  const k = String(slug || "outfit");
-  return FONT_PREVIEW[k] ?? FONT_PREVIEW.outfit;
-}
-
-function radiusPreviewPx(slug: string | null): string {
-  if (slug === "soft") return "14px";
-  if (slug === "sharp") return "6px";
-  return "10px";
-}
 
 function kindLabel(k: ShopItemKind): string {
   if (k === "avatar") return "аватар";
   if (k === "frame") return "рамка";
   if (k === "wallpaper") return "фон";
-  if (k === "cover") return "обложка";
-  if (k === "font") return "шрифт";
-  if (k === "ink") return "текст";
-  if (k === "accent") return "акцент";
-  return "углы";
+  return "обложка";
 }
 
 function kindSortKey(k: ShopItemKind): number {
@@ -93,10 +55,6 @@ function applyCosmeticsFromEquip(r: EquipResult) {
     wallpaper_url: r.wallpaper_url,
     avatar_frame_url: r.avatar_frame_url,
     profile_cover_url: r.profile_cover_url,
-    ui_font_slug: r.ui_font_slug,
-    ui_ink_hex: r.ui_ink_hex,
-    ui_accent_hex: r.ui_accent_hex,
-    ui_radius_slug: r.ui_radius_slug,
   };
 }
 
@@ -107,14 +65,6 @@ function isEquipped(a: OwnedShopItem): boolean {
   if (a.kind === "frame") return !!a.url && a.url !== "#" && a.url === c.avatar_frame_url;
   if (a.kind === "wallpaper") return !!a.url && a.url !== "#" && a.url === c.wallpaper_url;
   if (a.kind === "cover") return !!a.url && a.url !== "#" && a.url === c.profile_cover_url;
-  const pv = (a.preset_value ?? "").trim().toLowerCase();
-  if (a.kind === "font") return pv === (c.ui_font_slug || "outfit").trim().toLowerCase();
-  if (a.kind === "ink") return !!pv && pv === (c.ui_ink_hex || "").trim().toLowerCase();
-  if (a.kind === "accent") return !!pv && pv === (c.ui_accent_hex || "").trim().toLowerCase();
-  if (a.kind === "radius") {
-    const cur = (c.ui_radius_slug || "default").trim();
-    return (a.preset_value || "default").trim() === cur;
-  }
   return false;
 }
 
@@ -129,10 +79,6 @@ async function load() {
       wallpaper_url: me.wallpaper_url ?? "",
       avatar_frame_url: me.avatar_frame_url ?? "",
       profile_cover_url: me.profile_cover_url ?? "",
-      ui_font_slug: me.ui_font_slug ?? "outfit",
-      ui_ink_hex: me.ui_ink_hex ?? "",
-      ui_accent_hex: me.ui_accent_hex ?? "",
-      ui_radius_slug: me.ui_radius_slug ?? "default",
     };
   } catch (e) {
     toastError(e);
@@ -165,10 +111,6 @@ async function onCancel(a: OwnedShopItem) {
     else if (a.kind === "frame") body.avatar_frame_url = "";
     else if (a.kind === "wallpaper") body.wallpaper_url = "";
     else if (a.kind === "cover") body.profile_cover_url = "";
-    else if (a.kind === "font") body.ui_font_slug = "outfit";
-    else if (a.kind === "ink") body.ui_ink_hex = "";
-    else if (a.kind === "accent") body.ui_accent_hex = "";
-    else if (a.kind === "radius") body.ui_radius_slug = "default";
     await api("/api/me", { method: "PATCH", token: auth.token, body: JSON.stringify(body) });
     toastSuccess("снято");
     window.dispatchEvent(new CustomEvent("enoobis:profile-cosmetics-updated"));
@@ -211,20 +153,6 @@ onMounted(load);
             <div class="frame-demo">
               <span class="frame-inner" />
               <img :src="a.url" alt="" class="frame-layer" loading="lazy" />
-            </div>
-          </template>
-          <template v-else-if="a.kind === 'font'">
-            <div class="preset-font" :style="{ fontFamily: fontPreviewFamily(a.preset_value) }">аг</div>
-          </template>
-          <template v-else-if="a.kind === 'ink' || a.kind === 'accent'">
-            <div
-              class="preset-swatch"
-              :style="{ background: a.preset_value && a.preset_value.startsWith('#') ? a.preset_value : 'var(--surface2)' }"
-            />
-          </template>
-          <template v-else-if="a.kind === 'radius'">
-            <div class="preset-radius">
-              <span class="preset-radius-box" :style="{ borderRadius: radiusPreviewPx(a.preset_value) }" />
             </div>
           </template>
           <template v-else-if="a.kind === 'wallpaper' || a.kind === 'cover'">
@@ -352,35 +280,6 @@ onMounted(load);
   object-fit: contain;
   pointer-events: none;
 }
-.preset-font {
-  font-size: 2rem;
-  line-height: 1;
-  font-weight: 600;
-  color: var(--text);
-}
-.preset-swatch {
-  width: 100%;
-  height: 72px;
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-}
-.preset-radius {
-  width: 100%;
-  height: 72px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--surface2);
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-}
-.preset-radius-box {
-  display: block;
-  width: 52px;
-  height: 34px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-}
 .wide-thumb {
   width: 100%;
   height: 72px;
@@ -405,48 +304,35 @@ onMounted(load);
   justify-content: center;
   margin-top: auto;
 }
-.btn-equip {
-  padding: 0.25rem 0.65rem;
-  border-radius: 999px;
-  font-size: 0.8rem;
-  border: 1px solid var(--text);
-  background: var(--surface2);
-  color: var(--text);
-  cursor: pointer;
-  min-height: 0;
-}
-.btn-equip:hover:not(:disabled) {
-  background: var(--surface);
-}
+.btn-equip,
 .btn-cancel {
   padding: 0.25rem 0.65rem;
   border-radius: 999px;
   font-size: 0.8rem;
   border: 1px solid var(--border);
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-  min-height: 0;
-}
-.btn-cancel:hover:not(:disabled) {
   background: var(--surface2);
   color: var(--text);
+  cursor: pointer;
+  min-height: 0;
 }
 .btn-equip:disabled,
 .btn-cancel:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
+.btn-equip {
+  border-color: var(--text);
+}
+.btn-cancel {
+  border-color: var(--muted);
+  color: var(--muted);
+}
 .empty {
   text-align: center;
   margin-top: 4vh;
 }
-.empty p {
-  margin: 0 0 0.75rem;
-}
 .to-shop {
-  color: var(--text);
-  text-decoration: underline;
-  text-underline-offset: 3px;
+  display: inline-block;
+  margin-top: 0.5rem;
 }
 </style>

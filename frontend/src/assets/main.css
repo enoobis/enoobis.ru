@@ -8,6 +8,7 @@
   --accent: #ffffff;
   --danger: #e07b8a;
   --radius: 10px;
+  --profile-head-gap: 1.5rem;
   --font: "Outfit", system-ui, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, monospace;
   --icon-size: 16px;
@@ -227,6 +228,17 @@ input[type="radio"]:focus-visible {
   margin-bottom: 1.5rem;
   background: transparent;
   border-radius: 0;
+  position: relative;
+}
+.nav-route-loading {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  font-size: 0.82rem;
+  white-space: nowrap;
+  z-index: 1;
 }
 @media (max-width: 640px) {
   .nav {
@@ -402,27 +414,4 @@ h3 {
     font-size: 0.9rem;
     padding: 0.5rem 0.65rem;
   }
-}
-
-html[data-ui-font="system"] {
-  --font: system-ui, -apple-system, "Segoe UI", sans-serif;
-}
-html[data-ui-font="serif"] {
-  --font: ui-serif, "Georgia", "Times New Roman", serif;
-}
-html[data-ui-font="mono"] {
-  --font: var(--mono);
-}
-html[data-ui-font="readable"] {
-  --font: "Georgia", "Palatino Linotype", Palatino, serif;
-}
-html[data-ui-font="dm"] {
-  --font: "DM Sans", system-ui, sans-serif;
-}
-
-html[data-ui-radius="soft"] {
-  --radius: 14px;
-}
-html[data-ui-radius="sharp"] {
-  --radius: 6px;
 }

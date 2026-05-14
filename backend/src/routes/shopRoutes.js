@@ -1,22 +1,13 @@
 import express from "express";
 import { run, get, all, nowIso, db } from "../db.js";
 import { authRequired } from "../auth.js";
-import { SHOP_KINDS, validatePresetForKind } from "../utils/shopPresets.js";
+import { SHOP_KINDS } from "../utils/shopPresets.js";
 
 const router = express.Router();
 
-const PRESET_KINDS = new Set(["font", "ink", "accent", "radius"]);
+const DEFAULT_LIST_KINDS = ["avatar", "frame", "wallpaper", "cover"];
 
-const DEFAULT_LIST_KINDS = [
-  "avatar",
-  "frame",
-  "wallpaper",
-  "cover",
-  "font",
-  "ink",
-  "accent",
-  "radius",
-];
+const IMAGE_KINDS_SQL = "('avatar','frame','wallpaper','cover')";
 
 function ownedIdsForUser(userId) {
   return new Set(
@@ -55,10 +46,6 @@ function buyShopItemCore(userId, itemId, avatarOnly) {
   );
   if (!item) throw shopBuyError(404, "not_found");
   if (!avatarOnly && !SHOP_KINDS.has(item.kind)) throw shopBuyError(400, "bad_kind");
-  if (PRESET_KINDS.has(item.kind)) {
-    const ok = validatePresetForKind(item.kind, item.preset_value);
-    if (!ok) throw shopBuyError(400, "bad_item");
-  }
 
   const already = get("SELECT 1 FROM user_owned_shop_items WHERE user_id = ? AND item_id = ?", userId, item.id);
   if (already) throw shopBuyError(400, "already_owned");
@@ -100,8 +87,7 @@ function handleShopBuyError(res, err) {
 
 function cosmeticRow(userId) {
   return get(
-    `SELECT avatar_url, wallpaper_url, avatar_frame_url, profile_cover_url,
-            ui_font_slug, ui_ink_hex, ui_accent_hex, ui_radius_slug
+    `SELECT avatar_url, wallpaper_url, avatar_frame_url, profile_cover_url
      FROM users WHERE id = ?`,
     userId,
   );
@@ -111,9 +97,7 @@ router.get("/shop/items", authRequired, (req, res) => {
   const raw = String(req.query.kind ?? "").trim();
   /** @type {string[]} */
   let kinds;
-  if (raw === "ui") {
-    kinds = ["font", "ink", "accent", "radius"];
-  } else if (raw && SHOP_KINDS.has(raw)) {
+  if (raw && SHOP_KINDS.has(raw)) {
     kinds = [raw];
   } else {
     kinds = DEFAULT_LIST_KINDS;
@@ -134,7 +118,7 @@ router.get("/shop/my-items", authRequired, (req, res) => {
     `SELECT si.id, si.kind, si.name, si.url, si.price, si.is_animated, si.preset_value, uoi.acquired_at
      FROM user_owned_shop_items uoi
      JOIN shop_items si ON si.id = uoi.item_id
-     WHERE uoi.user_id = ?
+     WHERE uoi.user_id = ? AND si.kind IN ${IMAGE_KINDS_SQL}
      ORDER BY uoi.acquired_at DESC`,
     req.user.id,
   );
@@ -175,7 +159,7 @@ router.post("/shop/avatars/:id/buy", authRequired, (req, res) => {
   }
 });
 
-/** @param {{ kind: string; url: string; preset_value?: string | null }} item */
+/** @param {{ kind: string; url: string }} item */
 function applyEquip(userId, item) {
   if (item.kind === "avatar") {
     run("UPDATE users SET avatar_url = ? WHERE id = ?", item.url, userId);
@@ -193,30 +177,6 @@ function applyEquip(userId, item) {
     run("UPDATE users SET profile_cover_url = ? WHERE id = ?", item.url, userId);
     return null;
   }
-  if (item.kind === "font") {
-    const slug = validatePresetForKind("font", item.preset_value);
-    if (!slug) return "bad preset";
-    run("UPDATE users SET ui_font_slug = ? WHERE id = ?", slug, userId);
-    return null;
-  }
-  if (item.kind === "ink") {
-    const hex = validatePresetForKind("ink", item.preset_value);
-    if (!hex) return "bad preset";
-    run("UPDATE users SET ui_ink_hex = ? WHERE id = ?", hex, userId);
-    return null;
-  }
-  if (item.kind === "accent") {
-    const hex = validatePresetForKind("accent", item.preset_value);
-    if (!hex) return "bad preset";
-    run("UPDATE users SET ui_accent_hex = ? WHERE id = ?", hex, userId);
-    return null;
-  }
-  if (item.kind === "radius") {
-    const slug = validatePresetForKind("radius", item.preset_value);
-    if (!slug) return "bad preset";
-    run("UPDATE users SET ui_radius_slug = ? WHERE id = ?", slug, userId);
-    return null;
-  }
   return "bad kind";
 }
 
@@ -227,10 +187,10 @@ function equipPayload(row) {
     wallpaper_url: row?.wallpaper_url ?? "",
     avatar_frame_url: row?.avatar_frame_url ?? "",
     profile_cover_url: row?.profile_cover_url ?? "",
-    ui_font_slug: row?.ui_font_slug ?? "outfit",
-    ui_ink_hex: row?.ui_ink_hex ?? "",
-    ui_accent_hex: row?.ui_accent_hex ?? "",
-    ui_radius_slug: row?.ui_radius_slug ?? "default",
+    ui_font_slug: "outfit",
+    ui_ink_hex: "",
+    ui_accent_hex: "",
+    ui_radius_slug: "default",
   };
 }
 
@@ -240,6 +200,7 @@ router.post("/shop/items/:id/equip", authRequired, (req, res) => {
     req.params.id,
   );
   if (!item) return res.status(404).json({ error: "not found" });
+  if (!SHOP_KINDS.has(item.kind)) return res.status(400).json({ error: "bad kind" });
 
   const owned = get("SELECT 1 FROM user_owned_shop_items WHERE user_id = ? AND item_id = ?", req.user.id, item.id);
   if (!owned) return res.status(403).json({ error: "not owned" });
