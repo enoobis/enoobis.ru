@@ -27,3 +27,6 @@ backend/data/
 *.swp
 
 AGENTS.md
+
+# Cursor — правила агента только локально
+.cursor/rules/
