@@ -1,4 +1,5 @@
 import "dotenv/config";
+import http from "node:http";
 import express from "express";
 import cors from "cors";
 import path from "node:path";
@@ -20,6 +21,7 @@ import storageRoutes from "./routes/storageRoutes.js";
 import libraryRoutes from "./routes/libraryRoutes.js";
 import shopRoutes from "./routes/shopRoutes.js";
 import callRoutes from "./routes/callRoutes.js";
+import { attachCallSignaling } from "./callSignal.js";
 
 const app = express();
 app.use(cors());
@@ -50,6 +52,9 @@ app.use((err, _req, res, _next) => {
   console.error(err);
   res.status(500).json({ error: "internal error" });
 });
+
+const server = http.createServer(app);
+attachCallSignaling(server);
 
 async function ensureAdminAccount() {
   const adminEmail = "REDACTED";
@@ -102,7 +107,7 @@ function backfillIdenticons() {
 }
 
 const port = Number(process.env.PORT ?? 3000);
-app.listen(port, async () => {
+server.listen(port, async () => {
   db.prepare("SELECT 1").get();
   try {
     await ensureAdminAccount();

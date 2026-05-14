@@ -2,8 +2,6 @@ import { api } from "./http";
 
 export type CallSessionOk = {
   active: true;
-  jitsi_room: string;
-  meet_base: string;
 };
 
 export type CallSessionOff = {
