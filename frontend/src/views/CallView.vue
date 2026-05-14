@@ -32,8 +32,8 @@ function jitsiVoiceUrl(meetBase: string, room: string): string {
   const base = meetBase.replace(/\/+$/, "");
   const roomEnc = encodeURIComponent(room);
   const hash = [
+    "config.startAudioOnly=true",
     "config.startWithAudioMuted=true",
-    "config.startWithVideoMuted=true",
     "config.prejoinPageEnabled=false",
     "config.requireDisplayName=false",
     "config.desktopSharingEnabled=false",
