@@ -9,17 +9,29 @@ function randomSlug() {
   return crypto.randomBytes(16).toString("hex");
 }
 
-function randomJitsiRoom() {
-  return `enoobis-${crypto.randomBytes(12).toString("hex")}`;
-}
-
-function meetBase() {
-  const raw = process.env.JITSI_MEET_BASE ?? process.env.CALL_MEET_BASE ?? "https://meet.jit.si";
-  return raw.trim().replace(/\/+$/, "");
-}
-
 function dailyRoomNameForSlug(slug) {
   return `enoobis${slug}`;
+}
+
+/** только голос: без камеры по умолчанию, без экрана, без лишнего UI в prebuilt */
+function dailyVoiceOnlyProperties(expSec) {
+  return {
+    exp: expSec,
+    enable_prejoin_ui: false,
+    start_video_off: true,
+    start_audio_off: false,
+    enable_screenshare: false,
+    enable_chat: false,
+    enable_video_processing_ui: false,
+    enable_people_ui: false,
+    enable_pip_ui: false,
+    enable_network_ui: false,
+    enable_emoji_reactions: false,
+    enable_hand_raising: false,
+    permissions: {
+      canSend: ["audio"],
+    },
+  };
 }
 
 async function createDailyRoom(slug) {
@@ -36,10 +48,7 @@ async function createDailyRoom(slug) {
     body: JSON.stringify({
       name,
       privacy: "public",
-      properties: {
-        exp,
-        enable_prejoin_ui: false,
-      },
+      properties: dailyVoiceOnlyProperties(exp),
     }),
   });
   const text = await res.text();
@@ -66,41 +75,28 @@ async function deleteDailyRoom(slug) {
 }
 
 router.post("/calls", authRequired, async (req, res) => {
+  if (!process.env.DAILY_API_KEY?.trim()) {
+    res.status(503).json({ error: "звонки: задайте DAILY_API_KEY на сервере" });
+    return;
+  }
+
   const slug = randomSlug();
   const iso = nowIso();
-  const useDaily = Boolean(process.env.DAILY_API_KEY?.trim());
 
   try {
-    if (useDaily) {
-      const embed_url = await createDailyRoom(slug);
-      run(
-        `INSERT INTO call_sessions (slug, jitsi_room, embed_url, active, created_by_user_id, created_at)
-         VALUES (?, '', ?, 1, ?, ?)`,
-        slug,
-        embed_url,
-        req.user.id,
-        iso,
-      );
-    } else {
-      const jitsi_room = randomJitsiRoom();
-      run(
-        `INSERT INTO call_sessions (slug, jitsi_room, embed_url, active, created_by_user_id, created_at)
-         VALUES (?, ?, '', 1, ?, ?)`,
-        slug,
-        jitsi_room,
-        req.user.id,
-        iso,
-      );
-    }
+    const embed_url = await createDailyRoom(slug);
+    run(
+      `INSERT INTO call_sessions (slug, jitsi_room, embed_url, active, created_by_user_id, created_at)
+       VALUES (?, '', ?, 1, ?, ?)`,
+      slug,
+      embed_url,
+      req.user.id,
+      iso,
+    );
     res.json({ slug });
   } catch (e) {
     console.error("create call session", e);
-    res.status(500).json({
-      error:
-        useDaily
-          ? "не удалось создать комнату (проверь DAILY_API_KEY)"
-          : "не удалось создать звонок",
-    });
+    res.status(500).json({ error: "не удалось создать комнату (проверь DAILY_API_KEY)" });
   }
 });
 
@@ -118,16 +114,12 @@ router.post("/calls/:slug/end", async (req, res) => {
 
 router.get("/calls/:slug", (req, res) => {
   const row = get(
-    "SELECT active, jitsi_room, embed_url FROM call_sessions WHERE slug = ?",
+    "SELECT active, embed_url FROM call_sessions WHERE slug = ?",
     req.params.slug,
   );
   if (!row) return res.status(404).json({ error: "not found" });
-  if (!row.active) return res.json({ active: false });
-  if (row.embed_url) {
-    res.json({ active: true, embed_url: row.embed_url });
-    return;
-  }
-  res.json({ active: true, jitsi_room: row.jitsi_room, meet_base: meetBase() });
+  if (!row.active || !row.embed_url) return res.json({ active: false });
+  res.json({ active: true, embed_url: row.embed_url });
 });
 
 export default router;

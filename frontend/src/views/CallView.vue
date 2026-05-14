@@ -28,14 +28,6 @@ function startPoll() {
   }, 4000);
 }
 
-function jitsiEmbedUrl(meetBase: string, room: string): string {
-  const base = meetBase.replace(/\/+$/, "");
-  const roomEnc = encodeURIComponent(room);
-  const hash =
-    "config.prejoinPageEnabled=false&config.requireDisplayName=false&interfaceConfig.MOBILE_APP_PROMO=false";
-  return `${base}/${roomEnc}#${hash}`;
-}
-
 async function refresh() {
   const s = slug.value;
   if (!s) {
@@ -53,15 +45,7 @@ async function refresh() {
       return;
     }
     phase.value = "live";
-    if ("embed_url" in data && data.embed_url) {
-      iframeSrc.value = data.embed_url;
-    } else if ("jitsi_room" in data && data.jitsi_room) {
-      iframeSrc.value = jitsiEmbedUrl(data.meet_base, data.jitsi_room);
-    } else {
-      phase.value = "gone";
-      iframeSrc.value = "";
-      stopPoll();
-    }
+    iframeSrc.value = data.embed_url;
   } catch {
     phase.value = "gone";
     iframeSrc.value = "";
@@ -123,8 +107,8 @@ watch(slug, () => {
           v-if="iframeSrc"
           :src="iframeSrc"
           class="frame"
-          title="звонок"
-          allow="camera; microphone; fullscreen; display-capture; autoplay"
+          title="голосовой звонок"
+          allow="microphone; autoplay"
         />
       </div>
       <button type="button" class="end" :disabled="ending" @click="endCall">завершить звонок</button>
@@ -138,7 +122,7 @@ watch(slug, () => {
   display: flex;
   flex-direction: column;
   padding: 1rem;
-  gap: 1rem;
+  gap: 0.75rem;
   box-sizing: border-box;
 }
 .load {
@@ -153,8 +137,9 @@ watch(slug, () => {
   max-width: 28rem;
 }
 .frame-shell {
-  flex: 1;
-  min-height: min(72vh, 720px);
+  flex: 0 0 auto;
+  height: min(42vh, 340px);
+  max-height: 50vh;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   overflow: hidden;
@@ -163,7 +148,6 @@ watch(slug, () => {
 .frame {
   width: 100%;
   height: 100%;
-  min-height: inherit;
   border: none;
   display: block;
 }

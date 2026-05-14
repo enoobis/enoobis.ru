@@ -1,8 +1,9 @@
 import { api } from "./http";
 
-export type CallSessionOk =
-  | { active: true; embed_url: string }
-  | { active: true; jitsi_room: string; meet_base: string };
+export type CallSessionOk = {
+  active: true;
+  embed_url: string;
+};
 
 export type CallSessionOff = {
   active: false;
