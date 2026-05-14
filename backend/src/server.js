@@ -19,6 +19,7 @@ import fileRoutes from "./routes/fileRoutes.js";
 import storageRoutes from "./routes/storageRoutes.js";
 import libraryRoutes from "./routes/libraryRoutes.js";
 import shopRoutes from "./routes/shopRoutes.js";
+import callRoutes from "./routes/callRoutes.js";
 
 const app = express();
 app.use(cors());
@@ -41,6 +42,7 @@ app.use("/api", fileRoutes);
 app.use("/api", storageRoutes);
 app.use("/api", libraryRoutes);
 app.use("/api", shopRoutes);
+app.use("/api", callRoutes);
 app.use("/api", adminRoutes);
 
 app.use("/api", (req, res) => res.status(404).json({ error: "api not found" }));

@@ -790,3 +790,15 @@ try {
 } catch {
   // ignore
 }
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS call_sessions (
+    slug TEXT PRIMARY KEY,
+    jitsi_room TEXT NOT NULL,
+    active INTEGER NOT NULL DEFAULT 1,
+    created_by_user_id TEXT,
+    created_at TEXT NOT NULL,
+    ended_at TEXT,
+    FOREIGN KEY (created_by_user_id) REFERENCES users(id)
+  );
+`);

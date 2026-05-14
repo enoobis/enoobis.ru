@@ -67,6 +67,11 @@ const router = createRouter({
       name: "shared",
       component: () => import("../views/SharedView.vue"),
     },
+    {
+      path: "/call/:slug",
+      name: "call",
+      component: () => import("../views/CallView.vue"),
+    },
     { path: "/login", name: "login", component: () => import("../views/LoginView.vue") },
     { path: "/register", name: "register", component: () => import("../views/RegisterView.vue") },
     {

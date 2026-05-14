@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
+import { createCallSession } from "../api/calls";
 import {
   deleteChatThread,
   deleteMessage,
@@ -178,24 +179,14 @@ function onDocPointerDown(e: PointerEvent) {
   }
 }
 
-function randomMeetRoomSuffix(): string {
-  const bytes = new Uint8Array(8);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-function buildCallUrl(): string {
-  const raw = import.meta.env.VITE_CALL_MEET_BASE as string | undefined;
-  const base = (raw?.trim().replace(/\/+$/, "") || "https://meet.jit.si").replace(/\/+$/, "");
-  return `${base}/enoobis-${randomMeetRoomSuffix()}`;
-}
-
 async function createAndSendCallLink() {
   callMenuOpen.value = false;
   if (!auth.token || !activeId.value || sending.value) return;
   sending.value = true;
   try {
-    const body = `звонок: ${buildCallUrl()}`;
+    const { slug } = await createCallSession(auth.token);
+    const url = `${window.location.origin}/call/${slug}`;
+    const body = `звонок: ${url}`;
     const m = await sendMessage(activeId.value, auth.token, { body });
     messages.value = [...messages.value, m];
     await nextTick();
