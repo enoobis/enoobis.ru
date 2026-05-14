@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
-import { createCallSession } from "../api/calls";
 import {
   deleteChatThread,
   deleteMessage,
@@ -19,7 +18,7 @@ import {
 import AppIcon from "../components/AppIcon.vue";
 import { useAuthStore } from "../stores/auth";
 import { useChatStore } from "../stores/chat";
-import { toastError, toastSuccess } from "../utils/toast";
+import { toastError } from "../utils/toast";
 
 const auth = useAuthStore();
 const chatStore = useChatStore();
@@ -46,8 +45,6 @@ const lightboxUrl = ref("");
 const editingId = ref("");
 const editingDraft = ref("");
 const replyTarget = ref<ChatMessage | null>(null);
-const callMenuOpen = ref(false);
-const callMenuWrap = ref<HTMLElement | null>(null);
 let chatsTimer: ReturnType<typeof setInterval> | null = null;
 let messagesTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -164,40 +161,6 @@ function clearReplyTarget() {
 function removeCurrentChat() {
   const c = chats.value.find((x) => x.id === activeId.value);
   if (c) void removeChatFromList(c);
-}
-
-function toggleCallMenu() {
-  callMenuOpen.value = !callMenuOpen.value;
-}
-
-function onDocPointerDown(e: PointerEvent) {
-  const root = callMenuWrap.value;
-  if (!callMenuOpen.value || !root) return;
-  const t = e.target;
-  if (t instanceof Node && !root.contains(t)) {
-    callMenuOpen.value = false;
-  }
-}
-
-async function createAndSendCallLink() {
-  callMenuOpen.value = false;
-  if (!auth.token || !activeId.value || sending.value) return;
-  sending.value = true;
-  try {
-    const { slug } = await createCallSession(auth.token);
-    const url = `${window.location.origin}/call/${slug}`;
-    const body = `звонок: ${url}`;
-    const m = await sendMessage(activeId.value, auth.token, { body });
-    messages.value = [...messages.value, m];
-    await nextTick();
-    messagesEnd.value?.scrollIntoView({ block: "end", behavior: "smooth" });
-    void loadChats();
-    toastSuccess("отправлено");
-  } catch (e) {
-    toastError(e);
-  } finally {
-    sending.value = false;
-  }
 }
 
 async function loadChats() {
@@ -439,7 +402,6 @@ watch(
   activeId,
   () => {
     scheduleComposerResize();
-    callMenuOpen.value = false;
   },
   { flush: "post" },
 );
@@ -492,7 +454,6 @@ watch(
 );
 
 onMounted(async () => {
-  document.addEventListener("pointerdown", onDocPointerDown, true);
   await loadChats();
   const id = typeof route.query.id === "string" ? route.query.id : "";
   if (id) {
@@ -505,7 +466,6 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
-  document.removeEventListener("pointerdown", onDocPointerDown, true);
   if (chatsTimer) clearInterval(chatsTimer);
   if (messagesTimer) clearInterval(messagesTimer);
 });
@@ -567,30 +527,6 @@ onUnmounted(() => {
             <span>{{ otherNickname }}</span>
           </RouterLink>
           <span v-if="otherNickname" class="thread-head-actions">
-            <span ref="callMenuWrap" class="call-menu">
-              <button
-                type="button"
-                class="thread-act"
-                :aria-expanded="callMenuOpen"
-                aria-haspopup="true"
-                aria-label="звонок"
-                title="звонок"
-                @click.stop="toggleCallMenu"
-              >
-                <AppIcon name="call" :size="16" />
-              </button>
-              <div v-if="callMenuOpen" class="call-menu-panel" role="menu">
-                <button
-                  type="button"
-                  class="call-menu-item"
-                  role="menuitem"
-                  @click="createAndSendCallLink"
-                >
-                  <AppIcon name="link" :size="16" />
-                  <span>создать звонок по ссылке</span>
-                </button>
-              </div>
-            </span>
             <button
               type="button"
               class="thread-act"
@@ -984,39 +920,6 @@ onUnmounted(() => {
 .thread-act:hover {
   color: var(--text);
   background: var(--surface2);
-}
-.call-menu {
-  position: relative;
-}
-.call-menu-panel {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  z-index: 20;
-  min-width: max-content;
-  max-width: min(320px, calc(100vw - 2rem));
-  padding: 0.35rem 0;
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-}
-.call-menu-item {
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
-  width: 100%;
-  padding: 0.55rem 0.85rem;
-  border: none;
-  background: transparent;
-  color: var(--text);
-  font: inherit;
-  font-size: 0.88rem;
-  text-align: left;
-  cursor: pointer;
-  text-transform: lowercase;
-}
-.call-menu-item:hover {
-  background: var(--surface);
 }
 .back {
   display: none;

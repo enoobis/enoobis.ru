@@ -791,25 +791,8 @@ try {
   // ignore
 }
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS call_sessions (
-    slug TEXT PRIMARY KEY,
-    jitsi_room TEXT NOT NULL DEFAULT '',
-    embed_url TEXT NOT NULL DEFAULT '',
-    active INTEGER NOT NULL DEFAULT 1,
-    created_by_user_id TEXT,
-    created_at TEXT NOT NULL,
-    ended_at TEXT,
-    FOREIGN KEY (created_by_user_id) REFERENCES users(id)
-  );
-`);
-
 try {
-  db.prepare("SELECT embed_url FROM call_sessions LIMIT 1").get();
+  db.exec("DROP TABLE IF EXISTS call_sessions");
 } catch {
-  try {
-    db.exec("ALTER TABLE call_sessions ADD COLUMN embed_url TEXT NOT NULL DEFAULT ''");
-  } catch {
-    // ignore
-  }
+  // ignore
 }
