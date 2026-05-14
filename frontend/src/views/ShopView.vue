@@ -147,7 +147,7 @@ watch(tab, load);
           <template v-else-if="item.kind === 'wallpaper' || item.kind === 'cover'">
             <div
               class="wide-thumb"
-              :class="item.kind === 'cover' ? 'cover-thumb' : ''"
+              :class="item.kind === 'wallpaper' ? 'wallpaper-strip-thumb' : ''"
               :style="{ backgroundImage: `url(${item.url})` }"
             />
           </template>
@@ -308,7 +308,7 @@ watch(tab, load);
   background-size: cover;
   background-position: center;
 }
-.cover-thumb {
+.wallpaper-strip-thumb {
   height: 56px;
 }
 .item-name {

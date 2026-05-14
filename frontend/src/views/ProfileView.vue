@@ -188,18 +188,20 @@ watch(nick, load);
 </script>
 
 <template>
-  <section v-if="profile" class="profile">
+  <template v-if="profile">
     <div
       v-if="profile.wallpaper_url"
-      class="wallpaper"
+      class="profile-bg-layer"
+      aria-hidden="true"
       :style="{ backgroundImage: `url(${profile.wallpaper_url})` }"
     />
+    <section class="profile" :class="{ 'on-wallpaper': !!profile.wallpaper_url }">
     <div
       v-if="profile.profile_cover_url"
-      class="cover-strip"
+      class="cover-banner"
       :style="{ backgroundImage: `url(${profile.profile_cover_url})` }"
     />
-    <header class="head" :class="{ 'head-with-wallpaper': profile.wallpaper_url }">
+    <header class="head" :class="{ 'head-with-cover': !!profile.profile_cover_url }">
       <div class="avatar-cell">
         <div
           class="avatar-stack"
@@ -364,17 +366,31 @@ watch(nick, load);
       </div>
       <p v-else class="muted empty">записей нет</p>
     </template>
-  </section>
+    </section>
+  </template>
   <p v-else-if="err" class="error">{{ err }}</p>
   <p v-else class="muted">загрузка</p>
 </template>
 
 <style scoped>
+.profile-bg-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background-size: cover;
+  background-position: center;
+  pointer-events: none;
+}
 .profile {
+  position: relative;
+  z-index: 1;
   max-width: 640px;
   margin: 0 auto;
 }
-.wallpaper {
+.profile.on-wallpaper {
+  padding: 0.5rem 0.35rem 0;
+}
+.cover-banner {
   width: 100%;
   height: 180px;
   border-radius: var(--radius);
@@ -383,25 +399,16 @@ watch(nick, load);
   margin-bottom: -40px;
   border: 1px solid var(--border);
 }
-.head-with-wallpaper {
+.head-with-cover {
   padding-top: 0;
 }
-.head-with-wallpaper .avatar-stack {
+.head-with-cover .avatar-stack {
   width: 80px;
   height: 80px;
 }
-.head-with-wallpaper .avatar-stack.framed .avatar,
-.head-with-wallpaper .avatar-stack.framed .avatar.fallback {
+.head-with-cover .avatar-stack.framed .avatar,
+.head-with-cover .avatar-stack.framed .avatar.fallback {
   border: none;
-}
-.cover-strip {
-  width: 100%;
-  height: 88px;
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-  background-size: cover;
-  background-position: center;
-  margin-bottom: 0.75rem;
 }
 .avatar-cell {
   min-width: 0;

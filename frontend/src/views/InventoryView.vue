@@ -82,7 +82,7 @@ onMounted(load);
           <template v-else-if="a.kind === 'wallpaper' || a.kind === 'cover'">
             <div
               class="wide-thumb"
-              :class="a.kind === 'cover' ? 'cover-thumb' : ''"
+              :class="a.kind === 'wallpaper' ? 'wallpaper-strip-thumb' : ''"
               :style="{ backgroundImage: `url(${a.url})` }"
             />
           </template>
@@ -203,7 +203,7 @@ onMounted(load);
   background-size: cover;
   background-position: center;
 }
-.cover-thumb {
+.wallpaper-strip-thumb {
   height: 56px;
 }
 .item-name {
