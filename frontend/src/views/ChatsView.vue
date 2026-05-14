@@ -18,7 +18,7 @@ import {
 import AppIcon from "../components/AppIcon.vue";
 import { useAuthStore } from "../stores/auth";
 import { useChatStore } from "../stores/chat";
-import { toastError } from "../utils/toast";
+import { toastError, toastSuccess } from "../utils/toast";
 
 const auth = useAuthStore();
 const chatStore = useChatStore();
@@ -45,6 +45,8 @@ const lightboxUrl = ref("");
 const editingId = ref("");
 const editingDraft = ref("");
 const replyTarget = ref<ChatMessage | null>(null);
+const callMenuOpen = ref(false);
+const callMenuWrap = ref<HTMLElement | null>(null);
 let chatsTimer: ReturnType<typeof setInterval> | null = null;
 let messagesTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -161,6 +163,50 @@ function clearReplyTarget() {
 function removeCurrentChat() {
   const c = chats.value.find((x) => x.id === activeId.value);
   if (c) void removeChatFromList(c);
+}
+
+function toggleCallMenu() {
+  callMenuOpen.value = !callMenuOpen.value;
+}
+
+function onDocPointerDown(e: PointerEvent) {
+  const root = callMenuWrap.value;
+  if (!callMenuOpen.value || !root) return;
+  const t = e.target;
+  if (t instanceof Node && !root.contains(t)) {
+    callMenuOpen.value = false;
+  }
+}
+
+function randomMeetRoomSuffix(): string {
+  const bytes = new Uint8Array(8);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function buildCallUrl(): string {
+  const raw = import.meta.env.VITE_CALL_MEET_BASE as string | undefined;
+  const base = (raw?.trim().replace(/\/+$/, "") || "https://meet.jit.si").replace(/\/+$/, "");
+  return `${base}/enoobis-${randomMeetRoomSuffix()}`;
+}
+
+async function createAndSendCallLink() {
+  callMenuOpen.value = false;
+  if (!auth.token || !activeId.value || sending.value) return;
+  sending.value = true;
+  try {
+    const body = `звонок: ${buildCallUrl()}`;
+    const m = await sendMessage(activeId.value, auth.token, { body });
+    messages.value = [...messages.value, m];
+    await nextTick();
+    messagesEnd.value?.scrollIntoView({ block: "end", behavior: "smooth" });
+    void loadChats();
+    toastSuccess("отправлено");
+  } catch (e) {
+    toastError(e);
+  } finally {
+    sending.value = false;
+  }
 }
 
 async function loadChats() {
@@ -402,6 +448,7 @@ watch(
   activeId,
   () => {
     scheduleComposerResize();
+    callMenuOpen.value = false;
   },
   { flush: "post" },
 );
@@ -454,6 +501,7 @@ watch(
 );
 
 onMounted(async () => {
+  document.addEventListener("pointerdown", onDocPointerDown, true);
   await loadChats();
   const id = typeof route.query.id === "string" ? route.query.id : "";
   if (id) {
@@ -466,6 +514,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  document.removeEventListener("pointerdown", onDocPointerDown, true);
   if (chatsTimer) clearInterval(chatsTimer);
   if (messagesTimer) clearInterval(messagesTimer);
 });
@@ -526,16 +575,41 @@ onUnmounted(() => {
             </span>
             <span>{{ otherNickname }}</span>
           </RouterLink>
-          <button
-            v-if="otherNickname"
-            type="button"
-            class="thread-hide"
-            aria-label="убрать чат из списка"
-            title="убрать чат"
-            @click="removeCurrentChat"
-          >
-            <AppIcon name="delete" :size="16" />
-          </button>
+          <span v-if="otherNickname" class="thread-head-actions">
+            <span ref="callMenuWrap" class="call-menu">
+              <button
+                type="button"
+                class="thread-act"
+                :aria-expanded="callMenuOpen"
+                aria-haspopup="true"
+                aria-label="звонок"
+                title="звонок"
+                @click.stop="toggleCallMenu"
+              >
+                <AppIcon name="call" :size="16" />
+              </button>
+              <div v-if="callMenuOpen" class="call-menu-panel" role="menu">
+                <button
+                  type="button"
+                  class="call-menu-item"
+                  role="menuitem"
+                  @click="createAndSendCallLink"
+                >
+                  <AppIcon name="link" :size="16" />
+                  <span>создать звонок по ссылке</span>
+                </button>
+              </div>
+            </span>
+            <button
+              type="button"
+              class="thread-act"
+              aria-label="убрать чат из списка"
+              title="убрать чат"
+              @click="removeCurrentChat"
+            >
+              <AppIcon name="delete" :size="16" />
+            </button>
+          </span>
         </header>
 
         <div class="messages">
@@ -894,8 +968,14 @@ onUnmounted(() => {
   padding: 0.65rem 1rem;
   border-bottom: 1px solid var(--border);
 }
-.thread-hide {
+.thread-head-actions {
   margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  flex-shrink: 0;
+}
+.thread-act {
   width: 36px;
   height: 36px;
   min-height: 36px;
@@ -910,9 +990,42 @@ onUnmounted(() => {
   cursor: pointer;
   flex-shrink: 0;
 }
-.thread-hide:hover {
+.thread-act:hover {
   color: var(--text);
   background: var(--surface2);
+}
+.call-menu {
+  position: relative;
+}
+.call-menu-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 20;
+  min-width: max-content;
+  max-width: min(320px, calc(100vw - 2rem));
+  padding: 0.35rem 0;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.call-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0.55rem 0.85rem;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.88rem;
+  text-align: left;
+  cursor: pointer;
+  text-transform: lowercase;
+}
+.call-menu-item:hover {
+  background: var(--surface);
 }
 .back {
   display: none;

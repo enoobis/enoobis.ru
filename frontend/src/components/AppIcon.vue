@@ -54,7 +54,8 @@ const props = withDefaults(
       | "quote"
       | "link"
       | "seen"
-      | "reply";
+      | "reply"
+      | "call";
     size?: number;
   }>(),
   { size: 16 },
@@ -166,6 +167,8 @@ const d = computed(() => {
       return "M2 12c2.2-4.2 5.6-6.5 10-6.5S19.8 7.8 22 12c-2.2 4.2-5.6 6.5-10 6.5S4.2 16.2 2 12z";
     case "reply":
       return "M9 17L4 12l5-5M4 12h10.5a4.5 4.5 0 014.5 4.5V20";
+    case "call":
+      return "";
     default:
       return "";
   }
@@ -189,7 +192,20 @@ const d = computed(() => {
       <path d="M9 4h6l-1 5 3 4H7l3-4-1-5z" />
       <path d="M11 13h2v8H11z" />
     </g>
-    <path v-if="name !== 'pinned' && name !== 'liked' && name !== 'bookmarked'" :d="d" />
+    <g
+      v-if="name === 'call'"
+      stroke="currentColor"
+      fill="none"
+      stroke-width="2.2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <path
+        d="M22 16.92v3a2 2 0 01-2.18 2 19.8 19.8 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.8 19.8 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.13.96.36 1.9.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0122 16.92z"
+      />
+      <path d="M19 3v4M17 5h4" />
+    </g>
+    <path v-if="name !== 'pinned' && name !== 'liked' && name !== 'bookmarked' && name !== 'call'" :d="d" />
     <circle
       v-if="name === 'seen'"
       cx="12"
