@@ -103,8 +103,6 @@ watch(tab, load);
       </button>
     </nav>
 
-    <p class="muted small shop-hint">монеты за посты, задания и время на сайте (раз в 10 мин).</p>
-
     <div v-if="loading" class="muted">загрузка…</div>
     <div v-else-if="!shown.length" class="empty muted">пусто</div>
     <ul v-else class="grid">
@@ -207,9 +205,6 @@ watch(tab, load);
   color: var(--text);
   border-color: var(--text);
   background: var(--surface);
-}
-.shop-hint {
-  margin-bottom: 1.25rem;
 }
 .grid {
   list-style: none;
