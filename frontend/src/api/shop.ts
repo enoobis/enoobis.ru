@@ -9,6 +9,8 @@ export type ShopItem = {
   url: string;
   price: number;
   is_animated: number;
+  stock_limit: number | null;
+  sold_count: number;
   owned: boolean;
 };
 
@@ -88,12 +90,23 @@ export async function adminUploadShopItem(
   kind: ShopItemKind,
   name: string,
   price: number,
-): Promise<{ ok: boolean; id: string; url: string; name: string; price: number; kind: string; is_animated: number }> {
+  stockLimit?: number | null,
+): Promise<{
+  ok: boolean;
+  id: string;
+  url: string;
+  name: string;
+  price: number;
+  kind: string;
+  is_animated: number;
+  stock_limit: number | null;
+}> {
   const form = new FormData();
   form.append("file", file);
   form.append("kind", kind);
   form.append("name", name);
   form.append("price", String(price));
+  if (stockLimit != null && stockLimit >= 1) form.append("stock_limit", String(stockLimit));
   const res = await fetch("/api/admin/shop/items", {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },

@@ -77,6 +77,7 @@ const shopItems = ref<ShopItem[]>([]);
 const shopLoading = ref(false);
 const shopUploadName = ref("");
 const shopUploadPrice = ref(0);
+const shopUploadStock = ref("");
 const shopUploadKind = ref<ShopItemKind>("avatar");
 const shopUploadBusy = ref(false);
 const shopMsg = ref("");
@@ -275,17 +276,37 @@ function shopKindRu(k: ShopItemKind): string {
   return "обложка";
 }
 
+function shopStockLine(a: ShopItem): string {
+  const cap = a.stock_limit;
+  if (cap == null) return "";
+  const lim = Math.max(0, Math.floor(Number(cap)));
+  if (lim <= 0) return "";
+  const sold = Math.max(0, Math.floor(Number(a.sold_count ?? 0)));
+  return ` · ${sold}/${lim}`;
+}
+
 async function onShopItemFile(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0];
   if (!file || !auth.token) return;
   const name = shopUploadName.value.trim() || file.name;
   const price = Math.max(0, Math.floor(Number(shopUploadPrice.value) || 0));
+  const rawStock = shopUploadStock.value.trim();
+  let stockLimit: number | null = null;
+  if (rawStock !== "") {
+    const n = parseInt(rawStock, 10);
+    if (!Number.isFinite(n) || n < 1) {
+      shopMsg.value = "тираж: целое число от 1";
+      return;
+    }
+    stockLimit = n;
+  }
   shopUploadBusy.value = true;
   shopMsg.value = "";
   try {
-    await adminUploadShopItem(auth.token, file, shopUploadKind.value, name, price);
+    await adminUploadShopItem(auth.token, file, shopUploadKind.value, name, price, stockLimit);
     shopUploadName.value = "";
     shopUploadPrice.value = 0;
+    shopUploadStock.value = "";
     (e.target as HTMLInputElement).value = "";
     shopMsg.value = "добавлено";
     await loadShopItems();
@@ -928,19 +949,20 @@ async function restoreComment(id: string | null) {
         </select>
         <input v-model="shopUploadName" placeholder="название" class="shop-input" />
         <input v-model.number="shopUploadPrice" type="number" min="0" step="1" placeholder="цена" class="shop-input shop-price" />
+        <input v-model="shopUploadStock" inputmode="numeric" placeholder="тираж" class="shop-input shop-stock" aria-label="тираж" />
         <label class="btn-file" :class="{ disabled: shopUploadBusy }">
           <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" :disabled="shopUploadBusy" @change="onShopItemFile" />
           {{ shopUploadBusy ? "загрузка…" : "загрузить" }}
         </label>
       </div>
-      <p class="muted small gif">gif — без сжатия, помечается как анимация.</p>
+      <p class="muted small gif">тираж пустой — без лимита. gif — без сжатия.</p>
       <p v-if="shopLoading" class="muted small">загрузка…</p>
       <ul v-else-if="shopItems.length" class="shop-grid">
         <li v-for="a in shopItems" :key="a.id" class="shop-item">
           <img :src="a.url" :alt="a.name" class="shop-avatar-img" loading="lazy" />
           <span class="shop-avatar-meta">
             <span>{{ a.name }}</span>
-            <span class="muted small">{{ shopKindRu(a.kind) }} · {{ a.price }} · {{ a.is_animated ? "gif" : "" }}</span>
+            <span class="muted small">{{ shopKindRu(a.kind) }} · {{ a.price }} · {{ a.is_animated ? "gif" : "" }}{{ shopStockLine(a) }}</span>
           </span>
           <button class="secondary danger shop-del" type="button" @click="removeShopItem(a.id)">удалить</button>
         </li>
@@ -1235,6 +1257,10 @@ strong {
 }
 .shop-price {
   max-width: 120px;
+  flex: none;
+}
+.shop-stock {
+  max-width: 88px;
   flex: none;
 }
 .shop-kind {

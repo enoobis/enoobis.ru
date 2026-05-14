@@ -1,5 +1,5 @@
 import express from "express";
-import { run, get, all, nowIso } from "../db.js";
+import { run, get, all, nowIso, db } from "../db.js";
 import { authRequired } from "../auth.js";
 
 const router = express.Router();
@@ -17,10 +17,68 @@ function ownedIdsForUser(userId) {
 function listItemsQuery(kinds) {
   const placeholders = kinds.map(() => "?").join(", ");
   return all(
-    `SELECT id, kind, name, url, price, is_animated, created_at FROM shop_items
-     WHERE kind IN (${placeholders}) ORDER BY created_at DESC`,
+    `SELECT si.id, si.kind, si.name, si.url, si.price, si.is_animated, si.created_at, si.stock_limit,
+      (SELECT COUNT(*) FROM user_owned_shop_items uoi WHERE uoi.item_id = si.id) AS sold_count
+     FROM shop_items si
+     WHERE si.kind IN (${placeholders}) ORDER BY si.created_at DESC`,
     ...kinds,
   );
+}
+
+/** @param {number} status @param {string} code */
+function shopBuyError(status, code) {
+  const e = /** @type {Error & { status: number; code: string }} */ (new Error(code));
+  e.status = status;
+  e.code = code;
+  return e;
+}
+
+/** @param {string} userId @param {string} itemId @param {boolean} avatarOnly */
+function buyShopItemCore(userId, itemId, avatarOnly) {
+  const item = get(
+    avatarOnly
+      ? "SELECT id, kind, name, url, price, stock_limit FROM shop_items WHERE id = ? AND kind = 'avatar'"
+      : "SELECT id, kind, name, url, price, stock_limit FROM shop_items WHERE id = ?",
+    itemId,
+  );
+  if (!item) throw shopBuyError(404, "not_found");
+  if (!avatarOnly && !SHOP_KINDS.has(item.kind)) throw shopBuyError(400, "bad_kind");
+
+  const already = get("SELECT 1 FROM user_owned_shop_items WHERE user_id = ? AND item_id = ?", userId, item.id);
+  if (already) throw shopBuyError(400, "already_owned");
+
+  const soldRow = get("SELECT COUNT(*) as c FROM user_owned_shop_items WHERE item_id = ?", item.id);
+  const sold = Math.max(0, Math.floor(Number(soldRow?.c ?? 0)));
+  const limit = item.stock_limit == null ? null : Math.max(0, Math.floor(Number(item.stock_limit)));
+  if (limit != null && limit > 0 && sold >= limit) throw shopBuyError(400, "sold_out");
+
+  const user = get("SELECT coins FROM users WHERE id = ?", userId);
+  const coins = Math.max(0, Math.floor(Number(user?.coins ?? 0)));
+  if (coins < item.price) throw shopBuyError(400, "not_enough");
+
+  run("UPDATE users SET coins = coins - ? WHERE id = ?", item.price, userId);
+  run(
+    "INSERT INTO user_owned_shop_items (user_id, item_id, acquired_at) VALUES (?, ?, ?)",
+    userId,
+    item.id,
+    nowIso(),
+  );
+  return { ok: true, coins: Math.max(0, coins - item.price) };
+}
+
+function handleShopBuyError(res, err) {
+  const e = /** @type {{ status?: number; code?: string; message?: string }} */ (err);
+  if (e.status && e.code) {
+    const map = {
+      not_found: "not found",
+      bad_kind: "bad kind",
+      already_owned: "already owned",
+      sold_out: "распродано",
+      not_enough: "not enough coins",
+    };
+    return res.status(e.status).json({ error: map[e.code] ?? e.code });
+  }
+  return null;
 }
 
 function cosmeticRow(userId) {
@@ -69,45 +127,25 @@ router.get("/shop/my-avatars", authRequired, (req, res) => {
 });
 
 router.post("/shop/items/:id/buy", authRequired, (req, res) => {
-  const item = get("SELECT id, kind, name, url, price FROM shop_items WHERE id = ?", req.params.id);
-  if (!item) return res.status(404).json({ error: "not found" });
-  if (!SHOP_KINDS.has(item.kind)) return res.status(400).json({ error: "bad kind" });
-
-  const already = get("SELECT 1 FROM user_owned_shop_items WHERE user_id = ? AND item_id = ?", req.user.id, item.id);
-  if (already) return res.status(400).json({ error: "already owned" });
-
-  const user = get("SELECT coins FROM users WHERE id = ?", req.user.id);
-  const coins = Math.max(0, Math.floor(Number(user?.coins ?? 0)));
-  if (coins < item.price) return res.status(400).json({ error: "not enough coins" });
-
-  run("UPDATE users SET coins = coins - ? WHERE id = ?", item.price, req.user.id);
-  run(
-    "INSERT INTO user_owned_shop_items (user_id, item_id, acquired_at) VALUES (?, ?, ?)",
-    req.user.id,
-    item.id,
-    nowIso(),
-  );
-
-  const newCoins = Math.max(0, coins - item.price);
-  return res.json({ ok: true, coins: newCoins });
+  try {
+    const out = db.transaction(() => buyShopItemCore(req.user.id, req.params.id, false))();
+    return res.json(out);
+  } catch (err) {
+    const r = handleShopBuyError(res, err);
+    if (r) return r;
+    throw err;
+  }
 });
 
 router.post("/shop/avatars/:id/buy", authRequired, (req, res) => {
-  const item = get("SELECT id, kind, name, url, price FROM shop_items WHERE id = ? AND kind = 'avatar'", req.params.id);
-  if (!item) return res.status(404).json({ error: "not found" });
-  const already = get("SELECT 1 FROM user_owned_shop_items WHERE user_id = ? AND item_id = ?", req.user.id, item.id);
-  if (already) return res.status(400).json({ error: "already owned" });
-  const user = get("SELECT coins FROM users WHERE id = ?", req.user.id);
-  const coins = Math.max(0, Math.floor(Number(user?.coins ?? 0)));
-  if (coins < item.price) return res.status(400).json({ error: "not enough coins" });
-  run("UPDATE users SET coins = coins - ? WHERE id = ?", item.price, req.user.id);
-  run(
-    "INSERT INTO user_owned_shop_items (user_id, item_id, acquired_at) VALUES (?, ?, ?)",
-    req.user.id,
-    item.id,
-    nowIso(),
-  );
-  return res.json({ ok: true, coins: Math.max(0, coins - item.price) });
+  try {
+    const out = db.transaction(() => buyShopItemCore(req.user.id, req.params.id, true))();
+    return res.json(out);
+  } catch (err) {
+    const r = handleShopBuyError(res, err);
+    if (r) return r;
+    throw err;
+  }
 });
 
 /** @param {{ kind: string; url: string }} item */

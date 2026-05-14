@@ -156,6 +156,14 @@ router.post("/admin/shop/items", authRequired, uploadSingle(shopItemUpload, "fil
   if (!SHOP_KINDS.has(kind)) return res.status(400).json({ error: "bad kind" });
   const name = String(req.body?.name ?? "").trim() || req.file.originalname;
   const price = Math.max(0, parseInt(req.body?.price ?? "0", 10) || 0);
+  const rawStock = req.body?.stock_limit;
+  /** @type {number | null} */
+  let stockLimit = null;
+  if (rawStock !== undefined && rawStock !== null && String(rawStock).trim() !== "") {
+    const n = parseInt(String(rawStock), 10);
+    if (!Number.isFinite(n) || n < 1) return res.status(400).json({ error: "bad stock_limit" });
+    stockLimit = n;
+  }
   const isAnimated = req.file.mimetype === "image/gif" ? 1 : 0;
   let presetKey = "avatar";
   if (kind === "frame") presetKey = "shop_frame";
@@ -168,17 +176,18 @@ router.post("/admin/shop/items", authRequired, uploadSingle(shopItemUpload, "fil
   const url = `/uploads/shop-items/${req.file.filename}`;
   const id = uuidv4();
   run(
-    "INSERT INTO shop_items (id, kind, name, url, price, is_animated, added_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    "INSERT INTO shop_items (id, kind, name, url, price, is_animated, stock_limit, added_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
     id,
     kind,
     name,
     url,
     price,
     isAnimated,
+    stockLimit,
     req.user.id,
     nowIso(),
   );
-  return res.json({ ok: true, id, url, name, price, kind, is_animated: isAnimated });
+  return res.json({ ok: true, id, url, name, price, kind, is_animated: isAnimated, stock_limit: stockLimit });
 });
 
 router.delete("/admin/shop/items/:id", authRequired, (req, res) => {

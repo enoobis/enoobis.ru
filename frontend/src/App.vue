@@ -424,14 +424,8 @@ watch(
             >
               библиотека
             </RouterLink>
-            <RouterLink
-              v-if="auth.token"
-              to="/shop"
-              class="nav-drawer-link nav-drawer-with-ico"
-              @click="closeNavDrawer"
-            >
-              <AppIcon name="shop" :size="17" />
-              <span>магазин</span>
+            <RouterLink v-if="auth.token" to="/shop" class="nav-drawer-link" @click="closeNavDrawer">
+              магазин
             </RouterLink>
             <RouterLink
               v-if="auth.role === 'admin'"
@@ -529,12 +523,6 @@ watch(
   background: var(--surface2);
   color: var(--text);
   text-decoration: none;
-}
-
-.nav-drawer-link.nav-drawer-with-ico {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
 }
 
 .profile-menu-wrap {

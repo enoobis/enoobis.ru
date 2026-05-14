@@ -27,6 +27,29 @@ const profileCoins = ref(0);
 
 const shown = computed(() => items.value.filter((i) => i.kind === tab.value));
 
+function shopSold(item: ShopItem): number {
+  return Math.max(0, Math.floor(Number(item.sold_count ?? 0)));
+}
+
+function shopStockCap(item: ShopItem): number | null {
+  const v = item.stock_limit;
+  if (v == null) return null;
+  const n = Math.max(0, Math.floor(Number(v)));
+  return n > 0 ? n : null;
+}
+
+function shopStockLeft(item: ShopItem): number | null {
+  const cap = shopStockCap(item);
+  if (cap == null) return null;
+  return Math.max(0, cap - shopSold(item));
+}
+
+function shopSoldOut(item: ShopItem): boolean {
+  if (item.owned) return false;
+  const left = shopStockLeft(item);
+  return left !== null && left <= 0;
+}
+
 async function loadCoins() {
   if (!auth.token) return;
   const me = await fetch("/api/me", { headers: { Authorization: `Bearer ${auth.token}` } });
@@ -54,6 +77,7 @@ async function onBuy(item: ShopItem) {
     const r = await buyShopItem(auth.token, item.id);
     profileCoins.value = r.coins;
     item.owned = true;
+    item.sold_count = shopSold(item) + 1;
     toastSuccess(item.name);
   } catch (e) {
     toastError(e);
@@ -129,6 +153,9 @@ watch(tab, load);
           </template>
         </div>
         <p class="item-name">{{ item.name }}</p>
+        <p v-if="!item.owned && shopStockCap(item) !== null" class="stock-line muted">
+          {{ shopSoldOut(item) ? "распродано" : `ещё ${shopStockLeft(item)}` }}
+        </p>
         <div class="item-footer">
           <span class="price">
             <img src="/coin-gem.png" alt="" width="14" height="14" loading="lazy" />
@@ -138,7 +165,7 @@ watch(tab, load);
             v-if="!item.owned"
             type="button"
             class="btn-buy"
-            :disabled="busy === item.id || profileCoins < item.price"
+            :disabled="busy === item.id || profileCoins < item.price || shopSoldOut(item)"
             @click="onBuy(item)"
           >
             купить
@@ -291,6 +318,11 @@ watch(tab, load);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.stock-line {
+  margin: 0;
+  font-size: 0.72rem;
+  text-align: center;
 }
 .item-footer {
   display: flex;

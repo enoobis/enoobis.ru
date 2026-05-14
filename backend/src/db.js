@@ -650,6 +650,16 @@ try {
   }
 }
 
+try {
+  db.prepare("SELECT stock_limit FROM shop_items LIMIT 1").get();
+} catch {
+  try {
+    db.exec("ALTER TABLE shop_items ADD COLUMN stock_limit INTEGER");
+  } catch {
+    // ignore
+  }
+}
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS shop_avatars (
     id TEXT PRIMARY KEY,
@@ -679,6 +689,7 @@ db.exec(`
     url TEXT NOT NULL,
     price INTEGER NOT NULL DEFAULT 0,
     is_animated INTEGER NOT NULL DEFAULT 0,
+    stock_limit INTEGER,
     added_by TEXT NOT NULL,
     created_at TEXT NOT NULL
   );
