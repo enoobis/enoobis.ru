@@ -19,16 +19,44 @@ const slug = computed(() => (typeof route.params.slug === "string" ? route.param
 
 type Phase = "loading" | "live" | "gone";
 const phase = ref<Phase>("loading");
-const status = ref("");
 const micOn = ref(false);
 const ending = ref(false);
 const remoteAudioRef = ref<HTMLAudioElement | null>(null);
+
+const signalConnected = ref(false);
+/** alone — только ты в комнате сигналинга; together — второй тоже зашёл; gone — собеседник отключился */
+const peerPresence = ref<"alone" | "together" | "gone">("alone");
+/** off | connecting | on — готовность аудио-канала WebRTC */
+const mediaLink = ref<"off" | "connecting" | "on">("off");
+const micReady = ref(false);
+const micDenied = ref(false);
 
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 let sock: WebSocket | null = null;
 let pc: RTCPeerConnection | null = null;
 let localStream: MediaStream | null = null;
 let iceServers: RTCIceServer[] = [{ urls: "stun:stun.l.google.com:19302" }];
+
+const peerLabel = computed(() => {
+  if (peerPresence.value === "gone") return "вышел из звонка";
+  if (peerPresence.value === "alone") return "ещё не зашёл";
+  if (mediaLink.value === "on") return "в сети · связь есть";
+  if (mediaLink.value === "connecting") return "в сети · связываем…";
+  return "в сети";
+});
+
+const peerDotOn = computed(
+  () => peerPresence.value === "together" && mediaLink.value === "on",
+);
+
+const peerDotWarn = computed(() => peerPresence.value === "gone");
+
+const micHint = computed(() => {
+  if (micDenied.value) return "нет доступа к микрофону — проверь разрешения браузера";
+  if (!micReady.value) return "микрофон подключится при входе в разговор";
+  if (micOn.value) return "микрофон вкл — тебя слышно, если связь установлена";
+  return "микрофон выкл — тебя не слышно";
+});
 
 function stopPoll() {
   if (pollTimer) {
@@ -44,7 +72,46 @@ function startPoll() {
   }, 4000);
 }
 
+function syncMediaLink() {
+  if (!pc) {
+    mediaLink.value = "off";
+    return;
+  }
+  const s = pc.connectionState;
+  const ice = pc.iceConnectionState;
+  if (s === "connected" || ice === "connected" || ice === "completed") {
+    mediaLink.value = "on";
+    return;
+  }
+  if (
+    s === "connecting" ||
+    ice === "checking" ||
+    (s === "new" && peerPresence.value === "together")
+  ) {
+    mediaLink.value = "connecting";
+    return;
+  }
+  if (s === "disconnected" || s === "failed") {
+    mediaLink.value = peerPresence.value === "together" ? "connecting" : "off";
+    return;
+  }
+  if (s === "closed") {
+    mediaLink.value = "off";
+    return;
+  }
+  mediaLink.value = peerPresence.value === "together" ? "connecting" : "off";
+}
+
+function resetPresence() {
+  signalConnected.value = false;
+  peerPresence.value = "alone";
+  mediaLink.value = "off";
+  micReady.value = false;
+  micDenied.value = false;
+}
+
 function cleanupMedia() {
+  resetPresence();
   if (localStream) {
     for (const t of localStream.getTracks()) t.stop();
     localStream = null;
@@ -101,6 +168,7 @@ async function ensurePc(): Promise<RTCPeerConnection> {
       el.srcObject = ev.streams[0];
       void el.play().catch(() => {});
     }
+    syncMediaLink();
   };
   c.onicecandidate = (ev) => {
     if (sock?.readyState === WebSocket.OPEN) {
@@ -108,13 +176,24 @@ async function ensurePc(): Promise<RTCPeerConnection> {
       sock.send(JSON.stringify({ t: "ice", candidate }));
     }
   };
+  c.onconnectionstatechange = () => syncMediaLink();
+  c.oniceconnectionstatechange = () => syncMediaLink();
   pc = c;
+  syncMediaLink();
   return c;
 }
 
 async function ensureLocalAudio() {
+  micDenied.value = false;
   if (!localStream) {
-    localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    try {
+      localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      micReady.value = true;
+    } catch {
+      micDenied.value = true;
+      micReady.value = false;
+      throw new Error("mic denied");
+    }
   }
   for (const t of localStream.getAudioTracks()) {
     t.enabled = micOn.value;
@@ -126,9 +205,15 @@ async function ensureLocalAudio() {
 }
 
 function connectSignal() {
-  const s = slug.value;
   cleanupMedia();
+  micOn.value = false;
   sock = new WebSocket(wsCallUrl());
+  sock.onopen = () => {
+    signalConnected.value = true;
+  };
+  sock.onclose = () => {
+    signalConnected.value = false;
+  };
   sock.onmessage = async (ev) => {
     let msg: SigJson;
     try {
@@ -141,16 +226,20 @@ function connectSignal() {
       return;
     }
     if (msg.t === "wait") {
-      status.value = "ожидание собеседника";
+      peerPresence.value = "alone";
+      mediaLink.value = "off";
       return;
     }
-    if (msg.t === "wait-offer") {
-      status.value = "подключение";
-      return;
+    if (msg.t === "wait-offer" || msg.t === "create-offer") {
+      peerPresence.value = "together";
+      syncMediaLink();
     }
     if (msg.t === "create-offer") {
-      status.value = "подключение";
-      await ensureLocalAudio();
+      try {
+        await ensureLocalAudio();
+      } catch {
+        return;
+      }
       const c = await ensurePc();
       const offer = await c.createOffer();
       await c.setLocalDescription(offer);
@@ -158,7 +247,11 @@ function connectSignal() {
       return;
     }
     if (msg.t === "offer") {
-      await ensureLocalAudio();
+      try {
+        await ensureLocalAudio();
+      } catch {
+        return;
+      }
       const c = await ensurePc();
       await c.setRemoteDescription({ type: "offer", sdp: msg.sdp });
       const answer = await c.createAnswer();
@@ -182,7 +275,8 @@ function connectSignal() {
       return;
     }
     if (msg.t === "peer-left") {
-      status.value = "собеседник вышел";
+      peerPresence.value = "gone";
+      mediaLink.value = "off";
       if (pc) {
         pc.close();
         pc = null;
@@ -204,7 +298,6 @@ function toggleMic() {
 
 async function boot() {
   phase.value = "loading";
-  status.value = "";
   stopPoll();
   cleanupMedia();
   const s = slug.value;
@@ -219,7 +312,6 @@ async function boot() {
       return;
     }
     phase.value = "live";
-    micOn.value = false;
     connectSignal();
   } catch {
     phase.value = "gone";
@@ -269,7 +361,25 @@ watch(slug, () => {
       <p class="gone-msg">эта ссылка недоступна или звонок уже завершён</p>
     </template>
     <template v-else>
-      <p v-if="status" class="status muted small">{{ status }}</p>
+      <ul class="participants" aria-label="участники">
+        <li class="participant">
+          <span class="dot" :class="{ on: signalConnected }" aria-hidden="true" />
+          <span class="who">ты</span>
+          <span class="detail small" :class="{ muted: !signalConnected }">{{
+            signalConnected ? "в комнате" : "нет связи…"
+          }}</span>
+        </li>
+        <li class="participant">
+          <span
+            class="dot"
+            :class="{ on: peerDotOn, warn: peerDotWarn }"
+            aria-hidden="true"
+          />
+          <span class="who">собеседник</span>
+          <span class="detail small" :class="{ muted: !peerDotOn && !peerDotWarn }">{{ peerLabel }}</span>
+        </li>
+      </ul>
+      <p class="mic-hint small">{{ micHint }}</p>
       <audio ref="remoteAudioRef" class="sr-only" playsinline />
       <div class="row">
         <button type="button" class="secondary" @click="toggleMic">
@@ -287,15 +397,12 @@ watch(slug, () => {
   display: flex;
   flex-direction: column;
   padding: 1rem;
-  gap: 0.75rem;
+  gap: 0.85rem;
   box-sizing: border-box;
 }
 .load {
   margin: 2rem 0 0;
   font-size: 0.9rem;
-}
-.status {
-  margin: 0;
 }
 .gone-msg {
   margin: 2rem 0 0;
@@ -303,6 +410,61 @@ watch(slug, () => {
   color: var(--muted);
   text-transform: lowercase;
   max-width: 28rem;
+}
+.participants {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  max-width: 22rem;
+}
+.participant {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 0.5rem;
+  align-items: center;
+}
+.participant .dot {
+  grid-row: 1 / -1;
+}
+.dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--border);
+  flex-shrink: 0;
+}
+.dot.on {
+  background: var(--text);
+}
+.dot.warn {
+  background: var(--danger);
+}
+.who {
+  grid-column: 2;
+  grid-row: 1;
+  font-size: 0.88rem;
+  color: var(--text);
+  text-transform: lowercase;
+}
+.detail {
+  grid-column: 2;
+  grid-row: 2;
+  text-transform: lowercase;
+  color: var(--text);
+}
+.detail.muted {
+  color: var(--muted);
+}
+.mic-hint {
+  margin: 0;
+  color: var(--muted);
+  max-width: 24rem;
+  line-height: 1.4;
+  text-transform: lowercase;
 }
 .sr-only {
   position: absolute;
