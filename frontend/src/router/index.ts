@@ -121,6 +121,12 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      path: "/inventory",
+      name: "inventory",
+      component: () => import("../views/InventoryView.vue"),
+      meta: { requiresAuth: true },
+    },
+    {
       path: "/:pathMatch(.*)*",
       name: "not-found",
       component: () => import("../views/NotFoundView.vue"),

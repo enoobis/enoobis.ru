@@ -199,7 +199,12 @@ function onVisibilityChange() {
   }
 }
 
+function onAvatarUpdated() {
+  void loadMePresentation();
+}
+
 onMounted(async () => {
+  window.addEventListener("enoobis:avatar-updated", onAvatarUpdated);
   window.addEventListener("online", syncOnlineStatus);
   window.addEventListener("offline", syncOnlineStatus);
   window.addEventListener("resize", onLayoutScrollResize);
@@ -215,6 +220,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  window.removeEventListener("enoobis:avatar-updated", onAvatarUpdated);
   window.removeEventListener("online", syncOnlineStatus);
   window.removeEventListener("offline", syncOnlineStatus);
   window.removeEventListener("resize", onLayoutScrollResize);
@@ -337,8 +343,8 @@ watch(
             <RouterLink :to="`/u/${auth.nickname}`" class="profile-menu-item" @click="profileMenuOpen = false">
               <AppIcon name="profile" :size="16" /><span>профиль</span>
             </RouterLink>
-            <RouterLink to="/shop" class="profile-menu-item" @click="profileMenuOpen = false">
-              <AppIcon name="trophy" :size="16" /><span>магазин аватарок</span>
+            <RouterLink to="/inventory" class="profile-menu-item" @click="profileMenuOpen = false">
+              <AppIcon name="inventory" :size="16" /><span>инвентарь</span>
             </RouterLink>
             <RouterLink to="/blogs?mode=bookmarks" class="profile-menu-item" @click="profileMenuOpen = false">
               <AppIcon name="bookmark" :size="16" /><span>закладки блогов</span>

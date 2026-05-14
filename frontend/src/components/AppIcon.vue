@@ -44,6 +44,7 @@ const props = withDefaults(
       | "pin"
       | "pinned"
       | "trophy"
+      | "inventory"
       | "bold"
       | "italic"
       | "code"
@@ -142,6 +143,8 @@ const d = computed(() => {
       return "";
     case "trophy":
       return "M7 4h10v4a5 5 0 01-10 0V4zM5 5H3v2a3 3 0 003 3M19 5h2v2a3 3 0 01-3 3M10 13h4v3h-4zM8 17h8l1 3H7l1-3z";
+    case "inventory":
+      return "M12 21l-8-4.5V7.5L12 3l8 4.5V16.5L12 21zM12 12l8-4.5M12 12v9M12 12L4 7.5";
     case "bold":
       return "M6 4.5h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6V4.5zm0 8.5h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6v-8z";
     case "italic":
