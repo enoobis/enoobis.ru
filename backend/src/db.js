@@ -15,6 +15,8 @@ db.exec(`
     bio TEXT NOT NULL DEFAULT '',
     wallpaper_url TEXT NOT NULL DEFAULT '',
     avatar_url TEXT NOT NULL DEFAULT '',
+    avatar_frame_url TEXT NOT NULL DEFAULT '',
+    profile_cover_url TEXT NOT NULL DEFAULT '',
     theme_preference TEXT NOT NULL DEFAULT 'black',
     language_preference TEXT NOT NULL DEFAULT 'ru',
     font_preference TEXT NOT NULL DEFAULT 'normal',
@@ -628,6 +630,26 @@ try {
   }
 }
 
+try {
+  db.prepare("SELECT avatar_frame_url FROM users LIMIT 1").get();
+} catch {
+  try {
+    db.exec("ALTER TABLE users ADD COLUMN avatar_frame_url TEXT NOT NULL DEFAULT ''");
+  } catch {
+    // ignore
+  }
+}
+
+try {
+  db.prepare("SELECT profile_cover_url FROM users LIMIT 1").get();
+} catch {
+  try {
+    db.exec("ALTER TABLE users ADD COLUMN profile_cover_url TEXT NOT NULL DEFAULT ''");
+  } catch {
+    // ignore
+  }
+}
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS shop_avatars (
     id TEXT PRIMARY KEY,
@@ -648,3 +670,57 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_uoa_user ON user_owned_avatars(user_id);
 `);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS shop_items (
+    id TEXT PRIMARY KEY,
+    kind TEXT NOT NULL,
+    name TEXT NOT NULL,
+    url TEXT NOT NULL,
+    price INTEGER NOT NULL DEFAULT 0,
+    is_animated INTEGER NOT NULL DEFAULT 0,
+    added_by TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_shop_items_kind ON shop_items(kind);
+  CREATE INDEX IF NOT EXISTS idx_shop_items_created ON shop_items(created_at DESC);
+
+  CREATE TABLE IF NOT EXISTS user_owned_shop_items (
+    user_id TEXT NOT NULL,
+    item_id TEXT NOT NULL,
+    acquired_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, item_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_uosi_user ON user_owned_shop_items(user_id);
+`);
+
+try {
+  const n = /** @type {{ c?: number }} */ (get("SELECT COUNT(*) as c FROM shop_items"))?.c ?? 0;
+  if (n === 0) {
+    const avs = all("SELECT id, name, url, price, is_animated, added_by, created_at FROM shop_avatars");
+    for (const a of avs) {
+      run(
+        `INSERT OR IGNORE INTO shop_items (id, kind, name, url, price, is_animated, added_by, created_at)
+         VALUES (?, 'avatar', ?, ?, ?, ?, ?, ?)`,
+        a.id,
+        a.name,
+        a.url,
+        a.price ?? 0,
+        a.is_animated ?? 0,
+        a.added_by,
+        a.created_at,
+      );
+    }
+    const owns = all("SELECT user_id, avatar_id as item_id, acquired_at FROM user_owned_avatars");
+    for (const o of owns) {
+      run(
+        `INSERT OR IGNORE INTO user_owned_shop_items (user_id, item_id, acquired_at) VALUES (?, ?, ?)`,
+        o.user_id,
+        o.item_id,
+        o.acquired_at,
+      );
+    }
+  }
+} catch {
+  // ignore
+}

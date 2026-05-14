@@ -1,22 +1,45 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
+import {
+  listShopItems,
+  buyShopItem,
+  equipShopItem,
+  type ShopItem,
+  type ShopItemKind,
+} from "../api/shop";
 import { useAuthStore } from "../stores/auth";
-import { listShopAvatars, buyAvatar, equipAvatar, type ShopAvatar } from "../api/shop";
 import { toastError, toastSuccess } from "../utils/toast";
 
 const auth = useAuthStore();
-const avatars = ref<ShopAvatar[]>([]);
+
+const tabs: { key: ShopItemKind; label: string }[] = [
+  { key: "avatar", label: "аватар" },
+  { key: "frame", label: "рамка" },
+  { key: "wallpaper", label: "фон" },
+  { key: "cover", label: "обложка" },
+];
+
+const tab = ref<ShopItemKind>("avatar");
+const items = ref<ShopItem[]>([]);
 const loading = ref(true);
 const busy = ref<string | null>(null);
 const profileCoins = ref(0);
 
+const shown = computed(() => items.value.filter((i) => i.kind === tab.value));
+
+async function loadCoins() {
+  if (!auth.token) return;
+  const me = await fetch("/api/me", { headers: { Authorization: `Bearer ${auth.token}` } });
+  const data = await me.json();
+  profileCoins.value = Math.max(0, Math.floor(Number(data.coins ?? 0)));
+}
+
 async function load() {
+  if (!auth.token) return;
   loading.value = true;
   try {
-    avatars.value = await listShopAvatars(auth.token!);
-    const me = await fetch("/api/me", { headers: { Authorization: `Bearer ${auth.token}` } });
-    const data = await me.json();
-    profileCoins.value = Math.max(0, Math.floor(Number(data.coins ?? 0)));
+    await loadCoins();
+    items.value = await listShopItems(auth.token, tab.value);
   } catch (e) {
     toastError(e);
   } finally {
@@ -24,14 +47,14 @@ async function load() {
   }
 }
 
-async function onBuy(avatar: ShopAvatar) {
+async function onBuy(item: ShopItem) {
   if (!auth.token || busy.value) return;
-  busy.value = avatar.id;
+  busy.value = item.id;
   try {
-    const r = await buyAvatar(auth.token, avatar.id);
+    const r = await buyShopItem(auth.token, item.id);
     profileCoins.value = r.coins;
-    avatar.owned = true;
-    toastSuccess(`куплено: ${avatar.name}`);
+    item.owned = true;
+    toastSuccess(item.name);
   } catch (e) {
     toastError(e);
   } finally {
@@ -39,13 +62,13 @@ async function onBuy(avatar: ShopAvatar) {
   }
 }
 
-async function onEquip(avatar: ShopAvatar) {
+async function onEquip(item: ShopItem) {
   if (!auth.token || busy.value) return;
-  busy.value = avatar.id;
+  busy.value = item.id;
   try {
-    await equipAvatar(auth.token, avatar.id);
-    toastSuccess("аватарка установлена");
-    window.dispatchEvent(new CustomEvent("enoobis:avatar-updated"));
+    await equipShopItem(auth.token, item.id);
+    toastSuccess("применено");
+    window.dispatchEvent(new CustomEvent("enoobis:profile-cosmetics-updated"));
   } catch (e) {
     toastError(e);
   } finally {
@@ -54,44 +77,71 @@ async function onEquip(avatar: ShopAvatar) {
 }
 
 onMounted(load);
+watch(tab, load);
 </script>
 
 <template>
   <section class="shop">
     <header class="shop-head">
-      <h1>магазин аватарок</h1>
-      <div class="coins-badge" title="ваши монеты">
+      <h1>магазин</h1>
+      <div class="coins-badge" title="монеты">
         <img src="/coin-gem.png" alt="" width="18" height="18" loading="lazy" />
         <span>{{ profileCoins }}</span>
       </div>
     </header>
 
-    <p class="muted small shop-hint">
-      аватарки за монеты. монеты — за посты, задания и время на сайте (раз в 10 мин).
-    </p>
+    <nav class="shop-tabs" aria-label="разделы">
+      <button
+        v-for="t in tabs"
+        :key="t.key"
+        type="button"
+        class="tab-btn"
+        :class="{ on: tab === t.key }"
+        @click="tab = t.key"
+      >
+        {{ t.label }}
+      </button>
+    </nav>
+
+    <p class="muted small shop-hint">монеты за посты, задания и время на сайте (раз в 10 мин).</p>
 
     <div v-if="loading" class="muted">загрузка…</div>
-
-    <div v-else-if="!avatars.length" class="empty muted">в магазине пока ничего нет</div>
-
+    <div v-else-if="!shown.length" class="empty muted">пусто</div>
     <ul v-else class="grid">
-      <li v-for="a in avatars" :key="a.id" class="card avatar-card">
-        <div class="avatar-wrap">
-          <img :src="a.url" :alt="a.name" class="avatar-img" loading="lazy" />
-          <span v-if="a.is_animated" class="anim-badge">gif</span>
+      <li v-for="item in shown" :key="item.id" class="card item-card">
+        <div class="preview">
+          <template v-if="item.kind === 'avatar'">
+            <div class="avatar-wrap">
+              <img :src="item.url" :alt="item.name" class="avatar-img" loading="lazy" />
+              <span v-if="item.is_animated" class="anim-badge">gif</span>
+            </div>
+          </template>
+          <template v-else-if="item.kind === 'frame'">
+            <div class="frame-demo">
+              <span class="frame-inner" />
+              <img :src="item.url" alt="" class="frame-layer" loading="lazy" />
+            </div>
+          </template>
+          <template v-else-if="item.kind === 'wallpaper' || item.kind === 'cover'">
+            <div
+              class="wide-thumb"
+              :class="item.kind === 'cover' ? 'cover-thumb' : ''"
+              :style="{ backgroundImage: `url(${item.url})` }"
+            />
+          </template>
         </div>
-        <p class="avatar-name">{{ a.name }}</p>
-        <div class="avatar-footer">
+        <p class="item-name">{{ item.name }}</p>
+        <div class="item-footer">
           <span class="price">
             <img src="/coin-gem.png" alt="" width="14" height="14" loading="lazy" />
-            {{ a.price }}
+            {{ item.price }}
           </span>
           <button
-            v-if="!a.owned"
+            v-if="!item.owned"
             type="button"
             class="btn-buy"
-            :disabled="busy === a.id || profileCoins < a.price"
-            @click="onBuy(a)"
+            :disabled="busy === item.id || profileCoins < item.price"
+            @click="onBuy(item)"
           >
             купить
           </button>
@@ -99,10 +149,10 @@ onMounted(load);
             v-else
             type="button"
             class="btn-equip"
-            :disabled="busy === a.id"
-            @click="onEquip(a)"
+            :disabled="busy === item.id"
+            @click="onEquip(item)"
           >
-            надеть
+            применить
           </button>
         </div>
       </li>
@@ -120,7 +170,7 @@ onMounted(load);
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  margin-bottom: 0.4rem;
+  margin-bottom: 0.5rem;
 }
 .shop-head h1 {
   font-size: 1.2rem;
@@ -137,8 +187,29 @@ onMounted(load);
   font-size: 0.9rem;
   background: var(--surface);
 }
+.shop-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.65rem;
+}
+.tab-btn {
+  padding: 0.28rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--muted);
+  font-size: 0.82rem;
+  cursor: pointer;
+  min-height: 0;
+}
+.tab-btn.on {
+  color: var(--text);
+  border-color: var(--text);
+  background: var(--surface);
+}
 .shop-hint {
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.25rem;
 }
 .grid {
   list-style: none;
@@ -148,7 +219,7 @@ onMounted(load);
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 1rem;
 }
-.avatar-card {
+.item-card {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -157,9 +228,14 @@ onMounted(load);
   border-radius: var(--radius);
   background: var(--surface);
 }
+.preview {
+  min-height: 88px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 .avatar-wrap {
   position: relative;
-  align-self: center;
 }
 .avatar-img {
   width: 80px;
@@ -182,7 +258,38 @@ onMounted(load);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
-.avatar-name {
+.frame-demo {
+  position: relative;
+  width: 72px;
+  height: 72px;
+}
+.frame-inner {
+  position: absolute;
+  inset: 10px;
+  border-radius: 999px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+}
+.frame-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+.wide-thumb {
+  width: 100%;
+  height: 72px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background-size: cover;
+  background-position: center;
+}
+.cover-thumb {
+  height: 56px;
+}
+.item-name {
   margin: 0;
   font-size: 0.85rem;
   text-align: center;
@@ -190,7 +297,7 @@ onMounted(load);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.avatar-footer {
+.item-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;

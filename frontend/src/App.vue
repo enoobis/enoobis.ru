@@ -199,12 +199,12 @@ function onVisibilityChange() {
   }
 }
 
-function onAvatarUpdated() {
+function onProfileCosmeticsUpdated() {
   void loadMePresentation();
 }
 
 onMounted(async () => {
-  window.addEventListener("enoobis:avatar-updated", onAvatarUpdated);
+  window.addEventListener("enoobis:profile-cosmetics-updated", onProfileCosmeticsUpdated);
   window.addEventListener("online", syncOnlineStatus);
   window.addEventListener("offline", syncOnlineStatus);
   window.addEventListener("resize", onLayoutScrollResize);
@@ -220,7 +220,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
-  window.removeEventListener("enoobis:avatar-updated", onAvatarUpdated);
+  window.removeEventListener("enoobis:profile-cosmetics-updated", onProfileCosmeticsUpdated);
   window.removeEventListener("online", syncOnlineStatus);
   window.removeEventListener("offline", syncOnlineStatus);
   window.removeEventListener("resize", onLayoutScrollResize);
@@ -427,10 +427,11 @@ watch(
             <RouterLink
               v-if="auth.token"
               to="/shop"
-              class="nav-drawer-link"
+              class="nav-drawer-link nav-drawer-with-ico"
               @click="closeNavDrawer"
             >
-              магазин аватарок
+              <AppIcon name="shop" :size="17" />
+              <span>магазин</span>
             </RouterLink>
             <RouterLink
               v-if="auth.role === 'admin'"
@@ -530,8 +531,10 @@ watch(
   text-decoration: none;
 }
 
-.nav-drawer-link.router-link-active {
-  color: var(--text);
+.nav-drawer-link.nav-drawer-with-ico {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
 }
 
 .profile-menu-wrap {

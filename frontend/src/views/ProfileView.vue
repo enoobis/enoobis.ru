@@ -35,7 +35,9 @@ type Profile = {
   role: string;
   bio: string;
   avatar_url: string;
+  avatar_frame_url: string;
   wallpaper_url: string;
+  profile_cover_url: string;
   full_name: string;
   website_url: string;
   social_links: { name: string; url: string }[];
@@ -192,15 +194,33 @@ watch(nick, load);
       class="wallpaper"
       :style="{ backgroundImage: `url(${profile.wallpaper_url})` }"
     />
+    <div
+      v-if="profile.profile_cover_url"
+      class="cover-strip"
+      :style="{ backgroundImage: `url(${profile.profile_cover_url})` }"
+    />
     <header class="head" :class="{ 'head-with-wallpaper': profile.wallpaper_url }">
-      <img
-        v-if="profile.avatar_url && !avatarBroken"
-        class="avatar"
-        :src="profile.avatar_url"
-        alt=""
-        @error="avatarBroken = true"
-      />
-      <div v-else class="avatar fallback">{{ profile.nickname.slice(0, 2) }}</div>
+      <div class="avatar-cell">
+        <div
+          class="avatar-stack"
+          :class="{ framed: !!profile.avatar_frame_url }"
+        >
+          <img
+            v-if="profile.avatar_url && !avatarBroken"
+            class="avatar"
+            :src="profile.avatar_url"
+            alt=""
+            @error="avatarBroken = true"
+          />
+          <div v-else class="avatar fallback">{{ profile.nickname.slice(0, 2) }}</div>
+          <img
+            v-if="profile.avatar_frame_url"
+            class="avatar-frame"
+            :src="profile.avatar_frame_url"
+            alt=""
+          />
+        </div>
+      </div>
 
       <div class="info">
         <h1>{{ displayName }}</h1>
@@ -366,11 +386,50 @@ watch(nick, load);
 .head-with-wallpaper {
   padding-top: 0;
 }
-.head-with-wallpaper .avatar {
+.head-with-wallpaper .avatar-stack {
   width: 80px;
   height: 80px;
-  border: 2px solid var(--bg);
-  box-shadow: 0 0 0 1px var(--border);
+}
+.head-with-wallpaper .avatar-stack.framed .avatar,
+.head-with-wallpaper .avatar-stack.framed .avatar.fallback {
+  border: none;
+}
+.cover-strip {
+  width: 100%;
+  height: 88px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background-size: cover;
+  background-position: center;
+  margin-bottom: 0.75rem;
+}
+.avatar-cell {
+  min-width: 0;
+}
+.avatar-stack {
+  position: relative;
+  width: 64px;
+  height: 64px;
+}
+.avatar-stack .avatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  object-fit: cover;
+  background: var(--surface);
+}
+.avatar-stack.framed .avatar,
+.avatar-stack.framed .avatar.fallback {
+  border: none;
+}
+.avatar-frame {
+  position: absolute;
+  inset: -8px;
+  width: calc(100% + 16px);
+  height: calc(100% + 16px);
+  object-fit: contain;
+  pointer-events: none;
 }
 .mod-notes {
   list-style: none;
@@ -400,15 +459,7 @@ watch(nick, load);
   border-bottom: 1px solid var(--border);
   margin-bottom: 1rem;
 }
-.avatar {
-  width: 64px;
-  height: 64px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  object-fit: cover;
-  background: var(--surface);
-}
-.avatar.fallback {
+.avatar-stack .avatar.fallback {
   display: inline-flex;
   align-items: center;
   justify-content: center;

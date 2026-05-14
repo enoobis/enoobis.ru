@@ -10,7 +10,7 @@ import { isRasterImageMimetype, optimizeUploadedFile } from "../utils/imageOptim
 const router = express.Router();
 
 const UPLOAD_ROOT = path.resolve(process.env.UPLOADS_DIR ?? "./data/uploads");
-const SUBDIRS = ["avatars", "blog", "course-lectures", "wallpapers", "shop-avatars"];
+const SUBDIRS = ["avatars", "blog", "course-lectures", "wallpapers", "shop-avatars", "shop-items"];
 for (const d of SUBDIRS) fs.mkdirSync(path.join(UPLOAD_ROOT, d), { recursive: true });
 
 const IMAGE_MIMES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
@@ -113,15 +113,17 @@ const wallpaperUpload = multer({
   fileFilter: imageFileFilter,
 });
 
-const shopAvatarUpload = multer({
+const SHOP_KINDS = new Set(["avatar", "frame", "wallpaper", "cover"]);
+
+const shopItemUpload = multer({
   storage: multer.diskStorage({
-    destination: (_req, _file, cb) => cb(null, path.join(UPLOAD_ROOT, "shop-avatars")),
+    destination: (_req, _file, cb) => cb(null, path.join(UPLOAD_ROOT, "shop-items")),
     filename: (_req, file, cb) => {
       const ext = (path.extname(file.originalname) || ".bin").toLowerCase();
       cb(null, `shop-${uuidv4().replace(/-/g, "")}${ext}`);
     },
   }),
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: { fileSize: 6 * 1024 * 1024 },
   fileFilter: imageFileFilter,
 });
 
@@ -147,30 +149,51 @@ router.delete("/me/wallpaper", authRequired, (req, res) => {
   return res.json({ ok: true });
 });
 
-router.post("/admin/shop/avatars", authRequired, uploadSingle(shopAvatarUpload, "file"), async (req, res) => {
+router.post("/admin/shop/items", authRequired, uploadSingle(shopItemUpload, "file"), async (req, res) => {
   if (req.user.role !== "admin") return res.status(403).json({ error: "forbidden" });
   if (!req.file) return res.status(400).json({ error: "no file" });
+  const kind = String(req.body?.kind ?? "avatar").trim();
+  if (!SHOP_KINDS.has(kind)) return res.status(400).json({ error: "bad kind" });
   const name = String(req.body?.name ?? "").trim() || req.file.originalname;
   const price = Math.max(0, parseInt(req.body?.price ?? "0", 10) || 0);
   const isAnimated = req.file.mimetype === "image/gif" ? 1 : 0;
-  const url = `/uploads/shop-avatars/${req.file.filename}`;
+  let presetKey = "avatar";
+  if (kind === "frame") presetKey = "shop_frame";
+  else if (kind === "wallpaper") presetKey = "shop_wallpaper";
+  else if (kind === "cover") presetKey = "shop_cover";
+  if (isRasterImageMimetype(req.file.mimetype) && req.file.mimetype !== "image/gif") {
+    const r = await optimizeUploadedFile(req.file.path, /** @type {"avatar"|"shop_frame"|"shop_wallpaper"|"shop_cover"} */ (presetKey));
+    if (r.ok) req.file.filename = r.filename;
+  }
+  const url = `/uploads/shop-items/${req.file.filename}`;
+  const id = uuidv4();
   run(
-    "INSERT INTO shop_avatars (id, name, url, price, is_animated, added_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-    uuidv4(), name, url, price, isAnimated, req.user.id, nowIso(),
+    "INSERT INTO shop_items (id, kind, name, url, price, is_animated, added_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    id,
+    kind,
+    name,
+    url,
+    price,
+    isAnimated,
+    req.user.id,
+    nowIso(),
   );
-  return res.json({ ok: true, url, name, price, is_animated: isAnimated });
+  return res.json({ ok: true, id, url, name, price, kind, is_animated: isAnimated });
 });
 
-router.delete("/admin/shop/avatars/:id", authRequired, (req, res) => {
+router.delete("/admin/shop/items/:id", authRequired, (req, res) => {
   if (req.user.role !== "admin") return res.status(403).json({ error: "forbidden" });
-  const row = get("SELECT url FROM shop_avatars WHERE id = ?", req.params.id);
+  const row = get("SELECT url FROM shop_items WHERE id = ?", req.params.id);
   if (!row) return res.status(404).json({ error: "not found" });
-  if (row.url?.startsWith("/uploads/shop-avatars/")) {
+  run("DELETE FROM user_owned_shop_items WHERE item_id = ?", req.params.id);
+  if (row.url?.startsWith("/uploads/shop-items/") || row.url?.startsWith("/uploads/shop-avatars/")) {
     try {
       fs.unlinkSync(path.join(UPLOAD_ROOT, row.url.replace(/^\/uploads\//, "")));
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
-  run("DELETE FROM shop_avatars WHERE id = ?", req.params.id);
+  run("DELETE FROM shop_items WHERE id = ?", req.params.id);
   return res.json({ ok: true });
 });
 

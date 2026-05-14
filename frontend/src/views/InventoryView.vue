@@ -2,20 +2,27 @@
 import { onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import { api } from "../api/http";
-import { listMyAvatars, equipAvatar, type OwnedAvatar } from "../api/shop";
+import { listMyShopItems, equipShopItem, type OwnedShopItem, type ShopItemKind } from "../api/shop";
 import { useAuthStore } from "../stores/auth";
 import { toastError, toastSuccess } from "../utils/toast";
 
 const auth = useAuthStore();
-const items = ref<OwnedAvatar[]>([]);
+const items = ref<OwnedShopItem[]>([]);
 const loading = ref(true);
 const busy = ref<string | null>(null);
 const profileCoins = ref(0);
 
+function kindLabel(k: ShopItemKind): string {
+  if (k === "avatar") return "аватар";
+  if (k === "frame") return "рамка";
+  if (k === "wallpaper") return "фон";
+  return "обложка";
+}
+
 async function load() {
   loading.value = true;
   try {
-    items.value = await listMyAvatars(auth.token!);
+    items.value = await listMyShopItems(auth.token!);
     const me = await api<{ coins?: number }>("/api/me", { token: auth.token! });
     profileCoins.value = Math.max(0, Math.floor(Number(me.coins ?? 0)));
   } catch (e) {
@@ -25,13 +32,13 @@ async function load() {
   }
 }
 
-async function onEquip(a: OwnedAvatar) {
+async function onApply(a: OwnedShopItem) {
   if (!auth.token || busy.value) return;
   busy.value = a.id;
   try {
-    await equipAvatar(auth.token, a.id);
-    toastSuccess("аватарка установлена");
-    window.dispatchEvent(new CustomEvent("enoobis:avatar-updated"));
+    await equipShopItem(auth.token, a.id);
+    toastSuccess("применено");
+    window.dispatchEvent(new CustomEvent("enoobis:profile-cosmetics-updated"));
   } catch (e) {
     toastError(e);
   } finally {
@@ -46,7 +53,7 @@ onMounted(load);
   <section class="inv">
     <header class="inv-head">
       <h1>инвентарь</h1>
-      <div class="coins-badge" title="ваши монеты">
+      <div class="coins-badge" title="монеты">
         <img src="/coin-gem.png" alt="" width="18" height="18" loading="lazy" />
         <span>{{ profileCoins }}</span>
       </div>
@@ -57,15 +64,33 @@ onMounted(load);
       <RouterLink to="/shop" class="to-shop">магазин →</RouterLink>
     </div>
     <ul v-else class="grid">
-      <li v-for="a in items" :key="a.id" class="card avatar-card">
-        <div class="avatar-wrap">
-          <img :src="a.url" :alt="a.name" class="avatar-img" loading="lazy" />
-          <span v-if="a.is_animated" class="anim-badge">gif</span>
+      <li v-for="a in items" :key="a.id" class="card item-card">
+        <span class="kind muted small">{{ kindLabel(a.kind) }}</span>
+        <div class="preview">
+          <template v-if="a.kind === 'avatar'">
+            <div class="avatar-wrap">
+              <img :src="a.url" :alt="a.name" class="avatar-img" loading="lazy" />
+              <span v-if="a.is_animated" class="anim-badge">gif</span>
+            </div>
+          </template>
+          <template v-else-if="a.kind === 'frame'">
+            <div class="frame-demo">
+              <span class="frame-inner" />
+              <img :src="a.url" alt="" class="frame-layer" loading="lazy" />
+            </div>
+          </template>
+          <template v-else-if="a.kind === 'wallpaper' || a.kind === 'cover'">
+            <div
+              class="wide-thumb"
+              :class="a.kind === 'cover' ? 'cover-thumb' : ''"
+              :style="{ backgroundImage: `url(${a.url})` }"
+            />
+          </template>
         </div>
-        <p class="avatar-name">{{ a.name }}</p>
-        <div class="avatar-footer">
-          <button type="button" class="btn-equip" :disabled="busy === a.id" @click="onEquip(a)">
-            надеть
+        <p class="item-name">{{ a.name }}</p>
+        <div class="item-footer">
+          <button type="button" class="btn-equip" :disabled="busy === a.id" @click="onApply(a)">
+            применить
           </button>
         </div>
       </li>
@@ -108,18 +133,26 @@ onMounted(load);
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 1rem;
 }
-.avatar-card {
+.item-card {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.4rem;
   padding: 0.85rem;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
 }
+.kind {
+  font-size: 0.72rem;
+}
+.preview {
+  min-height: 88px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 .avatar-wrap {
   position: relative;
-  align-self: center;
 }
 .avatar-img {
   width: 80px;
@@ -142,7 +175,38 @@ onMounted(load);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
-.avatar-name {
+.frame-demo {
+  position: relative;
+  width: 72px;
+  height: 72px;
+}
+.frame-inner {
+  position: absolute;
+  inset: 10px;
+  border-radius: 999px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+}
+.frame-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+.wide-thumb {
+  width: 100%;
+  height: 72px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background-size: cover;
+  background-position: center;
+}
+.cover-thumb {
+  height: 56px;
+}
+.item-name {
   margin: 0;
   font-size: 0.85rem;
   text-align: center;
@@ -150,7 +214,7 @@ onMounted(load);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.avatar-footer {
+.item-footer {
   display: flex;
   justify-content: center;
   margin-top: auto;

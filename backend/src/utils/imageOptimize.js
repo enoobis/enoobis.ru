@@ -9,6 +9,10 @@ const PRESETS = {
   avatar: { maxWidth: 512, maxHeight: 512, quality: 82 },
   lecture: { maxWidth: 1920, maxHeight: 1920, quality: 82 },
   submission: { maxWidth: 1600, maxHeight: 1600, quality: 80 },
+  wallpaper: { maxWidth: 1920, maxHeight: 1080, quality: 82 },
+  shop_wallpaper: { maxWidth: 1920, maxHeight: 1080, quality: 82 },
+  shop_cover: { maxWidth: 1200, maxHeight: 480, quality: 82 },
+  shop_frame: { maxWidth: 512, maxHeight: 512, quality: 90, alphaQuality: 100 },
 };
 
 /**
@@ -47,7 +51,9 @@ export async function optimizeUploadedFile(absPath, presetKey) {
       });
     }
 
-    await pipeline.webp({ quality: opts.quality, effort: 4 }).toFile(outAbs);
+    const webpOpts = { quality: opts.quality, effort: 4 };
+    if (typeof opts.alphaQuality === "number") webpOpts.alphaQuality = opts.alphaQuality;
+    await pipeline.webp(webpOpts).toFile(outAbs);
 
     if (absPath !== outAbs && fs.existsSync(absPath)) {
       fs.unlinkSync(absPath);

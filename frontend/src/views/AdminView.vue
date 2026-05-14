@@ -26,7 +26,13 @@ import {
   type PublishPeriod,
 } from "../api/adminUsers";
 import { useAuthStore } from "../stores/auth";
-import { adminUploadShopAvatar, adminDeleteShopAvatar, type ShopAvatar } from "../api/shop";
+import {
+  adminDeleteShopItem,
+  adminUploadShopItem,
+  listShopItems,
+  type ShopItem,
+  type ShopItemKind,
+} from "../api/shop";
 
 const README_MAX = 4000;
 
@@ -67,10 +73,11 @@ const modInvites = ref<AdminInviteRow[]>([]);
 const modMsg = ref("");
 const modBusy = ref(false);
 
-const shopAvatars = ref<ShopAvatar[]>([]);
+const shopItems = ref<ShopItem[]>([]);
 const shopLoading = ref(false);
 const shopUploadName = ref("");
 const shopUploadPrice = ref(0);
+const shopUploadKind = ref<ShopItemKind>("avatar");
 const shopUploadBusy = ref(false);
 const shopMsg = ref("");
 
@@ -249,11 +256,11 @@ function presetBan(target: "blog" | "micro" | "comment" | "chat", unit: "day" | 
   box.value = { ...box.value, ban_forever: false, ban_until: d.toISOString().slice(0, 16) };
 }
 
-async function loadShopAvatars() {
+async function loadShopItems() {
   if (!auth.token) return;
   shopLoading.value = true;
   try {
-    shopAvatars.value = await api<ShopAvatar[]>("/api/shop/avatars", { token: auth.token });
+    shopItems.value = await listShopItems(auth.token);
   } catch {
     /* ignore */
   } finally {
@@ -261,7 +268,14 @@ async function loadShopAvatars() {
   }
 }
 
-async function onShopAvatarFile(e: Event) {
+function shopKindRu(k: ShopItemKind): string {
+  if (k === "avatar") return "аватар";
+  if (k === "frame") return "рамка";
+  if (k === "wallpaper") return "фон";
+  return "обложка";
+}
+
+async function onShopItemFile(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0];
   if (!file || !auth.token) return;
   const name = shopUploadName.value.trim() || file.name;
@@ -269,12 +283,12 @@ async function onShopAvatarFile(e: Event) {
   shopUploadBusy.value = true;
   shopMsg.value = "";
   try {
-    await adminUploadShopAvatar(auth.token, file, name, price);
+    await adminUploadShopItem(auth.token, file, shopUploadKind.value, name, price);
     shopUploadName.value = "";
     shopUploadPrice.value = 0;
     (e.target as HTMLInputElement).value = "";
     shopMsg.value = "добавлено";
-    await loadShopAvatars();
+    await loadShopItems();
   } catch (ex) {
     shopMsg.value = ex instanceof Error ? ex.message : "ошибка";
   } finally {
@@ -282,11 +296,11 @@ async function onShopAvatarFile(e: Event) {
   }
 }
 
-async function removeShopAvatar(id: string) {
+async function removeShopItem(id: string) {
   if (!auth.token) return;
   try {
-    await adminDeleteShopAvatar(auth.token, id);
-    shopAvatars.value = shopAvatars.value.filter((a) => a.id !== id);
+    await adminDeleteShopItem(auth.token, id);
+    shopItems.value = shopItems.value.filter((a) => a.id !== id);
   } catch (ex) {
     shopMsg.value = ex instanceof Error ? ex.message : "ошибка";
   }
@@ -314,7 +328,7 @@ async function load() {
 
 onMounted(() => {
   void load();
-  void loadShopAvatars();
+  void loadShopItems();
   document.addEventListener("visibilitychange", onAdminModerateVisibility);
   adminModeratePoll = setInterval(() => void refreshModerateOpen(), ADMIN_POLL_MS);
 });
@@ -903,29 +917,35 @@ async function restoreComment(id: string | null) {
     </template>
 
     <template v-else-if="tab === 'shop'">
-      <h2>аватарки магазина</h2>
+      <h2>товары магазина</h2>
       <p v-if="shopMsg" class="ok-msg small">{{ shopMsg }}</p>
       <div class="shop-add">
+        <select v-model="shopUploadKind" class="shop-input shop-kind" aria-label="тип">
+          <option value="avatar">аватар</option>
+          <option value="frame">рамка</option>
+          <option value="wallpaper">фон</option>
+          <option value="cover">обложка</option>
+        </select>
         <input v-model="shopUploadName" placeholder="название" class="shop-input" />
-        <input v-model.number="shopUploadPrice" type="number" min="0" step="1" placeholder="цена (монеты)" class="shop-input shop-price" />
+        <input v-model.number="shopUploadPrice" type="number" min="0" step="1" placeholder="цена" class="shop-input shop-price" />
         <label class="btn-file" :class="{ disabled: shopUploadBusy }">
-          <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" :disabled="shopUploadBusy" @change="onShopAvatarFile" />
-          {{ shopUploadBusy ? "загрузка…" : "загрузить аватарку" }}
+          <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" :disabled="shopUploadBusy" @change="onShopItemFile" />
+          {{ shopUploadBusy ? "загрузка…" : "загрузить" }}
         </label>
       </div>
-      <p class="muted small">GIF-файлы автоматически помечаются как анимированные.</p>
+      <p class="muted small gif">gif — без сжатия, помечается как анимация.</p>
       <p v-if="shopLoading" class="muted small">загрузка…</p>
-      <ul v-else-if="shopAvatars.length" class="shop-grid">
-        <li v-for="a in shopAvatars" :key="a.id" class="shop-item">
+      <ul v-else-if="shopItems.length" class="shop-grid">
+        <li v-for="a in shopItems" :key="a.id" class="shop-item">
           <img :src="a.url" :alt="a.name" class="shop-avatar-img" loading="lazy" />
           <span class="shop-avatar-meta">
             <span>{{ a.name }}</span>
-            <span class="muted small">{{ a.price }} монет{{ a.is_animated ? ' · gif' : '' }}</span>
+            <span class="muted small">{{ shopKindRu(a.kind) }} · {{ a.price }} · {{ a.is_animated ? "gif" : "" }}</span>
           </span>
-          <button class="secondary danger shop-del" type="button" @click="removeShopAvatar(a.id)">удалить</button>
+          <button class="secondary danger shop-del" type="button" @click="removeShopItem(a.id)">удалить</button>
         </li>
       </ul>
-      <p v-else class="muted small">аватарок нет</p>
+      <p v-else class="muted small">пусто</p>
     </template>
   </section>
 </template>
@@ -1216,6 +1236,11 @@ strong {
 .shop-price {
   max-width: 120px;
   flex: none;
+}
+.shop-kind {
+  flex: 0 0 auto;
+  min-width: 6.5rem;
+  max-width: 9rem;
 }
 .btn-file {
   display: inline-block;

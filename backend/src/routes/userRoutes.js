@@ -46,6 +46,8 @@ function buildMe(row) {
     bio: row.bio ?? "",
     wallpaper_url: row.wallpaper_url ?? "",
     avatar_url: row.avatar_url ?? "",
+    avatar_frame_url: row.avatar_frame_url ?? "",
+    profile_cover_url: row.profile_cover_url ?? "",
     theme_preference: row.theme_preference ?? "black",
     language_preference: row.language_preference ?? "ru",
     font_preference: row.font_preference ?? "normal",
@@ -73,7 +75,7 @@ const PASSIVE_COIN_AMOUNT = 5;
 
 router.get("/me", authRequired, (req, res) => {
   const row = get(
-    `SELECT id, email, nickname, role, status, bio, wallpaper_url, avatar_url,
+    `SELECT id, email, nickname, role, status, bio, wallpaper_url, avatar_url, avatar_frame_url, profile_cover_url,
             theme_preference, language_preference, font_preference, full_name, website_url,
             social_links_json, birthday, country, readme_md, created_at, last_seen_at,
             nickname_change_count, pinned_post_id, pinned_post_type, content_limits_json, coins
@@ -502,7 +504,7 @@ function fetchPinnedPost(userId) {
 
 router.get("/profile/:nickname", (req, res) => {
   const p = get(
-    `SELECT id, nickname, role, bio, wallpaper_url, avatar_url, theme_preference,
+    `SELECT id, nickname, role, bio, wallpaper_url, avatar_url, avatar_frame_url, profile_cover_url, theme_preference,
             language_preference, font_preference, full_name, website_url, social_links_json,
             birthday, country, readme_md, created_at, last_seen_at, content_limits_json
      FROM users WHERE nickname = ?`,
@@ -537,6 +539,8 @@ router.get("/profile/:nickname", (req, res) => {
     bio: p.bio ?? "",
     wallpaper_url: p.wallpaper_url ?? "",
     avatar_url: p.avatar_url ?? "",
+    avatar_frame_url: p.avatar_frame_url ?? "",
+    profile_cover_url: p.profile_cover_url ?? "",
     theme_preference: p.theme_preference ?? "black",
     language_preference: p.language_preference ?? "ru",
     font_preference: p.font_preference ?? "normal",
