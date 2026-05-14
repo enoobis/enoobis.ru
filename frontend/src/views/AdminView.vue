@@ -26,6 +26,7 @@ import {
   type PublishPeriod,
 } from "../api/adminUsers";
 import { useAuthStore } from "../stores/auth";
+import { adminUploadShopAvatar, adminDeleteShopAvatar, type ShopAvatar } from "../api/shop";
 
 const README_MAX = 4000;
 
@@ -43,7 +44,7 @@ type AdminUser = {
   avatar_url: string;
   coins?: number;
 };
-type Tab = "pending" | "users" | "reports";
+type Tab = "pending" | "users" | "reports" | "shop";
 
 const auth = useAuthStore();
 const tab = ref<Tab>("pending");
@@ -65,6 +66,13 @@ const moderateGemInput = ref("");
 const modInvites = ref<AdminInviteRow[]>([]);
 const modMsg = ref("");
 const modBusy = ref(false);
+
+const shopAvatars = ref<ShopAvatar[]>([]);
+const shopLoading = ref(false);
+const shopUploadName = ref("");
+const shopUploadPrice = ref(0);
+const shopUploadBusy = ref(false);
+const shopMsg = ref("");
 
 const ADMIN_POLL_MS = 12000;
 let adminModeratePoll: ReturnType<typeof setInterval> | null = null;
@@ -241,6 +249,49 @@ function presetBan(target: "blog" | "micro" | "comment" | "chat", unit: "day" | 
   box.value = { ...box.value, ban_forever: false, ban_until: d.toISOString().slice(0, 16) };
 }
 
+async function loadShopAvatars() {
+  if (!auth.token) return;
+  shopLoading.value = true;
+  try {
+    shopAvatars.value = await api<ShopAvatar[]>("/api/shop/avatars", { token: auth.token });
+  } catch {
+    /* ignore */
+  } finally {
+    shopLoading.value = false;
+  }
+}
+
+async function onShopAvatarFile(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0];
+  if (!file || !auth.token) return;
+  const name = shopUploadName.value.trim() || file.name;
+  const price = Math.max(0, Math.floor(Number(shopUploadPrice.value) || 0));
+  shopUploadBusy.value = true;
+  shopMsg.value = "";
+  try {
+    await adminUploadShopAvatar(auth.token, file, name, price);
+    shopUploadName.value = "";
+    shopUploadPrice.value = 0;
+    (e.target as HTMLInputElement).value = "";
+    shopMsg.value = "добавлено";
+    await loadShopAvatars();
+  } catch (ex) {
+    shopMsg.value = ex instanceof Error ? ex.message : "ошибка";
+  } finally {
+    shopUploadBusy.value = false;
+  }
+}
+
+async function removeShopAvatar(id: string) {
+  if (!auth.token) return;
+  try {
+    await adminDeleteShopAvatar(auth.token, id);
+    shopAvatars.value = shopAvatars.value.filter((a) => a.id !== id);
+  } catch (ex) {
+    shopMsg.value = ex instanceof Error ? ex.message : "ошибка";
+  }
+}
+
 async function load() {
   err.value = "";
   try {
@@ -263,6 +314,7 @@ async function load() {
 
 onMounted(() => {
   void load();
+  void loadShopAvatars();
   document.addEventListener("visibilitychange", onAdminModerateVisibility);
   adminModeratePoll = setInterval(() => void refreshModerateOpen(), ADMIN_POLL_MS);
 });
@@ -518,6 +570,9 @@ async function restoreComment(id: string | null) {
       </button>
       <button class="link" :class="{ active: tab === 'reports' }" type="button" @click="tab = 'reports'">
         жалобы <span v-if="reports.length" class="muted small">{{ reports.length }}</span>
+      </button>
+      <button class="link" :class="{ active: tab === 'shop' }" type="button" @click="tab = 'shop'">
+        магазин
       </button>
     </nav>
 
@@ -846,6 +901,32 @@ async function restoreComment(id: string | null) {
         </li>
       </ul>
     </template>
+
+    <template v-else-if="tab === 'shop'">
+      <h2>аватарки магазина</h2>
+      <p v-if="shopMsg" class="ok-msg small">{{ shopMsg }}</p>
+      <div class="shop-add">
+        <input v-model="shopUploadName" placeholder="название" class="shop-input" />
+        <input v-model.number="shopUploadPrice" type="number" min="0" step="1" placeholder="цена (монеты)" class="shop-input shop-price" />
+        <label class="btn-file" :class="{ disabled: shopUploadBusy }">
+          <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" :disabled="shopUploadBusy" @change="onShopAvatarFile" />
+          {{ shopUploadBusy ? "загрузка…" : "загрузить аватарку" }}
+        </label>
+      </div>
+      <p class="muted small">GIF-файлы автоматически помечаются как анимированные.</p>
+      <p v-if="shopLoading" class="muted small">загрузка…</p>
+      <ul v-else-if="shopAvatars.length" class="shop-grid">
+        <li v-for="a in shopAvatars" :key="a.id" class="shop-item">
+          <img :src="a.url" :alt="a.name" class="shop-avatar-img" loading="lazy" />
+          <span class="shop-avatar-meta">
+            <span>{{ a.name }}</span>
+            <span class="muted small">{{ a.price }} монет{{ a.is_animated ? ' · gif' : '' }}</span>
+          </span>
+          <button class="secondary danger shop-del" type="button" @click="removeShopAvatar(a.id)">удалить</button>
+        </li>
+      </ul>
+      <p v-else class="muted small">аватарок нет</p>
+    </template>
   </section>
 </template>
 
@@ -1114,5 +1195,82 @@ strong {
   border-radius: var(--radius);
   background: var(--bg);
   color: var(--text);
+}
+.shop-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+  align-items: center;
+}
+.shop-input {
+  font: inherit;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+  flex: 1;
+  min-width: 140px;
+}
+.shop-price {
+  max-width: 120px;
+  flex: none;
+}
+.btn-file {
+  display: inline-block;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.4rem 0.7rem;
+  background: var(--surface2);
+  font-size: 0.9rem;
+}
+.btn-file.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+.btn-file input {
+  display: none;
+}
+.shop-grid {
+  list-style: none;
+  padding: 0;
+  margin: 0.8rem 0 0;
+  display: grid;
+  gap: 0.5rem;
+}
+.shop-item {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.shop-avatar-img {
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.shop-avatar-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  flex: 1;
+  min-width: 0;
+  font-size: 0.88rem;
+  overflow: hidden;
+}
+.shop-del {
+  margin-left: auto;
+}
+.ok-msg {
+  color: var(--text);
+  margin-bottom: 0.4rem;
 }
 </style>

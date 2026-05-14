@@ -721,8 +721,10 @@ router.post("/courses/:id/assignments/:aid/submit", authRequired, (req, res) => 
       req.params.id,
       req.user.id,
     )?.v ?? 0;
+  run("UPDATE users SET coins = coins + 5 WHERE id = ?", req.user.id);
   if (totalAssignments > 0 && submitted >= totalAssignments) {
     awardAchievement(req.user.id, "course_complete");
+    run("UPDATE users SET coins = coins + 50 WHERE id = ?", req.user.id);
   }
 
   return res.json({ ...my, attachments: attachmentsForSubmission(my.id) });

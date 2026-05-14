@@ -10,7 +10,7 @@ import { isRasterImageMimetype, optimizeUploadedFile } from "../utils/imageOptim
 const router = express.Router();
 
 const UPLOAD_ROOT = path.resolve(process.env.UPLOADS_DIR ?? "./data/uploads");
-const SUBDIRS = ["avatars", "blog", "course-lectures"];
+const SUBDIRS = ["avatars", "blog", "course-lectures", "wallpapers", "shop-avatars"];
 for (const d of SUBDIRS) fs.mkdirSync(path.join(UPLOAD_ROOT, d), { recursive: true });
 
 const IMAGE_MIMES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
@@ -106,5 +106,72 @@ router.post(
     return res.json({ url, file_name: req.file.originalname });
   },
 );
+
+const wallpaperUpload = multer({
+  storage: makeStorage("wallpapers"),
+  limits: { fileSize: 8 * 1024 * 1024 },
+  fileFilter: imageFileFilter,
+});
+
+const shopAvatarUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, path.join(UPLOAD_ROOT, "shop-avatars")),
+    filename: (_req, file, cb) => {
+      const ext = (path.extname(file.originalname) || ".bin").toLowerCase();
+      cb(null, `shop-${uuidv4().replace(/-/g, "")}${ext}`);
+    },
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: imageFileFilter,
+});
+
+router.post("/me/wallpaper", authRequired, uploadSingle(wallpaperUpload, "file"), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: "no file" });
+  if (isRasterImageMimetype(req.file.mimetype) && req.file.mimetype !== "image/gif") {
+    const r = await optimizeUploadedFile(req.file.path, "wallpaper");
+    if (r.ok) req.file.filename = r.filename;
+  }
+  const url = `/uploads/wallpapers/${req.file.filename}`;
+  run("UPDATE users SET wallpaper_url = ? WHERE id = ?", url, req.user.id);
+  return res.json({ wallpaper_url: url });
+});
+
+router.delete("/me/wallpaper", authRequired, (req, res) => {
+  const row = get("SELECT wallpaper_url FROM users WHERE id = ?", req.user.id);
+  if (row?.wallpaper_url?.startsWith("/uploads/wallpapers/")) {
+    try {
+      fs.unlinkSync(path.join(UPLOAD_ROOT, row.wallpaper_url.replace(/^\/uploads\//, "")));
+    } catch { /* ignore */ }
+  }
+  run("UPDATE users SET wallpaper_url = '' WHERE id = ?", req.user.id);
+  return res.json({ ok: true });
+});
+
+router.post("/admin/shop/avatars", authRequired, uploadSingle(shopAvatarUpload, "file"), async (req, res) => {
+  if (req.user.role !== "admin") return res.status(403).json({ error: "forbidden" });
+  if (!req.file) return res.status(400).json({ error: "no file" });
+  const name = String(req.body?.name ?? "").trim() || req.file.originalname;
+  const price = Math.max(0, parseInt(req.body?.price ?? "0", 10) || 0);
+  const isAnimated = req.file.mimetype === "image/gif" ? 1 : 0;
+  const url = `/uploads/shop-avatars/${req.file.filename}`;
+  run(
+    "INSERT INTO shop_avatars (id, name, url, price, is_animated, added_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    uuidv4(), name, url, price, isAnimated, req.user.id, nowIso(),
+  );
+  return res.json({ ok: true, url, name, price, is_animated: isAnimated });
+});
+
+router.delete("/admin/shop/avatars/:id", authRequired, (req, res) => {
+  if (req.user.role !== "admin") return res.status(403).json({ error: "forbidden" });
+  const row = get("SELECT url FROM shop_avatars WHERE id = ?", req.params.id);
+  if (!row) return res.status(404).json({ error: "not found" });
+  if (row.url?.startsWith("/uploads/shop-avatars/")) {
+    try {
+      fs.unlinkSync(path.join(UPLOAD_ROOT, row.url.replace(/^\/uploads\//, "")));
+    } catch { /* ignore */ }
+  }
+  run("DELETE FROM shop_avatars WHERE id = ?", req.params.id);
+  return res.json({ ok: true });
+});
 
 export default router;

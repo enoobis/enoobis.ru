@@ -337,6 +337,9 @@ watch(
             <RouterLink :to="`/u/${auth.nickname}`" class="profile-menu-item" @click="profileMenuOpen = false">
               <AppIcon name="profile" :size="16" /><span>профиль</span>
             </RouterLink>
+            <RouterLink to="/shop" class="profile-menu-item" @click="profileMenuOpen = false">
+              <AppIcon name="trophy" :size="16" /><span>магазин аватарок</span>
+            </RouterLink>
             <RouterLink to="/blogs?mode=bookmarks" class="profile-menu-item" @click="profileMenuOpen = false">
               <AppIcon name="bookmark" :size="16" /><span>закладки блогов</span>
             </RouterLink>
@@ -414,6 +417,14 @@ watch(
               @click="closeNavDrawer"
             >
               библиотека
+            </RouterLink>
+            <RouterLink
+              v-if="auth.token"
+              to="/shop"
+              class="nav-drawer-link"
+              @click="closeNavDrawer"
+            >
+              магазин аватарок
             </RouterLink>
             <RouterLink
               v-if="auth.role === 'admin'"

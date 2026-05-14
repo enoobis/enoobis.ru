@@ -375,6 +375,7 @@ router.post("/blog", authRequired, (req, res) => {
   if (Array.isArray(body.categories)) syncCategories(id, body.categories);
   if (status === "published") {
     awardAchievement(req.user.id, "first_blog");
+    run("UPDATE users SET coins = coins + 2 WHERE id = ?", req.user.id);
   }
   return res.json(fetchPostFull(id, req.user.id));
 });
@@ -431,6 +432,9 @@ router.post("/blog/:id/publish", authRequired, (req, res) => {
     req.params.id,
   );
   awardAchievement(row.author_id, "first_blog");
+  if (row.status !== "published") {
+    run("UPDATE users SET coins = coins + 2 WHERE id = ?", row.author_id);
+  }
   return res.json({ ok: true });
 });
 

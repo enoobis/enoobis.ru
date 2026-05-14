@@ -391,7 +391,18 @@ function purgeUserMicroposts(userId) {
   run("DELETE FROM microposts WHERE author_id = ?", userId);
 }
 
-const deleteUserFully = db.transaction((userId) => {
+function deleteUserFully(userId) {
+  db.exec("BEGIN");
+  try {
+    const result = _deleteUserFullyBody(userId);
+    db.exec("COMMIT");
+    return result;
+  } catch (e) {
+    db.exec("ROLLBACK");
+    throw e;
+  }
+}
+function _deleteUserFullyBody(userId) {
   const userRow = get("SELECT avatar_url FROM users WHERE id = ?", userId);
   const avatarUrl = userRow?.avatar_url ?? "";
 
@@ -455,7 +466,7 @@ const deleteUserFully = db.transaction((userId) => {
 
   run("DELETE FROM users WHERE id = ?", userId);
   return { fileRows, bookRows, avatarUrl };
-});
+}
 
 function removeDeletedUserFiles(fileRows, bookRows, avatarUrl) {
   if (avatarUrl) unlinkIfUploadsUrl(String(avatarUrl));

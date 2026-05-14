@@ -1,8 +1,8 @@
-import Database from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite";
 
 const dbPath = process.env.DATABASE_FILE ?? "./edu.db";
-export const db = new Database(dbPath);
-db.pragma("journal_mode = WAL");
+export const db = new DatabaseSync(dbPath);
+db.exec("PRAGMA journal_mode = WAL");
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
@@ -627,3 +627,24 @@ try {
     // ignore
   }
 }
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS shop_avatars (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    url TEXT NOT NULL,
+    price INTEGER NOT NULL DEFAULT 0,
+    is_animated INTEGER NOT NULL DEFAULT 0,
+    added_by TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_shop_avatars_created ON shop_avatars(created_at DESC);
+
+  CREATE TABLE IF NOT EXISTS user_owned_avatars (
+    user_id TEXT NOT NULL,
+    avatar_id TEXT NOT NULL,
+    acquired_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, avatar_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_uoa_user ON user_owned_avatars(user_id);
+`);

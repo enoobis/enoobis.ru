@@ -262,6 +262,7 @@ router.post("/micro", authRequired, (req, res) => {
   );
   if (!parentId) {
     awardAchievement(req.user.id, "first_micro");
+    run("UPDATE users SET coins = coins + 3 WHERE id = ?", req.user.id);
   }
   return res.status(201).json(fetchById(id, req.user.id));
 });

@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { api } from "../api/http";
 import { uploadAvatar } from "../api/uploadAvatar";
+import { uploadWallpaper, deleteWallpaper } from "../api/shop";
 import { changeMyPassword } from "../api/profile";
 import AppIcon from "../components/AppIcon.vue";
 import { useAuthStore } from "../stores/auth";
@@ -24,6 +25,7 @@ type Me = {
   status: string;
   bio: string;
   avatar_url: string;
+  wallpaper_url: string;
   readme_md: string;
   language_preference: "ru" | "en";
   full_name: string;
@@ -66,6 +68,7 @@ const country = ref("");
 const err = ref("");
 const avatarMsg = ref("");
 const uploadingAvatar = ref(false);
+const uploadingWallpaper = ref(false);
 const saving = ref(false);
 
 const invites = ref<InviteLink[]>([]);
@@ -306,6 +309,34 @@ async function onAvatarFile(ev: Event) {
   }
 }
 
+async function onWallpaperFile(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0];
+  if (!file || !auth.token) return;
+  err.value = "";
+  uploadingWallpaper.value = true;
+  try {
+    const r = await uploadWallpaper(auth.token, file);
+    if (me.value) me.value.wallpaper_url = r.wallpaper_url;
+    avatarMsg.value = "фон обновлён";
+  } catch (ex) {
+    err.value = ex instanceof Error ? ex.message : "ошибка";
+  } finally {
+    uploadingWallpaper.value = false;
+  }
+}
+
+async function clearWallpaper() {
+  if (!auth.token) return;
+  err.value = "";
+  try {
+    await deleteWallpaper(auth.token);
+    if (me.value) me.value.wallpaper_url = "";
+    avatarMsg.value = "фон убран";
+  } catch (ex) {
+    err.value = ex instanceof Error ? ex.message : "ошибка";
+  }
+}
+
 async function clearAvatar() {
   if (!auth.token) return;
   err.value = "";
@@ -398,6 +429,18 @@ function closeSettings() {
               {{ uploadingAvatar ? "загрузка…" : "загрузить фото" }}
             </label>
             <button v-if="me.avatar_url" class="secondary" type="button" @click="clearAvatar">убрать</button>
+          </div>
+        </div>
+
+        <div class="wallpaper-section">
+          <p class="muted small">фон профиля</p>
+          <div v-if="me.wallpaper_url" class="wallpaper-preview" :style="{ backgroundImage: `url(${me.wallpaper_url})` }" />
+          <div class="avatar-actions">
+            <label class="btn-file">
+              <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" :disabled="uploadingWallpaper" @change="onWallpaperFile" />
+              {{ uploadingWallpaper ? "загрузка…" : "загрузить фон" }}
+            </label>
+            <button v-if="me.wallpaper_url" class="secondary" type="button" @click="clearWallpaper">убрать фон</button>
           </div>
         </div>
 
@@ -820,5 +863,21 @@ function closeSettings() {
   .social-row {
     grid-template-columns: 1fr;
   }
+}
+
+.wallpaper-section {
+  margin-bottom: 1rem;
+}
+.wallpaper-section .muted {
+  margin-bottom: 0.4rem;
+}
+.wallpaper-preview {
+  width: 100%;
+  height: 120px;
+  border-radius: var(--radius);
+  background-size: cover;
+  background-position: center;
+  border: 1px solid var(--border);
+  margin-bottom: 0.5rem;
 }
 </style>

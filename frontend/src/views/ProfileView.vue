@@ -35,6 +35,7 @@ type Profile = {
   role: string;
   bio: string;
   avatar_url: string;
+  wallpaper_url: string;
   full_name: string;
   website_url: string;
   social_links: { name: string; url: string }[];
@@ -43,6 +44,7 @@ type Profile = {
   last_seen_at: string;
   followers_count: number;
   following_count: number;
+  coins?: number;
   achievements: Achievement[];
   pinned_post: PinnedPost | null;
   moderation_notices?: string[];
@@ -185,7 +187,12 @@ watch(nick, load);
 
 <template>
   <section v-if="profile" class="profile">
-    <header class="head">
+    <div
+      v-if="profile.wallpaper_url"
+      class="wallpaper"
+      :style="{ backgroundImage: `url(${profile.wallpaper_url})` }"
+    />
+    <header class="head" :class="{ 'head-with-wallpaper': profile.wallpaper_url }">
       <img
         v-if="profile.avatar_url && !avatarBroken"
         class="avatar"
@@ -346,6 +353,24 @@ watch(nick, load);
 .profile {
   max-width: 640px;
   margin: 0 auto;
+}
+.wallpaper {
+  width: 100%;
+  height: 180px;
+  border-radius: var(--radius);
+  background-size: cover;
+  background-position: center;
+  margin-bottom: -40px;
+  border: 1px solid var(--border);
+}
+.head-with-wallpaper {
+  padding-top: 0;
+}
+.head-with-wallpaper .avatar {
+  width: 80px;
+  height: 80px;
+  border: 2px solid var(--bg);
+  box-shadow: 0 0 0 1px var(--border);
 }
 .mod-notes {
   list-style: none;
