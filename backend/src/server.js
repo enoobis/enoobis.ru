@@ -21,7 +21,6 @@ import storageRoutes from "./routes/storageRoutes.js";
 import libraryRoutes from "./routes/libraryRoutes.js";
 import shopRoutes from "./routes/shopRoutes.js";
 import callRoutes from "./routes/callRoutes.js";
-import { attachCallSignaling } from "./callSignal.js";
 
 const app = express();
 app.use(cors());
@@ -54,7 +53,6 @@ app.use((err, _req, res, _next) => {
 });
 
 const server = http.createServer(app);
-attachCallSignaling(server);
 
 async function ensureAdminAccount() {
   const adminEmail = "REDACTED";

@@ -5,6 +5,19 @@ import { get, nowIso, run } from "../db.js";
 
 const router = express.Router();
 
+function jitsiBase() {
+  const raw = process.env.JITSI_MEET_BASE_URL?.trim();
+  const b = raw && raw.length > 0 ? raw : "https://meet.jit.si";
+  return b.replace(/\/+$/, "");
+}
+
+function meetJoinUrl(slug) {
+  const room = `enoobis-${slug}`;
+  const hash =
+    "config.prejoinPageEnabled=false&config.startWithVideoMuted=true&config.disableDeepLinking=true";
+  return `${jitsiBase()}/${room}#${hash}`;
+}
+
 function randomSlug() {
   return crypto.randomBytes(16).toString("hex");
 }
@@ -12,11 +25,13 @@ function randomSlug() {
 router.post("/calls", authRequired, (req, res) => {
   const slug = randomSlug();
   const iso = nowIso();
+  const room = `enoobis-${slug}`;
   try {
     run(
       `INSERT INTO call_sessions (slug, jitsi_room, embed_url, active, created_by_user_id, created_at)
-       VALUES (?, '', '', 1, ?, ?)`,
+       VALUES (?, ?, '', 1, ?, ?)`,
       slug,
+      room,
       req.user.id,
       iso,
     );
@@ -42,7 +57,8 @@ router.get("/calls/:slug", (req, res) => {
   const row = get("SELECT active FROM call_sessions WHERE slug = ?", req.params.slug);
   if (!row) return res.status(404).json({ error: "not found" });
   if (!row.active) return res.json({ active: false });
-  res.json({ active: true });
+  const { slug } = req.params;
+  res.json({ active: true, meetUrl: meetJoinUrl(slug) });
 });
 
 export default router;

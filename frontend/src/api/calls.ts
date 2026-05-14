@@ -2,6 +2,7 @@ import { api } from "./http";
 
 export type CallSessionOk = {
   active: true;
+  meetUrl: string;
 };
 
 export type CallSessionOff = {
