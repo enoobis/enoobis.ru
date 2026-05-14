@@ -49,6 +49,8 @@ const loading = ref(true);
 const busy = ref<string | null>(null);
 const profileCoins = ref(0);
 
+let shopLoadSeq = 0;
+
 const shown = computed(() => {
   if (tab.value === "ui") return items.value.filter((i) => UI_KINDS.includes(i.kind));
   return items.value.filter((i) => i.kind === tab.value);
@@ -77,23 +79,36 @@ function shopSoldOut(item: ShopItem): boolean {
   return left !== null && left <= 0;
 }
 
-async function loadCoins() {
+async function loadCoins(): Promise<void> {
   if (!auth.token) return;
   const me = await fetch("/api/me", { headers: { Authorization: `Bearer ${auth.token}` } });
-  const data = await me.json();
+  const data = (await me.json()) as { coins?: unknown };
   profileCoins.value = Math.max(0, Math.floor(Number(data.coins ?? 0)));
 }
 
 async function load() {
-  if (!auth.token) return;
+  const seq = ++shopLoadSeq;
+  const kind = tab.value;
+
+  if (!auth.token) {
+    loading.value = false;
+    items.value = [];
+    return;
+  }
+
   loading.value = true;
   try {
     await loadCoins();
-    items.value = await listShopItems(auth.token, tab.value);
+    if (seq !== shopLoadSeq) return;
+
+    const list = await listShopItems(auth.token, kind);
+    if (seq !== shopLoadSeq) return;
+
+    items.value = list;
   } catch (e) {
-    toastError(e);
+    if (seq === shopLoadSeq) toastError(e);
   } finally {
-    loading.value = false;
+    if (seq === shopLoadSeq) loading.value = false;
   }
 }
 
@@ -129,6 +144,18 @@ async function onEquip(item: ShopItem) {
 
 onMounted(load);
 watch(tab, load);
+watch(
+  () => auth.token,
+  (t) => {
+    if (!t) {
+      shopLoadSeq += 1;
+      loading.value = false;
+      items.value = [];
+      return;
+    }
+    void load();
+  },
+);
 </script>
 
 <template>
