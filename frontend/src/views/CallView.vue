@@ -53,7 +53,15 @@ async function refresh() {
       return;
     }
     phase.value = "live";
-    iframeSrc.value = jitsiEmbedUrl(data.meet_base, data.jitsi_room);
+    if ("embed_url" in data && data.embed_url) {
+      iframeSrc.value = data.embed_url;
+    } else if ("jitsi_room" in data && data.jitsi_room) {
+      iframeSrc.value = jitsiEmbedUrl(data.meet_base, data.jitsi_room);
+    } else {
+      phase.value = "gone";
+      iframeSrc.value = "";
+      stopPoll();
+    }
   } catch {
     phase.value = "gone";
     iframeSrc.value = "";
