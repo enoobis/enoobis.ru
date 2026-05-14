@@ -23,10 +23,10 @@ const micOn = ref(false);
 const ending = ref(false);
 const remoteAudioRef = ref<HTMLAudioElement | null>(null);
 
+/** без клика по «разрешить микрофон» браузер часто не показывает запрос и не даёт getUserMedia */
+const audioPrimed = ref(false);
 const signalConnected = ref(false);
-/** alone — только ты в комнате сигналинга; together — второй тоже зашёл; gone — собеседник отключился */
 const peerPresence = ref<"alone" | "together" | "gone">("alone");
-/** off | connecting | on — готовность аудио-канала WebRTC */
 const mediaLink = ref<"off" | "connecting" | "on">("off");
 const micReady = ref(false);
 const micDenied = ref(false);
@@ -36,6 +36,16 @@ let sock: WebSocket | null = null;
 let pc: RTCPeerConnection | null = null;
 let localStream: MediaStream | null = null;
 let iceServers: RTCIceServer[] = [{ urls: "stun:stun.l.google.com:19302" }];
+
+let needCreateOffer = false;
+let pendingOfferSdp: string | null = null;
+const iceBuffer: RTCIceCandidateInit[] = [];
+
+function resetNegotiationQueue() {
+  needCreateOffer = false;
+  pendingOfferSdp = null;
+  iceBuffer.length = 0;
+}
 
 const peerLabel = computed(() => {
   if (peerPresence.value === "gone") return "вышел из звонка";
@@ -52,9 +62,13 @@ const peerDotOn = computed(
 const peerDotWarn = computed(() => peerPresence.value === "gone");
 
 const micHint = computed(() => {
+  if (!window.isSecureContext && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") {
+    return "лучше открыть сайт по https — иначе микрофон может не заработать";
+  }
   if (micDenied.value) return "нет доступа к микрофону — проверь разрешения браузера";
-  if (!micReady.value) return "микрофон подключится при входе в разговор";
-  if (micOn.value) return "микрофон вкл — тебя слышно, если связь установлена";
+  if (!audioPrimed.value) return "нажми кнопку ниже — без клика браузер часто не спрашивает микрофон";
+  if (!micReady.value) return "микрофон не готов";
+  if (micOn.value) return "микрофон вкл — тебя слышно, если связь есть";
   return "микрофон выкл — тебя не слышно";
 });
 
@@ -108,6 +122,8 @@ function resetPresence() {
   mediaLink.value = "off";
   micReady.value = false;
   micDenied.value = false;
+  audioPrimed.value = false;
+  resetNegotiationQueue();
 }
 
 function cleanupMedia() {
@@ -159,6 +175,32 @@ function wsCallUrl(): string {
   return u.toString();
 }
 
+async function flushIceBuffer() {
+  const c = pc;
+  if (!c?.remoteDescription) return;
+  const copy = [...iceBuffer];
+  iceBuffer.length = 0;
+  for (const cand of copy) {
+    try {
+      await c.addIceCandidate(cand);
+    } catch {
+      /* дубль или порядок */
+    }
+  }
+}
+
+async function addIceOrBuffer(c: RTCPeerConnection, cand: RTCIceCandidateInit) {
+  if (!c.remoteDescription) {
+    iceBuffer.push(cand);
+    return;
+  }
+  try {
+    await c.addIceCandidate(cand);
+  } catch {
+    /* */
+  }
+}
+
 async function ensurePc(): Promise<RTCPeerConnection> {
   if (pc) return pc;
   const c = new RTCPeerConnection({ iceServers });
@@ -183,24 +225,68 @@ async function ensurePc(): Promise<RTCPeerConnection> {
   return c;
 }
 
-async function ensureLocalAudio() {
-  micDenied.value = false;
-  if (!localStream) {
-    try {
-      localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-      micReady.value = true;
-    } catch {
-      micDenied.value = true;
-      micReady.value = false;
-      throw new Error("mic denied");
-    }
-  }
-  for (const t of localStream.getAudioTracks()) {
-    t.enabled = micOn.value;
-  }
-  const c = await ensurePc();
+function attachLocalTracks() {
+  if (!localStream || !pc) return;
   for (const t of localStream.getTracks()) {
-    if (!c.getSenders().some((s) => s.track === t)) c.addTrack(t, localStream);
+    if (!pc.getSenders().some((s) => s.track === t)) pc.addTrack(t, localStream);
+  }
+}
+
+async function runCreateOfferFlow() {
+  if (!localStream) return;
+  const c = await ensurePc();
+  attachLocalTracks();
+  const offer = await c.createOffer();
+  await c.setLocalDescription(offer);
+  sock?.send(JSON.stringify({ t: "offer", sdp: offer.sdp ?? "" }));
+}
+
+async function runAnswerFlow(offerSdp: string) {
+  if (!localStream) return;
+  const c = await ensurePc();
+  attachLocalTracks();
+  await c.setRemoteDescription({ type: "offer", sdp: offerSdp });
+  await flushIceBuffer();
+  const answer = await c.createAnswer();
+  await c.setLocalDescription(answer);
+  sock?.send(JSON.stringify({ t: "answer", sdp: answer.sdp ?? "" }));
+}
+
+async function flushNegotiationIfReady() {
+  if (!audioPrimed.value || !localStream) return;
+  if (needCreateOffer) {
+    needCreateOffer = false;
+    await runCreateOfferFlow();
+  }
+  if (pendingOfferSdp !== null) {
+    const sdp = pendingOfferSdp;
+    pendingOfferSdp = null;
+    await runAnswerFlow(sdp);
+  }
+}
+
+async function onPrimeAudio() {
+  micDenied.value = false;
+  if (!navigator.mediaDevices?.getUserMedia) {
+    micDenied.value = true;
+    return;
+  }
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    for (const t of localStream.getAudioTracks()) {
+      t.enabled = micOn.value;
+    }
+    micReady.value = true;
+    audioPrimed.value = true;
+    await flushNegotiationIfReady();
+  } catch {
+    micDenied.value = true;
+    micReady.value = false;
+    audioPrimed.value = false;
+    if (localStream) {
+      for (const t of localStream.getTracks()) t.stop();
+      localStream = null;
+    }
   }
 }
 
@@ -235,48 +321,37 @@ function connectSignal() {
       syncMediaLink();
     }
     if (msg.t === "create-offer") {
-      try {
-        await ensureLocalAudio();
-      } catch {
+      if (!audioPrimed.value || !localStream) {
+        needCreateOffer = true;
         return;
       }
-      const c = await ensurePc();
-      const offer = await c.createOffer();
-      await c.setLocalDescription(offer);
-      sock?.send(JSON.stringify({ t: "offer", sdp: offer.sdp ?? "" }));
+      await runCreateOfferFlow();
       return;
     }
     if (msg.t === "offer") {
-      try {
-        await ensureLocalAudio();
-      } catch {
+      if (!audioPrimed.value || !localStream) {
+        pendingOfferSdp = msg.sdp;
         return;
       }
-      const c = await ensurePc();
-      await c.setRemoteDescription({ type: "offer", sdp: msg.sdp });
-      const answer = await c.createAnswer();
-      await c.setLocalDescription(answer);
-      sock?.send(JSON.stringify({ t: "answer", sdp: answer.sdp ?? "" }));
+      await runAnswerFlow(msg.sdp);
       return;
     }
     if (msg.t === "answer") {
       const c = await ensurePc();
       await c.setRemoteDescription({ type: "answer", sdp: msg.sdp });
+      await flushIceBuffer();
       return;
     }
     if (msg.t === "ice") {
-      const c = await ensurePc();
       if (!msg.candidate) return;
-      try {
-        await c.addIceCandidate(msg.candidate);
-      } catch {
-        /* игнор дублей ice */
-      }
+      const c = await ensurePc();
+      await addIceOrBuffer(c, msg.candidate);
       return;
     }
     if (msg.t === "peer-left") {
       peerPresence.value = "gone";
       mediaLink.value = "off";
+      resetNegotiationQueue();
       if (pc) {
         pc.close();
         pc = null;
@@ -380,13 +455,25 @@ watch(slug, () => {
         </li>
       </ul>
       <p class="mic-hint small">{{ micHint }}</p>
+      <button v-if="!audioPrimed" type="button" class="prime" @click="onPrimeAudio">
+        {{ micDenied ? "попробовать снова" : "разрешить микрофон" }}
+      </button>
       <audio ref="remoteAudioRef" class="sr-only" playsinline />
-      <div class="row">
+      <div v-if="audioPrimed" class="row">
         <button type="button" class="secondary" @click="toggleMic">
           {{ micOn ? "выключить микрофон" : "включить микрофон" }}
         </button>
         <button type="button" class="end" :disabled="ending" @click="endCall">завершить звонок</button>
       </div>
+      <button
+        v-else
+        type="button"
+        class="end ghost-end"
+        :disabled="ending"
+        @click="endCall"
+      >
+        завершить звонок
+      </button>
     </template>
   </section>
 </template>
@@ -466,6 +553,9 @@ watch(slug, () => {
   line-height: 1.4;
   text-transform: lowercase;
 }
+.prime {
+  align-self: flex-start;
+}
 .sr-only {
   position: absolute;
   width: 1px;
@@ -481,6 +571,12 @@ watch(slug, () => {
   flex-wrap: wrap;
   gap: 0.5rem;
   align-items: center;
+}
+.ghost-end {
+  align-self: flex-start;
+  background: transparent;
+  border-color: var(--border);
+  color: var(--muted);
 }
 .end {
   border-color: var(--danger);
