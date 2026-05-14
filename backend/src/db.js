@@ -1,8 +1,8 @@
-import { DatabaseSync } from "node:sqlite";
+import Database from "better-sqlite3";
 
 const dbPath = process.env.DATABASE_FILE ?? "./edu.db";
-export const db = new DatabaseSync(dbPath);
-db.exec("PRAGMA journal_mode = WAL");
+export const db = new Database(dbPath);
+db.pragma("journal_mode = WAL");
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
@@ -289,7 +289,7 @@ try {
   db.prepare("SELECT coins_penalty_until FROM users LIMIT 1").get();
 } catch {
   try {
-   db.exec("ALTER TABLE users ADD COLUMN coins_penalty_until TEXT");
+    db.exec("ALTER TABLE users ADD COLUMN coins_penalty_until TEXT");
   } catch {
     // ignore
   }
