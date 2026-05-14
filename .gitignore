@@ -28,5 +28,5 @@ backend/data/
 
 AGENTS.md
 
-# Cursor — правила агента только локально
-.cursor/rules/
+# Cursor IDE — только локально, не в репозитории
+.cursor/
