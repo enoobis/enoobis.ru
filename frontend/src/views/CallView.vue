@@ -28,6 +28,20 @@ function startPoll() {
   }, 4000);
 }
 
+function jitsiVoiceUrl(meetBase: string, room: string): string {
+  const base = meetBase.replace(/\/+$/, "");
+  const roomEnc = encodeURIComponent(room);
+  const hash = [
+    "config.startWithAudioMuted=true",
+    "config.startWithVideoMuted=true",
+    "config.prejoinPageEnabled=false",
+    "config.requireDisplayName=false",
+    "config.desktopSharingEnabled=false",
+    "interfaceConfig.MOBILE_APP_PROMO=false",
+  ].join("&");
+  return `${base}/${roomEnc}#${hash}`;
+}
+
 async function refresh() {
   const s = slug.value;
   if (!s) {
@@ -45,7 +59,7 @@ async function refresh() {
       return;
     }
     phase.value = "live";
-    iframeSrc.value = data.embed_url;
+    iframeSrc.value = jitsiVoiceUrl(data.meet_base, data.jitsi_room);
   } catch {
     phase.value = "gone";
     iframeSrc.value = "";
@@ -107,7 +121,7 @@ watch(slug, () => {
           v-if="iframeSrc"
           :src="iframeSrc"
           class="frame"
-          title="голосовой звонок"
+          title="голос"
           allow="microphone; autoplay"
         />
       </div>
