@@ -124,6 +124,7 @@ async function loadMePresentation() {
     profileAvatarUrl.value = "";
     profileAvatarBroken.value = false;
     profileCoins.value = 0;
+    applyUserPreferences({});
     return;
   }
   try {
@@ -131,6 +132,10 @@ async function loadMePresentation() {
       theme_preference: string;
       language_preference: string;
       font_preference: string;
+      ui_font_slug: string;
+      ui_ink_hex: string;
+      ui_accent_hex: string;
+      ui_radius_slug: string;
       avatar_url: string;
       coins?: number;
     }>("/api/me", { token: auth.token });

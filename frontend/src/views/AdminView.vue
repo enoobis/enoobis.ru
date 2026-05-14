@@ -28,8 +28,11 @@ import {
 import { useAuthStore } from "../stores/auth";
 import {
   adminDeleteShopItem,
+  adminPostShopPresetItem,
   adminUploadShopItem,
   listShopItems,
+  type ImageShopKind,
+  type PresetShopKind,
   type ShopItem,
   type ShopItemKind,
 } from "../api/shop";
@@ -78,9 +81,18 @@ const shopLoading = ref(false);
 const shopUploadName = ref("");
 const shopUploadPrice = ref(0);
 const shopUploadStock = ref("");
-const shopUploadKind = ref<ShopItemKind>("avatar");
+const shopUploadKind = ref<ImageShopKind>("avatar");
 const shopUploadBusy = ref(false);
 const shopMsg = ref("");
+
+const shopPresetKind = ref<PresetShopKind>("font");
+const shopPresetName = ref("");
+const shopPresetPrice = ref(0);
+const shopPresetStock = ref("");
+const shopPresetFont = ref("outfit");
+const shopPresetHex = ref("#e8e8e8");
+const shopPresetRadius = ref<"default" | "soft" | "sharp">("soft");
+const shopPresetBusy = ref(false);
 
 const ADMIN_POLL_MS = 12000;
 let adminModeratePoll: ReturnType<typeof setInterval> | null = null;
@@ -273,7 +285,19 @@ function shopKindRu(k: ShopItemKind): string {
   if (k === "avatar") return "аватар";
   if (k === "frame") return "рамка";
   if (k === "wallpaper") return "фон";
-  return "обложка";
+  if (k === "cover") return "обложка";
+  if (k === "font") return "шрифт";
+  if (k === "ink") return "текст";
+  if (k === "accent") return "акцент";
+  return "углы";
+}
+
+function normalizeShopHex(raw: string): string | null {
+  let s = raw.trim();
+  if (!s) return null;
+  if (!s.startsWith("#")) s = `#${s}`;
+  if (!/^#[0-9a-fA-F]{6}$/.test(s)) return null;
+  return s.toLowerCase();
 }
 
 function shopStockLine(a: ShopItem): string {
@@ -283,6 +307,58 @@ function shopStockLine(a: ShopItem): string {
   if (lim <= 0) return "";
   const sold = Math.max(0, Math.floor(Number(a.sold_count ?? 0)));
   return ` · ${sold}/${lim}`;
+}
+
+async function addShopPreset() {
+  if (!auth.token) return;
+  const name = shopPresetName.value.trim();
+  if (!name) {
+    shopMsg.value = "название пресета";
+    return;
+  }
+  const price = Math.max(0, Math.floor(Number(shopPresetPrice.value) || 0));
+  const rawStock = shopPresetStock.value.trim();
+  let stockLimit: number | null = null;
+  if (rawStock !== "") {
+    const n = parseInt(rawStock, 10);
+    if (!Number.isFinite(n) || n < 1) {
+      shopMsg.value = "тираж: целое число от 1";
+      return;
+    }
+    stockLimit = n;
+  }
+  let preset_value = "";
+  if (shopPresetKind.value === "font") preset_value = shopPresetFont.value;
+  else if (shopPresetKind.value === "ink" || shopPresetKind.value === "accent") {
+    const h = normalizeShopHex(shopPresetHex.value);
+    if (!h) {
+      shopMsg.value = "цвет: #rrggbb";
+      return;
+    }
+    preset_value = h;
+  } else {
+    preset_value = shopPresetRadius.value;
+  }
+  shopPresetBusy.value = true;
+  shopMsg.value = "";
+  try {
+    await adminPostShopPresetItem(auth.token, {
+      kind: shopPresetKind.value,
+      name,
+      price,
+      preset_value,
+      stock_limit: stockLimit,
+    });
+    shopPresetName.value = "";
+    shopPresetPrice.value = 0;
+    shopPresetStock.value = "";
+    shopMsg.value = "добавлено";
+    await loadShopItems();
+  } catch (ex) {
+    shopMsg.value = ex instanceof Error ? ex.message : "ошибка";
+  } finally {
+    shopPresetBusy.value = false;
+  }
 }
 
 async function onShopItemFile(e: Event) {
@@ -955,14 +1031,53 @@ async function restoreComment(id: string | null) {
           {{ shopUploadBusy ? "загрузка…" : "загрузить" }}
         </label>
       </div>
-      <p class="muted small gif">тираж пустой — без лимита. gif — без сжатия.</p>
+      <p class="muted small gif">тираж пустой — без лимита. gif — без сжатия. пресеты — шрифт, цвета, углы.</p>
+      <div class="shop-add shop-preset-row">
+        <select v-model="shopPresetKind" class="shop-input shop-kind" aria-label="тип пресета">
+          <option value="font">шрифт</option>
+          <option value="ink">цвет текста</option>
+          <option value="accent">акцент</option>
+          <option value="radius">углы</option>
+        </select>
+        <input v-model="shopPresetName" placeholder="название" class="shop-input" />
+        <input v-model.number="shopPresetPrice" type="number" min="0" step="1" placeholder="цена" class="shop-input shop-price" />
+        <input v-model="shopPresetStock" inputmode="numeric" placeholder="тираж" class="shop-input shop-stock" aria-label="тираж пресета" />
+        <select v-if="shopPresetKind === 'font'" v-model="shopPresetFont" class="shop-input shop-preset-field" aria-label="гротеск">
+          <option value="outfit">outfit</option>
+          <option value="system">system</option>
+          <option value="serif">serif</option>
+          <option value="mono">mono</option>
+          <option value="readable">readable</option>
+          <option value="dm">dm sans</option>
+        </select>
+        <input
+          v-else-if="shopPresetKind === 'ink' || shopPresetKind === 'accent'"
+          v-model="shopPresetHex"
+          type="text"
+          class="shop-input shop-hex"
+          placeholder="#rrggbb"
+          aria-label="hex цвета"
+        />
+        <select v-else v-model="shopPresetRadius" class="shop-input shop-preset-field" aria-label="скругление">
+          <option value="default">обычные</option>
+          <option value="soft">мягче</option>
+          <option value="sharp">острее</option>
+        </select>
+        <button type="button" class="secondary" :disabled="shopPresetBusy" @click="addShopPreset">
+          {{ shopPresetBusy ? "…" : "пресет" }}
+        </button>
+      </div>
       <p v-if="shopLoading" class="muted small">загрузка…</p>
       <ul v-else-if="shopItems.length" class="shop-grid">
         <li v-for="a in shopItems" :key="a.id" class="shop-item">
-          <img :src="a.url" :alt="a.name" class="shop-avatar-img" loading="lazy" />
+          <img v-if="a.url && a.url !== '#'" :src="a.url" :alt="a.name" class="shop-avatar-img" loading="lazy" />
+          <div v-else class="shop-preset-ph" :title="a.preset_value ?? ''">{{ a.preset_value }}</div>
           <span class="shop-avatar-meta">
             <span>{{ a.name }}</span>
-            <span class="muted small">{{ shopKindRu(a.kind) }} · {{ a.price }} · {{ a.is_animated ? "gif" : "" }}{{ shopStockLine(a) }}</span>
+            <span class="muted small">
+              {{ shopKindRu(a.kind) }} · {{ a.price }}{{ a.preset_value ? ` · ${a.preset_value}` : "" }} ·
+              {{ a.is_animated ? "gif" : "" }}{{ shopStockLine(a) }}
+            </span>
           </span>
           <button class="secondary danger shop-del" type="button" @click="removeShopItem(a.id)">удалить</button>
         </li>
@@ -1245,6 +1360,9 @@ strong {
   margin-bottom: 0.4rem;
   align-items: center;
 }
+.shop-preset-row {
+  margin-top: 0.35rem;
+}
 .shop-input {
   font: inherit;
   padding: 0.4rem 0.55rem;
@@ -1262,6 +1380,30 @@ strong {
 .shop-stock {
   max-width: 88px;
   flex: none;
+}
+.shop-hex {
+  max-width: 108px;
+  flex: none;
+}
+.shop-preset-field {
+  max-width: 140px;
+  flex: none;
+  min-width: 0;
+}
+.shop-preset-ph {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0.15rem;
+  word-break: break-all;
 }
 .shop-kind {
   flex: 0 0 auto;

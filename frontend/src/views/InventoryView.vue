@@ -12,11 +12,35 @@ const loading = ref(true);
 const busy = ref<string | null>(null);
 const profileCoins = ref(0);
 
+const FONT_PREVIEW: Record<string, string> = {
+  outfit: '"Outfit", system-ui, sans-serif',
+  system: "system-ui, sans-serif",
+  serif: 'ui-serif, Georgia, "Times New Roman", serif',
+  mono: 'ui-monospace, "JetBrains Mono", monospace',
+  readable: 'Georgia, "Palatino Linotype", Palatino, serif',
+  dm: '"DM Sans", system-ui, sans-serif',
+};
+
+function fontPreviewFamily(slug: string | null): string {
+  const k = String(slug || "outfit");
+  return FONT_PREVIEW[k] ?? FONT_PREVIEW.outfit;
+}
+
+function radiusPreviewPx(slug: string | null): string {
+  if (slug === "soft") return "14px";
+  if (slug === "sharp") return "6px";
+  return "10px";
+}
+
 function kindLabel(k: ShopItemKind): string {
   if (k === "avatar") return "аватар";
   if (k === "frame") return "рамка";
   if (k === "wallpaper") return "фон";
-  return "обложка";
+  if (k === "cover") return "обложка";
+  if (k === "font") return "шрифт";
+  if (k === "ink") return "текст";
+  if (k === "accent") return "акцент";
+  return "углы";
 }
 
 async function load() {
@@ -77,6 +101,20 @@ onMounted(load);
             <div class="frame-demo">
               <span class="frame-inner" />
               <img :src="a.url" alt="" class="frame-layer" loading="lazy" />
+            </div>
+          </template>
+          <template v-else-if="a.kind === 'font'">
+            <div class="preset-font" :style="{ fontFamily: fontPreviewFamily(a.preset_value) }">аг</div>
+          </template>
+          <template v-else-if="a.kind === 'ink' || a.kind === 'accent'">
+            <div
+              class="preset-swatch"
+              :style="{ background: a.preset_value && a.preset_value.startsWith('#') ? a.preset_value : 'var(--surface2)' }"
+            />
+          </template>
+          <template v-else-if="a.kind === 'radius'">
+            <div class="preset-radius">
+              <span class="preset-radius-box" :style="{ borderRadius: radiusPreviewPx(a.preset_value) }" />
             </div>
           </template>
           <template v-else-if="a.kind === 'wallpaper' || a.kind === 'cover'">
@@ -194,6 +232,35 @@ onMounted(load);
   height: 100%;
   object-fit: contain;
   pointer-events: none;
+}
+.preset-font {
+  font-size: 2rem;
+  line-height: 1;
+  font-weight: 600;
+  color: var(--text);
+}
+.preset-swatch {
+  width: 100%;
+  height: 72px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+.preset-radius {
+  width: 100%;
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface2);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+.preset-radius-box {
+  display: block;
+  width: 52px;
+  height: 34px;
+  border: 1px solid var(--border);
+  background: var(--surface);
 }
 .wide-thumb {
   width: 100%;

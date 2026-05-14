@@ -403,3 +403,26 @@ h3 {
     padding: 0.5rem 0.65rem;
   }
 }
+
+html[data-ui-font="system"] {
+  --font: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+html[data-ui-font="serif"] {
+  --font: ui-serif, "Georgia", "Times New Roman", serif;
+}
+html[data-ui-font="mono"] {
+  --font: var(--mono);
+}
+html[data-ui-font="readable"] {
+  --font: "Georgia", "Palatino Linotype", Palatino, serif;
+}
+html[data-ui-font="dm"] {
+  --font: "DM Sans", system-ui, sans-serif;
+}
+
+html[data-ui-radius="soft"] {
+  --radius: 14px;
+}
+html[data-ui-radius="sharp"] {
+  --radius: 6px;
+}

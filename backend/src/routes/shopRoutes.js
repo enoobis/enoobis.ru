@@ -1,11 +1,22 @@
 import express from "express";
 import { run, get, all, nowIso, db } from "../db.js";
 import { authRequired } from "../auth.js";
+import { SHOP_KINDS, validatePresetForKind } from "../utils/shopPresets.js";
 
 const router = express.Router();
 
-/** @type {Set<string>} */
-const SHOP_KINDS = new Set(["avatar", "frame", "wallpaper", "cover"]);
+const PRESET_KINDS = new Set(["font", "ink", "accent", "radius"]);
+
+const DEFAULT_LIST_KINDS = [
+  "avatar",
+  "frame",
+  "wallpaper",
+  "cover",
+  "font",
+  "ink",
+  "accent",
+  "radius",
+];
 
 function ownedIdsForUser(userId) {
   return new Set(
@@ -18,6 +29,7 @@ function listItemsQuery(kinds) {
   const placeholders = kinds.map(() => "?").join(", ");
   return all(
     `SELECT si.id, si.kind, si.name, si.url, si.price, si.is_animated, si.created_at, si.stock_limit,
+      si.preset_value,
       (SELECT COUNT(*) FROM user_owned_shop_items uoi WHERE uoi.item_id = si.id) AS sold_count
      FROM shop_items si
      WHERE si.kind IN (${placeholders}) ORDER BY si.created_at DESC`,
@@ -37,12 +49,16 @@ function shopBuyError(status, code) {
 function buyShopItemCore(userId, itemId, avatarOnly) {
   const item = get(
     avatarOnly
-      ? "SELECT id, kind, name, url, price, stock_limit FROM shop_items WHERE id = ? AND kind = 'avatar'"
-      : "SELECT id, kind, name, url, price, stock_limit FROM shop_items WHERE id = ?",
+      ? "SELECT id, kind, name, url, price, stock_limit, preset_value FROM shop_items WHERE id = ? AND kind = 'avatar'"
+      : "SELECT id, kind, name, url, price, stock_limit, preset_value FROM shop_items WHERE id = ?",
     itemId,
   );
   if (!item) throw shopBuyError(404, "not_found");
   if (!avatarOnly && !SHOP_KINDS.has(item.kind)) throw shopBuyError(400, "bad_kind");
+  if (PRESET_KINDS.has(item.kind)) {
+    const ok = validatePresetForKind(item.kind, item.preset_value);
+    if (!ok) throw shopBuyError(400, "bad_item");
+  }
 
   const already = get("SELECT 1 FROM user_owned_shop_items WHERE user_id = ? AND item_id = ?", userId, item.id);
   if (already) throw shopBuyError(400, "already_owned");
@@ -75,6 +91,7 @@ function handleShopBuyError(res, err) {
       already_owned: "already owned",
       sold_out: "распродано",
       not_enough: "not enough coins",
+      bad_item: "bad item",
     };
     return res.status(e.status).json({ error: map[e.code] ?? e.code });
   }
@@ -83,14 +100,24 @@ function handleShopBuyError(res, err) {
 
 function cosmeticRow(userId) {
   return get(
-    "SELECT avatar_url, wallpaper_url, avatar_frame_url, profile_cover_url FROM users WHERE id = ?",
+    `SELECT avatar_url, wallpaper_url, avatar_frame_url, profile_cover_url,
+            ui_font_slug, ui_ink_hex, ui_accent_hex, ui_radius_slug
+     FROM users WHERE id = ?`,
     userId,
   );
 }
 
 router.get("/shop/items", authRequired, (req, res) => {
   const raw = String(req.query.kind ?? "").trim();
-  const kinds = raw && SHOP_KINDS.has(raw) ? [raw] : ["avatar", "frame", "wallpaper", "cover"];
+  /** @type {string[]} */
+  let kinds;
+  if (raw === "ui") {
+    kinds = ["font", "ink", "accent", "radius"];
+  } else if (raw && SHOP_KINDS.has(raw)) {
+    kinds = [raw];
+  } else {
+    kinds = DEFAULT_LIST_KINDS;
+  }
   const items = listItemsQuery(kinds);
   const owned = ownedIdsForUser(req.user.id);
   return res.json(items.map((i) => ({ ...i, owned: owned.has(i.id) })));
@@ -104,7 +131,7 @@ router.get("/shop/avatars", authRequired, (req, res) => {
 
 router.get("/shop/my-items", authRequired, (req, res) => {
   const rows = all(
-    `SELECT si.id, si.kind, si.name, si.url, si.price, si.is_animated, uoi.acquired_at
+    `SELECT si.id, si.kind, si.name, si.url, si.price, si.is_animated, si.preset_value, uoi.acquired_at
      FROM user_owned_shop_items uoi
      JOIN shop_items si ON si.id = uoi.item_id
      WHERE uoi.user_id = ?
@@ -148,51 +175,93 @@ router.post("/shop/avatars/:id/buy", authRequired, (req, res) => {
   }
 });
 
-/** @param {{ kind: string; url: string }} item */
+/** @param {{ kind: string; url: string; preset_value?: string | null }} item */
 function applyEquip(userId, item) {
   if (item.kind === "avatar") {
     run("UPDATE users SET avatar_url = ? WHERE id = ?", item.url, userId);
-  } else if (item.kind === "frame") {
-    run("UPDATE users SET avatar_frame_url = ? WHERE id = ?", item.url, userId);
-  } else if (item.kind === "wallpaper") {
-    run("UPDATE users SET wallpaper_url = ? WHERE id = ?", item.url, userId);
-  } else if (item.kind === "cover") {
-    run("UPDATE users SET profile_cover_url = ? WHERE id = ?", item.url, userId);
+    return null;
   }
+  if (item.kind === "frame") {
+    run("UPDATE users SET avatar_frame_url = ? WHERE id = ?", item.url, userId);
+    return null;
+  }
+  if (item.kind === "wallpaper") {
+    run("UPDATE users SET wallpaper_url = ? WHERE id = ?", item.url, userId);
+    return null;
+  }
+  if (item.kind === "cover") {
+    run("UPDATE users SET profile_cover_url = ? WHERE id = ?", item.url, userId);
+    return null;
+  }
+  if (item.kind === "font") {
+    const slug = validatePresetForKind("font", item.preset_value);
+    if (!slug) return "bad preset";
+    run("UPDATE users SET ui_font_slug = ? WHERE id = ?", slug, userId);
+    return null;
+  }
+  if (item.kind === "ink") {
+    const hex = validatePresetForKind("ink", item.preset_value);
+    if (!hex) return "bad preset";
+    run("UPDATE users SET ui_ink_hex = ? WHERE id = ?", hex, userId);
+    return null;
+  }
+  if (item.kind === "accent") {
+    const hex = validatePresetForKind("accent", item.preset_value);
+    if (!hex) return "bad preset";
+    run("UPDATE users SET ui_accent_hex = ? WHERE id = ?", hex, userId);
+    return null;
+  }
+  if (item.kind === "radius") {
+    const slug = validatePresetForKind("radius", item.preset_value);
+    if (!slug) return "bad preset";
+    run("UPDATE users SET ui_radius_slug = ? WHERE id = ?", slug, userId);
+    return null;
+  }
+  return "bad kind";
+}
+
+function equipPayload(row) {
+  return {
+    ok: true,
+    avatar_url: row?.avatar_url ?? "",
+    wallpaper_url: row?.wallpaper_url ?? "",
+    avatar_frame_url: row?.avatar_frame_url ?? "",
+    profile_cover_url: row?.profile_cover_url ?? "",
+    ui_font_slug: row?.ui_font_slug ?? "outfit",
+    ui_ink_hex: row?.ui_ink_hex ?? "",
+    ui_accent_hex: row?.ui_accent_hex ?? "",
+    ui_radius_slug: row?.ui_radius_slug ?? "default",
+  };
 }
 
 router.post("/shop/items/:id/equip", authRequired, (req, res) => {
-  const item = get("SELECT id, kind, url FROM shop_items WHERE id = ?", req.params.id);
+  const item = get(
+    "SELECT id, kind, url, preset_value FROM shop_items WHERE id = ?",
+    req.params.id,
+  );
   if (!item) return res.status(404).json({ error: "not found" });
 
   const owned = get("SELECT 1 FROM user_owned_shop_items WHERE user_id = ? AND item_id = ?", req.user.id, item.id);
   if (!owned) return res.status(403).json({ error: "not owned" });
 
-  applyEquip(req.user.id, item);
+  const applyErr = applyEquip(req.user.id, item);
+  if (applyErr) return res.status(400).json({ error: applyErr });
   const row = cosmeticRow(req.user.id);
-  return res.json({
-    ok: true,
-    avatar_url: row?.avatar_url ?? "",
-    wallpaper_url: row?.wallpaper_url ?? "",
-    avatar_frame_url: row?.avatar_frame_url ?? "",
-    profile_cover_url: row?.profile_cover_url ?? "",
-  });
+  return res.json(equipPayload(row));
 });
 
 router.post("/shop/avatars/:id/equip", authRequired, (req, res) => {
-  const item = get("SELECT id, kind, url FROM shop_items WHERE id = ? AND kind = 'avatar'", req.params.id);
+  const item = get(
+    "SELECT id, kind, url, preset_value FROM shop_items WHERE id = ? AND kind = 'avatar'",
+    req.params.id,
+  );
   if (!item) return res.status(404).json({ error: "not found" });
   const owned = get("SELECT 1 FROM user_owned_shop_items WHERE user_id = ? AND item_id = ?", req.user.id, item.id);
   if (!owned) return res.status(403).json({ error: "not owned" });
-  applyEquip(req.user.id, item);
+  const applyErr = applyEquip(req.user.id, item);
+  if (applyErr) return res.status(400).json({ error: applyErr });
   const row = cosmeticRow(req.user.id);
-  return res.json({
-    ok: true,
-    avatar_url: row?.avatar_url ?? "",
-    wallpaper_url: row?.wallpaper_url ?? "",
-    avatar_frame_url: row?.avatar_frame_url ?? "",
-    profile_cover_url: row?.profile_cover_url ?? "",
-  });
+  return res.json(equipPayload(row));
 });
 
 export default router;

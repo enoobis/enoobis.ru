@@ -65,6 +65,10 @@ function buildMe(row) {
     pinned_post_type: row.pinned_post_type ?? "",
     moderation_notices: buildModerationNotices(parseContentLimits(row.content_limits_json ?? "{}")),
     coins: Math.max(0, Math.floor(Number(row.coins ?? 0))),
+    ui_font_slug: row.ui_font_slug ?? "outfit",
+    ui_ink_hex: row.ui_ink_hex ?? "",
+    ui_accent_hex: row.ui_accent_hex ?? "",
+    ui_radius_slug: row.ui_radius_slug ?? "default",
   };
 }
 
@@ -78,7 +82,8 @@ router.get("/me", authRequired, (req, res) => {
     `SELECT id, email, nickname, role, status, bio, wallpaper_url, avatar_url, avatar_frame_url, profile_cover_url,
             theme_preference, language_preference, font_preference, full_name, website_url,
             social_links_json, birthday, country, readme_md, created_at, last_seen_at,
-            nickname_change_count, pinned_post_id, pinned_post_type, content_limits_json, coins
+            nickname_change_count, pinned_post_id, pinned_post_type, content_limits_json, coins,
+            ui_font_slug, ui_ink_hex, ui_accent_hex, ui_radius_slug
      FROM users WHERE id = ?`,
     req.user.id,
   );

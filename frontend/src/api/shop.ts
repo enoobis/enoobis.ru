@@ -1,6 +1,17 @@
 import { api } from "./http";
 
-export type ShopItemKind = "avatar" | "frame" | "wallpaper" | "cover";
+export type ShopItemKind =
+  | "avatar"
+  | "frame"
+  | "wallpaper"
+  | "cover"
+  | "font"
+  | "ink"
+  | "accent"
+  | "radius";
+
+/** вкладка магазина: `ui` — шрифт, текст, акцент, углы */
+export type ShopListKind = ShopItemKind | "ui";
 
 export type ShopItem = {
   id: string;
@@ -11,6 +22,7 @@ export type ShopItem = {
   is_animated: number;
   stock_limit: number | null;
   sold_count: number;
+  preset_value: string | null;
   owned: boolean;
 };
 
@@ -22,6 +34,7 @@ export type OwnedShopItem = {
   price: number;
   is_animated: number;
   acquired_at: string;
+  preset_value: string | null;
 };
 
 export type EquipResult = {
@@ -30,9 +43,13 @@ export type EquipResult = {
   wallpaper_url: string;
   avatar_frame_url: string;
   profile_cover_url: string;
+  ui_font_slug: string;
+  ui_ink_hex: string;
+  ui_accent_hex: string;
+  ui_radius_slug: string;
 };
 
-export function listShopItems(token: string, kind?: ShopItemKind): Promise<ShopItem[]> {
+export function listShopItems(token: string, kind?: ShopListKind): Promise<ShopItem[]> {
   const q = kind ? `?kind=${encodeURIComponent(kind)}` : "";
   return api(`/api/shop/items${q}`, { token });
 }
@@ -87,7 +104,7 @@ export async function deleteWallpaper(token: string): Promise<void> {
 export async function adminUploadShopItem(
   token: string,
   file: File,
-  kind: ShopItemKind,
+  kind: ImageShopKind,
   name: string,
   price: number,
   stockLimit?: number | null,
@@ -117,6 +134,37 @@ export async function adminUploadShopItem(
     throw new Error((j as { error?: string }).error ?? "upload error");
   }
   return res.json();
+}
+
+export type PresetShopKind = "font" | "ink" | "accent" | "radius";
+
+export type ImageShopKind = Extract<ShopItemKind, "avatar" | "frame" | "wallpaper" | "cover">;
+
+export function adminPostShopPresetItem(
+  token: string,
+  body: {
+    kind: PresetShopKind;
+    name: string;
+    price: number;
+    preset_value: string;
+    stock_limit?: number | null;
+  },
+): Promise<{
+  ok: boolean;
+  id: string;
+  url: string;
+  name: string;
+  price: number;
+  kind: string;
+  is_animated: number;
+  stock_limit: number | null;
+  preset_value: string;
+}> {
+  return api("/api/admin/shop/preset-item", {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
 }
 
 export function adminDeleteShopItem(token: string, itemId: string): Promise<{ ok: boolean }> {

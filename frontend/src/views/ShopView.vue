@@ -6,26 +6,53 @@ import {
   equipShopItem,
   type ShopItem,
   type ShopItemKind,
+  type ShopListKind,
 } from "../api/shop";
 import { useAuthStore } from "../stores/auth";
 import { toastError, toastSuccess } from "../utils/toast";
 
 const auth = useAuthStore();
 
-const tabs: { key: ShopItemKind; label: string }[] = [
+const UI_KINDS: ShopItemKind[] = ["font", "ink", "accent", "radius"];
+
+const FONT_PREVIEW: Record<string, string> = {
+  outfit: '"Outfit", system-ui, sans-serif',
+  system: "system-ui, sans-serif",
+  serif: 'ui-serif, Georgia, "Times New Roman", serif',
+  mono: 'ui-monospace, "JetBrains Mono", monospace',
+  readable: 'Georgia, "Palatino Linotype", Palatino, serif',
+  dm: '"DM Sans", system-ui, sans-serif',
+};
+
+function fontPreviewFamily(slug: string | null): string {
+  const k = String(slug || "outfit");
+  return FONT_PREVIEW[k] ?? FONT_PREVIEW.outfit;
+}
+
+function radiusPreviewPx(slug: string | null): string {
+  if (slug === "soft") return "14px";
+  if (slug === "sharp") return "6px";
+  return "10px";
+}
+
+const tabs: { key: ShopListKind; label: string }[] = [
   { key: "avatar", label: "аватар" },
   { key: "frame", label: "рамка" },
   { key: "wallpaper", label: "фон" },
   { key: "cover", label: "обложка" },
+  { key: "ui", label: "оформление" },
 ];
 
-const tab = ref<ShopItemKind>("avatar");
+const tab = ref<ShopListKind>("avatar");
 const items = ref<ShopItem[]>([]);
 const loading = ref(true);
 const busy = ref<string | null>(null);
 const profileCoins = ref(0);
 
-const shown = computed(() => items.value.filter((i) => i.kind === tab.value));
+const shown = computed(() => {
+  if (tab.value === "ui") return items.value.filter((i) => UI_KINDS.includes(i.kind));
+  return items.value.filter((i) => i.kind === tab.value);
+});
 
 function shopSold(item: ShopItem): number {
   return Math.max(0, Math.floor(Number(item.sold_count ?? 0)));
@@ -142,6 +169,20 @@ watch(tab, load);
             <div class="frame-demo">
               <span class="frame-inner" />
               <img :src="item.url" alt="" class="frame-layer" loading="lazy" />
+            </div>
+          </template>
+          <template v-else-if="item.kind === 'font'">
+            <div class="preset-font" :style="{ fontFamily: fontPreviewFamily(item.preset_value) }">аг</div>
+          </template>
+          <template v-else-if="item.kind === 'ink' || item.kind === 'accent'">
+            <div
+              class="preset-swatch"
+              :style="{ background: item.preset_value && item.preset_value.startsWith('#') ? item.preset_value : 'var(--surface2)' }"
+            />
+          </template>
+          <template v-else-if="item.kind === 'radius'">
+            <div class="preset-radius">
+              <span class="preset-radius-box" :style="{ borderRadius: radiusPreviewPx(item.preset_value) }" />
             </div>
           </template>
           <template v-else-if="item.kind === 'wallpaper' || item.kind === 'cover'">
@@ -299,6 +340,35 @@ watch(tab, load);
   height: 100%;
   object-fit: contain;
   pointer-events: none;
+}
+.preset-font {
+  font-size: 2rem;
+  line-height: 1;
+  font-weight: 600;
+  color: var(--text);
+}
+.preset-swatch {
+  width: 100%;
+  height: 72px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+.preset-radius {
+  width: 100%;
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface2);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+.preset-radius-box {
+  display: block;
+  width: 52px;
+  height: 34px;
+  border: 1px solid var(--border);
+  background: var(--surface);
 }
 .wide-thumb {
   width: 100%;

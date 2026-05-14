@@ -660,6 +660,60 @@ try {
   }
 }
 
+try {
+  db.prepare("SELECT preset_value FROM shop_items LIMIT 1").get();
+} catch {
+  try {
+    db.exec("ALTER TABLE shop_items ADD COLUMN preset_value TEXT");
+  } catch {
+    // ignore
+  }
+}
+
+try {
+  db.prepare("SELECT ui_font_slug FROM users LIMIT 1").get();
+} catch {
+  try {
+    db.exec(
+      "ALTER TABLE users ADD COLUMN ui_font_slug TEXT NOT NULL DEFAULT 'outfit'",
+    );
+  } catch {
+    // ignore
+  }
+}
+
+try {
+  db.prepare("SELECT ui_ink_hex FROM users LIMIT 1").get();
+} catch {
+  try {
+    db.exec("ALTER TABLE users ADD COLUMN ui_ink_hex TEXT NOT NULL DEFAULT ''");
+  } catch {
+    // ignore
+  }
+}
+
+try {
+  db.prepare("SELECT ui_accent_hex FROM users LIMIT 1").get();
+} catch {
+  try {
+    db.exec("ALTER TABLE users ADD COLUMN ui_accent_hex TEXT NOT NULL DEFAULT ''");
+  } catch {
+    // ignore
+  }
+}
+
+try {
+  db.prepare("SELECT ui_radius_slug FROM users LIMIT 1").get();
+} catch {
+  try {
+    db.exec(
+      "ALTER TABLE users ADD COLUMN ui_radius_slug TEXT NOT NULL DEFAULT 'default'",
+    );
+  } catch {
+    // ignore
+  }
+}
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS shop_avatars (
     id TEXT PRIMARY KEY,
@@ -690,6 +744,7 @@ db.exec(`
     price INTEGER NOT NULL DEFAULT 0,
     is_animated INTEGER NOT NULL DEFAULT 0,
     stock_limit INTEGER,
+    preset_value TEXT,
     added_by TEXT NOT NULL,
     created_at TEXT NOT NULL
   );
