@@ -23,9 +23,12 @@ const micOn = ref(false);
 const ending = ref(false);
 const remoteAudioRef = ref<HTMLAudioElement | null>(null);
 
-/** без клика по «разрешить микрофон» браузер часто не показывает запрос и не даёт getUserMedia */
+/** без жеста (клика) getUserMedia часто блокируют — системный запрос не появляется */
 const audioPrimed = ref(false);
-const signalConnected = ref(false);
+/** websocket к комнате: не путать с голосом (это ice/pc) */
+type WsState = "idle" | "connecting" | "open" | "closed";
+const wsState = ref<WsState>("idle");
+const wsCloseReason = ref<"none" | "room_full" | "other">("none");
 const peerPresence = ref<"alone" | "together" | "gone">("alone");
 const mediaLink = ref<"off" | "connecting" | "on">("off");
 const micReady = ref(false);
@@ -49,10 +52,11 @@ function resetNegotiationQueue() {
 
 const peerLabel = computed(() => {
   if (peerPresence.value === "gone") return "вышел из звонка";
+  if (wsState.value !== "open") return "ждём комнату…";
   if (peerPresence.value === "alone") return "ещё не зашёл";
-  if (mediaLink.value === "on") return "в сети · связь есть";
-  if (mediaLink.value === "connecting") return "в сети · связываем…";
-  return "в сети";
+  if (mediaLink.value === "on") return "есть, слышно";
+  if (mediaLink.value === "connecting") return "звонок цепляется…";
+  return "в комнате";
 });
 
 const peerDotOn = computed(
@@ -61,15 +65,24 @@ const peerDotOn = computed(
 
 const peerDotWarn = computed(() => peerPresence.value === "gone");
 
+const selfRoomLine = computed(() => {
+  if (wsCloseReason.value === "room_full") return "уже двое — нужна новая ссылка";
+  if (wsState.value === "open") return "в комнате";
+  if (wsState.value === "connecting") return "заходим в комнату…";
+  return "не вышло зайти в комнату — обнови страницу";
+});
+
 const micHint = computed(() => {
   if (!window.isSecureContext && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") {
-    return "лучше открыть сайт по https — иначе микрофон может не заработать";
+    return "лучше https — иначе запрос микрофона может не появиться";
   }
-  if (micDenied.value) return "нет доступа к микрофону — проверь разрешения браузера";
-  if (!audioPrimed.value) return "нажми кнопку ниже — без клика браузер часто не спрашивает микрофон";
+  if (micDenied.value) return "браузер заблокировал микрофон — значок слева от адреса → разрешить";
+  if (!audioPrimed.value) {
+    return "нажми ниже: откроется обычный запрос браузера у адресной строки";
+  }
   if (!micReady.value) return "микрофон не готов";
-  if (micOn.value) return "микрофон вкл — тебя слышно, если связь есть";
-  return "микрофон выкл — тебя не слышно";
+  if (micOn.value) return "микрофон вкл";
+  return "микрофон выкл";
 });
 
 function stopPoll() {
@@ -117,7 +130,8 @@ function syncMediaLink() {
 }
 
 function resetPresence() {
-  signalConnected.value = false;
+  wsState.value = "idle";
+  wsCloseReason.value = "none";
   peerPresence.value = "alone";
   mediaLink.value = "off";
   micReady.value = false;
@@ -293,12 +307,15 @@ async function onPrimeAudio() {
 function connectSignal() {
   cleanupMedia();
   micOn.value = false;
+  wsState.value = "connecting";
+  wsCloseReason.value = "none";
   sock = new WebSocket(wsCallUrl());
   sock.onopen = () => {
-    signalConnected.value = true;
+    wsState.value = "open";
   };
-  sock.onclose = () => {
-    signalConnected.value = false;
+  sock.onclose = (ev) => {
+    wsState.value = "closed";
+    wsCloseReason.value = ev.code === 4001 ? "room_full" : "other";
   };
   sock.onmessage = async (ev) => {
     let msg: SigJson;
@@ -438,11 +455,9 @@ watch(slug, () => {
     <template v-else>
       <ul class="participants" aria-label="участники">
         <li class="participant">
-          <span class="dot" :class="{ on: signalConnected }" aria-hidden="true" />
+          <span class="dot" :class="{ on: wsState === 'open' }" aria-hidden="true" />
           <span class="who">ты</span>
-          <span class="detail small" :class="{ muted: !signalConnected }">{{
-            signalConnected ? "в комнате" : "нет связи…"
-          }}</span>
+          <span class="detail small" :class="{ muted: wsState !== 'open' }">{{ selfRoomLine }}</span>
         </li>
         <li class="participant">
           <span
@@ -456,7 +471,7 @@ watch(slug, () => {
       </ul>
       <p class="mic-hint small">{{ micHint }}</p>
       <button v-if="!audioPrimed" type="button" class="prime" @click="onPrimeAudio">
-        {{ micDenied ? "попробовать снова" : "разрешить микрофон" }}
+        {{ micDenied ? "попробовать снова" : "запросить микрофон" }}
       </button>
       <audio ref="remoteAudioRef" class="sr-only" playsinline />
       <div v-if="audioPrimed" class="row">
