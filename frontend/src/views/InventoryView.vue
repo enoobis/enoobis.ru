@@ -1,8 +1,14 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import { api } from "../api/http";
-import { listMyShopItems, equipShopItem, type OwnedShopItem, type ShopItemKind } from "../api/shop";
+import {
+  listMyShopItems,
+  equipShopItem,
+  type EquipResult,
+  type OwnedShopItem,
+  type ShopItemKind,
+} from "../api/shop";
 import { useAuthStore } from "../stores/auth";
 import { toastError, toastSuccess } from "../utils/toast";
 
@@ -11,6 +17,31 @@ const items = ref<OwnedShopItem[]>([]);
 const loading = ref(true);
 const busy = ref<string | null>(null);
 const profileCoins = ref(0);
+
+/** порядок: рамка → обложка → фон → аватар → оформление */
+const KIND_ORDER: ShopItemKind[] = [
+  "frame",
+  "cover",
+  "wallpaper",
+  "avatar",
+  "font",
+  "ink",
+  "accent",
+  "radius",
+];
+
+type Cosmetics = {
+  avatar_url: string;
+  wallpaper_url: string;
+  avatar_frame_url: string;
+  profile_cover_url: string;
+  ui_font_slug: string;
+  ui_ink_hex: string;
+  ui_accent_hex: string;
+  ui_radius_slug: string;
+};
+
+const cosmetics = ref<Cosmetics | null>(null);
 
 const FONT_PREVIEW: Record<string, string> = {
   outfit: '"Outfit", system-ui, sans-serif',
@@ -43,12 +74,66 @@ function kindLabel(k: ShopItemKind): string {
   return "углы";
 }
 
+function kindSortKey(k: ShopItemKind): number {
+  const i = KIND_ORDER.indexOf(k);
+  return i === -1 ? 100 : i;
+}
+
+const sortedItems = computed(() =>
+  [...items.value].sort((a, b) => {
+    const d = kindSortKey(a.kind) - kindSortKey(b.kind);
+    if (d !== 0) return d;
+    return a.acquired_at < b.acquired_at ? 1 : -1;
+  }),
+);
+
+function applyCosmeticsFromEquip(r: EquipResult) {
+  cosmetics.value = {
+    avatar_url: r.avatar_url,
+    wallpaper_url: r.wallpaper_url,
+    avatar_frame_url: r.avatar_frame_url,
+    profile_cover_url: r.profile_cover_url,
+    ui_font_slug: r.ui_font_slug,
+    ui_ink_hex: r.ui_ink_hex,
+    ui_accent_hex: r.ui_accent_hex,
+    ui_radius_slug: r.ui_radius_slug,
+  };
+}
+
+function isEquipped(a: OwnedShopItem): boolean {
+  const c = cosmetics.value;
+  if (!c) return false;
+  if (a.kind === "avatar") return !!a.url && a.url !== "#" && a.url === c.avatar_url;
+  if (a.kind === "frame") return !!a.url && a.url !== "#" && a.url === c.avatar_frame_url;
+  if (a.kind === "wallpaper") return !!a.url && a.url !== "#" && a.url === c.wallpaper_url;
+  if (a.kind === "cover") return !!a.url && a.url !== "#" && a.url === c.profile_cover_url;
+  const pv = (a.preset_value ?? "").trim().toLowerCase();
+  if (a.kind === "font") return pv === (c.ui_font_slug || "outfit").trim().toLowerCase();
+  if (a.kind === "ink") return !!pv && pv === (c.ui_ink_hex || "").trim().toLowerCase();
+  if (a.kind === "accent") return !!pv && pv === (c.ui_accent_hex || "").trim().toLowerCase();
+  if (a.kind === "radius") {
+    const cur = (c.ui_radius_slug || "default").trim();
+    return (a.preset_value || "default").trim() === cur;
+  }
+  return false;
+}
+
 async function load() {
   loading.value = true;
   try {
     items.value = await listMyShopItems(auth.token!);
-    const me = await api<{ coins?: number }>("/api/me", { token: auth.token! });
+    const me = await api<Cosmetics & { coins?: number }>("/api/me", { token: auth.token! });
     profileCoins.value = Math.max(0, Math.floor(Number(me.coins ?? 0)));
+    cosmetics.value = {
+      avatar_url: me.avatar_url ?? "",
+      wallpaper_url: me.wallpaper_url ?? "",
+      avatar_frame_url: me.avatar_frame_url ?? "",
+      profile_cover_url: me.profile_cover_url ?? "",
+      ui_font_slug: me.ui_font_slug ?? "outfit",
+      ui_ink_hex: me.ui_ink_hex ?? "",
+      ui_accent_hex: me.ui_accent_hex ?? "",
+      ui_radius_slug: me.ui_radius_slug ?? "default",
+    };
   } catch (e) {
     toastError(e);
   } finally {
@@ -60,9 +145,34 @@ async function onApply(a: OwnedShopItem) {
   if (!auth.token || busy.value) return;
   busy.value = a.id;
   try {
-    await equipShopItem(auth.token, a.id);
+    const r = await equipShopItem(auth.token, a.id);
+    applyCosmeticsFromEquip(r);
     toastSuccess("применено");
     window.dispatchEvent(new CustomEvent("enoobis:profile-cosmetics-updated"));
+  } catch (e) {
+    toastError(e);
+  } finally {
+    busy.value = null;
+  }
+}
+
+async function onCancel(a: OwnedShopItem) {
+  if (!auth.token || busy.value) return;
+  busy.value = a.id;
+  try {
+    const body: Record<string, string> = {};
+    if (a.kind === "avatar") body.avatar_url = "";
+    else if (a.kind === "frame") body.avatar_frame_url = "";
+    else if (a.kind === "wallpaper") body.wallpaper_url = "";
+    else if (a.kind === "cover") body.profile_cover_url = "";
+    else if (a.kind === "font") body.ui_font_slug = "outfit";
+    else if (a.kind === "ink") body.ui_ink_hex = "";
+    else if (a.kind === "accent") body.ui_accent_hex = "";
+    else if (a.kind === "radius") body.ui_radius_slug = "default";
+    await api("/api/me", { method: "PATCH", token: auth.token, body: JSON.stringify(body) });
+    toastSuccess("снято");
+    window.dispatchEvent(new CustomEvent("enoobis:profile-cosmetics-updated"));
+    await load();
   } catch (e) {
     toastError(e);
   } finally {
@@ -88,7 +198,7 @@ onMounted(load);
       <RouterLink to="/shop" class="to-shop">магазин →</RouterLink>
     </div>
     <ul v-else class="grid">
-      <li v-for="a in items" :key="a.id" class="card item-card">
+      <li v-for="a in sortedItems" :key="a.id" class="card item-card">
         <span class="kind muted small">{{ kindLabel(a.kind) }}</span>
         <div class="preview">
           <template v-if="a.kind === 'avatar'">
@@ -127,7 +237,16 @@ onMounted(load);
         </div>
         <p class="item-name">{{ a.name }}</p>
         <div class="item-footer">
-          <button type="button" class="btn-equip" :disabled="busy === a.id" @click="onApply(a)">
+          <button
+            v-if="isEquipped(a)"
+            type="button"
+            class="btn-cancel"
+            :disabled="busy === a.id"
+            @click="onCancel(a)"
+          >
+            отменить
+          </button>
+          <button v-else type="button" class="btn-equip" :disabled="busy === a.id" @click="onApply(a)">
             применить
           </button>
         </div>
@@ -299,7 +418,22 @@ onMounted(load);
 .btn-equip:hover:not(:disabled) {
   background: var(--surface);
 }
-.btn-equip:disabled {
+.btn-cancel {
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  min-height: 0;
+}
+.btn-cancel:hover:not(:disabled) {
+  background: var(--surface2);
+  color: var(--text);
+}
+.btn-equip:disabled,
+.btn-cancel:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }

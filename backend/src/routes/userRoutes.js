@@ -8,6 +8,7 @@ import {
   checkFollowerMilestones,
 } from "../utils/achievements.js";
 import { buildModerationNotices, parseContentLimits } from "../utils/contentLimits.js";
+import { normalizeFontSlug, normalizeHexColor, normalizeRadiusSlug } from "../utils/shopPresets.js";
 
 const JWT_SECRET = process.env.JWT_SECRET ?? "dev-secret-change-me";
 
@@ -147,6 +148,9 @@ router.patch("/me", authRequired, (req, res) => {
   const allowed = [
     "bio",
     "avatar_url",
+    "wallpaper_url",
+    "avatar_frame_url",
+    "profile_cover_url",
     "theme_preference",
     "language_preference",
     "font_preference",
@@ -163,6 +167,46 @@ router.patch("/me", authRequired, (req, res) => {
   for (const field of allowed) {
     if (body[field] !== undefined) {
       run(`UPDATE users SET ${field} = ? WHERE id = ?`, body[field] ?? "", req.user.id);
+    }
+  }
+  if (body.ui_font_slug !== undefined) {
+    const t = String(body.ui_font_slug ?? "").trim();
+    if (!t) {
+      run("UPDATE users SET ui_font_slug = 'outfit' WHERE id = ?", req.user.id);
+    } else {
+      const s = normalizeFontSlug(t);
+      if (!s) return res.status(400).json({ error: "bad ui_font_slug" });
+      run("UPDATE users SET ui_font_slug = ? WHERE id = ?", s, req.user.id);
+    }
+  }
+  if (body.ui_ink_hex !== undefined) {
+    const t = String(body.ui_ink_hex ?? "").trim();
+    if (!t) {
+      run("UPDATE users SET ui_ink_hex = '' WHERE id = ?", req.user.id);
+    } else {
+      const h = normalizeHexColor(t);
+      if (!h) return res.status(400).json({ error: "bad ui_ink_hex" });
+      run("UPDATE users SET ui_ink_hex = ? WHERE id = ?", h, req.user.id);
+    }
+  }
+  if (body.ui_accent_hex !== undefined) {
+    const t = String(body.ui_accent_hex ?? "").trim();
+    if (!t) {
+      run("UPDATE users SET ui_accent_hex = '' WHERE id = ?", req.user.id);
+    } else {
+      const h = normalizeHexColor(t);
+      if (!h) return res.status(400).json({ error: "bad ui_accent_hex" });
+      run("UPDATE users SET ui_accent_hex = ? WHERE id = ?", h, req.user.id);
+    }
+  }
+  if (body.ui_radius_slug !== undefined) {
+    const t = String(body.ui_radius_slug ?? "").trim();
+    if (!t) {
+      run("UPDATE users SET ui_radius_slug = 'default' WHERE id = ?", req.user.id);
+    } else {
+      const r = normalizeRadiusSlug(t);
+      if (!r) return res.status(400).json({ error: "bad ui_radius_slug" });
+      run("UPDATE users SET ui_radius_slug = ? WHERE id = ?", r, req.user.id);
     }
   }
   if (Array.isArray(body.social_links)) {

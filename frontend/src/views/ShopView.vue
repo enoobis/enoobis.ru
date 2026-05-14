@@ -3,7 +3,6 @@ import { computed, onMounted, ref, watch } from "vue";
 import {
   listShopItems,
   buyShopItem,
-  equipShopItem,
   type ShopItem,
   type ShopItemKind,
   type ShopListKind,
@@ -52,8 +51,10 @@ const profileCoins = ref(0);
 let shopLoadSeq = 0;
 
 const shown = computed(() => {
-  if (tab.value === "ui") return items.value.filter((i) => UI_KINDS.includes(i.kind));
-  return items.value.filter((i) => i.kind === tab.value);
+  let base: ShopItem[];
+  if (tab.value === "ui") base = items.value.filter((i) => UI_KINDS.includes(i.kind));
+  else base = items.value.filter((i) => i.kind === tab.value);
+  return base.filter((i) => !i.owned);
 });
 
 function shopSold(item: ShopItem): number {
@@ -74,7 +75,6 @@ function shopStockLeft(item: ShopItem): number | null {
 }
 
 function shopSoldOut(item: ShopItem): boolean {
-  if (item.owned) return false;
   const left = shopStockLeft(item);
   return left !== null && left <= 0;
 }
@@ -118,23 +118,8 @@ async function onBuy(item: ShopItem) {
   try {
     const r = await buyShopItem(auth.token, item.id);
     profileCoins.value = r.coins;
-    item.owned = true;
-    item.sold_count = shopSold(item) + 1;
+    items.value = items.value.filter((x) => x.id !== item.id);
     toastSuccess(item.name);
-  } catch (e) {
-    toastError(e);
-  } finally {
-    busy.value = null;
-  }
-}
-
-async function onEquip(item: ShopItem) {
-  if (!auth.token || busy.value) return;
-  busy.value = item.id;
-  try {
-    await equipShopItem(auth.token, item.id);
-    toastSuccess("применено");
-    window.dispatchEvent(new CustomEvent("enoobis:profile-cosmetics-updated"));
   } catch (e) {
     toastError(e);
   } finally {
@@ -221,7 +206,7 @@ watch(
           </template>
         </div>
         <p class="item-name">{{ item.name }}</p>
-        <p v-if="!item.owned && shopStockCap(item) !== null" class="stock-line muted">
+        <p v-if="shopStockCap(item) !== null" class="stock-line muted">
           {{ shopSoldOut(item) ? "распродано" : `ещё ${shopStockLeft(item)}` }}
         </p>
         <div class="item-footer">
@@ -230,22 +215,12 @@ watch(
             {{ item.price }}
           </span>
           <button
-            v-if="!item.owned"
             type="button"
             class="btn-buy"
             :disabled="busy === item.id || profileCoins < item.price || shopSoldOut(item)"
             @click="onBuy(item)"
           >
             купить
-          </button>
-          <button
-            v-else
-            type="button"
-            class="btn-equip"
-            :disabled="busy === item.id"
-            @click="onEquip(item)"
-          >
-            применить
           </button>
         </div>
       </li>
@@ -435,8 +410,7 @@ watch(
   font-size: 0.85rem;
   color: var(--muted);
 }
-.btn-buy,
-.btn-equip {
+.btn-buy {
   padding: 0.25rem 0.65rem;
   border-radius: 999px;
   font-size: 0.8rem;
@@ -449,12 +423,6 @@ watch(
 .btn-buy:disabled {
   opacity: 0.45;
   cursor: not-allowed;
-}
-.btn-equip {
-  border-color: var(--text);
-}
-.btn-equip:hover:not(:disabled) {
-  background: var(--surface);
 }
 .empty {
   text-align: center;
