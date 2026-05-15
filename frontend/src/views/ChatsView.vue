@@ -312,6 +312,13 @@ function selectChat(id: string) {
   router.replace({ name: "chats", query: { id } });
 }
 
+function onChatRowKey(e: KeyboardEvent, id: string) {
+  if (e.key === "Enter" || e.key === " ") {
+    e.preventDefault();
+    selectChat(id);
+  }
+}
+
 function startEdit(m: ChatMessage) {
   editingId.value = m.id;
   editingDraft.value = m.body;
@@ -484,8 +491,12 @@ onUnmounted(() => {
         :key="c.id"
         class="chat-row-outer"
         :class="{ on: c.id === activeId, unread: c.unread > 0 }"
+        role="button"
+        tabindex="0"
+        @click="selectChat(c.id)"
+        @keydown="(e) => onChatRowKey(e, c.id)"
       >
-        <button class="chat-row" type="button" @click="selectChat(c.id)">
+        <div class="chat-row">
           <span class="avatar">
             <img v-if="c.other_avatar" :src="c.other_avatar" alt="" />
             <span v-else>{{ c.other_nickname.slice(0, 2) }}</span>
@@ -499,14 +510,14 @@ onUnmounted(() => {
               <span v-if="c.last_from_me" class="muted">вы: </span>{{ c.last_body || "—" }}
             </span>
           </span>
-        </button>
+        </div>
         <span class="chat-row-side">
           <button
             type="button"
             class="chat-row-del"
             aria-label="убрать чат"
             title="убрать чат"
-            @click="removeChatFromList(c)"
+            @click.stop="removeChatFromList(c)"
           >
             <AppIcon name="delete" :size="14" />
           </button>
@@ -743,6 +754,31 @@ onUnmounted(() => {
   margin: auto;
 }
 
+.chat-row-outer {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: stretch;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  outline: none;
+}
+.chat-row-outer:focus-visible {
+  outline: 2px solid var(--border);
+  outline-offset: -2px;
+}
+.chat-row-outer:hover {
+  background: var(--surface);
+}
+.chat-row-outer.on {
+  background: var(--surface2);
+}
+.chat-row-outer.on:hover {
+  background: var(--surface2);
+}
 .chat-row {
   display: grid;
   grid-template-columns: 36px 1fr;
@@ -757,13 +793,9 @@ onUnmounted(() => {
   text-align: left;
   font: inherit;
   min-height: 0;
-  cursor: pointer;
 }
-.chat-row:hover {
-  background: var(--surface);
-}
-.chat-row-outer.on .chat-row:hover {
-  background: var(--surface2);
+.chat-row-outer.on .chat-row {
+  background: transparent;
 }
 
 .avatar {
@@ -821,15 +853,6 @@ onUnmounted(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.chat-row-outer {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: stretch;
-  border-bottom: 1px solid var(--border);
-}
-.chat-row-outer.on .chat-row {
-  background: var(--surface2);
 }
 .chat-row-side {
   display: inline-flex;
