@@ -582,29 +582,6 @@ onUnmounted(() => {
               {{ row.line }}
             </div>
             <div v-else class="msg" :class="{ me: row.m.from_me }">
-              <span
-                v-if="!row.m.from_me && editingId !== row.m.id"
-                class="msg-actions msg-actions--peer"
-              >
-                <button
-                  type="button"
-                  class="msg-act"
-                  aria-label="ответить"
-                  title="ответить"
-                  @click="setReplyTo(row.m)"
-                >
-                  <AppIcon name="reply" :size="14" />
-                </button>
-                <button
-                  type="button"
-                  class="msg-act"
-                  aria-label="удалить"
-                  title="удалить"
-                  @click="removeMessage(row.m)"
-                >
-                  <AppIcon name="delete" :size="14" />
-                </button>
-              </span>
               <span class="bubble">
                 <div v-if="row.m.reply_to" class="msg-reply muted small">
                   <span class="msg-reply-author">{{ replyAuthorLabel(row.m.reply_to.from_me) }}</span>
@@ -645,6 +622,29 @@ onUnmounted(() => {
                     </span>
                   </span>
                 </template>
+              </span>
+              <span
+                v-if="!row.m.from_me && editingId !== row.m.id"
+                class="msg-actions msg-actions--peer"
+              >
+                <button
+                  type="button"
+                  class="msg-act"
+                  aria-label="ответить"
+                  title="ответить"
+                  @click="setReplyTo(row.m)"
+                >
+                  <AppIcon name="reply" :size="14" />
+                </button>
+                <button
+                  type="button"
+                  class="msg-act"
+                  aria-label="удалить"
+                  title="удалить"
+                  @click="removeMessage(row.m)"
+                >
+                  <AppIcon name="delete" :size="14" />
+                </button>
               </span>
               <span v-if="row.m.from_me && editingId !== row.m.id" class="msg-actions">
                 <button
@@ -1119,6 +1119,7 @@ onUnmounted(() => {
   gap: 0.15rem;
   opacity: 0;
   transition: opacity 0.15s ease;
+  flex-shrink: 0;
 }
 .msg:hover .msg-actions {
   opacity: 1;
