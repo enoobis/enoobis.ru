@@ -117,7 +117,7 @@ function onKeydown(e: KeyboardEvent) {
   >
     <textarea
       v-model="body"
-      :placeholder="placeholder ?? 'ну?'"
+      :placeholder="placeholder ?? 'текст'"
       rows="2"
       :autofocus="autofocus"
       :maxlength="limit"

@@ -54,7 +54,8 @@ const props = withDefaults(
       | "quote"
       | "link"
       | "seen"
-      | "reply",
+      | "reply"
+      | "clear",
     size?: number;
   }>(),
   { size: 16 },
@@ -166,6 +167,8 @@ const d = computed(() => {
       return "M2 12c2.2-4.2 5.6-6.5 10-6.5S19.8 7.8 22 12c-2.2 4.2-5.6 6.5-10 6.5S4.2 16.2 2 12z";
     case "reply":
       return "M9 17L4 12l5-5M4 12h10.5a4.5 4.5 0 014.5 4.5V20";
+    case "clear":
+      return "M5 8h14M5 12h10M5 16h6M17 6L7 18";
     default:
       return "";
   }

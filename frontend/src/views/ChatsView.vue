@@ -556,11 +556,12 @@ onUnmounted(() => {
           <span v-if="otherNickname" class="thread-head-actions">
             <button
               type="button"
-              class="thread-clear"
+              class="thread-act"
+              aria-label="очистить переписку"
               title="очистить переписку"
               @click="clearThreadHistory"
             >
-              очистить
+              <AppIcon name="clear" :size="16" />
             </button>
             <button
               type="button"
@@ -965,21 +966,6 @@ onUnmounted(() => {
   align-items: center;
   gap: 0.25rem;
   flex-shrink: 0;
-}
-.thread-clear {
-  border: none;
-  background: transparent;
-  color: var(--muted);
-  font: inherit;
-  font-size: 0.82rem;
-  padding: 0.35rem 0.45rem;
-  cursor: pointer;
-  text-transform: lowercase;
-  border-radius: 6px;
-}
-.thread-clear:hover {
-  color: var(--text);
-  background: var(--surface2);
 }
 .thread-act {
   width: 36px;
