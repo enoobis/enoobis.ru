@@ -719,8 +719,12 @@ onUnmounted(() => {
   gap: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  height: calc(100vh - 140px);
-  min-height: 480px;
+  /* сначала vh — старые браузеры; dvh — мобильный chrome без «обрезания» композера */
+  height: calc(100vh - 8.75rem);
+  max-height: calc(100vh - 8.75rem);
+  height: calc(100dvh - 8.75rem);
+  max-height: calc(100dvh - 8.75rem);
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -729,6 +733,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
   overflow-y: auto;
 }
 .list-head {
@@ -908,6 +913,8 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
   background: transparent;
 }
 
@@ -917,6 +924,7 @@ onUnmounted(() => {
   gap: 0.7rem;
   padding: 0.65rem 1rem;
   border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
 }
 .thread-head-actions {
   margin-left: auto;
@@ -968,8 +976,12 @@ onUnmounted(() => {
 }
 
 .messages {
-  flex: 1;
+  flex: 1 1 0;
+  min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   padding: 1rem;
   display: flex;
   flex-direction: column;
@@ -1117,6 +1129,7 @@ onUnmounted(() => {
 
 .composer-wrap {
   border-top: 1px solid var(--border);
+  flex-shrink: 0;
 }
 .reply-bar {
   display: flex;
@@ -1264,9 +1277,19 @@ onUnmounted(() => {
   display: block;
 }
 
+@media (min-width: 761px) {
+  .chats {
+    min-height: 400px;
+  }
+}
+
 @media (max-width: 760px) {
   .chats {
     grid-template-columns: 1fr;
+    height: calc(100vh - 6.25rem);
+    max-height: calc(100vh - 6.25rem);
+    height: calc(100dvh - 6.25rem);
+    max-height: calc(100dvh - 6.25rem);
   }
   .list.hidden {
     display: none;
