@@ -353,7 +353,7 @@ watch(
               <AppIcon name="bookmark" :size="16" /><span>закладки блогов</span>
             </RouterLink>
             <RouterLink to="/microblogs/saved" class="profile-menu-item" @click="profileMenuOpen = false">
-              <AppIcon name="bookmark" :size="16" /><span>закладки микро</span>
+              <AppIcon name="bookmark" :size="16" /><span>закладки микро блогов</span>
             </RouterLink>
             <RouterLink
               v-if="auth.role === 'teacher' || auth.role === 'admin'"
