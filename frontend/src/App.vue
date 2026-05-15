@@ -371,14 +371,6 @@ watch(
             >
               <AppIcon name="invites" :size="16" /><span>инвайты</span>
             </RouterLink>
-            <RouterLink
-              v-if="auth.role === 'admin'"
-              to="/admin"
-              class="profile-menu-item desktop-only"
-              @click="profileMenuOpen = false"
-            >
-              <AppIcon name="admin" :size="16" /><span>админ</span>
-            </RouterLink>
             <RouterLink to="/me/edit" class="profile-menu-item" @click="profileMenuOpen = false">
               <AppIcon name="settings" :size="16" /><span>настройки</span>
             </RouterLink>
