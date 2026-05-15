@@ -111,6 +111,13 @@ export function editMessage(messageId: string, token: string, body: string) {
   });
 }
 
+export function clearThreadMessages(threadId: string, token: string) {
+  return api<{ ok: boolean }>(`/api/chats/${threadId}/messages`, {
+    method: "DELETE",
+    token,
+  });
+}
+
 export function deleteMessage(messageId: string, token: string) {
   return api<{ ok: boolean }>(`/api/chats/messages/${messageId}`, {
     method: "DELETE",

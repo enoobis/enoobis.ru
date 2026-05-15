@@ -224,6 +224,32 @@ router.get("/chats/:id/messages", authRequired, (req, res) => {
   });
 });
 
+router.delete("/chats/:id/messages", authRequired, (req, res) => {
+  const thread = get(
+    "SELECT id, user_a_id, user_b_id FROM chat_threads WHERE id = ?",
+    req.params.id,
+  );
+  if (!thread) return res.status(404).json({ error: "not found" });
+  if (thread.user_a_id !== req.user.id && thread.user_b_id !== req.user.id) {
+    return res.status(403).json({ error: "forbidden" });
+  }
+  const msgs = all("SELECT image_url FROM chat_messages WHERE thread_id = ?", thread.id);
+  for (const m of msgs) {
+    const url = m.image_url && String(m.image_url);
+    if (url && url.startsWith("/uploads/chat/")) {
+      const file = path.join(UPLOAD_ROOT, url.replace(/^\/uploads\//, ""));
+      try {
+        fs.unlinkSync(file);
+      } catch {
+        // ignore missing file
+      }
+    }
+  }
+  run("DELETE FROM chat_messages WHERE thread_id = ?", thread.id);
+  run("UPDATE chat_threads SET last_message_at = NULL WHERE id = ?", thread.id);
+  res.json({ ok: true });
+});
+
 router.delete("/chats/:id", authRequired, (req, res) => {
   const thread = get(
     "SELECT id, user_a_id, user_b_id FROM chat_threads WHERE id = ?",
@@ -405,7 +431,11 @@ router.delete("/chats/messages/:id", authRequired, (req, res) => {
     req.params.id,
   );
   if (!msg) return res.status(404).json({ error: "not found" });
-  if (msg.sender_id !== req.user.id) {
+  const thread = get(
+    "SELECT id, user_a_id, user_b_id FROM chat_threads WHERE id = ?",
+    msg.thread_id,
+  );
+  if (!thread || (thread.user_a_id !== req.user.id && thread.user_b_id !== req.user.id)) {
     return res.status(403).json({ error: "forbidden" });
   }
   if (msg.image_url && msg.image_url.startsWith("/uploads/chat/")) {

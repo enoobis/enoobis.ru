@@ -2,6 +2,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import {
+  clearThreadMessages,
   deleteChatThread,
   deleteMessage,
   editMessage,
@@ -161,6 +162,21 @@ function clearReplyTarget() {
 function removeCurrentChat() {
   const c = chats.value.find((x) => x.id === activeId.value);
   if (c) void removeChatFromList(c);
+}
+
+async function clearThreadHistory() {
+  if (!auth.token || !activeId.value) return;
+  if (!window.confirm("удалить все сообщения в этом чате? без восстановления.")) return;
+  try {
+    await clearThreadMessages(activeId.value, auth.token);
+    messages.value = [];
+    replyTarget.value = null;
+    cancelEdit();
+    await loadChats();
+    void chatStore.refresh();
+  } catch (e) {
+    toastError(e);
+  }
 }
 
 async function loadChats() {
@@ -540,6 +556,14 @@ onUnmounted(() => {
           <span v-if="otherNickname" class="thread-head-actions">
             <button
               type="button"
+              class="thread-clear"
+              title="очистить переписку"
+              @click="clearThreadHistory"
+            >
+              очистить
+            </button>
+            <button
+              type="button"
               class="thread-act"
               aria-label="убрать чат из списка"
               title="убрать чат"
@@ -570,6 +594,15 @@ onUnmounted(() => {
                   @click="setReplyTo(row.m)"
                 >
                   <AppIcon name="reply" :size="14" />
+                </button>
+                <button
+                  type="button"
+                  class="msg-act"
+                  aria-label="удалить"
+                  title="удалить"
+                  @click="removeMessage(row.m)"
+                >
+                  <AppIcon name="delete" :size="14" />
                 </button>
               </span>
               <span class="bubble">
@@ -930,8 +963,23 @@ onUnmounted(() => {
   margin-left: auto;
   display: inline-flex;
   align-items: center;
-  gap: 0.2rem;
+  gap: 0.25rem;
   flex-shrink: 0;
+}
+.thread-clear {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.82rem;
+  padding: 0.35rem 0.45rem;
+  cursor: pointer;
+  text-transform: lowercase;
+  border-radius: 6px;
+}
+.thread-clear:hover {
+  color: var(--text);
+  background: var(--surface2);
 }
 .thread-act {
   width: 36px;
