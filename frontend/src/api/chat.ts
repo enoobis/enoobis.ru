@@ -1,9 +1,13 @@
 import { api } from "./http";
 
+export type OnlineStatus = { online: boolean } | null;
+
 export type ChatThread = {
   id: string;
   other_nickname: string;
   other_avatar: string;
+  /** true = онлайн, false = не в сети (но статус виден), null = скрыто */
+  other_online: boolean | null;
   last_body: string;
   last_from_me: boolean;
   last_at: string | null;
@@ -30,7 +34,7 @@ export type ChatMessage = {
 
 export type ChatMessages = {
   items: ChatMessage[];
-  other: { id: string; nickname: string; avatar_url: string } | null;
+  other: { id: string; nickname: string; avatar_url: string; online: OnlineStatus } | null;
 };
 
 export function listChats(token: string) {

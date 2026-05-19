@@ -7,6 +7,7 @@ import { all, get, nowIso, run } from "../db.js";
 import { authRequired } from "../auth.js";
 import { assertChatOutgoing } from "../utils/contentLimits.js";
 import { optimizeUploadedFile } from "../utils/imageOptimize.js";
+import { onlinePayload } from "../utils/onlineStatus.js";
 
 const router = express.Router();
 const MAX_BODY = 4000;
@@ -80,7 +81,22 @@ function ensureThread(meId, otherId) {
 
 function otherUser(thread, meId) {
   const otherId = thread.user_a_id === meId ? thread.user_b_id : thread.user_a_id;
-  return get("SELECT id, nickname, avatar_url FROM users WHERE id = ?", otherId);
+  const u = get(
+    "SELECT id, nickname, avatar_url, last_seen_at FROM users WHERE id = ?",
+    otherId,
+  );
+  if (!u) return null;
+  const priv = get(
+    "SELECT show_online_status FROM user_privacy_settings WHERE user_id = ?",
+    otherId,
+  );
+  const showOnline = !!priv?.show_online_status;
+  return {
+    id: u.id,
+    nickname: u.nickname,
+    avatar_url: u.avatar_url ?? "",
+    online: onlinePayload(u.last_seen_at, showOnline),
+  };
 }
 
 function unreadInThread(threadId, meId) {
@@ -135,6 +151,7 @@ function threadDto(row, meId) {
     id: row.id,
     other_nickname: other?.nickname ?? "",
     other_avatar: other?.avatar_url ?? "",
+    other_online: other?.online?.online ?? null,
     last_body: previewOf(last),
     last_from_me: last ? last.sender_id === meId : false,
     last_at: last?.created_at ?? row.last_message_at ?? null,
@@ -218,9 +235,17 @@ router.get("/chats/:id/messages", authRequired, (req, res) => {
         req.params.id,
       );
   const ordered = after ? rows : rows.reverse();
+  const other = otherUser(thread, req.user.id);
   res.json({
     items: ordered.map((r) => messageRowDto(r, req.user.id)),
-    other: otherUser(thread, req.user.id),
+    other: other
+      ? {
+          id: other.id,
+          nickname: other.nickname,
+          avatar_url: other.avatar_url,
+          online: other.online,
+        }
+      : null,
   });
 });
 

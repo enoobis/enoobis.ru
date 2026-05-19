@@ -30,6 +30,7 @@ const chats = ref<ChatThread[]>([]);
 const activeId = ref<string>("");
 const otherNickname = ref("");
 const otherAvatar = ref("");
+const otherOnline = ref<boolean | null>(null);
 const messages = ref<ChatMessage[]>([]);
 const draft = ref("");
 const sending = ref(false);
@@ -200,6 +201,10 @@ async function loadMessages(scrollEnd = true) {
     messages.value = data.items;
     otherNickname.value = data.other?.nickname ?? "";
     otherAvatar.value = data.other?.avatar_url ?? "";
+    otherOnline.value =
+      data.other?.online === null || data.other?.online === undefined
+        ? null
+        : !!data.other.online.online;
     if (scrollEnd) {
       await nextTick();
       messagesEnd.value?.scrollIntoView({ block: "end" });
@@ -233,6 +238,12 @@ async function pollMessages() {
   const last = messages.value.at(-1)?.created_at;
   try {
     const data = await listMessages(activeId.value, auth.token, last);
+    if (data.other) {
+      otherOnline.value =
+        data.other.online === null || data.other.online === undefined
+          ? null
+          : !!data.other.online.online;
+    }
     if (data.items.length) {
       messages.value = [...messages.value, ...data.items];
       await nextTick();
@@ -453,6 +464,7 @@ watch(
     if (id !== activeId.value) {
       activeId.value = id;
       messages.value = [];
+      otherOnline.value = null;
       replyTarget.value = null;
       if (id) await loadMessages();
     }
@@ -513,9 +525,10 @@ onUnmounted(() => {
         @keydown="(e) => onChatRowKey(e, c.id)"
       >
         <div class="chat-row">
-          <span class="avatar">
+          <span class="avatar" :class="{ 'has-online': c.other_online === true }">
             <img v-if="c.other_avatar" :src="c.other_avatar" alt="" />
             <span v-else>{{ c.other_nickname.slice(0, 2) }}</span>
+            <span v-if="c.other_online === true" class="online-dot" />
           </span>
           <span class="row-text">
             <span class="row-line">
@@ -547,11 +560,15 @@ onUnmounted(() => {
         <header class="thread-head">
           <button class="back" type="button" @click="router.replace({ name: 'chats' })">←</button>
           <RouterLink v-if="otherNickname" :to="`/u/${otherNickname}`" class="who">
-            <span class="avatar small">
+            <span class="avatar small" :class="{ 'has-online': otherOnline === true }">
               <img v-if="otherAvatar" :src="otherAvatar" alt="" />
               <span v-else>{{ otherNickname.slice(0, 2) }}</span>
+              <span v-if="otherOnline === true" class="online-dot" />
             </span>
-            <span>{{ otherNickname }}</span>
+            <span class="who-text">
+              <span>{{ otherNickname }}</span>
+              <span v-if="otherOnline === true" class="online-label">онлайн</span>
+            </span>
           </RouterLink>
           <span v-if="otherNickname" class="thread-head-actions">
             <button
@@ -838,6 +855,7 @@ onUnmounted(() => {
 }
 
 .avatar {
+  position: relative;
   width: 36px;
   height: 36px;
   border-radius: 999px;
@@ -846,7 +864,7 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
+  overflow: visible;
   color: var(--muted);
   font-weight: 500;
   font-size: 0.78rem;
@@ -857,6 +875,33 @@ onUnmounted(() => {
   width: 28px;
   height: 28px;
   font-size: 0.7rem;
+}
+.avatar .online-dot {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: #4ade80;
+  border: 2px solid var(--bg, #0a0a0a);
+  box-sizing: border-box;
+  z-index: 1;
+}
+.avatar.small .online-dot {
+  width: 8px;
+  height: 8px;
+}
+.who-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  min-width: 0;
+}
+.online-label {
+  color: #4ade80;
+  font-size: 0.72rem;
+  line-height: 1.2;
 }
 .avatar img {
   width: 100%;

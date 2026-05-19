@@ -43,7 +43,7 @@ type Profile = {
   social_links: { name: string; url: string }[];
   readme_md: string;
   created_at: string;
-  last_seen_at: string;
+  online?: { online: boolean } | null;
   followers_count: number;
   following_count: number;
   coins?: number;
@@ -72,6 +72,7 @@ const renderedReadme = computed(() => renderMarkdown(profile.value?.readme_md ??
 const socialPublic = computed(() =>
   (profile.value?.social_links ?? []).filter((s) => String(s?.url ?? "").trim().length > 0),
 );
+const isOnline = computed(() => profile.value?.online?.online === true);
 
 async function load() {
   err.value = "";
@@ -205,7 +206,7 @@ watch(nick, load);
       <div class="avatar-cell">
         <div
           class="avatar-stack"
-          :class="{ framed: !!profile.avatar_frame_url }"
+          :class="{ framed: !!profile.avatar_frame_url, online: isOnline }"
         >
           <img
             v-if="profile.avatar_url && !avatarBroken"
@@ -221,12 +222,16 @@ watch(nick, load);
             :src="profile.avatar_frame_url"
             alt=""
           />
+          <span v-if="isOnline" class="online-dot" title="онлайн" />
         </div>
       </div>
 
       <div class="info">
         <h1>{{ displayName }}</h1>
-        <p class="muted">@{{ profile.nickname }}</p>
+        <p class="muted nick-line">
+          @{{ profile.nickname }}
+          <span v-if="isOnline" class="online-label">· онлайн</span>
+        </p>
         <p v-if="profile.bio" class="bio">{{ profile.bio }}</p>
         <p class="meta muted">
           <RouterLink
@@ -437,6 +442,25 @@ watch(nick, load);
   height: calc(100% + 16px);
   object-fit: contain;
   pointer-events: none;
+}
+.online-dot {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  background: #4ade80;
+  border: 2px solid var(--bg, #0a0a0a);
+  box-sizing: border-box;
+  z-index: 2;
+}
+.online-label {
+  color: #4ade80;
+  font-size: 0.82rem;
+}
+.nick-line {
+  margin: 0;
 }
 .mod-notes {
   list-style: none;

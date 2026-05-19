@@ -4,7 +4,7 @@ import { useRouter } from "vue-router";
 import { api } from "../api/http";
 import { uploadAvatar } from "../api/uploadAvatar";
 import { uploadWallpaper, deleteWallpaper } from "../api/shop";
-import { changeMyPassword } from "../api/profile";
+import { changeMyPassword, getMyPrivacy, patchMyPrivacy } from "../api/profile";
 import AppIcon from "../components/AppIcon.vue";
 import { useAuthStore } from "../stores/auth";
 import { applyUserPreferences } from "../utils/preferences";
@@ -64,6 +64,7 @@ const websiteUrl = ref("");
 const socialLinks = ref<SocialLink[]>([]);
 const birthday = ref("");
 const country = ref("");
+const showOnlineStatus = ref(false);
 
 const err = ref("");
 const avatarMsg = ref("");
@@ -266,6 +267,12 @@ onMounted(async () => {
     applyUserPreferences({ language_preference: me.value.language_preference });
     avatarMsg.value = "";
     await loadInvites();
+    try {
+      const priv = await getMyPrivacy(auth.token);
+      showOnlineStatus.value = priv.show_online_status;
+    } catch {
+      showOnlineStatus.value = false;
+    }
     document.addEventListener("visibilitychange", onMeVisibility);
     mePoll = setInterval(() => void refreshMeFromServer(), POLL_MS);
   } catch (e) {
@@ -373,6 +380,7 @@ async function save() {
         country: country.value,
       }),
     });
+    await patchMyPrivacy(auth.token, { show_online_status: showOnlineStatus.value });
     applyUserPreferences({ language_preference: languagePreference.value });
     toastSuccess("сохранено");
     await router.push(`/u/${auth.nickname}`);
@@ -550,6 +558,14 @@ function closeSettings() {
             </select>
           </label>
         </div>
+
+        <section class="privacy-block">
+          <label class="toggle-row">
+            <input v-model="showOnlineStatus" type="checkbox" />
+            <span>показывать, что я онлайн</span>
+          </label>
+          <p class="muted small">по умолчанию выключено · видно в профиле и в чатах</p>
+        </section>
       </template>
 
       <template v-else-if="tab === 'security'">
@@ -807,6 +823,24 @@ function closeSettings() {
   margin: 0;
   font-size: 1rem;
   font-weight: 500;
+}
+.privacy-block {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  cursor: pointer;
+  font-size: 0.92rem;
+}
+.toggle-row input {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: var(--text);
 }
 .nick-row {
   display: flex;

@@ -235,6 +235,7 @@ db.exec(`
     media_visibility TEXT NOT NULL DEFAULT 'public',
     show_birthday INTEGER NOT NULL DEFAULT 1,
     show_country INTEGER NOT NULL DEFAULT 1,
+    show_online_status INTEGER NOT NULL DEFAULT 0,
     updated_at TEXT NOT NULL
   );
 
@@ -302,6 +303,18 @@ try {
 } catch {
   try {
     db.exec("ALTER TABLE users ADD COLUMN last_passive_coin_at TEXT");
+  } catch {
+    // ignore
+  }
+}
+
+try {
+  db.prepare("SELECT show_online_status FROM user_privacy_settings LIMIT 1").get();
+} catch {
+  try {
+    db.exec(
+      "ALTER TABLE user_privacy_settings ADD COLUMN show_online_status INTEGER NOT NULL DEFAULT 0",
+    );
   } catch {
     // ignore
   }

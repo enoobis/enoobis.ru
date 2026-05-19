@@ -8,6 +8,7 @@ import {
   checkFollowerMilestones,
 } from "../utils/achievements.js";
 import { buildModerationNotices, parseContentLimits } from "../utils/contentLimits.js";
+import { onlinePayload } from "../utils/onlineStatus.js";
 const JWT_SECRET = process.env.JWT_SECRET ?? "dev-secret-change-me";
 
 function viewerId(req) {
@@ -225,7 +226,9 @@ router.post("/me/activity", authRequired, (req, res) => {
     );
   }
 
-  run("UPDATE users SET last_seen_at = ? WHERE id = ?", now, userId);
+  if (userShowsOnlineStatus(userId)) {
+    run("UPDATE users SET last_seen_at = ? WHERE id = ?", now, userId);
+  }
 
   if (seconds > 0) {
     const rowAfter = get(
@@ -343,17 +346,23 @@ router.delete("/me/invites/:id", authRequired, (req, res) => {
 function ensurePrivacyRow(userId) {
   run(
     `INSERT OR IGNORE INTO user_privacy_settings
-       (user_id, profile_visibility, activity_visibility, media_visibility, show_birthday, show_country, updated_at)
-       VALUES (?, 'public', 'public', 'public', 1, 1, ?)`,
+       (user_id, profile_visibility, activity_visibility, media_visibility, show_birthday, show_country, show_online_status, updated_at)
+       VALUES (?, 'public', 'public', 'public', 1, 1, 0, ?)`,
     userId,
     nowIso(),
   );
 }
 
+function userShowsOnlineStatus(userId) {
+  ensurePrivacyRow(userId);
+  const row = get("SELECT show_online_status FROM user_privacy_settings WHERE user_id = ?", userId);
+  return !!row?.show_online_status;
+}
+
 router.get("/me/privacy", authRequired, (req, res) => {
   ensurePrivacyRow(req.user.id);
   const row = get(
-    `SELECT profile_visibility, activity_visibility, media_visibility, show_birthday, show_country
+    `SELECT profile_visibility, activity_visibility, media_visibility, show_birthday, show_country, show_online_status
      FROM user_privacy_settings WHERE user_id = ?`,
     req.user.id,
   );
@@ -363,6 +372,7 @@ router.get("/me/privacy", authRequired, (req, res) => {
     media_visibility: row?.media_visibility ?? "public",
     show_birthday: !!row?.show_birthday,
     show_country: !!row?.show_country,
+    show_online_status: !!row?.show_online_status,
   });
 });
 
@@ -375,6 +385,7 @@ router.patch("/me/privacy", authRequired, (req, res) => {
     media_visibility: body.media_visibility,
     show_birthday: body.show_birthday,
     show_country: body.show_country,
+    show_online_status: body.show_online_status,
   };
   for (const [k, v] of Object.entries(fields)) {
     if (v === undefined) continue;
@@ -385,7 +396,7 @@ router.patch("/me/privacy", authRequired, (req, res) => {
     }
   }
   const updated = get(
-    `SELECT profile_visibility, activity_visibility, media_visibility, show_birthday, show_country
+    `SELECT profile_visibility, activity_visibility, media_visibility, show_birthday, show_country, show_online_status
      FROM user_privacy_settings WHERE user_id = ?`,
     req.user.id,
   );
@@ -395,6 +406,7 @@ router.patch("/me/privacy", authRequired, (req, res) => {
     media_visibility: updated.media_visibility,
     show_birthday: !!updated.show_birthday,
     show_country: !!updated.show_country,
+    show_online_status: !!updated.show_online_status,
   });
 });
 
@@ -602,7 +614,7 @@ router.get("/profile/:nickname", (req, res) => {
     country: p.country ?? "",
     readme_md: p.readme_md ?? "",
     created_at: p.created_at ?? "",
-    last_seen_at: p.last_seen_at ?? "",
+    online: onlinePayload(p.last_seen_at, userShowsOnlineStatus(p.id)),
     favorite_courses,
     achievements,
     followers_count,
