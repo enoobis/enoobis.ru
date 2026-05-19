@@ -1,5 +1,5 @@
 /** активность за последние N мс считается «онлайн» */
-export const ONLINE_THRESHOLD_MS = 90 * 1000;
+export const ONLINE_THRESHOLD_MS = 120 * 1000;
 
 export function isOnlineFromLastSeen(lastSeenAt) {
   if (!lastSeenAt) return false;

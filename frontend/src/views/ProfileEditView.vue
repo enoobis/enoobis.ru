@@ -383,6 +383,9 @@ async function save() {
       }),
     });
     await patchMyPrivacy(auth.token, { show_online_status: showOnlineStatus.value });
+    if (showOnlineStatus.value) {
+      window.dispatchEvent(new CustomEvent("enoobis:online-preference-updated"));
+    }
     applyUserPreferences({ language_preference: languagePreference.value });
     toastSuccess("сохранено");
     await router.push(`/u/${auth.nickname}`);

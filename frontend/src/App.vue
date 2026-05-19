@@ -162,7 +162,7 @@ async function flushActivity(force = false, visible = !document.hidden) {
   if (!auth.token) return;
   const now = Date.now();
   const elapsed = Math.floor((now - activityTickStart) / 1000);
-  if (!force && elapsed < 15) return;
+  if (!force && elapsed < 10) return;
   if (!force && document.hidden) return;
   activityTickStart = now;
   const seconds = visible && elapsed > 0 ? Math.min(elapsed, 600) : 0;
@@ -171,7 +171,7 @@ async function flushActivity(force = false, visible = !document.hidden) {
     const data = await api<{ ok?: boolean; coins?: number }>("/api/me/activity", {
       method: "POST",
       token: auth.token,
-      body: JSON.stringify({ seconds, visible }),
+      body: JSON.stringify({ seconds, visible: !!visible }),
     });
     if (typeof data.coins === "number") profileCoins.value = data.coins;
   } catch {
@@ -179,13 +179,19 @@ async function flushActivity(force = false, visible = !document.hidden) {
   }
 }
 
+function pulseOnlinePresence() {
+  if (!auth.token || document.hidden) return;
+  void flushActivity(true, true);
+}
+
 function startActivityTracking() {
   stopActivityTracking();
   activityTickStart = Date.now();
   if (!auth.token) return;
+  pulseOnlinePresence();
   activityInterval = setInterval(() => {
-    void flushActivity(false);
-  }, 60000);
+    void flushActivity(false, !document.hidden);
+  }, 30000);
 }
 
 function startChatPoll() {
@@ -221,8 +227,13 @@ function onProfileCosmeticsUpdated() {
   void loadMePresentation();
 }
 
+function onOnlinePreferenceUpdated() {
+  pulseOnlinePresence();
+}
+
 onMounted(async () => {
   window.addEventListener("enoobis:profile-cosmetics-updated", onProfileCosmeticsUpdated);
+  window.addEventListener("enoobis:online-preference-updated", onOnlinePreferenceUpdated);
   window.addEventListener("online", syncOnlineStatus);
   window.addEventListener("offline", syncOnlineStatus);
   window.addEventListener("resize", onLayoutScrollResize);
@@ -239,6 +250,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener("enoobis:profile-cosmetics-updated", onProfileCosmeticsUpdated);
+  window.removeEventListener("enoobis:online-preference-updated", onOnlinePreferenceUpdated);
   window.removeEventListener("online", syncOnlineStatus);
   window.removeEventListener("offline", syncOnlineStatus);
   window.removeEventListener("resize", onLayoutScrollResize);

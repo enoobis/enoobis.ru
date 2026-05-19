@@ -227,10 +227,10 @@ router.post("/me/activity", authRequired, (req, res) => {
   }
 
   if (userShowsOnlineStatus(userId)) {
-    if (req.body?.visible === true) {
-      run("UPDATE users SET last_seen_at = ? WHERE id = ?", now, userId);
-    } else if (req.body?.visible === false) {
+    if (req.body?.visible === false) {
       run("UPDATE users SET last_seen_at = NULL WHERE id = ?", userId);
+    } else if (req.body?.visible === true || seconds > 0) {
+      run("UPDATE users SET last_seen_at = ? WHERE id = ?", now, userId);
     }
   }
 
@@ -395,8 +395,12 @@ router.patch("/me/privacy", authRequired, (req, res) => {
     if (v === undefined) continue;
     if (k.startsWith("show_")) {
       run(`UPDATE user_privacy_settings SET ${k} = ?, updated_at = ? WHERE user_id = ?`, v ? 1 : 0, nowIso(), req.user.id);
-      if (k === "show_online_status" && !v) {
-        run("UPDATE users SET last_seen_at = NULL WHERE id = ?", req.user.id);
+      if (k === "show_online_status") {
+        if (!v) {
+          run("UPDATE users SET last_seen_at = NULL WHERE id = ?", req.user.id);
+        } else {
+          run("UPDATE users SET last_seen_at = ? WHERE id = ?", nowIso(), req.user.id);
+        }
       }
     } else if (typeof v === "string" && ["public", "followers", "private"].includes(v)) {
       run(`UPDATE user_privacy_settings SET ${k} = ?, updated_at = ? WHERE user_id = ?`, v, nowIso(), req.user.id);
