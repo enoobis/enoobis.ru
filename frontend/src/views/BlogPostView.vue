@@ -8,21 +8,22 @@ import {
   deletePost,
   getMyPostState,
   getPost,
-  likePost,
   listComments,
   reportComment,
   reportPost,
-  unlikePost,
+  votePost,
   unbookmarkPost,
   type BlogPost,
   type CommentItem,
 } from "../api/blog";
 import AppIcon from "../components/AppIcon.vue";
-import { pinPost } from "../api/profile";
 import { useAuthStore } from "../stores/auth";
 import { renderMarkdown } from "../utils/markdown";
 import { addRecentPost, updateRecentPostProgress } from "../utils/recentPosts";
 import { toast, toastError, toastSuccess } from "../utils/toast";
+import "../styles/post-actions.css";
+
+const ACT = 18;
 
 const route = useRoute();
 const router = useRouter();
@@ -32,7 +33,12 @@ const comments = ref<CommentItem[]>([]);
 const err = ref("");
 const commentBody = ref("");
 const working = ref(false);
-const myState = ref({ liked: false, bookmarked: false, can_edit: false, can_delete: false });
+const myState = ref({
+  my_vote: null as 1 | -1 | null,
+  bookmarked: false,
+  can_edit: false,
+  can_delete: false,
+});
 
 const postId = computed(() => String(route.params.id || ""));
 const renderedBody = computed(() => renderMarkdown(post.value?.body ?? ""));
@@ -58,7 +64,7 @@ async function load() {
     if (auth.token) {
       myState.value = await getMyPostState(postId.value, auth.token);
     } else {
-      myState.value = { liked: false, bookmarked: false, can_edit: false, can_delete: false };
+      myState.value = { my_vote: null, bookmarked: false, can_edit: false, can_delete: false };
     }
   } catch (e) {
     err.value = e instanceof Error ? e.message : "ошибка";
@@ -75,7 +81,7 @@ async function softRefreshPost() {
     if (auth.token) {
       myState.value = await getMyPostState(postId.value, auth.token);
     } else {
-      myState.value = { liked: false, bookmarked: false, can_edit: false, can_delete: false };
+      myState.value = { my_vote: null, bookmarked: false, can_edit: false, can_delete: false };
     }
   } catch {
   }
@@ -96,16 +102,15 @@ function persistProgress() {
   updateRecentPostProgress(post.value.id, readingProgress());
 }
 
-async function toggleLike() {
-  if (!auth.token || !post.value || working.value) return;
+const isAuthor = computed(() => !!post.value && auth.user?.id === post.value.author_id);
+
+async function castVote(vote: 1 | -1) {
+  if (!auth.token || !post.value || working.value || isAuthor.value) return;
   working.value = true;
   try {
-    if (myState.value.liked) {
-      await unlikePost(post.value.id, auth.token);
-    } else {
-      await likePost(post.value.id, auth.token);
-    }
-    await load();
+    const res = await votePost(post.value.id, auth.token, vote);
+    post.value = { ...post.value, up_count: res.up_count, down_count: res.down_count, my_vote: res.my_vote };
+    myState.value = { ...myState.value, my_vote: res.my_vote };
   } catch (e) {
     err.value = e instanceof Error ? e.message : "ошибка";
   } finally {
@@ -130,13 +135,11 @@ async function toggleBookmark() {
   }
 }
 
-async function pinThis() {
-  if (!auth.token || !post.value) return;
-  try {
-    await pinPost(auth.token, { type: "blog", id: post.value.id });
-    toastSuccess("закреплено в профиле");
-  } catch (e) {
-    toastError(e);
+function goBack() {
+  if (window.history.state?.back) {
+    router.back();
+  } else {
+    router.push({ name: "blog" });
   }
 }
 
@@ -230,6 +233,44 @@ watch(() => route.params.id, load);
 
 <template>
   <article v-if="post" class="post">
+    <div class="post-actions post-actions--top post-actions--lg">
+      <button class="act" type="button" aria-label="назад" title="назад" @click="goBack">
+        <AppIcon name="back" :size="ACT" />
+      </button>
+      <button
+        v-if="auth.token"
+        class="act"
+        type="button"
+        :class="{ on: myState.bookmarked }"
+        :title="myState.bookmarked ? 'убрать из закладок' : 'в закладки'"
+        @click="toggleBookmark"
+      >
+        <AppIcon :name="myState.bookmarked ? 'bookmarked' : 'bookmark'" :size="ACT" />
+      </button>
+      <div v-if="auth.token && !isAuthor" class="votes">
+        <button class="act" type="button" :class="{ on: myState.my_vote === 1 }" title="вверх" @click="castVote(1)">
+          <AppIcon name="voteUp" :size="ACT" />
+        </button>
+        <span v-if="post.up_count || post.down_count" class="vote-score">
+          <span v-if="post.up_count">{{ post.up_count }}</span>
+          <span v-if="post.up_count && post.down_count" class="vote-sep">·</span>
+          <span v-if="post.down_count">{{ post.down_count }}</span>
+        </span>
+        <button class="act" type="button" :class="{ on: myState.my_vote === -1 }" title="вниз" @click="castVote(-1)">
+          <AppIcon name="voteDown" :size="ACT" />
+        </button>
+      </div>
+      <span v-else-if="post.up_count || post.down_count" class="votes votes-readonly">
+        <span class="act" aria-hidden="true"><AppIcon name="voteUp" :size="ACT" /></span>
+        <span class="vote-score">
+          <span v-if="post.up_count">{{ post.up_count }}</span>
+          <span v-if="post.up_count && post.down_count" class="vote-sep">·</span>
+          <span v-if="post.down_count">{{ post.down_count }}</span>
+        </span>
+        <span class="act" aria-hidden="true"><AppIcon name="voteDown" :size="ACT" /></span>
+      </span>
+    </div>
+
     <h1>{{ post.title }}</h1>
     <p class="meta muted">
       <RouterLink :to="`/u/${post.author_nickname}`">{{ post.author_nickname }}</RouterLink>
@@ -244,41 +285,18 @@ watch(() => route.params.id, load);
     />
     <div class="markdown-body" v-html="renderedBody" />
 
-    <div class="actions">
-      <button v-if="auth.token" class="icon-action" type="button" :title="myState.liked ? 'убрать лайк' : 'лайк'" @click="toggleLike">
-        <AppIcon :name="myState.liked ? 'liked' : 'like'" />
-        <span>{{ post.like_count }}</span>
+    <div class="post-actions post-actions--lg">
+      <button class="act" type="button" title="поделиться" @click="sharePost">
+        <AppIcon name="send" :size="ACT" />
       </button>
-      <button v-if="auth.token" class="icon-action" type="button" :title="myState.bookmarked ? 'убрать из закладок' : 'в закладки'" @click="toggleBookmark">
-        <AppIcon :name="myState.bookmarked ? 'bookmarked' : 'bookmark'" />
-      </button>
-      <button class="icon-action" type="button" title="поделиться" @click="sharePost">
-        <AppIcon name="send" />
-      </button>
-      <button
-        v-if="myState.can_edit"
-        class="icon-action"
-        type="button"
-        title="закрепить в профиле"
-        @click="pinThis"
-      >
-        <AppIcon name="pin" />
-      </button>
-      <RouterLink v-if="myState.can_edit" :to="`/blogs/${post.id}/edit`" class="icon-action" title="редактировать">
-        <AppIcon name="edit" />
+      <RouterLink v-if="myState.can_edit" :to="`/blogs/${post.id}/edit`" class="act" title="редактировать">
+        <AppIcon name="edit" :size="ACT" />
       </RouterLink>
-      <button
-        v-if="myState.can_delete"
-        class="icon-action icon-action--danger"
-        type="button"
-        title="удалить пост"
-        :disabled="working"
-        @click="removePost"
-      >
-        <AppIcon name="delete" />
+      <button v-if="myState.can_delete" class="act danger" type="button" title="удалить" :disabled="working" @click="removePost">
+        <AppIcon name="delete" :size="ACT" />
       </button>
-      <button v-if="auth.token" class="icon-action" type="button" title="пожаловаться" @click="sendPostReport">
-        <AppIcon name="report" />
+      <button v-if="auth.token && !isAuthor" class="act" type="button" title="пожаловаться" @click="sendPostReport">
+        <AppIcon name="report" :size="ACT" />
       </button>
     </div>
 
@@ -304,7 +322,12 @@ watch(() => route.params.id, load);
             >
               удалить
             </button>
-            <button class="link-btn" type="button" @click="sendCommentReport(c.id)">
+            <button
+              v-if="auth.user?.id !== c.user_id"
+              class="link-btn"
+              type="button"
+              @click="sendCommentReport(c.id)"
+            >
               жалоба
             </button>
           </div>
@@ -392,32 +415,15 @@ h1 {
   border-bottom: 1px solid var(--border);
 }
 
-.actions {
-  display: flex;
-  gap: 0.5rem;
-  margin: 2rem 0 0;
-  padding-top: 1.2rem;
-  border-top: 1px solid var(--border);
-}
-.icon-action {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  background: transparent;
+.post-actions--top {
+  margin: 0 0 1rem;
+  padding: 0;
   border: none;
-  color: var(--muted);
-  padding: 0.4rem 0.5rem;
-  border-radius: 6px;
-  font-size: 0.85rem;
-  min-height: 0;
 }
-.icon-action:hover {
-  color: var(--text);
-  background: var(--surface);
-}
-.icon-action--danger:hover {
-  color: var(--text);
-  background: rgba(180, 60, 60, 0.12);
+.post-actions {
+  margin: 2.25rem 0 0;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
 }
 
 .comments {

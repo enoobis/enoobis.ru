@@ -16,6 +16,8 @@ const props = withDefaults(
       | "logout"
       | "like"
       | "liked"
+      | "voteUp"
+      | "voteDown"
       | "comment"
       | "tag"
       | "bookmark"
@@ -89,6 +91,10 @@ const d = computed(() => {
       return "M12 20s-6.8-4.3-6.8-9.6A3.8 3.8 0 0112 8a3.8 3.8 0 016.8 2.4C18.8 15.7 12 20 12 20z";
     case "liked":
       return "M12 20s-6.8-4.3-6.8-9.6A3.8 3.8 0 0112 8a3.8 3.8 0 016.8 2.4C18.8 15.7 12 20 12 20z";
+    case "voteUp":
+      return "M12 7.2 17.4 17 6.6 17 12 7.2z";
+    case "voteDown":
+      return "M12 16.8 17.4 7 6.6 7 12 16.8z";
     case "comment":
       return "M5 6h14v9H10l-5 4V6z";
     case "tag":
@@ -98,11 +104,11 @@ const d = computed(() => {
     case "bookmarked":
       return "M7 4h10v16l-5-3-5 3V4z";
     case "report":
-      return "M12 3l8 4.5v9L12 21 4 16.5v-9L12 3zm0 5v5m0 3h.01";
+      return "M12 4l7 4v8l-7 4-7-4v-8l7-4zM12 9v4m0 2.5h.01";
     case "send":
-      return "M3 11.5L21 4l-7 16-2.6-6.4L3 11.5zm8.4 2.1L21 4";
+      return "M3 11.5L21 4l-7 16-2.6-6.4L3 11.5z";
     case "delete":
-      return "M6 7h12M9 7V5h6v2m-8 0l1 12h8l1-12M10 11v6M14 11v6";
+      return "M5 7h14M8 7V5h8v2M6 7l1.2 13h9.6L18 7M10 11v5M14 11v5";
     case "edit":
       return "M4 20h4l10-10-4-4L4 16v4zm9-13l4 4";
     case "settings":
@@ -140,7 +146,7 @@ const d = computed(() => {
     case "image":
       return "M4 5h16v14H4V5zm0 11l5-5 4 4 3-3 4 4M9 10a1.5 1.5 0 100-3 1.5 1.5 0 000 3z";
     case "pin":
-      return "M9 4h6l-1 5 3 4H7l3-4-1-5zM12 13v7";
+      return "M12 5.5l3.5 6.5H8.5L12 5.5zM12 12v6.5";
     case "pinned":
       return "";
     case "trophy":
@@ -183,7 +189,7 @@ const d = computed(() => {
     :viewBox="viewBox"
     fill="none"
     stroke="currentColor"
-    stroke-width="2.2"
+    stroke-width="2"
     stroke-linecap="round"
     stroke-linejoin="round"
     aria-hidden="true"
@@ -192,7 +198,22 @@ const d = computed(() => {
       <path d="M9 4h6l-1 5 3 4H7l3-4-1-5z" />
       <path d="M11 13h2v8H11z" />
     </g>
-    <path v-if="name !== 'pinned' && name !== 'liked' && name !== 'bookmarked'" :d="d" />
+    <path
+      v-if="name === 'voteUp' || name === 'voteDown'"
+      :d="d"
+      fill="currentColor"
+      stroke="none"
+    />
+    <path
+      v-else-if="name === 'liked' || name === 'bookmarked'"
+      :d="d"
+      fill="currentColor"
+      stroke="none"
+    />
+    <path
+      v-else-if="name !== 'pinned'"
+      :d="d"
+    />
     <circle
       v-if="name === 'seen'"
       cx="12"
@@ -201,6 +222,12 @@ const d = computed(() => {
       fill="currentColor"
       stroke="none"
     />
-    <path v-if="name === 'liked' || name === 'bookmarked'" :d="d" fill="currentColor" stroke="none" />
   </svg>
 </template>
+
+<style scoped>
+.app-icon {
+  display: block;
+  flex-shrink: 0;
+}
+</style>

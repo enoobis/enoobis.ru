@@ -152,6 +152,7 @@ function threadDto(row, meId) {
     other_nickname: other?.nickname ?? "",
     other_avatar: other?.avatar_url ?? "",
     other_online: other?.online?.online ?? null,
+    other_last_seen_at: other?.online?.last_seen_at ?? null,
     last_body: previewOf(last),
     last_from_me: last ? last.sender_id === meId : false,
     last_at: last?.created_at ?? row.last_message_at ?? null,

@@ -9,10 +9,17 @@ export type MicroPost = {
   author_nickname: string;
   author_avatar: string;
   created_at: string;
-  like_count: number;
+  up_count: number;
+  down_count: number;
+  my_vote: 1 | -1 | null;
   reply_count: number;
-  liked_by_me: boolean;
   bookmarked_by_me?: boolean;
+};
+
+export type VoteSummary = {
+  up_count: number;
+  down_count: number;
+  my_vote: 1 | -1 | null;
 };
 
 export type MicroFeed = {
@@ -82,12 +89,12 @@ export function updateMicro(id: string, token: string, body: string) {
   });
 }
 
-export function likeMicro(id: string, token: string) {
-  return api<{ ok: boolean }>(`/api/micro/${id}/like`, { method: "POST", token });
-}
-
-export function unlikeMicro(id: string, token: string) {
-  return api<{ ok: boolean }>(`/api/micro/${id}/like`, { method: "DELETE", token });
+export function voteMicro(id: string, token: string, vote: 1 | -1) {
+  return api<VoteSummary>(`/api/micro/${id}/vote`, {
+    method: "POST",
+    token,
+    body: JSON.stringify({ vote }),
+  });
 }
 
 export function bookmarkMicro(id: string, token: string) {

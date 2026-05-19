@@ -1,5 +1,5 @@
 /** активность за последние N мс считается «онлайн» */
-export const ONLINE_THRESHOLD_MS = 2 * 60 * 1000;
+export const ONLINE_THRESHOLD_MS = 90 * 1000;
 
 export function isOnlineFromLastSeen(lastSeenAt) {
   if (!lastSeenAt) return false;
@@ -8,8 +8,12 @@ export function isOnlineFromLastSeen(lastSeenAt) {
   return Date.now() - t <= ONLINE_THRESHOLD_MS;
 }
 
-/** null — пользователь скрыл статус; иначе { online: boolean } */
+/** null — статус скрыт; иначе online + last_seen_at (если был в сети) */
 export function onlinePayload(lastSeenAt, showOnlineStatus) {
   if (!showOnlineStatus) return null;
-  return { online: isOnlineFromLastSeen(lastSeenAt) };
+  const seen = lastSeenAt ? String(lastSeenAt) : null;
+  return {
+    online: isOnlineFromLastSeen(lastSeenAt),
+    last_seen_at: seen,
+  };
 }

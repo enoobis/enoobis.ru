@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { RouterLink } from "vue-router";
 import AppIcon from "../components/AppIcon.vue";
+import PostMetaStats from "../components/PostMetaStats.vue";
 import {
   listMyBookmarks,
   listPosts,
@@ -31,7 +32,7 @@ const filtersOpen = ref(false);
 
 const sortedPosts = computed(() => {
   const items = posts.value.slice();
-  if (sort.value === "popular") items.sort((a, b) => b.like_count - a.like_count);
+  if (sort.value === "popular") items.sort((a, b) => b.up_count - a.up_count);
   else if (sort.value === "discussed") items.sort((a, b) => b.comment_count - a.comment_count);
   return items;
 });
@@ -189,8 +190,14 @@ onMounted(async () => {
             <span>{{ p.author_nickname }}</span>
             <span>·</span>
             <span>{{ (p.published_at || p.created_at).slice(0, 10) }}</span>
-            <span v-if="p.like_count">· {{ p.like_count }} ♥</span>
-            <span v-if="p.comment_count">· {{ p.comment_count }} ✦</span>
+            <template v-if="p.up_count || p.down_count || p.comment_count">
+              <span>·</span>
+              <PostMetaStats
+                :up-count="p.up_count"
+                :down-count="p.down_count"
+                :comment-count="p.comment_count"
+              />
+            </template>
           </div>
         </li>
       </ul>
@@ -336,6 +343,7 @@ onMounted(async () => {
 .meta {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 0.35rem;
   font-size: 0.82rem;
 }

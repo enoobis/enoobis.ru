@@ -13,7 +13,8 @@ export type BlogListItem = {
   updated_at: string;
   tags: string[];
   categories: string[];
-  like_count: number;
+  up_count: number;
+  down_count: number;
   comment_count: number;
 };
 
@@ -33,10 +34,11 @@ export type BlogPost = {
   tags: string[];
   categories: string[];
   image_urls: string[];
-  like_count: number;
+  up_count: number;
+  down_count: number;
+  my_vote: 1 | -1 | null;
   bookmark_count: number;
   comment_count: number;
-  liked_by_me: boolean;
   bookmarked_by_me: boolean;
   can_edit: boolean;
 };
@@ -66,8 +68,14 @@ export type CommentItem = {
   updated_at: string;
 };
 
+export type VoteSummary = {
+  up_count: number;
+  down_count: number;
+  my_vote: 1 | -1 | null;
+};
+
 export type MyPostState = {
-  liked: boolean;
+  my_vote: 1 | -1 | null;
   bookmarked: boolean;
   can_edit: boolean;
   can_delete: boolean;
@@ -224,12 +232,12 @@ export function reportComment(commentId: string, token: string, reason: string) 
   });
 }
 
-export function likePost(postId: string, token: string) {
-  return api<{ ok: boolean }>(`/api/blog/${postId}/like`, { method: "POST", token });
-}
-
-export function unlikePost(postId: string, token: string) {
-  return api<{ ok: boolean }>(`/api/blog/${postId}/like`, { method: "DELETE", token });
+export function votePost(postId: string, token: string, vote: 1 | -1) {
+  return api<VoteSummary>(`/api/blog/${postId}/vote`, {
+    method: "POST",
+    token,
+    body: JSON.stringify({ vote }),
+  });
 }
 
 export function bookmarkPost(postId: string, token: string) {

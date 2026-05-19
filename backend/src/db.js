@@ -90,6 +90,7 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS blog_post_likes (
     user_id TEXT NOT NULL,
     post_id TEXT NOT NULL,
+    vote INTEGER NOT NULL DEFAULT 1,
     created_at TEXT NOT NULL,
     PRIMARY KEY (user_id, post_id)
   );
@@ -321,6 +322,26 @@ try {
 }
 
 try {
+  db.prepare("SELECT vote FROM blog_post_likes LIMIT 1").get();
+} catch {
+  try {
+    db.exec("ALTER TABLE blog_post_likes ADD COLUMN vote INTEGER NOT NULL DEFAULT 1");
+  } catch {
+    // ignore
+  }
+}
+
+try {
+  db.prepare("SELECT vote FROM micropost_likes LIMIT 1").get();
+} catch {
+  try {
+    db.exec("ALTER TABLE micropost_likes ADD COLUMN vote INTEGER NOT NULL DEFAULT 1");
+  } catch {
+    // ignore
+  }
+}
+
+try {
   db.prepare("SELECT category FROM library_books LIMIT 1").get();
 } catch {
   try {
@@ -487,6 +508,7 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS micropost_likes (
     micropost_id TEXT NOT NULL,
     user_id TEXT NOT NULL,
+    vote INTEGER NOT NULL DEFAULT 1,
     created_at TEXT NOT NULL,
     PRIMARY KEY (micropost_id, user_id),
     FOREIGN KEY (micropost_id) REFERENCES microposts(id),

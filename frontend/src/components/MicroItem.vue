@@ -6,15 +6,16 @@ import RichText from "./RichText.vue";
 import {
   bookmarkMicro,
   deleteMicro,
-  likeMicro,
   unbookmarkMicro,
-  unlikeMicro,
   updateMicro,
+  voteMicro,
   type MicroPost,
 } from "../api/micro";
-import { pinPost } from "../api/profile";
 import { useAuthStore } from "../stores/auth";
 import { toast, toastError, toastSuccess } from "../utils/toast";
+import "../styles/post-actions.css";
+
+const ACT = 15;
 
 const props = defineProps<{
   post: MicroPost;
@@ -29,15 +30,14 @@ const emit = defineEmits<{
 
 const auth = useAuthStore();
 const router = useRouter();
-const liked = ref(props.post.liked_by_me);
-const likes = ref(props.post.like_count);
+const myVote = ref<1 | -1 | null>(props.post.my_vote);
+const upCount = ref(props.post.up_count);
+const downCount = ref(props.post.down_count);
 const bookmarked = ref(!!props.post.bookmarked_by_me);
 const busy = ref(false);
 const editing = ref(false);
 const draft = ref("");
 const saving = ref(false);
-const pinBusy = ref(false);
-
 const EDIT_WINDOW_MS = 5 * 60 * 1000;
 const isAuthor = computed(() => auth.user?.id === props.post.author_id);
 const canDelete = computed(
@@ -63,19 +63,14 @@ function formatAgo(iso: string) {
   return iso.slice(0, 10);
 }
 
-async function toggleLike() {
-  if (!auth.token || busy.value) return;
+async function castVote(vote: 1 | -1) {
+  if (!auth.token || busy.value || isAuthor.value) return;
   busy.value = true;
   try {
-    if (liked.value) {
-      await unlikeMicro(props.post.id, auth.token);
-      liked.value = false;
-      likes.value = Math.max(0, likes.value - 1);
-    } else {
-      await likeMicro(props.post.id, auth.token);
-      liked.value = true;
-      likes.value += 1;
-    }
+    const res = await voteMicro(props.post.id, auth.token, vote);
+    myVote.value = res.my_vote;
+    upCount.value = res.up_count;
+    downCount.value = res.down_count;
   } catch {
     /* ignore */
   } finally {
@@ -100,19 +95,6 @@ async function toggleBookmark() {
     toastError(e);
   } finally {
     busy.value = false;
-  }
-}
-
-async function togglePin() {
-  if (!auth.token || pinBusy.value) return;
-  pinBusy.value = true;
-  try {
-    await pinPost(auth.token, { type: "micro", id: props.post.id });
-    toastSuccess("закреплено в профиле");
-  } catch (e) {
-    toastError(e);
-  } finally {
-    pinBusy.value = false;
   }
 }
 
@@ -199,54 +181,71 @@ async function share() {
         <img v-if="post.image_url" :src="post.image_url" alt="" class="image" />
       </template>
 
-      <div class="actions" @click.stop>
-        <button
-          class="action"
-          type="button"
-          :class="{ on: liked }"
-          :disabled="!auth.token || editing"
-          @click="toggleLike"
-        >
-          <AppIcon :name="liked ? 'liked' : 'like'" :size="14" />
-          <span v-if="likes">{{ likes }}</span>
-        </button>
-        <RouterLink :to="`/microblogs/${post.id}`" class="action">
-          <AppIcon name="comment" :size="14" />
+      <div class="post-actions" @click.stop>
+        <div v-if="!isAuthor" class="votes">
+          <button
+            class="act"
+            type="button"
+            :class="{ on: myVote === 1 }"
+            :disabled="!auth.token || editing"
+            title="вверх"
+            @click="castVote(1)"
+          >
+            <AppIcon name="voteUp" :size="ACT" />
+          </button>
+          <span v-if="upCount || downCount" class="vote-score">
+            <span v-if="upCount">{{ upCount }}</span>
+            <span v-if="upCount && downCount" class="vote-sep">·</span>
+            <span v-if="downCount">{{ downCount }}</span>
+          </span>
+          <button
+            class="act"
+            type="button"
+            :class="{ on: myVote === -1 }"
+            :disabled="!auth.token || editing"
+            title="вниз"
+            @click="castVote(-1)"
+          >
+            <AppIcon name="voteDown" :size="ACT" />
+          </button>
+        </div>
+        <span v-else-if="upCount || downCount" class="votes votes-readonly">
+          <span class="act" aria-hidden="true"><AppIcon name="voteUp" :size="ACT" /></span>
+          <span class="vote-score">
+            <span v-if="upCount">{{ upCount }}</span>
+            <span v-if="upCount && downCount" class="vote-sep">·</span>
+            <span v-if="downCount">{{ downCount }}</span>
+          </span>
+          <span class="act" aria-hidden="true"><AppIcon name="voteDown" :size="ACT" /></span>
+        </span>
+        <RouterLink :to="`/microblogs/${post.id}`" class="act" title="комментарии">
+          <AppIcon name="comment" :size="ACT" />
           <span v-if="post.reply_count">{{ post.reply_count }}</span>
         </RouterLink>
         <button
           v-if="auth.token"
-          class="action"
+          class="act"
           type="button"
           :class="{ on: bookmarked }"
           :title="bookmarked ? 'убрать из закладок' : 'в закладки'"
           @click="toggleBookmark"
         >
-          <AppIcon :name="bookmarked ? 'bookmarked' : 'bookmark'" :size="14" />
+          <AppIcon :name="bookmarked ? 'bookmarked' : 'bookmark'" :size="ACT" />
         </button>
-        <button class="action" type="button" title="поделиться" @click="share">
-          <AppIcon name="send" :size="14" />
-        </button>
-        <button
-          v-if="isAuthor && !editing"
-          class="action"
-          type="button"
-          title="закрепить в профиле"
-          @click="togglePin"
-        >
-          <AppIcon name="pin" :size="14" />
+        <button class="act" type="button" title="поделиться" @click="share">
+          <AppIcon name="send" :size="ACT" />
         </button>
         <button
           v-if="canEdit && !editing"
-          class="action"
+          class="act"
           type="button"
           title="редактировать"
           @click="startEdit"
         >
-          <AppIcon name="edit" :size="14" />
+          <AppIcon name="edit" :size="ACT" />
         </button>
-        <button v-if="canDelete && !editing" class="action danger" type="button" @click="remove">
-          <AppIcon name="delete" :size="14" />
+        <button v-if="canDelete && !editing" class="act danger" type="button" title="удалить" @click="remove">
+          <AppIcon name="delete" :size="ACT" />
         </button>
       </div>
     </div>
@@ -352,33 +351,8 @@ header {
   color: var(--text);
 }
 
-.actions {
-  display: flex;
-  gap: 0.6rem;
+.post-actions {
   margin-top: 0.3rem;
-}
-.action {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  background: transparent;
-  border: none;
-  color: var(--muted);
-  padding: 0.2rem 0.4rem;
-  min-height: 0;
-  border-radius: 6px;
-  font-size: 0.78rem;
-}
-.action:hover:not(:disabled) {
-  color: var(--text);
-  background: var(--surface);
-}
-.action.on {
-  color: var(--text);
-}
-.action.danger:hover {
-  color: var(--danger);
-  background: transparent;
 }
 .small {
   font-size: 0.78rem;

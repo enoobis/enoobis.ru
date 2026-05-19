@@ -10,6 +10,7 @@ import {
   awardAchievement,
   checkMicroLikeMilestone,
 } from "../utils/achievements.js";
+import { applyVote, voteSummary } from "../utils/votes.js";
 import { assertMicroPublish } from "../utils/contentLimits.js";
 import { optimizeUploadedFile } from "../utils/imageOptimize.js";
 
@@ -50,10 +51,6 @@ function userLimitsJson(userId) {
   return get("SELECT content_limits_json FROM users WHERE id = ?", userId)?.content_limits_json ?? "{}";
 }
 
-function likeCount(id) {
-  return get("SELECT COUNT(*) as v FROM micropost_likes WHERE micropost_id = ?", id)?.v ?? 0;
-}
-
 function replyCount(id) {
   return (
     get("SELECT COUNT(*) as v FROM microposts WHERE parent_id = ? AND is_deleted = 0", id)?.v ?? 0
@@ -88,9 +85,8 @@ function rowToItem(row, viewerId) {
     author_nickname: row.author_nickname ?? "",
     author_avatar: row.author_avatar ?? "",
     created_at: row.created_at,
-    like_count: likeCount(row.id),
+    ...voteSummary("micropost_likes", "micropost_id", row.id, viewerId),
     reply_count: replyCount(row.id),
-    liked_by_me: likedByUser(row.id, viewerId),
     bookmarked_by_me: bookmarkedByUser(row.id, viewerId),
   };
 }
@@ -315,29 +311,25 @@ router.patch("/micro/:id", authRequired, (req, res) => {
   return res.json(fetchById(req.params.id, req.user.id));
 });
 
-router.post("/micro/:id/like", authRequired, (req, res) => {
+router.post("/micro/:id/vote", authRequired, (req, res) => {
+  const vote = Number(req.body?.vote);
+  if (vote !== 1 && vote !== -1) return res.status(400).json({ error: "invalid vote" });
   const post = get(
     "SELECT id, author_id FROM microposts WHERE id = ? AND is_deleted = 0",
     req.params.id,
   );
   if (!post) return res.status(404).json({ error: "not found" });
-  run(
-    "INSERT OR IGNORE INTO micropost_likes (micropost_id, user_id, created_at) VALUES (?, ?, ?)",
-    req.params.id,
-    req.user.id,
-    nowIso(),
-  );
+  if (post.author_id === req.user.id) return res.status(403).json({ error: "cannot vote own post" });
+  applyVote({
+    table: "micropost_likes",
+    idColumn: "micropost_id",
+    userIdColumn: "user_id",
+    id: req.params.id,
+    userId: req.user.id,
+    vote,
+  });
   checkMicroLikeMilestone(req.params.id);
-  res.json({ ok: true });
-});
-
-router.delete("/micro/:id/like", authRequired, (req, res) => {
-  run(
-    "DELETE FROM micropost_likes WHERE micropost_id = ? AND user_id = ?",
-    req.params.id,
-    req.user.id,
-  );
-  res.json({ ok: true });
+  res.json(voteSummary("micropost_likes", "micropost_id", req.params.id, req.user.id));
 });
 
 export default router;

@@ -7,6 +7,7 @@ import {
   awardAchievement,
   checkBlogLikeMilestone,
 } from "../utils/achievements.js";
+import { applyVote, voteSummary } from "../utils/votes.js";
 import { assertBlogComment, assertBlogPublish } from "../utils/contentLimits.js";
 
 const router = express.Router();
@@ -39,7 +40,7 @@ function rowToListItem(row) {
     updated_at: row.updated_at ?? "",
     tags: tagsForPost(row.id),
     categories: categoriesForPost(row.id),
-    like_count: likeCount(row.id),
+    ...voteSummary("blog_post_likes", "post_id", row.id, null),
     comment_count: commentCount(row.id),
   };
 }
@@ -55,9 +56,6 @@ function categoriesForPost(postId) {
     `SELECT c.slug FROM blog_post_categories pc JOIN blog_categories c ON c.id = pc.category_id WHERE pc.post_id = ?`,
     postId,
   ).map((r) => r.slug);
-}
-function likeCount(postId) {
-  return get("SELECT COUNT(*) as v FROM blog_post_likes WHERE post_id = ?", postId)?.v ?? 0;
 }
 function commentCount(postId) {
   return (
@@ -197,13 +195,7 @@ function fetchPostFull(id, viewerId) {
     id,
   );
   if (!row) return null;
-  const liked = viewerId
-    ? !!get(
-        "SELECT 1 as v FROM blog_post_likes WHERE user_id = ? AND post_id = ?",
-        viewerId,
-        id,
-      )
-    : false;
+  const votes = voteSummary("blog_post_likes", "post_id", id, viewerId);
   const bookmarked = viewerId
     ? !!get(
         "SELECT 1 as v FROM blog_post_bookmarks WHERE user_id = ? AND post_id = ?",
@@ -232,10 +224,9 @@ function fetchPostFull(id, viewerId) {
     tags: tagsForPost(id),
     categories: categoriesForPost(id),
     image_urls,
-    like_count: likeCount(id),
+    ...votes,
     bookmark_count: bookmarkCount(id),
     comment_count: commentCount(id),
-    liked_by_me: liked,
     bookmarked_by_me: bookmarked,
     can_edit,
   };
@@ -272,11 +263,7 @@ router.get("/blog/:id/edit", authRequired, (req, res) => {
 });
 
 router.get("/blog/:id/me", authRequired, (req, res) => {
-  const liked = !!get(
-    "SELECT 1 as v FROM blog_post_likes WHERE user_id = ? AND post_id = ?",
-    req.user.id,
-    req.params.id,
-  );
+  const votes = voteSummary("blog_post_likes", "post_id", req.params.id, req.user.id);
   const bookmarked = !!get(
     "SELECT 1 as v FROM blog_post_bookmarks WHERE user_id = ? AND post_id = ?",
     req.user.id,
@@ -285,7 +272,7 @@ router.get("/blog/:id/me", authRequired, (req, res) => {
   const post = get("SELECT author_id FROM blog_posts WHERE id = ?", req.params.id);
   const isAuthor = !!post && post.author_id === req.user.id;
   return res.json({
-    liked,
+    my_vote: votes.my_vote,
     bookmarked,
     can_edit: isAuthor,
     can_delete:
@@ -534,23 +521,25 @@ router.delete("/blog/comments/:id", authRequired, (req, res) => {
   return res.json({ ok: true });
 });
 
-router.post("/blog/:id/like", authRequired, (req, res) => {
-  run(
-    "INSERT OR IGNORE INTO blog_post_likes (user_id, post_id, created_at) VALUES (?, ?, ?)",
-    req.user.id,
+router.post("/blog/:id/vote", authRequired, (req, res) => {
+  const vote = Number(req.body?.vote);
+  if (vote !== 1 && vote !== -1) return res.status(400).json({ error: "invalid vote" });
+  const post = get(
+    "SELECT author_id FROM blog_posts WHERE id = ? AND is_deleted = 0",
     req.params.id,
-    nowIso(),
   );
+  if (!post) return res.status(404).json({ error: "not found" });
+  if (post.author_id === req.user.id) return res.status(403).json({ error: "cannot vote own post" });
+  applyVote({
+    table: "blog_post_likes",
+    idColumn: "post_id",
+    userIdColumn: "user_id",
+    id: req.params.id,
+    userId: req.user.id,
+    vote,
+  });
   checkBlogLikeMilestone(req.params.id);
-  return res.json({ ok: true });
-});
-router.delete("/blog/:id/like", authRequired, (req, res) => {
-  run(
-    "DELETE FROM blog_post_likes WHERE user_id = ? AND post_id = ?",
-    req.user.id,
-    req.params.id,
-  );
-  return res.json({ ok: true });
+  return res.json(voteSummary("blog_post_likes", "post_id", req.params.id, req.user.id));
 });
 router.post("/blog/:id/bookmark", authRequired, (req, res) => {
   run(
@@ -571,6 +560,9 @@ router.delete("/blog/:id/bookmark", authRequired, (req, res) => {
 });
 
 router.post("/blog/:id/report", authRequired, (req, res) => {
+  const post = get("SELECT author_id FROM blog_posts WHERE id = ?", req.params.id);
+  if (!post) return res.status(404).json({ error: "not found" });
+  if (post.author_id === req.user.id) return res.status(403).json({ error: "cannot report own post" });
   const id = uuidv4();
   run(
     `INSERT INTO blog_reports (id, target_type, target_post_id, target_comment_id, reporter_user_id, reason, status, created_at)
@@ -585,8 +577,9 @@ router.post("/blog/:id/report", authRequired, (req, res) => {
 });
 
 router.post("/blog/comments/:id/report", authRequired, (req, res) => {
-  const comment = get("SELECT post_id FROM blog_comments WHERE id = ?", req.params.id);
+  const comment = get("SELECT post_id, user_id FROM blog_comments WHERE id = ?", req.params.id);
   if (!comment) return res.status(404).json({ error: "not found" });
+  if (comment.user_id === req.user.id) return res.status(403).json({ error: "cannot report own comment" });
   const id = uuidv4();
   run(
     `INSERT INTO blog_reports (id, target_type, target_post_id, target_comment_id, reporter_user_id, reason, status, created_at)

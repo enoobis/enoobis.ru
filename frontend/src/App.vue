@@ -111,13 +111,26 @@ function toggleProfileMenu() {
   profileMenuOpen.value = !profileMenuOpen.value;
 }
 
+async function clearOnlinePresence() {
+  if (!auth.token) return;
+  try {
+    await api("/api/me/activity", {
+      method: "POST",
+      token: auth.token,
+      body: JSON.stringify({ seconds: 0, visible: false }),
+    });
+  } catch {
+    // ignore
+  }
+}
+
 function logoutFromMenu() {
   profileMenuOpen.value = false;
   profileAvatarUrl.value = "";
   profileAvatarBroken.value = false;
   profileCoins.value = 0;
   stopActivityTracking();
-  auth.logout();
+  void clearOnlinePresence().finally(() => auth.logout());
 }
 
 async function loadMePresentation() {
@@ -145,18 +158,20 @@ async function loadMePresentation() {
   }
 }
 
-async function flushActivity(force = false) {
+async function flushActivity(force = false, visible = !document.hidden) {
   if (!auth.token) return;
   const now = Date.now();
   const elapsed = Math.floor((now - activityTickStart) / 1000);
   if (!force && elapsed < 15) return;
+  if (!force && document.hidden) return;
   activityTickStart = now;
-  if (elapsed <= 0) return;
+  const seconds = visible && elapsed > 0 ? Math.min(elapsed, 600) : 0;
+  if (!visible && seconds <= 0 && !force) return;
   try {
     const data = await api<{ ok?: boolean; coins?: number }>("/api/me/activity", {
       method: "POST",
       token: auth.token,
-      body: JSON.stringify({ seconds: Math.min(elapsed, 600) }),
+      body: JSON.stringify({ seconds, visible }),
     });
     if (typeof data.coins === "number") profileCoins.value = data.coins;
   } catch {
@@ -195,9 +210,10 @@ function stopActivityTracking() {
 
 function onVisibilityChange() {
   if (document.hidden) {
-    void flushActivity(true);
+    void flushActivity(true, false);
   } else {
     activityTickStart = Date.now();
+    void flushActivity(true, true);
   }
 }
 
@@ -231,7 +247,7 @@ onUnmounted(() => {
   window.removeEventListener("keydown", onGlobalKey);
   document.removeEventListener("visibilitychange", onVisibilityChange);
   document.removeEventListener("click", onDocumentClick);
-  void flushActivity(true);
+  void flushActivity(true, false);
   stopActivityTracking();
   stopChatPoll();
 });

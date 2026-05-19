@@ -20,7 +20,7 @@ export type PrivacySettings = {
   show_online_status: boolean;
 };
 
-export type OnlineStatus = { online: boolean } | null;
+export type OnlineStatus = { online: boolean; last_seen_at: string | null } | null;
 
 export type NotificationSettings = {
   email_enabled: boolean;
@@ -67,20 +67,6 @@ export function changeMyPassword(token: string, current_password: string, new_pa
     token,
     body: JSON.stringify({ current_password, new_password }),
   });
-}
-
-export type PinPayload = { type: "micro" | "blog"; id: string };
-
-export function pinPost(token: string, payload: PinPayload) {
-  return api<{ ok: boolean }>("/api/me/pin", {
-    method: "POST",
-    token,
-    body: JSON.stringify(payload),
-  });
-}
-
-export function unpinPost(token: string) {
-  return api<{ ok: boolean }>("/api/me/pin", { method: "DELETE", token });
 }
 
 export type Achievement = {

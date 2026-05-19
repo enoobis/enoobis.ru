@@ -566,7 +566,7 @@ function closeSettings() {
             <input v-model="showOnlineStatus" type="checkbox" />
             <span>показывать, что я онлайн</span>
           </label>
-          <p class="muted small">по умолчанию выключено · видно в профиле и в чатах</p>
+          <p class="muted small">по умолчанию выключено · «онлайн» или когда был в сети</p>
         </section>
       </template>
 

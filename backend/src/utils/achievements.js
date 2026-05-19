@@ -64,7 +64,7 @@ export function checkFollowerMilestones(userId) {
 export function checkBlogLikeMilestone(postId) {
   if (!postId) return;
   const row = get(
-    "SELECT author_id, (SELECT COUNT(*) FROM blog_post_likes WHERE post_id = bp.id) as likes FROM blog_posts bp WHERE bp.id = ?",
+    "SELECT author_id, (SELECT COUNT(*) FROM blog_post_likes WHERE post_id = bp.id AND vote = 1) as likes FROM blog_posts bp WHERE bp.id = ?",
     postId,
   );
   if (!row) return;
@@ -74,7 +74,7 @@ export function checkBlogLikeMilestone(postId) {
 export function checkMicroLikeMilestone(microId) {
   if (!microId) return;
   const row = get(
-    "SELECT author_id, (SELECT COUNT(*) FROM micropost_likes WHERE micropost_id = m.id) as likes FROM microposts m WHERE m.id = ?",
+    "SELECT author_id, (SELECT COUNT(*) FROM micropost_likes WHERE micropost_id = m.id AND vote = 1) as likes FROM microposts m WHERE m.id = ?",
     microId,
   );
   if (!row) return;

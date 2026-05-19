@@ -6,30 +6,11 @@ import { listAuthorPosts, type BlogListItem } from "../api/blog";
 import { listMicroByAuthor, type MicroPost } from "../api/micro";
 import MicroItem from "../components/MicroItem.vue";
 import AppIcon from "../components/AppIcon.vue";
-import { unpinPost, type Achievement } from "../api/profile";
+import PostMetaStats from "../components/PostMetaStats.vue";
+import type { Achievement } from "../api/profile";
 import { useAuthStore } from "../stores/auth";
 import { renderMarkdown } from "../utils/markdown";
-import { toastError, toastSuccess } from "../utils/toast";
-
-type PinnedPost =
-  | {
-      type: "micro";
-      id: string;
-      body: string;
-      image_url: string;
-      author_nickname: string;
-      author_avatar: string;
-      created_at: string;
-    }
-  | {
-      type: "blog";
-      id: string;
-      title: string;
-      excerpt: string;
-      author_nickname: string;
-      created_at: string;
-    };
-
+import { formatLastSeen } from "../utils/lastSeen";
 type Profile = {
   nickname: string;
   role: string;
@@ -43,12 +24,11 @@ type Profile = {
   social_links: { name: string; url: string }[];
   readme_md: string;
   created_at: string;
-  online?: { online: boolean } | null;
+  online?: { online: boolean; last_seen_at: string | null } | null;
   followers_count: number;
   following_count: number;
   coins?: number;
   achievements: Achievement[];
-  pinned_post: PinnedPost | null;
   moderation_notices?: string[];
 };
 
@@ -72,7 +52,16 @@ const renderedReadme = computed(() => renderMarkdown(profile.value?.readme_md ??
 const socialPublic = computed(() =>
   (profile.value?.social_links ?? []).filter((s) => String(s?.url ?? "").trim().length > 0),
 );
-const isOnline = computed(() => profile.value?.online?.online === true);
+const isOnline = computed(
+  () => !isMe.value && profile.value?.online?.online === true,
+);
+const presenceLabel = computed(() => {
+  const o = profile.value?.online;
+  if (!o || isMe.value) return "";
+  if (o.online) return "онлайн";
+  if (o.last_seen_at) return formatLastSeen(o.last_seen_at);
+  return "";
+});
 
 async function load() {
   err.value = "";
@@ -135,22 +124,6 @@ const earnedAchievements = computed(() =>
 );
 
 const moderationNotices = computed(() => profile.value?.moderation_notices ?? []);
-
-const pinBusy = ref(false);
-
-async function unpinFromProfile() {
-  if (!auth.token || pinBusy.value) return;
-  pinBusy.value = true;
-  try {
-    await unpinPost(auth.token);
-    if (profile.value) profile.value.pinned_post = null;
-    toastSuccess("открепили");
-  } catch (e) {
-    toastError(e);
-  } finally {
-    pinBusy.value = false;
-  }
-}
 
 const POLL_MS = 12000;
 let profilePoll: ReturnType<typeof setInterval> | null = null;
@@ -222,7 +195,9 @@ watch(nick, load);
             :src="profile.avatar_frame_url"
             alt=""
           />
-          <span v-if="isOnline" class="online-dot" title="онлайн" />
+          <span v-if="isOnline" class="online-star" title="онлайн">
+            <AppIcon name="spark" :size="11" />
+          </span>
         </div>
       </div>
 
@@ -230,7 +205,9 @@ watch(nick, load);
         <h1>{{ displayName }}</h1>
         <p class="muted nick-line">
           @{{ profile.nickname }}
-          <span v-if="isOnline" class="online-label">· онлайн</span>
+          <span v-if="presenceLabel" class="presence-label" :class="{ online: isOnline }">
+            · {{ presenceLabel }}
+          </span>
         </p>
         <p v-if="profile.bio" class="bio">{{ profile.bio }}</p>
         <p class="meta muted">
@@ -284,47 +261,6 @@ watch(nick, load);
 
     <article v-if="profile.readme_md" class="readme markdown-body" v-html="renderedReadme" />
 
-    <section v-if="profile.pinned_post" class="pinned">
-      <header class="pinned-head">
-        <span class="muted small pinned-label">
-          <AppIcon name="pin" :size="12" />
-          закреплено
-        </span>
-        <button
-          v-if="isMe"
-          type="button"
-          class="pin-x"
-          :disabled="pinBusy"
-          aria-label="открепить"
-          title="открепить"
-          @click="unpinFromProfile"
-        >
-          <AppIcon name="close" :size="12" />
-        </button>
-      </header>
-      <RouterLink
-        v-if="profile.pinned_post.type === 'blog'"
-        :to="`/blogs/${profile.pinned_post.id}`"
-        class="pinned-blog"
-      >
-        <strong>{{ profile.pinned_post.title }}</strong>
-        <span v-if="profile.pinned_post.excerpt" class="muted small">{{ profile.pinned_post.excerpt }}</span>
-      </RouterLink>
-      <RouterLink
-        v-else-if="profile.pinned_post.type === 'micro'"
-        :to="`/microblogs/${profile.pinned_post.id}`"
-        class="pinned-micro"
-      >
-        <p v-if="profile.pinned_post.body" class="pinned-body">{{ profile.pinned_post.body }}</p>
-        <img
-          v-if="profile.pinned_post.image_url"
-          :src="profile.pinned_post.image_url"
-          alt=""
-          class="pinned-img"
-        />
-      </RouterLink>
-    </section>
-
     <section v-if="earnedAchievements.length" class="ach">
       <p class="muted small ach-title">
         <AppIcon name="trophy" :size="12" />
@@ -352,7 +288,17 @@ watch(nick, load);
       <ul v-if="posts.length" class="post-list">
         <li v-for="p in posts" :key="p.id">
           <RouterLink :to="`/blogs/${p.id}`" class="post-title">{{ p.title }}</RouterLink>
-          <span class="muted small">{{ (p.published_at || p.created_at).slice(0, 10) }}</span>
+          <p class="meta muted small">
+            <span>{{ (p.published_at || p.created_at).slice(0, 10) }}</span>
+            <template v-if="p.up_count || p.down_count || p.comment_count">
+              <span>·</span>
+              <PostMetaStats
+                :up-count="p.up_count"
+                :down-count="p.down_count"
+                :comment-count="p.comment_count"
+              />
+            </template>
+          </p>
         </li>
       </ul>
       <p v-else class="muted empty">записей нет</p>
@@ -443,21 +389,20 @@ watch(nick, load);
   object-fit: contain;
   pointer-events: none;
 }
-.online-dot {
+.online-star {
   position: absolute;
-  right: 2px;
-  bottom: 2px;
-  width: 11px;
-  height: 11px;
-  border-radius: 999px;
-  background: #4ade80;
-  border: 2px solid var(--bg, #0a0a0a);
-  box-sizing: border-box;
+  right: 0;
+  bottom: 0;
+  display: inline-flex;
+  color: #fbbf24;
   z-index: 2;
 }
-.online-label {
-  color: #4ade80;
+.presence-label {
+  color: var(--muted);
   font-size: 0.82rem;
+}
+.presence-label.online {
+  color: #fbbf24;
 }
 .nick-line {
   margin: 0;
@@ -617,65 +562,6 @@ watch(nick, load);
   padding: 0;
 }
 
-.pinned {
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 0.7rem 0.85rem;
-  margin-bottom: 1rem;
-  background: var(--surface);
-}
-.pinned-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.4rem;
-}
-.pinned-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  font-size: 0.7rem;
-}
-.pin-x {
-  width: 22px;
-  height: 22px;
-  min-height: 22px;
-  padding: 0;
-  border-radius: 999px;
-  border: none;
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-}
-.pin-x:hover {
-  color: var(--text);
-  background: var(--surface2);
-}
-.pinned-blog,
-.pinned-micro {
-  display: block;
-  color: var(--text);
-}
-.pinned-blog strong {
-  display: block;
-  margin-bottom: 0.2rem;
-}
-.pinned-body {
-  margin: 0;
-  font-size: 0.95rem;
-  white-space: pre-wrap;
-}
-.pinned-img {
-  max-width: 100%;
-  max-height: 240px;
-  border-radius: 8px;
-  margin-top: 0.4rem;
-  border: 1px solid var(--border);
-  display: block;
-}
-
 .ach {
   margin-bottom: 1rem;
 }
@@ -744,10 +630,15 @@ watch(nick, load);
   gap: 1rem;
 }
 .post-list li {
+  display: grid;
+  gap: 0.25rem;
+}
+.post-list .meta {
   display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  align-items: baseline;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
 }
 .post-title {
   color: var(--text);
