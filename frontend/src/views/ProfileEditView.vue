@@ -267,11 +267,13 @@ onMounted(async () => {
     applyUserPreferences({ language_preference: me.value.language_preference });
     avatarMsg.value = "";
     await loadInvites();
-    try {
-      const priv = await getMyPrivacy(auth.token);
-      showOnlineStatus.value = priv.show_online_status;
-    } catch {
-      showOnlineStatus.value = false;
+    if (auth.token) {
+      try {
+        const priv = await getMyPrivacy(auth.token);
+        showOnlineStatus.value = priv.show_online_status;
+      } catch {
+        showOnlineStatus.value = false;
+      }
     }
     document.addEventListener("visibilitychange", onMeVisibility);
     mePoll = setInterval(() => void refreshMeFromServer(), POLL_MS);
