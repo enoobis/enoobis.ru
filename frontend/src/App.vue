@@ -439,14 +439,6 @@ watch(
               магазин
             </RouterLink>
             <RouterLink
-              v-if="auth.role === 'teacher' || auth.role === 'admin'"
-              to="/storage"
-              class="nav-drawer-link"
-              @click="closeNavDrawer"
-            >
-              хранилище
-            </RouterLink>
-            <RouterLink
               v-if="auth.role === 'admin'"
               to="/admin"
               class="nav-drawer-link"
