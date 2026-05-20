@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
 import { api } from "./api/http";
 import { useAuthStore } from "./stores/auth";
@@ -19,8 +19,6 @@ const isOnline = ref(typeof navigator !== "undefined" ? navigator.onLine : true)
 const profileMenuOpen = ref(false);
 const profileMenuRoot = ref<HTMLElement | null>(null);
 const navDrawerOpen = ref(false);
-const navBurgerRef = ref<HTMLButtonElement | null>(null);
-const drawerPanelPos = ref({ top: "0px", left: "0px" });
 const profileAvatarUrl = ref("");
 const profileAvatarBroken = ref(false);
 const profileCoins = ref(0);
@@ -43,7 +41,7 @@ function onDocumentClick(event: MouseEvent) {
     profileMenuOpen.value = false;
   }
   if (navDrawerOpen.value) {
-    if (target?.closest?.(".nav-drawer-panel")) return;
+    if (target?.closest?.(".nav-menu-sheet")) return;
     navDrawerOpen.value = false;
   }
 }
@@ -78,29 +76,8 @@ function refreshPage() {
   window.location.reload();
 }
 
-function syncDrawerPanelPos() {
-  const el = navBurgerRef.value;
-  if (!el) return;
-  const r = el.getBoundingClientRect();
-  const pad = 6;
-  const panelW = 208;
-  let left = Math.round(r.left);
-  const margin = 8;
-  const maxLeft = Math.max(margin, window.innerWidth - panelW - margin);
-  if (left > maxLeft) left = maxLeft;
-  drawerPanelPos.value = {
-    top: `${Math.round(r.bottom + pad)}px`,
-    left: `${left}px`,
-  };
-}
-
-function onLayoutScrollResize() {
-  if (navDrawerOpen.value) syncDrawerPanelPos();
-}
-
 function toggleNavDrawer() {
   navDrawerOpen.value = !navDrawerOpen.value;
-  if (navDrawerOpen.value) void nextTick(() => syncDrawerPanelPos());
 }
 
 function closeNavDrawer() {
@@ -236,8 +213,6 @@ onMounted(async () => {
   window.addEventListener("enoobis:online-preference-updated", onOnlinePreferenceUpdated);
   window.addEventListener("online", syncOnlineStatus);
   window.addEventListener("offline", syncOnlineStatus);
-  window.addEventListener("resize", onLayoutScrollResize);
-  window.addEventListener("scroll", onLayoutScrollResize, true);
   window.addEventListener("keydown", onEscape);
   window.addEventListener("keydown", onGlobalKey);
   document.addEventListener("visibilitychange", onVisibilityChange);
@@ -253,9 +228,8 @@ onUnmounted(() => {
   window.removeEventListener("enoobis:online-preference-updated", onOnlinePreferenceUpdated);
   window.removeEventListener("online", syncOnlineStatus);
   window.removeEventListener("offline", syncOnlineStatus);
-  window.removeEventListener("resize", onLayoutScrollResize);
-  window.removeEventListener("scroll", onLayoutScrollResize, true);
   window.removeEventListener("keydown", onEscape);
+  document.documentElement.style.overflow = "";
   window.removeEventListener("keydown", onGlobalKey);
   document.removeEventListener("visibilitychange", onVisibilityChange);
   document.removeEventListener("click", onDocumentClick);
@@ -272,7 +246,8 @@ watch(
 );
 
 watch(navDrawerOpen, (open) => {
-  if (open) void nextTick(() => syncDrawerPanelPos());
+  if (typeof document === "undefined") return;
+  document.documentElement.style.overflow = open ? "hidden" : "";
 });
 
 watch(
@@ -294,7 +269,6 @@ watch(
       <span v-if="routeNavPending" class="nav-route-loading muted" aria-live="polite">загрузка…</span>
       <button
         v-if="auth.token"
-        ref="navBurgerRef"
         type="button"
         class="icon-btn nav-burger"
         :aria-expanded="navDrawerOpen"
@@ -403,60 +377,48 @@ watch(
       </template>
     </header>
     <Teleport to="body">
-      <template v-if="navDrawerOpen">
-        <div class="nav-drawer-backdrop" aria-hidden="true" @click="closeNavDrawer" />
-        <aside
-          id="nav-drawer"
-          class="nav-drawer-panel card"
-          role="dialog"
-          aria-modal="true"
-          aria-label="разделы"
-          :style="{ top: drawerPanelPos.top, left: drawerPanelPos.left }"
-          @click.stop
-        >
-          <nav class="nav-drawer-inner">
-            <RouterLink to="/blogs" class="nav-drawer-link" @click="closeNavDrawer">блоги</RouterLink>
-            <RouterLink to="/microblogs" class="nav-drawer-link" @click="closeNavDrawer">
-              микроблоги
-            </RouterLink>
-            <RouterLink
-              v-if="auth.token"
-              to="/courses"
-              class="nav-drawer-link"
-              @click="closeNavDrawer"
-            >
-              курсы
-            </RouterLink>
-            <RouterLink
-              v-if="auth.token"
-              to="/library"
-              class="nav-drawer-link"
-              @click="closeNavDrawer"
-            >
-              библиотека
-            </RouterLink>
-            <RouterLink v-if="auth.token" to="/shop" class="nav-drawer-link" @click="closeNavDrawer">
-              магазин
-            </RouterLink>
-            <RouterLink
-              v-if="auth.role === 'teacher' || auth.role === 'admin'"
-              to="/storage"
-              class="nav-drawer-link"
-              @click="closeNavDrawer"
-            >
-              хранилище
-            </RouterLink>
-            <RouterLink
-              v-if="auth.role === 'admin'"
-              to="/admin"
-              class="nav-drawer-link"
-              @click="closeNavDrawer"
-            >
-              админ
-            </RouterLink>
-          </nav>
-        </aside>
-      </template>
+      <Transition name="nav-menu">
+        <div v-if="navDrawerOpen" id="nav-drawer" class="nav-menu-root" @click="closeNavDrawer">
+          <div
+            class="nav-menu-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-label="разделы"
+            @click.stop
+          >
+            <span class="nav-menu-handle" aria-hidden="true" />
+            <nav class="nav-menu-inner">
+              <RouterLink to="/blogs" class="nav-menu-link" @click="closeNavDrawer">блоги</RouterLink>
+              <RouterLink to="/microblogs" class="nav-menu-link" @click="closeNavDrawer">микроблоги</RouterLink>
+              <RouterLink v-if="auth.token" to="/courses" class="nav-menu-link" @click="closeNavDrawer">
+                курсы
+              </RouterLink>
+              <RouterLink v-if="auth.token" to="/library" class="nav-menu-link" @click="closeNavDrawer">
+                библиотека
+              </RouterLink>
+              <RouterLink v-if="auth.token" to="/shop" class="nav-menu-link" @click="closeNavDrawer">
+                магазин
+              </RouterLink>
+              <RouterLink
+                v-if="auth.role === 'teacher' || auth.role === 'admin'"
+                to="/storage"
+                class="nav-menu-link"
+                @click="closeNavDrawer"
+              >
+                хранилище
+              </RouterLink>
+              <RouterLink
+                v-if="auth.role === 'admin'"
+                to="/admin"
+                class="nav-menu-link"
+                @click="closeNavDrawer"
+              >
+                админ
+              </RouterLink>
+            </nav>
+          </div>
+        </div>
+      </Transition>
     </Teleport>
     <RouterView v-slot="{ Component, route }">
       <Transition name="page" mode="out-in">
@@ -498,50 +460,80 @@ watch(
   color: var(--muted);
 }
 
-.nav-drawer-backdrop {
+.nav-menu-root {
   position: fixed;
   inset: 0;
   z-index: 90;
-  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
 }
 
-.nav-drawer-panel {
-  position: fixed;
-  z-index: 91;
+.nav-menu-sheet {
+  width: 100%;
+  max-width: 640px;
   margin: 0;
-  min-width: 13rem;
-  max-width: min(16rem, calc(100vw - 1rem));
-  max-height: min(70vh, calc(100vh - 3.5rem));
-  padding: 0.45rem 0.4rem;
+  padding: 0.5rem 0.85rem calc(0.85rem + env(safe-area-inset-bottom, 0px));
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: var(--radius) var(--radius) 0 0;
+  max-height: min(72vh, 28rem);
+  overflow-y: auto;
+}
+
+.nav-menu-handle {
+  display: block;
+  width: 2.25rem;
+  height: 3px;
+  margin: 0.35rem auto 0.65rem;
+  border-radius: 999px;
+  background: var(--border);
+}
+
+.nav-menu-inner {
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
-  overflow-y: auto;
-  border-radius: var(--radius);
 }
 
-.nav-drawer-inner {
-  display: flex;
-  flex-direction: column;
-  gap: 0.12rem;
-}
-
-.nav-drawer-link {
+.nav-menu-link {
   display: block;
-  padding: 0.52rem 0.62rem;
-  border-radius: 6px;
-  color: var(--muted);
+  padding: 0.75rem 0.25rem;
+  color: var(--text);
   text-transform: lowercase;
   font-size: 0.92rem;
   font-weight: 500;
   border: none;
+  border-radius: 0;
   background: transparent;
+  text-align: center;
 }
 
-.nav-drawer-link:hover {
-  background: var(--surface2);
-  color: var(--text);
+.nav-menu-link:hover {
+  color: var(--muted);
   text-decoration: none;
+}
+
+.nav-menu-enter-active .nav-menu-sheet,
+.nav-menu-leave-active .nav-menu-sheet {
+  transition: transform 0.24s ease;
+}
+
+.nav-menu-enter-active.nav-menu-root,
+.nav-menu-leave-active.nav-menu-root {
+  transition: background 0.2s ease;
+}
+
+.nav-menu-enter-from .nav-menu-sheet,
+.nav-menu-leave-to .nav-menu-sheet {
+  transform: translateY(100%);
+}
+
+.nav-menu-enter-from.nav-menu-root,
+.nav-menu-leave-to.nav-menu-root {
+  background: rgba(0, 0, 0, 0);
 }
 
 .profile-menu-wrap {
