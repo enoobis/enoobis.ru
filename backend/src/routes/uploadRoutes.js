@@ -108,12 +108,6 @@ router.post(
   },
 );
 
-const wallpaperUpload = multer({
-  storage: makeStorage("wallpapers"),
-  limits: { fileSize: 8 * 1024 * 1024 },
-  fileFilter: imageFileFilter,
-});
-
 const shopItemUpload = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, path.join(UPLOAD_ROOT, "shop-items")),
@@ -124,28 +118,6 @@ const shopItemUpload = multer({
   }),
   limits: { fileSize: 6 * 1024 * 1024 },
   fileFilter: imageFileFilter,
-});
-
-router.post("/me/wallpaper", authRequired, uploadSingle(wallpaperUpload, "file"), async (req, res) => {
-  if (!req.file) return res.status(400).json({ error: "no file" });
-  if (isRasterImageMimetype(req.file.mimetype) && req.file.mimetype !== "image/gif") {
-    const r = await optimizeUploadedFile(req.file.path, "wallpaper");
-    if (r.ok) req.file.filename = r.filename;
-  }
-  const url = `/uploads/wallpapers/${req.file.filename}`;
-  run("UPDATE users SET wallpaper_url = ? WHERE id = ?", url, req.user.id);
-  return res.json({ wallpaper_url: url });
-});
-
-router.delete("/me/wallpaper", authRequired, (req, res) => {
-  const row = get("SELECT wallpaper_url FROM users WHERE id = ?", req.user.id);
-  if (row?.wallpaper_url?.startsWith("/uploads/wallpapers/")) {
-    try {
-      fs.unlinkSync(path.join(UPLOAD_ROOT, row.wallpaper_url.replace(/^\/uploads\//, "")));
-    } catch { /* ignore */ }
-  }
-  run("UPDATE users SET wallpaper_url = '' WHERE id = ?", req.user.id);
-  return res.json({ ok: true });
 });
 
 router.post("/admin/shop/items", authRequired, uploadSingle(shopItemUpload, "file"), async (req, res) => {

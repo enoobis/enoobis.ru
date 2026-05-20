@@ -3,11 +3,11 @@ import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { api } from "../api/http";
 import { uploadAvatar } from "../api/uploadAvatar";
-import { uploadWallpaper, deleteWallpaper } from "../api/shop";
 import { changeMyPassword, getMyPrivacy, patchMyPrivacy } from "../api/profile";
 import AppIcon from "../components/AppIcon.vue";
 import { useAuthStore } from "../stores/auth";
 import { applyUserPreferences } from "../utils/preferences";
+import { THEMES, normalizeThemeId, type ThemeId } from "../utils/themes";
 import { toastError, toastSuccess } from "../utils/toast";
 
 const README_MAX = 4000;
@@ -28,6 +28,7 @@ type Me = {
   wallpaper_url: string;
   readme_md: string;
   language_preference: "ru" | "en";
+  theme_preference: string;
   full_name: string;
   website_url: string;
   social_links: SocialLink[];
@@ -59,6 +60,7 @@ const tab = ref<SettingsTab>("profile");
 const bio = ref("");
 const readmeMd = ref("");
 const languagePreference = ref<"ru" | "en">("ru");
+const themePreference = ref<ThemeId>("black");
 const fullName = ref("");
 const websiteUrl = ref("");
 const socialLinks = ref<SocialLink[]>([]);
@@ -69,7 +71,6 @@ const showOnlineStatus = ref(false);
 const err = ref("");
 const avatarMsg = ref("");
 const uploadingAvatar = ref(false);
-const uploadingWallpaper = ref(false);
 const saving = ref(false);
 
 const invites = ref<InviteLink[]>([]);
@@ -104,6 +105,9 @@ function applyMeMerge(oldMe: Me, fresh: Me) {
   if (languagePreference.value === oldMe.language_preference) {
     languagePreference.value = fresh.language_preference;
   }
+  if (themePreference.value === normalizeThemeId(oldMe.theme_preference)) {
+    themePreference.value = normalizeThemeId(fresh.theme_preference);
+  }
   if (fullName.value === normStr(oldMe.full_name)) fullName.value = normStr(fresh.full_name);
   if (websiteUrl.value === normStr(oldMe.website_url)) websiteUrl.value = normStr(fresh.website_url);
   if (birthday.value === normStr(oldMe.birthday)) birthday.value = normStr(fresh.birthday);
@@ -112,7 +116,10 @@ function applyMeMerge(oldMe: Me, fresh: Me) {
     socialLinks.value = Array.isArray(fresh.social_links) ? [...fresh.social_links] : [];
   }
   me.value = fresh;
-  applyUserPreferences({ language_preference: fresh.language_preference });
+  applyUserPreferences({
+    language_preference: fresh.language_preference,
+    theme_preference: fresh.theme_preference,
+  });
   if (auth.token && auth.user && fresh.nickname !== auth.user.nickname) {
     auth.applySession(auth.token, { ...auth.user, nickname: fresh.nickname });
   }
@@ -129,12 +136,16 @@ async function refreshMeFromServer() {
       bio.value = fresh.bio;
       readmeMd.value = fresh.readme_md ?? "";
       languagePreference.value = fresh.language_preference;
+      themePreference.value = normalizeThemeId(fresh.theme_preference);
       fullName.value = fresh.full_name ?? "";
       websiteUrl.value = fresh.website_url ?? "";
       socialLinks.value = Array.isArray(fresh.social_links) ? [...fresh.social_links] : [];
       birthday.value = fresh.birthday ?? "";
       country.value = fresh.country ?? "";
-      applyUserPreferences({ language_preference: fresh.language_preference });
+      applyUserPreferences({
+        language_preference: fresh.language_preference,
+        theme_preference: fresh.theme_preference,
+      });
       return;
     }
     applyMeMerge(old, fresh);
@@ -149,6 +160,13 @@ function onMeVisibility() {
 const nickChangesLeft = computed(() => {
   if (!me.value) return MAX_NICK_CHANGES;
   return Math.max(0, MAX_NICK_CHANGES - (me.value.nickname_change_count ?? 0));
+});
+
+const roleLabel = computed(() => {
+  const r = me.value?.role ?? auth.role ?? "student";
+  if (r === "admin") return "админ";
+  if (r === "teacher") return "ментор";
+  return "ученик";
 });
 
 function onNickInput() {
@@ -259,12 +277,16 @@ onMounted(async () => {
     bio.value = me.value.bio;
     readmeMd.value = me.value.readme_md ?? "";
     languagePreference.value = me.value.language_preference;
+    themePreference.value = normalizeThemeId(me.value.theme_preference);
     fullName.value = me.value.full_name ?? "";
     websiteUrl.value = me.value.website_url ?? "";
     socialLinks.value = Array.isArray(me.value.social_links) ? [...me.value.social_links] : [];
     birthday.value = me.value.birthday ?? "";
     country.value = me.value.country ?? "";
-    applyUserPreferences({ language_preference: me.value.language_preference });
+    applyUserPreferences({
+      language_preference: me.value.language_preference,
+      theme_preference: me.value.theme_preference,
+    });
     avatarMsg.value = "";
     await loadInvites();
     if (auth.token) {
@@ -318,34 +340,6 @@ async function onAvatarFile(ev: Event) {
   }
 }
 
-async function onWallpaperFile(e: Event) {
-  const file = (e.target as HTMLInputElement).files?.[0];
-  if (!file || !auth.token) return;
-  err.value = "";
-  uploadingWallpaper.value = true;
-  try {
-    const r = await uploadWallpaper(auth.token, file);
-    if (me.value) me.value.wallpaper_url = r.wallpaper_url;
-    avatarMsg.value = "фон обновлён";
-  } catch (ex) {
-    err.value = ex instanceof Error ? ex.message : "ошибка";
-  } finally {
-    uploadingWallpaper.value = false;
-  }
-}
-
-async function clearWallpaper() {
-  if (!auth.token) return;
-  err.value = "";
-  try {
-    await deleteWallpaper(auth.token);
-    if (me.value) me.value.wallpaper_url = "";
-    avatarMsg.value = "фон убран";
-  } catch (ex) {
-    err.value = ex instanceof Error ? ex.message : "ошибка";
-  }
-}
-
 async function clearAvatar() {
   if (!auth.token) return;
   err.value = "";
@@ -375,6 +369,7 @@ async function save() {
         bio: bio.value,
         readme_md: readmeMd.value,
         language_preference: languagePreference.value,
+        theme_preference: themePreference.value,
         full_name: fullName.value,
         website_url: websiteUrl.value,
         social_links: socialLinks.value,
@@ -386,7 +381,10 @@ async function save() {
     if (showOnlineStatus.value) {
       window.dispatchEvent(new CustomEvent("enoobis:online-preference-updated"));
     }
-    applyUserPreferences({ language_preference: languagePreference.value });
+    applyUserPreferences({
+      language_preference: languagePreference.value,
+      theme_preference: themePreference.value,
+    });
     toastSuccess("сохранено");
     await router.push(`/u/${auth.nickname}`);
   } catch (e) {
@@ -395,6 +393,14 @@ async function save() {
   } finally {
     saving.value = false;
   }
+}
+
+function pickTheme(id: ThemeId) {
+  themePreference.value = id;
+  applyUserPreferences({
+    language_preference: languagePreference.value,
+    theme_preference: id,
+  });
 }
 
 function closeSettings() {
@@ -442,18 +448,6 @@ function closeSettings() {
               {{ uploadingAvatar ? "загрузка…" : "загрузить фото" }}
             </label>
             <button v-if="me.avatar_url" class="secondary" type="button" @click="clearAvatar">убрать</button>
-          </div>
-        </div>
-
-        <div class="wallpaper-section">
-          <p class="muted small">фон профиля</p>
-          <div v-if="me.wallpaper_url" class="wallpaper-preview" :style="{ backgroundImage: `url(${me.wallpaper_url})` }" />
-          <div class="avatar-actions">
-            <label class="btn-file">
-              <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" :disabled="uploadingWallpaper" @change="onWallpaperFile" />
-              {{ uploadingWallpaper ? "загрузка…" : "загрузить фон" }}
-            </label>
-            <button v-if="me.wallpaper_url" class="secondary" type="button" @click="clearWallpaper">убрать фон</button>
           </div>
         </div>
 
@@ -542,10 +536,31 @@ function closeSettings() {
           <p v-else class="muted small">лимит смен исчерпан</p>
         </section>
 
+        <section class="theme-block">
+          <span class="theme-label muted">тема</span>
+          <div class="theme-picker">
+            <button
+              v-for="t in THEMES"
+              :key="t.id"
+              type="button"
+              class="theme-opt"
+              :data-preview="t.id"
+              :class="{ on: themePreference === t.id }"
+              :aria-label="t.label"
+              :title="t.label"
+              @click="pickTheme(t.id)"
+            />
+          </div>
+        </section>
+
         <div class="form-grid">
           <label class="col-2">
             <span>email</span>
             <input :value="me.email" disabled />
+          </label>
+          <label>
+            <span>роль</span>
+            <input :value="roleLabel" disabled />
           </label>
           <label>
             <span>день рождения</span>
@@ -616,7 +631,7 @@ function closeSettings() {
     </div>
   </section>
   <p v-else-if="err" class="error">{{ err }}</p>
-  <p v-else class="muted">Loading…</p>
+  <p v-else class="muted">загрузка</p>
 </template>
 
 <style scoped>
@@ -829,6 +844,44 @@ function closeSettings() {
   font-size: 1rem;
   font-weight: 500;
 }
+.theme-block {
+  margin-bottom: 1rem;
+}
+.theme-label {
+  display: block;
+  font-size: 0.82rem;
+  margin-bottom: 0.45rem;
+}
+.theme-picker {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.theme-opt {
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.theme-opt.on {
+  border-color: var(--text);
+}
+.theme-opt[data-preview="black"] {
+  background: #0a0a0a;
+}
+.theme-opt[data-preview="white"] {
+  background: #f6f6f6;
+}
+.theme-opt[data-preview="contrast"] {
+  background: #000;
+  box-shadow: inset 0 0 0 1px #fff;
+}
+.theme-opt[data-preview="contrast-white"] {
+  background: #fff;
+  box-shadow: inset 0 0 0 1px #000;
+}
 .privacy-block {
   margin-top: 1rem;
   padding-top: 1rem;
@@ -904,19 +957,4 @@ function closeSettings() {
   }
 }
 
-.wallpaper-section {
-  margin-bottom: 1rem;
-}
-.wallpaper-section .muted {
-  margin-bottom: 0.4rem;
-}
-.wallpaper-preview {
-  width: 100%;
-  height: 120px;
-  border-radius: var(--radius);
-  background-size: cover;
-  background-position: center;
-  border: 1px solid var(--border);
-  margin-bottom: 0.5rem;
-}
 </style>

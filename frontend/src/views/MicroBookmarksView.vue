@@ -42,7 +42,7 @@ onMounted(load);
 <template>
   <section class="saved">
     <header class="head">
-      <RouterLink to="/microblogs" class="back muted">← микроблоги</RouterLink>
+      <RouterLink to="/saved" class="back muted">← закладки</RouterLink>
       <h1>закладки</h1>
     </header>
     <p v-if="err" class="error">{{ err }}</p>

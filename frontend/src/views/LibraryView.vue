@@ -29,6 +29,8 @@ const isStaff = computed(() => auth.role === "teacher" || auth.role === "admin")
 const search = ref("");
 const activeCategory = ref("");
 const sort = ref<"new" | "title">("new");
+const categoryOpen = ref(false);
+const categoryMenuRoot = ref<HTMLElement | null>(null);
 let searchTimer: ReturnType<typeof setTimeout> | null = null;
 
 const showForm = ref(false);
@@ -116,7 +118,18 @@ async function loadCategories() {
 }
 
 function selectCategory(cat: string) {
-  activeCategory.value = activeCategory.value === cat ? "" : cat;
+  activeCategory.value = cat;
+  categoryOpen.value = false;
+}
+
+const categoryButtonLabel = computed(() => activeCategory.value || "все");
+
+function onDocumentClick(event: MouseEvent) {
+  if (!categoryOpen.value) return;
+  const target = event.target as HTMLElement | null;
+  const root = categoryMenuRoot.value;
+  if (root && target && root.contains(target)) return;
+  categoryOpen.value = false;
 }
 
 function onSearchInput() {
@@ -258,6 +271,7 @@ function canManageBook(b: LibraryBook) {
 }
 
 onMounted(() => {
+  document.addEventListener("click", onDocumentClick);
   if (auth.token) {
     void load();
     void loadCategories();
@@ -269,6 +283,7 @@ watch([activeCategory, sort], () => {
 });
 
 onBeforeUnmount(() => {
+  document.removeEventListener("click", onDocumentClick);
   closeReader();
   closeEdit();
 });
@@ -280,7 +295,12 @@ onBeforeUnmount(() => {
 
     <template v-else>
       <header class="head">
-        <h1>библиотека</h1>
+        <div class="head-main">
+          <h1>библиотека</h1>
+          <p class="stats muted small">
+            {{ totalCount }} {{ totalCount === 1 ? "книга" : "книг" }} · {{ fmtUsed(storageBytesUsed) }} / {{ libraryQuotaLabel }}
+          </p>
+        </div>
         <button v-if="isStaff && !showForm" type="button" @click="showForm = true">
           добавить
         </button>
@@ -311,78 +331,85 @@ onBeforeUnmount(() => {
         </div>
       </form>
 
-      <div class="grid">
-        <aside class="sidebar">
-          <h2>категории</h2>
-          <ul class="cat-list">
-            <li>
-              <button :class="{ active: activeCategory === '' }" type="button" @click="activeCategory = ''">
-                <span>все</span>
-              </button>
-            </li>
-            <li v-for="c in categories" :key="c.category">
-              <button
-                :class="{ active: activeCategory === c.category }"
-                type="button"
-                @click="selectCategory(c.category)"
-              >
-                <span>{{ c.category }}</span>
-                <span class="muted small">{{ c.count }}</span>
-              </button>
-            </li>
-          </ul>
-        </aside>
-
-        <div class="content">
-          <div class="bar">
-            <input
-              v-model="search"
-              class="search"
-              type="text"
-              placeholder="поиск по названию, автору, описанию"
-              @input="onSearchInput"
-            />
-            <select v-model="sort" class="sort">
-              <option value="new">новые</option>
-              <option value="title">по названию</option>
-            </select>
-          </div>
-
-          <p v-if="loading" class="muted">загрузка</p>
-          <p v-else-if="!books.length" class="muted">пусто</p>
-          <ul v-else class="list">
-            <li v-for="b in books" :key="b.id" class="row">
-              <div class="info">
-                <span class="title">{{ b.title }}</span>
-                <span v-if="b.author" class="muted small">{{ b.author }}</span>
-                <span v-if="b.description" class="muted small desc">{{ b.description }}</span>
-                <span class="muted small meta">
-                  <span v-if="b.category" class="cat-pill">{{ b.category }}</span>
-                  @{{ b.uploader_nickname }} · {{ fmt(b.size_bytes) }}
-                </span>
-              </div>
-              <div class="row-actions">
-                <button
-                  v-if="isPdfBook(b)"
-                  class="secondary"
-                  type="button"
-                  @click="openReader(b)"
-                >
-                  читать
-                </button>
-                <button class="secondary" type="button" @click="onDownload(b)">скачать</button>
-                <button v-if="canManageBook(b)" class="secondary" type="button" @click="openEdit(b)">
-                  изменить
-                </button>
-              </div>
-            </li>
-          </ul>
-
-          <div class="footer-stats muted small">
-            <span>{{ totalCount }} книг</span>
-            <span>{{ libraryQuotaLabel }} · занято {{ fmtUsed(storageBytesUsed) }}</span>
+      <div class="toolbar">
+        <input
+          v-model="search"
+          class="search"
+          type="search"
+          placeholder="поиск"
+          @input="onSearchInput"
+        />
+        <div ref="categoryMenuRoot" class="cat-wrap">
+          <button
+            type="button"
+            class="cat-btn secondary"
+            :class="{ on: categoryOpen || activeCategory }"
+            aria-haspopup="listbox"
+            :aria-expanded="categoryOpen"
+            @click.stop="categoryOpen = !categoryOpen"
+          >
+            {{ categoryButtonLabel }}
+          </button>
+          <div v-if="categoryOpen" class="cat-menu card" role="listbox">
+            <button
+              type="button"
+              class="cat-opt"
+              :class="{ on: activeCategory === '' }"
+              role="option"
+              @click="selectCategory('')"
+            >
+              все
+            </button>
+            <button
+              v-for="c in categories"
+              :key="c.category"
+              type="button"
+              class="cat-opt"
+              :class="{ on: activeCategory === c.category }"
+              role="option"
+              @click="selectCategory(c.category)"
+            >
+              <span>{{ c.category }}</span>
+              <span class="muted small">{{ c.count }}</span>
+            </button>
           </div>
         </div>
+        <select v-model="sort" class="sort" aria-label="сортировка">
+          <option value="new">новые</option>
+          <option value="title">по названию</option>
+        </select>
+      </div>
+
+      <div class="panel">
+        <p v-if="loading" class="state muted">загрузка</p>
+        <p v-else-if="!books.length" class="state muted">пусто</p>
+        <ul v-else class="list">
+          <li v-for="b in books" :key="b.id" class="row">
+            <div class="info">
+              <span class="title">{{ b.title }}</span>
+              <span v-if="b.author" class="muted small">{{ b.author }}</span>
+              <span v-if="b.description" class="muted small desc">{{ b.description }}</span>
+              <span class="muted small meta">
+                <span v-if="b.category" class="cat-pill">{{ b.category }}</span>
+                @{{ b.uploader_nickname }} · {{ fmt(b.size_bytes) }}
+              </span>
+            </div>
+            <div class="row-actions">
+              <button
+                v-if="isPdfBook(b)"
+                class="secondary"
+                type="button"
+                @click="openReader(b)"
+              >
+                читать
+              </button>
+              <button class="secondary" type="button" @click="onDownload(b)">скачать</button>
+              <button v-if="canManageBook(b)" class="secondary" type="button" @click="openEdit(b)">
+                изменить
+              </button>
+            </div>
+          </li>
+        </ul>
       </div>
 
       <div v-if="readerOpen" class="reader-overlay" role="dialog" aria-modal="true">
@@ -434,18 +461,29 @@ onBeforeUnmount(() => {
 <style scoped>
 .library {
   display: grid;
-  gap: 0.85rem;
+  gap: 0.75rem;
+  max-width: 52rem;
 }
 
 .head {
   display: flex;
-  align-items: baseline;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 0.6rem;
+  gap: 0.75rem;
+}
+
+.head-main {
+  min-width: 0;
 }
 
 .head h1 {
   margin: 0;
+  font-size: 1.25rem;
+  font-weight: 500;
+}
+
+.stats {
+  margin: 0.25rem 0 0;
 }
 
 .form {
@@ -465,79 +503,113 @@ onBeforeUnmount(() => {
   justify-content: flex-end;
 }
 
-.grid {
-  display: grid;
-  grid-template-columns: 200px minmax(0, 1fr);
-  gap: 1rem;
-  align-items: start;
-}
-
 @media (max-width: 760px) {
-  .grid {
-    grid-template-columns: 1fr;
-  }
   .form-row {
     grid-template-columns: 1fr;
   }
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .cat-wrap {
+    width: 100%;
+  }
+  .cat-btn {
+    width: 100%;
+  }
+  .sort {
+    width: 100%;
+  }
 }
 
-.sidebar h2 {
-  font-size: 0.82rem;
-  font-weight: 500;
-  color: var(--muted);
-  margin: 0 0 0.4rem;
-  text-transform: lowercase;
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
 }
 
-.cat-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
+.search {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.cat-wrap {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.cat-btn {
+  min-width: 7rem;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+.cat-btn.on {
+  border-color: var(--text);
+  color: var(--text);
+}
+
+.cat-menu {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  z-index: 20;
+  min-width: 100%;
+  width: max-content;
+  max-width: min(16rem, calc(100vw - 2rem));
+  padding: 0.35rem;
   display: grid;
   gap: 0.15rem;
 }
 
-.cat-list button {
+.cat-opt {
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.5rem;
-  background: transparent;
-  border: 1px solid transparent;
-  color: var(--muted);
-  padding: 0.4rem 0.6rem;
+  gap: 0.75rem;
+  padding: 0.45rem 0.6rem;
+  border: none;
   border-radius: 8px;
-  min-height: 0;
+  background: transparent;
+  color: var(--muted);
   font-size: 0.88rem;
+  min-height: 0;
   text-align: left;
 }
 
-.cat-list button:hover {
+.cat-opt:hover {
+  background: var(--surface2);
+  color: var(--text);
+}
+
+.cat-opt.on {
   color: var(--text);
   background: var(--surface2);
-}
-
-.cat-list button.active {
-  color: var(--text);
-  background: var(--surface2);
-  border-color: var(--border);
-}
-
-.bar {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.5rem;
-  margin-bottom: 0.7rem;
-}
-
-.search {
-  width: 100%;
 }
 
 .sort {
-  width: auto;
-  min-width: 130px;
+  flex: 0 0 auto;
+  min-width: 7.5rem;
+}
+
+.panel {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  min-height: 8rem;
+}
+
+.state {
+  margin: 0;
+  padding: 2.5rem 1rem;
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+.panel .list {
+  padding: 0.5rem;
 }
 
 .list {
@@ -604,16 +676,6 @@ onBeforeUnmount(() => {
   min-height: 0;
   padding: 0.35rem 0.7rem;
   font-size: 0.82rem;
-}
-
-.footer-stats {
-  margin-top: 0.5rem;
-  display: flex;
-  justify-content: flex-end;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 0.65rem 1rem;
-  text-align: right;
 }
 
 .edit-overlay {

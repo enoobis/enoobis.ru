@@ -152,6 +152,15 @@ router.post("/me/nickname", authRequired, (req, res) => {
   });
 });
 
+const ALLOWED_THEMES = new Set(["black", "white", "contrast", "contrast-white"]);
+
+function normalizeThemePreference(raw) {
+  const v = String(raw ?? "black").trim();
+  if (v === "graphite") return "black";
+  if (ALLOWED_THEMES.has(v)) return v;
+  return null;
+}
+
 router.patch("/me", authRequired, (req, res) => {
   const allowed = [
     "bio",
@@ -171,6 +180,11 @@ router.patch("/me", authRequired, (req, res) => {
   const body = req.body ?? {};
   if (typeof body.readme_md === "string" && body.readme_md.length > 4000) {
     return res.status(400).json({ error: "readme_too_long" });
+  }
+  if (body.theme_preference !== undefined) {
+    const theme = normalizeThemePreference(body.theme_preference);
+    if (!theme) return res.status(400).json({ error: "invalid_theme" });
+    body.theme_preference = theme;
   }
   for (const field of allowed) {
     if (body[field] !== undefined) {

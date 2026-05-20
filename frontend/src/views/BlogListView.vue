@@ -230,7 +230,7 @@ onMounted(async () => {
 }
 .search:focus-within,
 .search.active {
-  border-color: #3a3a3a;
+  border-color: var(--focus-border);
   color: var(--text);
 }
 .search input {
@@ -296,7 +296,7 @@ onMounted(async () => {
 .chip.on {
   background: var(--surface2);
   color: var(--text);
-  border-color: #2f2f2f;
+  border-color: var(--hover-border);
 }
 
 .active-chips {

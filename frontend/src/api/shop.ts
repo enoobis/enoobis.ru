@@ -67,25 +67,6 @@ export function equipAvatar(token: string, avatarId: string): Promise<EquipResul
   return api(`/api/shop/avatars/${avatarId}/equip`, { method: "POST", token });
 }
 
-export async function uploadWallpaper(token: string, file: File): Promise<{ wallpaper_url: string }> {
-  const form = new FormData();
-  form.append("file", file);
-  const res = await fetch("/api/me/wallpaper", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
-    body: form,
-  });
-  if (!res.ok) {
-    const j = await res.json().catch(() => ({}));
-    throw new Error((j as { error?: string }).error ?? "upload error");
-  }
-  return res.json();
-}
-
-export async function deleteWallpaper(token: string): Promise<void> {
-  await api("/api/me/wallpaper", { method: "DELETE", token });
-}
-
 export type ImageShopKind = ShopItemKind;
 
 export async function adminUploadShopItem(

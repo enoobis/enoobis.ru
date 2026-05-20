@@ -49,6 +49,12 @@ const router = createRouter({
     { path: "/micro", redirect: "/microblogs" },
     { path: "/micro/:id", redirect: (to) => `/microblogs/${to.params.id}` },
 
+    {
+      path: "/saved",
+      name: "saved",
+      component: () => import("../views/SavedView.vue"),
+      meta: { requiresAuth: true },
+    },
     { path: "/search", name: "search", component: () => import("../views/SearchView.vue") },
     {
       path: "/chats",

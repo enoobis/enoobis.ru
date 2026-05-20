@@ -269,6 +269,19 @@ watch(() => route.params.id, load);
         </span>
         <span class="act" aria-hidden="true"><AppIcon name="voteDown" :size="ACT" /></span>
       </span>
+      <span class="post-actions-gap" aria-hidden="true" />
+      <button class="act" type="button" title="поделиться" @click="sharePost">
+        <AppIcon name="send" :size="ACT" />
+      </button>
+      <RouterLink v-if="myState.can_edit" :to="`/blogs/${post.id}/edit`" class="act" title="редактировать">
+        <AppIcon name="edit" :size="ACT" />
+      </RouterLink>
+      <button v-if="myState.can_delete" class="act danger" type="button" title="удалить" :disabled="working" @click="removePost">
+        <AppIcon name="delete" :size="ACT" />
+      </button>
+      <button v-if="auth.token && !isAuthor" class="act" type="button" title="пожаловаться" @click="sendPostReport">
+        <AppIcon name="report" :size="ACT" />
+      </button>
     </div>
 
     <h1>{{ post.title }}</h1>
@@ -284,21 +297,6 @@ watch(() => route.params.id, load);
       class="cover"
     />
     <div class="markdown-body" v-html="renderedBody" />
-
-    <div class="post-actions post-actions--lg">
-      <button class="act" type="button" title="поделиться" @click="sharePost">
-        <AppIcon name="send" :size="ACT" />
-      </button>
-      <RouterLink v-if="myState.can_edit" :to="`/blogs/${post.id}/edit`" class="act" title="редактировать">
-        <AppIcon name="edit" :size="ACT" />
-      </RouterLink>
-      <button v-if="myState.can_delete" class="act danger" type="button" title="удалить" :disabled="working" @click="removePost">
-        <AppIcon name="delete" :size="ACT" />
-      </button>
-      <button v-if="auth.token && !isAuthor" class="act" type="button" title="пожаловаться" @click="sendPostReport">
-        <AppIcon name="report" :size="ACT" />
-      </button>
-    </div>
 
     <section class="comments">
       <h2>комментарии · {{ comments.length }}</h2>
@@ -416,14 +414,21 @@ h1 {
 }
 
 .post-actions--top {
+  flex-wrap: wrap;
   margin: 0 0 1rem;
   padding: 0;
   border: none;
 }
-.post-actions {
-  margin: 2.25rem 0 0;
-  padding-top: 1.5rem;
-  border-top: 1px solid var(--border);
+.post-actions-gap {
+  flex: 1;
+  min-width: 0.5rem;
+}
+@media (max-width: 640px) {
+  .post-actions-gap {
+    flex-basis: 100%;
+    height: 0;
+    min-width: 0;
+  }
 }
 
 .comments {

@@ -357,7 +357,6 @@ watch(
             <div class="profile-menu-head">
               <div class="profile-menu-head-main">
                 <span class="profile-menu-name">@{{ auth.nickname }}</span>
-                <span v-if="auth.role" class="profile-menu-role muted">{{ auth.role }}</span>
               </div>
               <div class="profile-menu-coins" title="монеты">
                 <img
@@ -377,19 +376,8 @@ watch(
             <RouterLink to="/inventory" class="profile-menu-item" @click="profileMenuOpen = false">
               <AppIcon name="inventory" :size="16" /><span>инвентарь</span>
             </RouterLink>
-            <RouterLink to="/blogs?mode=bookmarks" class="profile-menu-item" @click="profileMenuOpen = false">
-              <AppIcon name="bookmark" :size="16" /><span>закладки блогов</span>
-            </RouterLink>
-            <RouterLink to="/microblogs/saved" class="profile-menu-item" @click="profileMenuOpen = false">
-              <AppIcon name="bookmark" :size="16" /><span>закладки микроблогов</span>
-            </RouterLink>
-            <RouterLink
-              v-if="auth.role === 'teacher' || auth.role === 'admin'"
-              to="/storage"
-              class="profile-menu-item desktop-only"
-              @click="profileMenuOpen = false"
-            >
-              <AppIcon name="folder" :size="16" /><span>хранилище</span>
+            <RouterLink to="/saved" class="profile-menu-item" @click="profileMenuOpen = false">
+              <AppIcon name="bookmark" :size="16" /><span>закладки</span>
             </RouterLink>
             <RouterLink
               v-if="auth.role === 'teacher' || auth.role === 'admin'"
@@ -449,6 +437,14 @@ watch(
             </RouterLink>
             <RouterLink v-if="auth.token" to="/shop" class="nav-drawer-link" @click="closeNavDrawer">
               магазин
+            </RouterLink>
+            <RouterLink
+              v-if="auth.role === 'teacher' || auth.role === 'admin'"
+              to="/storage"
+              class="nav-drawer-link"
+              @click="closeNavDrawer"
+            >
+              хранилище
             </RouterLink>
             <RouterLink
               v-if="auth.role === 'admin'"
@@ -593,7 +589,7 @@ watch(
 }
 
 .profile-trigger:hover {
-  background: #181818;
+  background: var(--hover-surface);
 }
 
 .profile-trigger-avatar {
