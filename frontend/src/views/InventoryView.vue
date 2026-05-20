@@ -127,15 +127,17 @@ onMounted(load);
 
 <template>
   <section class="inv page-shell">
-    <header class="inv-head">
-      <h1>инвентарь</h1>
+    <header class="page-head">
+      <div class="page-head-main">
+        <h1>инвентарь</h1>
+      </div>
       <div class="coins-badge" title="монеты">
         <img src="/coin-gem.png" alt="" width="18" height="18" loading="lazy" />
         <span>{{ profileCoins }}</span>
       </div>
     </header>
-    <div v-if="loading" class="muted">загрузка…</div>
-    <div v-else-if="!items.length" class="empty muted">
+    <div v-if="loading" class="page-empty muted">загрузка</div>
+    <div v-else-if="!items.length" class="page-empty muted">
       <p>пусто</p>
       <RouterLink to="/shop" class="to-shop">магазин →</RouterLink>
     </div>
@@ -187,18 +189,6 @@ onMounted(load);
 .inv {
   display: grid;
   gap: 0.5rem;
-}
-.inv-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 0.4rem;
-}
-.inv-head h1 {
-  font-size: 1.2rem;
-  font-weight: 600;
-  margin: 0;
 }
 .grid {
   list-style: none;

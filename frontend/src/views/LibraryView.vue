@@ -294,10 +294,10 @@ onBeforeUnmount(() => {
     <div v-if="!auth.token" class="muted">войдите, чтобы видеть библиотеку</div>
 
     <template v-else>
-      <header class="head">
-        <div class="head-main">
+      <header class="page-head">
+        <div class="page-head-main">
           <h1>библиотека</h1>
-          <p class="stats muted small">
+          <p class="page-head-meta">
             {{ totalCount }} {{ totalCount === 1 ? "книга" : "книг" }} · {{ fmtUsed(storageBytesUsed) }} / {{ libraryQuotaLabel }}
           </p>
         </div>
@@ -463,27 +463,6 @@ onBeforeUnmount(() => {
 .library {
   display: grid;
   gap: 0.75rem;
-}
-
-.head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.75rem;
-}
-
-.head-main {
-  min-width: 0;
-}
-
-.head h1 {
-  margin: 0;
-  font-size: 1.25rem;
-  font-weight: 500;
-}
-
-.stats {
-  margin: 0.25rem 0 0;
 }
 
 .form {

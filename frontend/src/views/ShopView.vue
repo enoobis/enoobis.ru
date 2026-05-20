@@ -111,8 +111,10 @@ watch(
 
 <template>
   <section class="shop page-shell">
-    <header class="shop-head">
-      <h1>магазин</h1>
+    <header class="page-head">
+      <div class="page-head-main">
+        <h1>магазин</h1>
+      </div>
       <div class="coins-badge" title="монеты">
         <img src="/coin-gem.png" alt="" width="18" height="18" loading="lazy" />
         <span>{{ profileCoins }}</span>
@@ -132,8 +134,8 @@ watch(
       </button>
     </nav>
 
-    <div v-if="loading" class="muted">загрузка…</div>
-    <div v-else-if="!shown.length" class="empty muted">пусто</div>
+    <div v-if="loading" class="page-empty muted">загрузка</div>
+    <div v-else-if="!shown.length" class="page-empty muted">пусто</div>
     <ul v-else class="grid">
       <li v-for="item in shown" :key="item.id" class="card item-card">
         <div class="preview">
@@ -184,18 +186,6 @@ watch(
 .shop {
   display: grid;
   gap: 0.5rem;
-}
-.shop-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 0.5rem;
-}
-.shop-head h1 {
-  font-size: 1.2rem;
-  font-weight: 600;
-  margin: 0;
 }
 .shop .filter-tabs {
   margin-bottom: 0.35rem;
@@ -318,9 +308,5 @@ watch(
 .btn-buy:disabled {
   opacity: 0.45;
   cursor: not-allowed;
-}
-.empty {
-  text-align: center;
-  margin-top: 4vh;
 }
 </style>

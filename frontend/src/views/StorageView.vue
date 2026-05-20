@@ -274,16 +274,19 @@ onMounted(async () => {
 
 <template>
   <section class="page page-shell">
-    <h1>хранилище</h1>
+    <header class="page-head">
+      <div class="page-head-main">
+        <h1>хранилище</h1>
+        <p v-if="isStaff" class="page-head-meta">
+          {{ fmt(used) }} из {{ fmt(quota) }} · {{ usedPercent }}%
+        </p>
+      </div>
+    </header>
 
     <p v-if="!isStaff" class="muted">доступно только менторам и админам</p>
 
     <template v-else>
-      <div class="quota">
-        <div class="quota-row">
-          <span class="muted">{{ fmt(used) }} из {{ fmt(quota) }}</span>
-          <span class="muted">{{ usedPercent }}%</span>
-        </div>
+      <div v-if="isStaff" class="quota-bar-wrap">
         <div class="quota-bar"><span :style="{ width: usedPercent + '%' }" /></div>
       </div>
 
@@ -311,8 +314,8 @@ onMounted(async () => {
           <p>{{ uploading ? "загрузка…" : "перетащите файл или нажмите" }}</p>
         </div>
 
-        <p v-if="filesLoading" class="muted">загрузка</p>
-        <p v-else-if="!files.length" class="muted">пусто</p>
+        <p v-if="filesLoading" class="page-empty muted">загрузка</p>
+        <p v-else-if="!files.length" class="page-empty muted">пусто</p>
         <ul v-else class="list">
           <li v-for="f in files" :key="f.id" class="list-row">
             <div class="info">
@@ -342,8 +345,8 @@ onMounted(async () => {
           </div>
         </div>
 
-        <p v-if="notesLoading" class="muted">загрузка</p>
-        <p v-else-if="!notes.length" class="muted">пусто</p>
+        <p v-if="notesLoading" class="page-empty muted">загрузка</p>
+        <p v-else-if="!notes.length" class="page-empty muted">пусто</p>
         <ul v-else class="list">
           <li v-for="n in notes" :key="n.id" class="list-row">
             <div class="info">
@@ -404,11 +407,8 @@ onMounted(async () => {
   gap: 0.85rem;
 }
 
-.quota-row {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.82rem;
-  margin-bottom: 0.25rem;
+.quota-bar-wrap {
+  margin: 0 0 0.5rem;
 }
 
 .quota-bar {
@@ -436,7 +436,8 @@ onMounted(async () => {
 
 .dropzone p {
   margin: 0;
-  font-size: 0.92rem;
+  font-size: 0.88rem;
+  color: var(--muted);
 }
 
 .dropzone.over {
