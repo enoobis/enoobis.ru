@@ -71,14 +71,14 @@ onMounted(load);
 </script>
 
 <template>
-  <section class="feed">
+  <section class="feed page-shell">
     <MicroComposer v-if="auth.token" @posted="onPosted" />
     <p v-else class="muted login-hint">
       <RouterLink to="/login">войдите</RouterLink>, чтобы публиковать
     </p>
 
-    <div class="bar">
-      <div class="search">
+    <div class="filter-bar">
+      <div class="filter-search">
         <AppIcon name="search" :size="14" />
         <input
           v-model="q"
@@ -91,9 +91,9 @@ onMounted(load);
           "
         />
       </div>
-      <div v-if="auth.token" class="tabs">
-        <button class="tab" :class="{ on: feed === 'all' }" type="button" @click="feed = 'all'">все</button>
-        <button class="tab" :class="{ on: feed === 'following' }" type="button" @click="feed = 'following'">
+      <div v-if="auth.token" class="filter-tabs">
+        <button class="filter-tab" :class="{ on: feed === 'all' }" type="button" @click="feed = 'all'">все</button>
+        <button class="filter-tab" :class="{ on: feed === 'following' }" type="button" @click="feed = 'following'">
           подписки
         </button>
       </div>
@@ -116,64 +116,12 @@ onMounted(load);
 
 <style scoped>
 .feed {
-  max-width: 640px;
-  margin: 0 auto;
+  display: grid;
+  gap: 0;
 }
 .login-hint {
   padding: 1rem 0;
   border-bottom: 1px solid var(--border);
-}
-.bar {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-  margin: 0.6rem 0 0.4rem;
-}
-.search {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.35rem 0.7rem;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  color: var(--muted);
-}
-.search:focus-within {
-  color: var(--text);
-  border-color: #3a3a3a;
-}
-.search input {
-  flex: 1;
-  border: none;
-  background: transparent;
-  padding: 0.15rem 0;
-  color: var(--text);
-  font-size: 0.92rem;
-}
-.search input:focus {
-  outline: none;
-}
-.tabs {
-  display: inline-flex;
-  gap: 0.2rem;
-}
-.tab {
-  background: transparent;
-  border: none;
-  color: var(--muted);
-  padding: 0.3rem 0.6rem;
-  min-height: 0;
-  font-size: 0.82rem;
-  border-radius: 999px;
-}
-.tab:hover {
-  color: var(--text);
-  background: transparent;
-}
-.tab.on {
-  color: var(--text);
-  background: var(--surface);
 }
 .empty {
   text-align: center;

@@ -290,7 +290,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section class="library">
+  <section class="library page-shell">
     <div v-if="!auth.token" class="muted">войдите, чтобы видеть библиотеку</div>
 
     <template v-else>
@@ -331,18 +331,19 @@ onBeforeUnmount(() => {
         </div>
       </form>
 
-      <div class="toolbar">
-        <input
-          v-model="search"
-          class="search"
-          type="search"
-          placeholder="поиск"
-          @input="onSearchInput"
-        />
-        <div ref="categoryMenuRoot" class="cat-wrap">
+      <div class="filter-bar">
+        <div class="filter-search">
+          <input
+            v-model="search"
+            type="search"
+            placeholder="поиск"
+            @input="onSearchInput"
+          />
+        </div>
+        <div ref="categoryMenuRoot" class="filter-menu-wrap">
           <button
             type="button"
-            class="cat-btn secondary"
+            class="filter-tab"
             :class="{ on: categoryOpen || activeCategory }"
             aria-haspopup="listbox"
             :aria-expanded="categoryOpen"
@@ -350,10 +351,10 @@ onBeforeUnmount(() => {
           >
             {{ categoryButtonLabel }}
           </button>
-          <div v-if="categoryOpen" class="cat-menu card" role="listbox">
+          <div v-if="categoryOpen" class="filter-menu card" role="listbox">
             <button
               type="button"
-              class="cat-opt"
+              class="filter-menu-opt"
               :class="{ on: activeCategory === '' }"
               role="option"
               @click="selectCategory('')"
@@ -364,7 +365,7 @@ onBeforeUnmount(() => {
               v-for="c in categories"
               :key="c.category"
               type="button"
-              class="cat-opt"
+              class="filter-menu-opt"
               :class="{ on: activeCategory === c.category }"
               role="option"
               @click="selectCategory(c.category)"
@@ -374,17 +375,17 @@ onBeforeUnmount(() => {
             </button>
           </div>
         </div>
-        <select v-model="sort" class="sort" aria-label="сортировка">
+        <select v-model="sort" class="filter-select" aria-label="сортировка">
           <option value="new">новые</option>
           <option value="title">по названию</option>
         </select>
       </div>
 
-      <div class="panel">
-        <p v-if="loading" class="state muted">загрузка</p>
-        <p v-else-if="!books.length" class="state muted">пусто</p>
+      <div class="list-panel">
+        <p v-if="loading" class="list-panel-state muted">загрузка</p>
+        <p v-else-if="!books.length" class="list-panel-state muted">пусто</p>
         <ul v-else class="list">
-          <li v-for="b in books" :key="b.id" class="row">
+          <li v-for="b in books" :key="b.id" class="list-row">
             <div class="info">
               <span class="title">{{ b.title }}</span>
               <span v-if="b.author" class="muted small">{{ b.author }}</span>
@@ -462,7 +463,6 @@ onBeforeUnmount(() => {
 .library {
   display: grid;
   gap: 0.75rem;
-  max-width: 52rem;
 }
 
 .head {
@@ -507,126 +507,11 @@ onBeforeUnmount(() => {
   .form-row {
     grid-template-columns: 1fr;
   }
-  .toolbar {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  .cat-wrap {
-    width: 100%;
-  }
-  .cat-btn {
-    width: 100%;
-  }
-  .sort {
-    width: 100%;
-  }
 }
 
-.toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  align-items: center;
-}
-
-.search {
-  flex: 1 1 12rem;
-  min-width: 0;
-}
-
-.cat-wrap {
-  position: relative;
-  flex: 0 0 auto;
-}
-
-.cat-btn {
+.filter-menu-wrap .filter-tab {
   min-width: 7rem;
-  justify-content: center;
   white-space: nowrap;
-}
-
-.cat-btn.on {
-  border-color: var(--text);
-  color: var(--text);
-}
-
-.cat-menu {
-  position: absolute;
-  top: calc(100% + 0.35rem);
-  left: 0;
-  z-index: 20;
-  min-width: 100%;
-  width: max-content;
-  max-width: min(16rem, calc(100vw - 2rem));
-  padding: 0.35rem;
-  display: grid;
-  gap: 0.15rem;
-}
-
-.cat-opt {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.45rem 0.6rem;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--muted);
-  font-size: 0.88rem;
-  min-height: 0;
-  text-align: left;
-}
-
-.cat-opt:hover {
-  background: var(--surface2);
-  color: var(--text);
-}
-
-.cat-opt.on {
-  color: var(--text);
-  background: var(--surface2);
-}
-
-.sort {
-  flex: 0 0 auto;
-  min-width: 7.5rem;
-}
-
-.panel {
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-  min-height: 8rem;
-}
-
-.state {
-  margin: 0;
-  padding: 2.5rem 1rem;
-  text-align: center;
-  font-size: 0.9rem;
-}
-
-.panel .list {
-  padding: 0.5rem;
-}
-
-.list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: grid;
-  gap: 0.45rem;
-}
-
-.row {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.6rem;
-  padding: 0.65rem 0.8rem;
-  border: 1px solid var(--border);
-  border-radius: 10px;
 }
 
 .info {
@@ -660,7 +545,7 @@ onBeforeUnmount(() => {
 .cat-pill {
   display: inline-block;
   padding: 0.05rem 0.45rem;
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: var(--surface2);
   color: var(--text);
   font-size: 0.74rem;

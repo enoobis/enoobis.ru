@@ -126,7 +126,7 @@ onMounted(load);
 </script>
 
 <template>
-  <section class="inv">
+  <section class="inv page-shell">
     <header class="inv-head">
       <h1>инвентарь</h1>
       <div class="coins-badge" title="монеты">
@@ -185,8 +185,8 @@ onMounted(load);
 
 <style scoped>
 .inv {
-  max-width: 720px;
-  margin: 0 auto;
+  display: grid;
+  gap: 0.5rem;
 }
 .inv-head {
   display: flex;
@@ -199,16 +199,6 @@ onMounted(load);
   font-size: 1.2rem;
   font-weight: 600;
   margin: 0;
-}
-.coins-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.25rem 0.7rem;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  font-size: 0.9rem;
-  background: var(--surface);
 }
 .grid {
   list-style: none;

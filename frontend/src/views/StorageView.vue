@@ -273,7 +273,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <section class="page">
+  <section class="page page-shell">
     <h1>хранилище</h1>
 
     <p v-if="!isStaff" class="muted">доступно только менторам и админам</p>
@@ -287,11 +287,11 @@ onMounted(async () => {
         <div class="quota-bar"><span :style="{ width: usedPercent + '%' }" /></div>
       </div>
 
-      <nav class="tabs">
-        <button :class="{ active: section === 'files' }" type="button" @click="section = 'files'">
+      <nav class="filter-tabs">
+        <button class="filter-tab" :class="{ on: section === 'files' }" type="button" @click="section = 'files'">
           файлы
         </button>
-        <button :class="{ active: section === 'notes' }" type="button" @click="section = 'notes'">
+        <button class="filter-tab" :class="{ on: section === 'notes' }" type="button" @click="section = 'notes'">
           заметки
         </button>
       </nav>
@@ -314,7 +314,7 @@ onMounted(async () => {
         <p v-if="filesLoading" class="muted">загрузка</p>
         <p v-else-if="!files.length" class="muted">пусто</p>
         <ul v-else class="list">
-          <li v-for="f in files" :key="f.id" class="row">
+          <li v-for="f in files" :key="f.id" class="list-row">
             <div class="info">
               <span class="name">{{ f.original_name }}</span>
               <span class="muted small">{{ fmt(f.size_bytes) }}</span>
@@ -345,7 +345,7 @@ onMounted(async () => {
         <p v-if="notesLoading" class="muted">загрузка</p>
         <p v-else-if="!notes.length" class="muted">пусто</p>
         <ul v-else class="list">
-          <li v-for="n in notes" :key="n.id" class="row">
+          <li v-for="n in notes" :key="n.id" class="list-row">
             <div class="info">
               <span class="name">{{ n.title || "без названия" }}</span>
               <span class="muted small">{{ n.body.slice(0, 80) }}</span>
@@ -362,7 +362,7 @@ onMounted(async () => {
       <section v-if="shares.length" class="shares">
         <h2>ссылки</h2>
         <ul class="list">
-          <li v-for="s in shares" :key="s.id" class="row">
+          <li v-for="s in shares" :key="s.id" class="list-row">
             <div class="info">
               <span class="name">{{ s.label || s.target_type }}</span>
               <span class="muted small">{{ s.target_type }} · {{ ttlLabel(s.expires_at) }}</span>
@@ -425,28 +425,9 @@ onMounted(async () => {
   transition: width 0.2s ease;
 }
 
-.tabs {
-  display: flex;
-  gap: 0.4rem;
-}
-
-.tabs button {
-  background: transparent;
-  border: 1px solid transparent;
-  color: var(--muted);
-  padding: 0.4rem 0.7rem;
-  min-height: 0;
-}
-
-.tabs button.active {
-  color: var(--text);
-  background: var(--surface2);
-  border-color: var(--border);
-}
-
 .dropzone {
   border: 1px dashed var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   padding: 1.1rem 1rem;
   text-align: center;
   cursor: pointer;
@@ -474,15 +455,6 @@ onMounted(async () => {
   margin: 0;
   display: grid;
   gap: 0.4rem;
-}
-
-.row {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.55rem 0.7rem;
-  border: 1px solid var(--border);
-  border-radius: 10px;
 }
 
 .info {

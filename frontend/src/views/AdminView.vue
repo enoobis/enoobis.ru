@@ -596,18 +596,18 @@ async function restoreComment(id: string | null) {
 </script>
 
 <template>
-  <section class="admin">
-    <nav class="tabs">
-      <button class="link" :class="{ active: tab === 'pending' }" type="button" @click="tab = 'pending'">
+  <section class="admin page-shell">
+    <nav class="filter-tabs admin-tabs">
+      <button class="filter-tab" :class="{ on: tab === 'pending' }" type="button" @click="tab = 'pending'">
         заявки <span v-if="pending.length" class="muted small">{{ pending.length }}</span>
       </button>
-      <button class="link" :class="{ active: tab === 'users' }" type="button" @click="tab = 'users'">
+      <button class="filter-tab" :class="{ on: tab === 'users' }" type="button" @click="tab = 'users'">
         пользователи
       </button>
-      <button class="link" :class="{ active: tab === 'reports' }" type="button" @click="tab = 'reports'">
+      <button class="filter-tab" :class="{ on: tab === 'reports' }" type="button" @click="tab = 'reports'">
         жалобы <span v-if="reports.length" class="muted small">{{ reports.length }}</span>
       </button>
-      <button class="link" :class="{ active: tab === 'shop' }" type="button" @click="tab = 'shop'">
+      <button class="filter-tab" :class="{ on: tab === 'shop' }" type="button" @click="tab = 'shop'">
         магазин
       </button>
     </nav>
@@ -634,7 +634,9 @@ async function restoreComment(id: string | null) {
     </template>
 
     <template v-else-if="tab === 'users'">
-      <input v-model="usersQuery" placeholder="поиск" class="search" />
+      <div class="filter-search admin-users-search">
+        <input v-model="usersQuery" placeholder="поиск" />
+      </div>
       <div v-if="moderateUserId" class="mod-panel">
         <template v-if="moderateDetail">
           <p class="mod-title">
@@ -977,33 +979,10 @@ async function restoreComment(id: string | null) {
 </template>
 
 <style scoped>
-.admin {
-  max-width: 720px;
-  margin: 0 auto;
+.admin-tabs {
+  margin-bottom: 1rem;
 }
-.tabs {
-  display: flex;
-  gap: 0.4rem;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 0.5rem;
-  margin-bottom: 1.5rem;
-}
-.link {
-  background: transparent;
-  border: none;
-  color: var(--muted);
-  padding: 0.3rem 0.5rem;
-  min-height: 0;
-  font-size: 0.9rem;
-}
-.link:hover {
-  background: transparent;
-  color: var(--text);
-}
-.link.active {
-  color: var(--text);
-}
-.search {
+.admin-users-search {
   margin-bottom: 1rem;
 }
 .list {

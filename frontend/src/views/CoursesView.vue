@@ -1041,17 +1041,15 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 </script>
 
 <template>
-  <section class="courses">
+  <section class="courses page-shell">
     <p v-if="err" class="error">{{ err }}</p>
 
     <!-- список курсов -->
     <template v-if="!classroom">
-      <div class="board-tools">
-        <input
-          v-model="courseQuery"
-          class="board-search"
-          placeholder="поиск курса"
-        />
+      <div class="board-tools filter-bar">
+        <div class="filter-search board-search-wrap">
+          <input v-model="courseQuery" placeholder="поиск курса" />
+        </div>
         <input
           v-model="joinCode"
           class="board-code"
@@ -1279,10 +1277,10 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
         </p>
       </header>
 
-      <nav class="tabs">
+      <nav class="filter-tabs course-tabs">
         <button
-          class="tab"
-          :class="{ active: tab === 'lectures' }"
+          class="filter-tab"
+          :class="{ on: tab === 'lectures' }"
           type="button"
           @click="tab = 'lectures'"
         >
@@ -1290,8 +1288,8 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
           <span class="tab-count">{{ courseStats.lectures }}</span>
         </button>
         <button
-          class="tab"
-          :class="{ active: tab === 'assignments' }"
+          class="filter-tab"
+          :class="{ on: tab === 'assignments' }"
           type="button"
           @click="tab = 'assignments'"
         >
@@ -1299,16 +1297,16 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
           <span class="tab-count">{{ courseStats.assignments }}</span>
         </button>
         <button
-          class="tab"
-          :class="{ active: tab === 'stream' }"
+          class="filter-tab"
+          :class="{ on: tab === 'stream' }"
           type="button"
           @click="tab = 'stream'"
         >
           лента
         </button>
         <button
-          class="tab"
-          :class="{ active: tab === 'people' }"
+          class="filter-tab"
+          :class="{ on: tab === 'people' }"
           type="button"
           @click="tab = 'people'"
         >
@@ -1316,8 +1314,8 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
           <span class="tab-count">{{ courseStats.members }}</span>
         </button>
         <button
-          class="tab"
-          :class="{ active: tab === 'grades' }"
+          class="filter-tab"
+          :class="{ on: tab === 'grades' }"
           type="button"
           @click="tab = 'grades'"
         >
@@ -2099,12 +2097,17 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 
 .board-tools {
   display: grid;
-  grid-template-columns: 1fr auto auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
   gap: 0.5rem;
-  align-items: center;
+  align-items: stretch;
 }
-.board-search {
-  font-size: 0.93rem;
+.board-search-wrap {
+  grid-column: 1 / -1;
+}
+@media (min-width: 600px) {
+  .board-search-wrap {
+    grid-column: auto;
+  }
 }
 .board-code {
   width: 8rem;
@@ -2114,9 +2117,16 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   .board-tools {
     grid-template-columns: 1fr 1fr;
   }
+  .board-search-wrap {
+    grid-column: 1 / -1;
+  }
   .board-code {
     width: auto;
   }
+}
+.course-tabs {
+  margin: 0.75rem 0;
+  flex-wrap: wrap;
 }
 
 .form-card {
@@ -2223,7 +2233,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   padding: 0.3rem 0.7rem;
   min-height: 0;
   font-size: 0.82rem;
-  border-radius: 999px;
+  border-radius: var(--radius);
 }
 .course-card--hidden {
   opacity: 0.52;
@@ -2313,39 +2323,11 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   color: var(--text);
 }
 
-.tabs {
-  display: flex;
-  gap: 0.2rem;
-  border-bottom: 1px solid var(--border);
-  overflow-x: auto;
-}
-.tab {
-  background: transparent;
-  border: none;
-  border-bottom: 2px solid transparent;
-  border-radius: 0;
-  padding: 0.55rem 0.9rem;
-  min-height: 0;
-  color: var(--muted);
-  font-size: 0.9rem;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  white-space: nowrap;
-}
-.tab:hover {
-  color: var(--text);
-}
-.tab.active {
-  color: var(--text);
-  border-bottom-color: var(--text);
-}
 .tab-count {
   font-size: 0.72rem;
   color: var(--muted);
   background: var(--surface2);
-  border-radius: 999px;
+  border-radius: var(--radius);
   padding: 0.05rem 0.4rem;
   min-width: 1.2rem;
   text-align: center;
@@ -2393,7 +2375,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   gap: 0.4rem;
   padding: 0.32rem 0.75rem;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--muted);
   font-size: 0.83rem;
@@ -2431,7 +2413,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   min-height: 0;
   width: 22px;
   height: 22px;
-  border-radius: 999px;
+  border-radius: var(--radius);
   font-size: 0.95rem;
   cursor: pointer;
   line-height: 1;
@@ -2465,7 +2447,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   height: 28px;
   min-height: 28px;
   padding: 0;
-  border-radius: 999px;
+  border-radius: var(--radius);
   border: none;
   background: transparent;
   color: var(--muted);
@@ -2546,7 +2528,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   padding: 0.25rem 0.7rem;
   min-height: 0;
   font-size: 0.8rem;
-  border-radius: 999px;
+  border-radius: var(--radius);
   align-self: flex-start;
 }
 
@@ -2580,7 +2562,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   padding: 0.32rem 0.85rem;
   min-height: 0;
   font-size: 0.85rem;
-  border-radius: 999px;
+  border-radius: var(--radius);
 }
 .grid-2 {
   display: grid;
@@ -2693,7 +2675,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 }
 .grade-chip {
   display: inline-flex;
-  border-radius: 999px;
+  border-radius: var(--radius);
   border: 1px solid var(--border);
   padding: 0.1rem 0.45rem;
   font-size: 0.78rem;
@@ -2881,7 +2863,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 .g-dot {
   width: 6px;
   height: 6px;
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: var(--border);
   flex-shrink: 0;
 }
@@ -2939,7 +2921,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   min-height: 0;
   padding: 0;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--text);
   cursor: pointer;

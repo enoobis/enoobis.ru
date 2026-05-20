@@ -123,8 +123,8 @@ onMounted(async () => {
 </script>
 
 <template>
-  <section class="blog">
-    <div class="search" :class="{ active: filtersOpen }">
+  <section class="blog page-shell">
+    <div class="filter-search" :class="{ active: filtersOpen }">
       <AppIcon name="search" :size="16" />
       <input
         v-model="q"
@@ -137,7 +137,7 @@ onMounted(async () => {
         "
       />
       <button
-        class="filter-toggle"
+        class="filter-icon-btn"
         type="button"
         :class="{ on: filtersOpen || activeChips.length }"
         :title="filtersOpen ? 'свернуть' : 'фильтры'"
@@ -151,9 +151,9 @@ onMounted(async () => {
       <div class="row">
         <span class="muted small">сортировка</span>
         <div class="chips">
-          <button class="chip" :class="{ on: sort === 'new' }" type="button" @click="sort = 'new'">новые</button>
-          <button class="chip" :class="{ on: sort === 'popular' }" type="button" @click="sort = 'popular'">популярные</button>
-          <button class="chip" :class="{ on: sort === 'discussed' }" type="button" @click="sort = 'discussed'">обсуждаемые</button>
+          <button class="filter-chip" :class="{ on: sort === 'new' }" type="button" @click="sort = 'new'">новые</button>
+          <button class="filter-chip" :class="{ on: sort === 'popular' }" type="button" @click="sort = 'popular'">популярные</button>
+          <button class="filter-chip" :class="{ on: sort === 'discussed' }" type="button" @click="sort = 'discussed'">обсуждаемые</button>
         </div>
       </div>
       <div v-if="tags.length" class="row">
@@ -166,8 +166,8 @@ onMounted(async () => {
       <div v-if="auth.token" class="row">
         <span class="muted small">показать</span>
         <div class="chips">
-          <button class="chip" :class="{ on: mode === 'all' }" type="button" @click="mode = 'all'">все</button>
-          <button class="chip" :class="{ on: mode === 'bookmarks' }" type="button" @click="mode = 'bookmarks'">закладки</button>
+          <button class="filter-chip" :class="{ on: mode === 'all' }" type="button" @click="mode = 'all'">все</button>
+          <button class="filter-chip" :class="{ on: mode === 'bookmarks' }" type="button" @click="mode = 'bookmarks'">закладки</button>
         </div>
       </div>
     </div>
@@ -213,53 +213,8 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.blog {
-  max-width: 640px;
-  margin: 0 auto;
-}
-
-.search {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.4rem 0.5rem 0.4rem 0.75rem;
-  border: 1px solid var(--border);
-  border-radius: 999px;
+.blog > .filter-search {
   margin-bottom: 0.6rem;
-  color: var(--muted);
-}
-.search:focus-within,
-.search.active {
-  border-color: var(--focus-border);
-  color: var(--text);
-}
-.search input {
-  flex: 1;
-  border: none;
-  background: transparent;
-  padding: 0.25rem 0;
-  color: var(--text);
-}
-.search input:focus {
-  outline: none;
-}
-.filter-toggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  min-height: 28px;
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: var(--muted);
-  border-radius: 999px;
-}
-.filter-toggle:hover,
-.filter-toggle.on {
-  background: var(--surface);
-  color: var(--text);
 }
 
 .filters {
@@ -281,24 +236,6 @@ onMounted(async () => {
   gap: 0.3rem;
   flex-wrap: wrap;
 }
-.chip {
-  padding: 0.25rem 0.65rem;
-  min-height: 28px;
-  border-radius: 999px;
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--muted);
-  font-size: 0.82rem;
-}
-.chip:hover {
-  color: var(--text);
-}
-.chip.on {
-  background: var(--surface2);
-  color: var(--text);
-  border-color: var(--hover-border);
-}
-
 .active-chips {
   display: flex;
   flex-wrap: wrap;
@@ -306,13 +243,13 @@ onMounted(async () => {
   margin-bottom: 1.5rem;
 }
 .active-chip {
-  padding: 0.2rem 0.55rem;
-  min-height: 24px;
-  border-radius: 999px;
+  padding: 0.35rem 0.65rem;
+  min-height: 38px;
+  border-radius: var(--radius);
   background: var(--surface);
   border: 1px solid var(--border);
   color: var(--muted);
-  font-size: 0.78rem;
+  font-size: 0.82rem;
 }
 .active-chip:hover {
   color: var(--text);

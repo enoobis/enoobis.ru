@@ -110,7 +110,7 @@ watch(
 </script>
 
 <template>
-  <section class="shop">
+  <section class="shop page-shell">
     <header class="shop-head">
       <h1>магазин</h1>
       <div class="coins-badge" title="монеты">
@@ -119,12 +119,12 @@ watch(
       </div>
     </header>
 
-    <nav class="shop-tabs" aria-label="разделы">
+    <nav class="filter-tabs" aria-label="разделы">
       <button
         v-for="t in tabs"
         :key="t.key"
         type="button"
-        class="tab-btn"
+        class="filter-tab"
         :class="{ on: tab === t.key }"
         @click="tab = t.key"
       >
@@ -182,8 +182,8 @@ watch(
 
 <style scoped>
 .shop {
-  max-width: 720px;
-  margin: 0 auto;
+  display: grid;
+  gap: 0.5rem;
 }
 .shop-head {
   display: flex;
@@ -197,36 +197,8 @@ watch(
   font-weight: 600;
   margin: 0;
 }
-.coins-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.25rem 0.7rem;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  font-size: 0.9rem;
-  background: var(--surface);
-}
-.shop-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-  margin-bottom: 0.65rem;
-}
-.tab-btn {
-  padding: 0.28rem 0.65rem;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--surface2);
-  color: var(--muted);
-  font-size: 0.82rem;
-  cursor: pointer;
-  min-height: 0;
-}
-.tab-btn.on {
-  color: var(--text);
-  border-color: var(--text);
-  background: var(--surface);
+.shop .filter-tabs {
+  margin-bottom: 0.35rem;
 }
 .grid {
   list-style: none;
