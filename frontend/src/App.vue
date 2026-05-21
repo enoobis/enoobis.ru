@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
 import { api } from "./api/http";
 import { useAuthStore } from "./stores/auth";
@@ -19,6 +19,12 @@ const isOnline = ref(typeof navigator !== "undefined" ? navigator.onLine : true)
 const profileMenuOpen = ref(false);
 const profileMenuRoot = ref<HTMLElement | null>(null);
 const navDrawerOpen = ref(false);
+const navMenuAnchor = ref<HTMLElement | null>(null);
+const navMenuSheetStyle = ref<Record<string, string>>({});
+const navMenuMobile = ref(
+  typeof window !== "undefined" ? window.innerWidth <= 640 : false,
+);
+const MOBILE_NAV_MAX = 640;
 const profileAvatarUrl = ref("");
 const profileAvatarBroken = ref(false);
 const profileCoins = ref(0);
@@ -76,8 +82,51 @@ function refreshPage() {
   window.location.reload();
 }
 
+function isMobileNav() {
+  return typeof window !== "undefined" && window.innerWidth <= MOBILE_NAV_MAX;
+}
+
+function refreshNavMenuMode() {
+  navMenuMobile.value = isMobileNav();
+  syncNavMenuSheetPos();
+}
+
+function syncNavMenuSheetPos() {
+  if (!navDrawerOpen.value || navMenuMobile.value) {
+    navMenuSheetStyle.value = {};
+    return;
+  }
+  const btn = navMenuAnchor.value?.querySelector(".nav-burger") as HTMLElement | null;
+  if (!btn) {
+    navMenuSheetStyle.value = {};
+    return;
+  }
+  const r = btn.getBoundingClientRect();
+  const panelW = 208;
+  const gap = 6;
+  const margin = 8;
+  let left = Math.round(r.left);
+  const maxLeft = Math.max(margin, window.innerWidth - panelW - margin);
+  if (left > maxLeft) left = maxLeft;
+  navMenuSheetStyle.value = {
+    position: "fixed",
+    top: `${Math.round(r.bottom + gap)}px`,
+    left: `${left}px`,
+    width: `${panelW}px`,
+    maxWidth: `min(${panelW}px, calc(100vw - ${margin * 2}px))`,
+  };
+}
+
+function onNavMenuLayoutChange() {
+  if (navDrawerOpen.value) refreshNavMenuMode();
+}
+
 function toggleNavDrawer() {
   navDrawerOpen.value = !navDrawerOpen.value;
+  if (navDrawerOpen.value) {
+    refreshNavMenuMode();
+    void nextTick(() => syncNavMenuSheetPos());
+  }
 }
 
 function closeNavDrawer() {
@@ -217,6 +266,8 @@ onMounted(async () => {
   window.addEventListener("keydown", onGlobalKey);
   document.addEventListener("visibilitychange", onVisibilityChange);
   document.addEventListener("click", onDocumentClick);
+  window.addEventListener("resize", onNavMenuLayoutChange);
+  window.addEventListener("scroll", onNavMenuLayoutChange, true);
   await loadMePresentation();
   startActivityTracking();
   void chatStore.refresh();
@@ -233,6 +284,8 @@ onUnmounted(() => {
   window.removeEventListener("keydown", onGlobalKey);
   document.removeEventListener("visibilitychange", onVisibilityChange);
   document.removeEventListener("click", onDocumentClick);
+  window.removeEventListener("resize", onNavMenuLayoutChange);
+  window.removeEventListener("scroll", onNavMenuLayoutChange, true);
   void flushActivity(true, false);
   stopActivityTracking();
   stopChatPoll();
@@ -247,7 +300,14 @@ watch(
 
 watch(navDrawerOpen, (open) => {
   if (typeof document === "undefined") return;
-  document.documentElement.style.overflow = open ? "hidden" : "";
+  if (open) {
+    refreshNavMenuMode();
+    void nextTick(() => syncNavMenuSheetPos());
+    if (navMenuMobile.value) document.documentElement.style.overflow = "hidden";
+  } else {
+    navMenuSheetStyle.value = {};
+    document.documentElement.style.overflow = "";
+  }
 });
 
 watch(
@@ -267,17 +327,18 @@ watch(
   <div class="layout">
     <header class="nav">
       <span v-if="routeNavPending" class="nav-route-loading muted" aria-live="polite">загрузка…</span>
-      <button
-        v-if="auth.token"
-        type="button"
-        class="icon-btn nav-burger"
-        :aria-expanded="navDrawerOpen"
-        aria-controls="nav-drawer"
-        aria-label="меню"
-        @click.stop="toggleNavDrawer"
-      >
-        <AppIcon name="menu" :size="18" />
-      </button>
+      <div v-if="auth.token" ref="navMenuAnchor" class="nav-menu-anchor">
+        <button
+          type="button"
+          class="icon-btn nav-burger"
+          :aria-expanded="navDrawerOpen"
+          aria-controls="nav-drawer"
+          aria-label="меню"
+          @click.stop="toggleNavDrawer"
+        >
+          <AppIcon name="menu" :size="18" />
+        </button>
+      </div>
       <RouterLink v-if="onHome" to="/" class="nav-link brand-link">
         <span>enoobis</span>
       </RouterLink>
@@ -298,7 +359,7 @@ watch(
           <RouterLink
             v-if="auth.role === 'teacher' || auth.role === 'admin'"
             to="/storage"
-            class="icon-btn desktop-only"
+            class="icon-btn"
             aria-label="хранилище"
             title="хранилище"
           >
@@ -378,9 +439,17 @@ watch(
     </header>
     <Teleport to="body">
       <Transition name="nav-menu">
-        <div v-if="navDrawerOpen" id="nav-drawer" class="nav-menu-root" @click="closeNavDrawer">
+        <div
+          v-if="navDrawerOpen"
+          id="nav-drawer"
+          class="nav-menu-root"
+          :class="{ 'nav-menu-root--sheet': navMenuMobile }"
+          @click="closeNavDrawer"
+        >
           <div
             class="nav-menu-sheet"
+            :class="{ 'nav-menu-sheet--popover': !navMenuMobile }"
+            :style="navMenuSheetStyle"
             role="dialog"
             aria-modal="true"
             aria-label="разделы"
@@ -398,14 +467,6 @@ watch(
               </RouterLink>
               <RouterLink v-if="auth.token" to="/shop" class="nav-menu-link" @click="closeNavDrawer">
                 магазин
-              </RouterLink>
-              <RouterLink
-                v-if="auth.role === 'teacher' || auth.role === 'admin'"
-                to="/storage"
-                class="nav-menu-link"
-                @click="closeNavDrawer"
-              >
-                хранилище
               </RouterLink>
               <RouterLink
                 v-if="auth.role === 'admin'"
@@ -460,10 +521,19 @@ watch(
   color: var(--muted);
 }
 
+.nav-menu-anchor {
+  display: inline-flex;
+  align-items: center;
+}
+
 .nav-menu-root {
   position: fixed;
   inset: 0;
   z-index: 90;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.nav-menu-root--sheet {
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -471,16 +541,26 @@ watch(
 }
 
 .nav-menu-sheet {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  overflow-y: auto;
+}
+
+.nav-menu-sheet--popover {
+  padding: 0.35rem;
+  border-radius: var(--radius);
+  max-height: min(70vh, 20rem);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.nav-menu-root--sheet .nav-menu-sheet {
   width: 100%;
   max-width: 640px;
   margin: 0;
   padding: 0.5rem 0.85rem calc(0.85rem + env(safe-area-inset-bottom, 0px));
-  background: var(--surface);
-  border: 1px solid var(--border);
   border-bottom: none;
   border-radius: var(--radius) var(--radius) 0 0;
   max-height: min(72vh, 28rem);
-  overflow-y: auto;
 }
 
 .nav-menu-handle {
@@ -492,33 +572,50 @@ watch(
   background: var(--border);
 }
 
+.nav-menu-root:not(.nav-menu-root--sheet) .nav-menu-handle {
+  display: none;
+}
+
 .nav-menu-inner {
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
+  gap: 0.1rem;
 }
 
 .nav-menu-link {
   display: block;
-  padding: 0.75rem 0.25rem;
+  padding: 0.55rem 0.5rem;
   color: var(--text);
   text-transform: lowercase;
-  font-size: 0.92rem;
+  font-size: 0.9rem;
   font-weight: 500;
   border: none;
-  border-radius: 0;
+  border-radius: 6px;
   background: transparent;
+  text-align: left;
+}
+
+.nav-menu-root--sheet .nav-menu-link {
+  padding: 0.75rem 0.25rem;
+  font-size: 0.92rem;
+  border-radius: 0;
   text-align: center;
 }
 
 .nav-menu-link:hover {
-  color: var(--muted);
+  background: var(--surface2);
+  color: var(--text);
   text-decoration: none;
+}
+
+.nav-menu-root--sheet .nav-menu-link:hover {
+  background: transparent;
+  color: var(--muted);
 }
 
 .nav-menu-enter-active .nav-menu-sheet,
 .nav-menu-leave-active .nav-menu-sheet {
-  transition: transform 0.24s ease;
+  transition: transform 0.24s ease, opacity 0.18s ease;
 }
 
 .nav-menu-enter-active.nav-menu-root,
@@ -526,9 +623,15 @@ watch(
   transition: background 0.2s ease;
 }
 
-.nav-menu-enter-from .nav-menu-sheet,
-.nav-menu-leave-to .nav-menu-sheet {
+.nav-menu-root--sheet.nav-menu-enter-from .nav-menu-sheet,
+.nav-menu-root--sheet.nav-menu-leave-to .nav-menu-sheet {
   transform: translateY(100%);
+}
+
+.nav-menu-root:not(.nav-menu-root--sheet).nav-menu-enter-from .nav-menu-sheet,
+.nav-menu-root:not(.nav-menu-root--sheet).nav-menu-leave-to .nav-menu-sheet {
+  transform: translateY(-6px);
+  opacity: 0;
 }
 
 .nav-menu-enter-from.nav-menu-root,
