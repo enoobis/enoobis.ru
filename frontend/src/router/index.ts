@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from "vue-router";
 import { useAuthStore } from "../stores/auth";
 import { routeNavPending } from "../sync/routeNavPending";
+import { applyDocumentSeo } from "../utils/seo";
 
 const router = createRouter({
   history: createWebHistory(),
@@ -151,6 +152,7 @@ router.beforeEach((to) => {
 
 router.afterEach(() => {
   routeNavPending.value = false;
+  applyDocumentSeo();
 });
 
 router.onError(() => {
