@@ -8,6 +8,7 @@ const PRESETS = {
   chat: { maxWidth: 1280, maxHeight: 1280, quality: 80 },
   avatar: { maxWidth: 512, maxHeight: 512, quality: 82 },
   lecture: { maxWidth: 1920, maxHeight: 1920, quality: 82 },
+  course_icon: { maxWidth: 256, maxHeight: 256, quality: 82 },
   submission: { maxWidth: 1600, maxHeight: 1600, quality: 80 },
   wallpaper: { maxWidth: 1920, maxHeight: 1080, quality: 82 },
   shop_wallpaper: { maxWidth: 1920, maxHeight: 1080, quality: 82 },

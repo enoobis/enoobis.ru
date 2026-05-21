@@ -11,7 +11,15 @@ import { SHOP_KINDS } from "../utils/shopPresets.js";
 const router = express.Router();
 
 const UPLOAD_ROOT = path.resolve(process.env.UPLOADS_DIR ?? "./data/uploads");
-const SUBDIRS = ["avatars", "blog", "course-lectures", "wallpapers", "shop-avatars", "shop-items"];
+const SUBDIRS = [
+  "avatars",
+  "blog",
+  "course-lectures",
+  "course-icons",
+  "wallpapers",
+  "shop-avatars",
+  "shop-items",
+];
 for (const d of SUBDIRS) fs.mkdirSync(path.join(UPLOAD_ROOT, d), { recursive: true });
 
 const IMAGE_MIMES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
@@ -91,6 +99,43 @@ router.post("/blog/upload-image", authRequired, uploadSingle(blogUpload, "file")
     }
   }
   return res.json({ url });
+});
+
+router.post(
+  "/courses/:id/icon",
+  authRequired,
+  uploadSingle(courseIconUpload, "file"),
+  async (req, res) => {
+    const courseId = String(req.params.id ?? "").trim();
+    if (!courseId) return res.status(400).json({ error: "invalid course" });
+    if (!canEditCourseIcon(req.user, courseId)) {
+      return res.status(403).json({ error: "forbidden" });
+    }
+    if (!req.file) return res.status(400).json({ error: "no file" });
+    if (isRasterImageMimetype(req.file.mimetype)) {
+      const r = await optimizeUploadedFile(req.file.path, "course_icon");
+      if (r.ok) req.file.filename = r.filename;
+    }
+    const url = `/uploads/course-icons/${req.file.filename}`;
+    const prev = get("SELECT icon_url FROM courses WHERE id = ?", courseId);
+    if (!prev) return res.status(404).json({ error: "not found" });
+    unlinkCourseIconUrl(prev.icon_url);
+    run("UPDATE courses SET icon_url = ? WHERE id = ?", url, courseId);
+    return res.json({ icon_url: url });
+  },
+);
+
+router.delete("/courses/:id/icon", authRequired, (req, res) => {
+  const courseId = String(req.params.id ?? "").trim();
+  if (!courseId) return res.status(400).json({ error: "invalid course" });
+  if (!canEditCourseIcon(req.user, courseId)) {
+    return res.status(403).json({ error: "forbidden" });
+  }
+  const prev = get("SELECT icon_url FROM courses WHERE id = ?", courseId);
+  if (!prev) return res.status(404).json({ error: "not found" });
+  unlinkCourseIconUrl(prev.icon_url);
+  run("UPDATE courses SET icon_url = '' WHERE id = ?", courseId);
+  return res.json({ icon_url: "" });
 });
 
 router.post(

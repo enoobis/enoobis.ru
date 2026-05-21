@@ -19,6 +19,7 @@ export type Course = {
   enrolled: boolean;
   is_pinned?: boolean;
   is_hidden?: boolean;
+  icon_url?: string;
 };
 
 export type CourseListResponse = {
@@ -321,6 +322,39 @@ export function gradeSubmission(
       body: JSON.stringify(payload),
     },
   );
+}
+
+export async function uploadCourseIcon(courseId: string, file: File, token: string) {
+  const fd = new FormData();
+  fd.append("file", file);
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(`/api/courses/${courseId}/icon`, {
+    method: "POST",
+    headers,
+    body: fd,
+  });
+  const text = await res.text();
+  let data: unknown = null;
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = { error: text };
+    }
+  }
+  if (!res.ok) {
+    const err = (data as { error?: string })?.error ?? res.statusText;
+    throw new Error(err);
+  }
+  return data as { icon_url: string };
+}
+
+export function deleteCourseIcon(courseId: string, token: string) {
+  return api<{ icon_url: string }>(`/api/courses/${courseId}/icon`, {
+    method: "DELETE",
+    token,
+  });
 }
 
 export async function uploadLectureAttachment(courseId: string, file: File, token: string) {

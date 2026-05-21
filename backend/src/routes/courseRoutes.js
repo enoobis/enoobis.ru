@@ -106,6 +106,7 @@ function courseToDto(row, viewerId) {
     co_teachers: co,
     is_owner: !!isOwner,
     created_at: row.created_at,
+    icon_url: row.icon_url ?? "",
     enrolled,
   };
 }
@@ -252,6 +253,15 @@ router.delete("/courses/:id", authRequired, (req, res) => {
   run("DELETE FROM course_students WHERE course_id = ?", c.id);
   run("DELETE FROM course_co_teachers WHERE course_id = ?", c.id);
   run("DELETE FROM user_favorite_courses WHERE course_id = ?", c.id);
+  const iconRow = get("SELECT icon_url FROM courses WHERE id = ?", c.id);
+  if (iconRow?.icon_url?.startsWith("/uploads/course-icons/")) {
+    const fp = path.join(UPLOAD_ROOT, iconRow.icon_url.replace(/^\/uploads\//, ""));
+    try {
+      fs.unlinkSync(fp);
+    } catch {
+      /* ignore */
+    }
+  }
   run("DELETE FROM courses WHERE id = ?", c.id);
   return res.json({ ok: true });
 });

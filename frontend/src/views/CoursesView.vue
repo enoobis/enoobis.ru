@@ -23,6 +23,7 @@ import {
   setClosedStudents,
   submitAssignment,
   unenrollCourse,
+  uploadCourseIcon,
   uploadLectureAttachment,
   uploadSubmissionFile,
   type Assignment,
@@ -80,6 +81,10 @@ const courseQuery = ref("");
 
 const title = ref("");
 const description = ref("");
+const createIconFile = ref<File | null>(null);
+const iconFileInputRef = ref<HTMLInputElement | null>(null);
+const iconUploadCourseId = ref<string | null>(null);
+const iconUploading = ref(false);
 const isOpen = ref(true);
 const studentsDraft = ref("");
 const joinCode = ref("");
@@ -246,6 +251,50 @@ const filteredCourses = computed(() => {
       c.teacher_nickname.toLowerCase().includes(q),
   );
 });
+
+function courseInitial(title: string) {
+  const ch = title.trim().charAt(0);
+  return ch ? ch.toLowerCase() : "?";
+}
+
+function canEditCourseIcon(c: Course) {
+  if (!auth.token || !canTeach.value) return false;
+  if (auth.role === "admin") return true;
+  if (c.teacher_id === auth.user?.id) return true;
+  return c.co_teachers?.some((ct) => ct.id === auth.user?.id) ?? false;
+}
+
+function onCreateIconChange(event: Event) {
+  const input = event.target as HTMLInputElement;
+  createIconFile.value = input.files?.[0] ?? null;
+}
+
+function openIconPicker(courseId: string) {
+  iconUploadCourseId.value = courseId;
+  iconFileInputRef.value?.click();
+}
+
+async function onIconFileSelected(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  const courseId = iconUploadCourseId.value;
+  input.value = "";
+  iconUploadCourseId.value = null;
+  if (!file || !courseId || !auth.token) return;
+  iconUploading.value = true;
+  err.value = "";
+  try {
+    await uploadCourseIcon(courseId, file, auth.token);
+    await loadCourses();
+    if (classroom.value?.course.id === courseId) {
+      await loadClassroom(courseId);
+    }
+  } catch (e) {
+    err.value = e instanceof Error ? e.message : "ошибка";
+  } finally {
+    iconUploading.value = false;
+  }
+}
 
 function closeCourse() {
   classroom.value = null;
@@ -518,13 +567,18 @@ async function onCreateCourse() {
   if (!auth.token) return;
   err.value = "";
   try {
-    await createCourse(auth.token, {
+    const created = await createCourse(auth.token, {
       title: title.value,
       description: description.value,
       is_open: isOpen.value,
     });
+    const iconFile = createIconFile.value;
+    if (iconFile) {
+      await uploadCourseIcon(created.id, iconFile, auth.token);
+    }
     title.value = "";
     description.value = "";
+    createIconFile.value = null;
     creatingCourse.value = false;
     await loadCourses();
   } catch (e) {
@@ -1082,6 +1136,14 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
       <div v-if="creatingCourse" class="form-card">
         <input v-model="title" placeholder="название" />
         <textarea v-model="description" rows="2" placeholder="описание" />
+        <label class="course-icon-pick muted small">
+          <span>иконка</span>
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            @change="onCreateIconChange"
+          />
+        </label>
         <label class="check">
           <input v-model="isOpen" type="checkbox" />
           <span>открытый курс</span>
@@ -1091,6 +1153,14 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
         </button>
       </div>
 
+      <input
+        ref="iconFileInputRef"
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif"
+        class="course-icon-file-input"
+        @change="onIconFileSelected"
+      />
+
       <div class="course-grid">
         <article
           v-for="c in filteredCourses"
@@ -1099,13 +1169,15 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
           :class="{ 'course-card--hidden': c.is_hidden }"
           @click="openCourse(c.id)"
         >
-          <header class="course-card-head">
-            <div class="course-card-title">
-              <h3>{{ c.title }}</h3>
-              <span class="dot">·</span>
-              <span class="muted small">{{ c.is_open ? "открытый" : "закрытый" }}</span>
-            </div>
-            <div class="course-card-head-tools" @click.stop>
+          <div class="course-card-layout">
+            <div class="course-card-main">
+              <header class="course-card-head">
+                <div class="course-card-title">
+                  <h3>{{ c.title }}</h3>
+                  <span class="dot">·</span>
+                  <span class="muted small">{{ c.is_open ? "открытый" : "закрытый" }}</span>
+                </div>
+                <div class="course-card-head-tools" @click.stop>
               <span
                 v-if="c.is_pinned"
                 class="course-card-pin"
@@ -1161,6 +1233,15 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
                   копировать код
                 </button>
                 <button
+                  v-if="canEditCourseIcon(c)"
+                  type="button"
+                  class="course-menu-item"
+                  :disabled="iconUploading"
+                  @click="openIconPicker(c.id); closeCourseMenu($event)"
+                >
+                  {{ c.icon_url ? "сменить иконку" : "добавить иконку" }}
+                </button>
+                <button
                   v-if="canTeach && (c.teacher_id === auth.user?.id || auth.role === 'admin')"
                   type="button"
                   class="course-menu-item course-menu-item--danger"
@@ -1170,16 +1251,22 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
                 </button>
               </div>
             </details>
+                </div>
+              </header>
+              <p v-if="c.description" class="muted small course-card-desc">
+                {{ c.description }}
+              </p>
+              <footer class="course-card-foot">
+                <span class="muted small">{{ c.teacher_nickname }}</span>
+                <span class="muted small">код {{ c.course_code }}</span>
+              </footer>
             </div>
-          </header>
-          <p v-if="c.description" class="muted small course-card-desc">
-            {{ c.description }}
-          </p>
-          <footer class="course-card-foot">
-            <span class="muted small">{{ c.teacher_nickname }}</span>
-            <span class="muted small">код {{ c.course_code }}</span>
-          </footer>
-          <div class="course-card-actions" @click.stop>
+            <div class="course-card-thumb" aria-hidden="true">
+              <img v-if="c.icon_url" :src="c.icon_url" alt="" class="course-card-thumb-img" />
+              <span v-else class="course-card-thumb-letter">{{ courseInitial(c.title) }}</span>
+            </div>
+          </div>
+          <div class="course-card-actions" @click.stop">
             <button v-if="c.is_open && !c.enrolled" type="button" @click="onEnroll(c.id)">
               записаться
             </button>
@@ -1204,7 +1291,24 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
       <header class="course-head">
         <button class="back" type="button" @click="closeCourse">← к курсам</button>
         <div class="course-head-row">
-          <h2>{{ classroom.course.title }}</h2>
+          <div class="course-head-title">
+            <h2>{{ classroom.course.title }}</h2>
+            <p class="muted small course-head-teacher">{{ classroom.course.teacher_nickname }}</p>
+          </div>
+          <div
+            v-if="classroom.course.icon_url"
+            class="course-card-thumb course-card-thumb--head"
+            aria-hidden="true"
+          >
+            <img :src="classroom.course.icon_url" alt="" class="course-card-thumb-img" />
+          </div>
+          <div
+            v-else
+            class="course-card-thumb course-card-thumb--head"
+            aria-hidden="true"
+          >
+            <span class="course-card-thumb-letter">{{ courseInitial(classroom.course.title) }}</span>
+          </div>
           <div class="course-head-actions">
             <span
               v-if="classroom.course.is_pinned"
@@ -1243,6 +1347,15 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
                   @click="copyCourseCode(classroom.course, $event)"
                 >
                   копировать код
+                </button>
+                <button
+                  v-if="canEditCourseIcon(classroom.course)"
+                  type="button"
+                  class="course-menu-item"
+                  :disabled="iconUploading"
+                  @click="openIconPicker(classroom.course.id); closeCourseMenu($event)"
+                >
+                  {{ classroom.course.icon_url ? "сменить иконку" : "добавить иконку" }}
                 </button>
                 <button
                   v-if="isOwnerInCurrent"
@@ -2179,6 +2292,63 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   border-color: #3a3a3a;
   background: var(--surface2);
 }
+.course-card-layout {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+.course-card-main {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+.course-card-thumb {
+  flex-shrink: 0;
+  width: 72px;
+  height: 72px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+}
+.course-card-thumb--head {
+  width: 56px;
+  height: 56px;
+}
+.course-card-thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.course-card-thumb-letter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: lowercase;
+}
+.course-icon-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+.course-icon-pick {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.course-icon-pick input[type="file"] {
+  font-size: 0.82rem;
+  max-width: 100%;
+}
 .course-card-head {
   display: flex;
   align-items: flex-start;
@@ -2295,9 +2465,16 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 }
 .course-head-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 0.5rem;
+  gap: 0.65rem;
+}
+.course-head-title {
+  flex: 1;
+  min-width: 0;
+}
+.course-head-teacher {
+  margin: 0.2rem 0 0;
 }
 .course-head-actions {
   display: flex;

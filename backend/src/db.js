@@ -827,6 +827,16 @@ try {
 }
 
 try {
+  db.prepare("SELECT icon_url FROM courses LIMIT 1").get();
+} catch {
+  try {
+    db.exec("ALTER TABLE courses ADD COLUMN icon_url TEXT NOT NULL DEFAULT ''");
+  } catch {
+    // ignore
+  }
+}
+
+try {
   db.exec("DROP TABLE IF EXISTS call_sessions");
 } catch {
   // ignore

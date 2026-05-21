@@ -316,6 +316,8 @@ function purgeUserCourses(userId) {
     run("DELETE FROM course_students WHERE course_id = ?", c.id);
     run("DELETE FROM course_co_teachers WHERE course_id = ?", c.id);
     run("DELETE FROM user_favorite_courses WHERE course_id = ?", c.id);
+    const iconRow = get("SELECT icon_url FROM courses WHERE id = ?", c.id);
+    unlinkIfUploadsUrl(iconRow?.icon_url ?? "");
     run("DELETE FROM courses WHERE id = ?", c.id);
   }
 }
