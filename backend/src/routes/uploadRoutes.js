@@ -62,6 +62,32 @@ const lectureUpload = multer({
   storage: makeStorage("course-lectures"),
   limits: { fileSize: 32 * 1024 * 1024 },
 });
+const courseIconUpload = multer({
+  storage: makeStorage("course-icons"),
+  limits: { fileSize: 3 * 1024 * 1024 },
+  fileFilter: imageFileFilter,
+});
+
+function canEditCourseIcon(user, courseId) {
+  const c = get("SELECT teacher_id FROM courses WHERE id = ?", courseId);
+  if (!c) return false;
+  if (user.role === "admin") return true;
+  if (c.teacher_id === user.id) return true;
+  return !!get(
+    "SELECT 1 as v FROM course_co_teachers WHERE course_id = ? AND user_id = ?",
+    courseId,
+    user.id,
+  );
+}
+
+function unlinkCourseIconUrl(url) {
+  if (!url || !url.startsWith("/uploads/course-icons/")) return;
+  try {
+    fs.unlinkSync(path.join(UPLOAD_ROOT, url.replace(/^\/uploads\//, "")));
+  } catch {
+    /* ignore */
+  }
+}
 
 router.post("/me/avatar", authRequired, uploadSingle(avatarUpload, "file"), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: "no file" });
