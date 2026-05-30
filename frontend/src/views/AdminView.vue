@@ -80,6 +80,7 @@ const shopLoading = ref(false);
 const shopUploadName = ref("");
 const shopUploadPrice = ref(0);
 const shopUploadStock = ref("");
+const shopUploadCategory = ref("");
 const shopUploadKind = ref<ImageShopKind>("avatar");
 const shopUploadBusy = ref(false);
 const shopKindOptions: { value: ImageShopKind; label: string }[] = [
@@ -91,6 +92,7 @@ const shopKindOptions: { value: ImageShopKind; label: string }[] = [
 const shopEditOpen = ref(false);
 const shopEditTarget = ref<ShopItem | null>(null);
 const shopEditKind = ref<ImageShopKind>("avatar");
+const shopEditCategory = ref("");
 const shopEditName = ref("");
 const shopEditPrice = ref(0);
 const shopEditStock = ref("");
@@ -293,6 +295,7 @@ function shopStockToInput(limit: number | null) {
 function openShopEdit(item: ShopItem) {
   shopEditTarget.value = item;
   shopEditKind.value = item.kind;
+  shopEditCategory.value = item.category ?? "";
   shopEditName.value = item.name;
   shopEditPrice.value = item.price;
   shopEditStock.value = shopStockToInput(item.stock_limit);
@@ -330,6 +333,7 @@ async function saveShopEdit() {
   try {
     await adminPatchShopItem(auth.token, item.id, {
       kind: shopEditKind.value,
+      category: shopEditCategory.value.trim().toLowerCase(),
       name,
       price: Math.max(0, Math.floor(Number(shopEditPrice.value) || 0)),
       stock_limit: stock,
@@ -382,10 +386,19 @@ async function onShopItemFile(e: Event) {
   shopUploadBusy.value = true;
   shopMsg.value = "";
   try {
-    await adminUploadShopItem(auth.token, file, shopUploadKind.value, name, price, stockLimit);
+    await adminUploadShopItem(
+      auth.token,
+      file,
+      shopUploadKind.value,
+      name,
+      price,
+      stockLimit,
+      shopUploadCategory.value,
+    );
     shopUploadName.value = "";
     shopUploadPrice.value = 0;
     shopUploadStock.value = "";
+    shopUploadCategory.value = "";
     (e.target as HTMLInputElement).value = "";
     shopMsg.value = "добавлено";
     await loadShopItems();
@@ -1025,11 +1038,17 @@ async function restoreComment(id: string | null) {
       <p v-if="shopMsg" class="ok-msg small">{{ shopMsg }}</p>
       <div class="shop-add">
         <label class="shop-add-field">
-          <span class="muted small">категория</span>
+          <span class="muted small">тип</span>
           <select v-model="shopUploadKind" class="shop-input shop-kind">
             <option v-for="k in shopKindOptions" :key="k.value" :value="k.value">{{ k.label }}</option>
           </select>
         </label>
+        <input
+          v-model="shopUploadCategory"
+          placeholder="категория"
+          class="shop-input shop-category"
+          aria-label="категория"
+        />
         <input v-model="shopUploadName" placeholder="название" class="shop-input" />
         <input v-model.number="shopUploadPrice" type="number" min="0" step="1" placeholder="цена" class="shop-input shop-price" />
         <input v-model="shopUploadStock" inputmode="numeric" placeholder="тираж" class="shop-input shop-stock" aria-label="тираж" />
@@ -1038,7 +1057,7 @@ async function restoreComment(id: string | null) {
           {{ shopUploadBusy ? "загрузка…" : "загрузить" }}
         </label>
       </div>
-      <p class="muted small gif">тираж пустой — без лимита. gif — без сжатия.</p>
+      <p class="muted small gif">категория: аниме, природа… · тираж пустой — без лимита</p>
       <p v-if="shopLoading" class="muted small">загрузка…</p>
       <ul v-else-if="shopItems.length" class="shop-grid">
         <li v-for="a in shopItems" :key="a.id" class="shop-item">
@@ -1046,8 +1065,8 @@ async function restoreComment(id: string | null) {
           <span class="shop-avatar-meta">
             <span>{{ a.name }}</span>
             <span class="muted small">
-              {{ shopKindRu(a.kind) }} · {{ a.price }}{{ a.is_animated ? " · gif" : ""
-              }}{{ shopStockLine(a) }}
+              {{ shopKindRu(a.kind) }}<template v-if="a.category"> · {{ a.category }}</template> ·
+              {{ a.price }}{{ a.is_animated ? " · gif" : "" }}{{ shopStockLine(a) }}
             </span>
           </span>
           <div class="shop-item-actions">
@@ -1068,10 +1087,18 @@ async function restoreComment(id: string | null) {
           <div class="shop-edit-dialog card" role="dialog" aria-modal="true" aria-label="редактирование товара">
             <h3 class="shop-edit-title">товар</h3>
             <label class="shop-edit-field">
-              <span class="muted small">категория</span>
+              <span class="muted small">тип</span>
               <select v-model="shopEditKind" class="shop-input shop-kind">
                 <option v-for="k in shopKindOptions" :key="k.value" :value="k.value">{{ k.label }}</option>
               </select>
+            </label>
+            <label class="shop-edit-field">
+              <span class="muted small">категория</span>
+              <input
+                v-model="shopEditCategory"
+                class="shop-input shop-category"
+                placeholder="аниме, природа…"
+              />
             </label>
             <label class="shop-edit-field">
               <span class="muted small">название</span>
@@ -1384,6 +1411,10 @@ strong {
 }
 .shop-price {
   max-width: 120px;
+  flex: none;
+}
+.shop-category {
+  max-width: 140px;
   flex: none;
 }
 .shop-stock {

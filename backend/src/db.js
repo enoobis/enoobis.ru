@@ -774,6 +774,7 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS shop_items (
     id TEXT PRIMARY KEY,
     kind TEXT NOT NULL,
+    category TEXT NOT NULL DEFAULT '',
     name TEXT NOT NULL,
     url TEXT NOT NULL,
     price INTEGER NOT NULL DEFAULT 0,
@@ -831,6 +832,16 @@ try {
 } catch {
   try {
     db.exec("ALTER TABLE courses ADD COLUMN icon_url TEXT NOT NULL DEFAULT ''");
+  } catch {
+    // ignore
+  }
+}
+
+try {
+  db.prepare("SELECT category FROM shop_items LIMIT 1").get();
+} catch {
+  try {
+    db.exec("ALTER TABLE shop_items ADD COLUMN category TEXT NOT NULL DEFAULT ''");
   } catch {
     // ignore
   }

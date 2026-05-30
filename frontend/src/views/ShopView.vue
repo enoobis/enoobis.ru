@@ -14,6 +14,7 @@ const tabs: { key: ShopItemKind; label: string }[] = [
 ];
 
 const tab = ref<ShopItemKind>("avatar");
+const categoryFilter = ref("");
 const items = ref<ShopItem[]>([]);
 const loading = ref(true);
 const busy = ref<string | null>(null);
@@ -21,7 +22,23 @@ const profileCoins = ref(0);
 
 let shopLoadSeq = 0;
 
-const shown = computed(() => items.value.filter((i) => i.kind === tab.value && !i.owned));
+const categoriesInTab = computed(() => {
+  const set = new Set<string>();
+  for (const i of items.value) {
+    if (i.kind !== tab.value) continue;
+    const c = (i.category || "").trim();
+    if (c) set.add(c);
+  }
+  return [...set].sort((a, b) => a.localeCompare(b, "ru"));
+});
+
+const shown = computed(() =>
+  items.value.filter((i) => {
+    if (i.kind !== tab.value || i.owned) return false;
+    if (!categoryFilter.value) return true;
+    return (i.category || "").trim() === categoryFilter.value;
+  }),
+);
 
 function shopSold(item: ShopItem): number {
   return Math.max(0, Math.floor(Number(item.sold_count ?? 0)));
@@ -94,7 +111,10 @@ async function onBuy(item: ShopItem) {
 }
 
 onMounted(load);
-watch(tab, load);
+watch(tab, () => {
+  categoryFilter.value = "";
+  void load();
+});
 watch(
   () => auth.token,
   (t) => {
@@ -134,6 +154,27 @@ watch(
       </button>
     </nav>
 
+    <nav v-if="categoriesInTab.length" class="filter-tabs shop-cats" aria-label="категории">
+      <button
+        type="button"
+        class="filter-tab"
+        :class="{ on: !categoryFilter }"
+        @click="categoryFilter = ''"
+      >
+        все
+      </button>
+      <button
+        v-for="c in categoriesInTab"
+        :key="c"
+        type="button"
+        class="filter-tab"
+        :class="{ on: categoryFilter === c }"
+        @click="categoryFilter = c"
+      >
+        {{ c }}
+      </button>
+    </nav>
+
     <div v-if="loading" class="page-empty muted">загрузка</div>
     <div v-else-if="!shown.length" class="page-empty muted">пусто</div>
     <ul v-else class="grid">
@@ -160,6 +201,7 @@ watch(
           </template>
         </div>
         <p class="item-name">{{ item.name }}</p>
+        <p v-if="item.category" class="item-category muted small">{{ item.category }}</p>
         <p v-if="shopStockCap(item) !== null" class="stock-line muted">
           {{ shopSoldOut(item) ? "распродано" : `ещё ${shopStockLeft(item)}` }}
         </p>
@@ -189,6 +231,13 @@ watch(
 }
 .shop .filter-tabs {
   margin-bottom: 0.35rem;
+}
+.shop-cats {
+  margin-bottom: 0.5rem;
+}
+.item-category {
+  margin: -0.15rem 0 0;
+  text-transform: lowercase;
 }
 .grid {
   list-style: none;

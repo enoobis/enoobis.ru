@@ -19,7 +19,7 @@ function ownedIdsForUser(userId) {
 function listItemsQuery(kinds) {
   const placeholders = kinds.map(() => "?").join(", ");
   return all(
-    `SELECT si.id, si.kind, si.name, si.url, si.price, si.is_animated, si.created_at, si.stock_limit,
+    `SELECT si.id, si.kind, si.category, si.name, si.url, si.price, si.is_animated, si.created_at, si.stock_limit,
       si.preset_value,
       (SELECT COUNT(*) FROM user_owned_shop_items uoi WHERE uoi.item_id = si.id) AS sold_count
      FROM shop_items si
@@ -115,7 +115,7 @@ router.get("/shop/avatars", authRequired, (req, res) => {
 
 router.get("/shop/my-items", authRequired, (req, res) => {
   const rows = all(
-    `SELECT si.id, si.kind, si.name, si.url, si.price, si.is_animated, si.preset_value, uoi.acquired_at
+    `SELECT si.id, si.kind, si.category, si.name, si.url, si.price, si.is_animated, si.preset_value, uoi.acquired_at
      FROM user_owned_shop_items uoi
      JOIN shop_items si ON si.id = uoi.item_id
      WHERE uoi.user_id = ? AND si.kind IN ${IMAGE_KINDS_SQL}

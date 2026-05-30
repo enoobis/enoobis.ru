@@ -5,6 +5,7 @@ export type ShopItemKind = "avatar" | "frame" | "wallpaper" | "cover";
 export type ShopItem = {
   id: string;
   kind: ShopItemKind;
+  category: string;
   name: string;
   url: string;
   price: number;
@@ -18,6 +19,7 @@ export type ShopItem = {
 export type OwnedShopItem = {
   id: string;
   kind: ShopItemKind;
+  category: string;
   name: string;
   url: string;
   price: number;
@@ -76,6 +78,7 @@ export async function adminUploadShopItem(
   name: string,
   price: number,
   stockLimit?: number | null,
+  category?: string,
 ): Promise<{
   ok: boolean;
   id: string;
@@ -92,6 +95,8 @@ export async function adminUploadShopItem(
   form.append("name", name);
   form.append("price", String(price));
   if (stockLimit != null && stockLimit >= 1) form.append("stock_limit", String(stockLimit));
+  const cat = (category ?? "").trim();
+  if (cat) form.append("category", cat);
   const res = await fetch("/api/admin/shop/items", {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
@@ -107,7 +112,13 @@ export async function adminUploadShopItem(
 export function adminPatchShopItem(
   token: string,
   itemId: string,
-  payload: { kind?: ShopItemKind; name?: string; price?: number; stock_limit?: number | null },
+  payload: {
+    kind?: ShopItemKind;
+    category?: string;
+    name?: string;
+    price?: number;
+    stock_limit?: number | null;
+  },
 ): Promise<{ ok: boolean; item: ShopItem }> {
   return api(`/api/admin/shop/items/${itemId}`, {
     method: "PATCH",
