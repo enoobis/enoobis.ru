@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { listShopItems, buyShopItem, type ShopItem, type ShopItemKind } from "../api/shop";
+import {
+  listShopCategories,
+  listShopItems,
+  buyShopItem,
+  type ShopCategory,
+  type ShopItem,
+  type ShopItemKind,
+} from "../api/shop";
 import { useAuthStore } from "../stores/auth";
 import { toastError, toastSuccess } from "../utils/toast";
 
@@ -15,6 +22,7 @@ const tabs: { key: ShopItemKind; label: string }[] = [
 
 const tab = ref<ShopItemKind>("avatar");
 const categoryFilter = ref("");
+const shopCategories = ref<ShopCategory[]>([]);
 const items = ref<ShopItem[]>([]);
 const loading = ref(true);
 const busy = ref<string | null>(null);
@@ -22,23 +30,17 @@ const profileCoins = ref(0);
 
 let shopLoadSeq = 0;
 
-const categoriesInTab = computed(() => {
-  const set = new Set<string>();
-  for (const i of items.value) {
-    if (i.kind !== tab.value) continue;
-    const c = (i.category || "").trim();
-    if (c) set.add(c);
-  }
-  return [...set].sort((a, b) => a.localeCompare(b, "ru"));
-});
-
 const shown = computed(() =>
   items.value.filter((i) => {
     if (i.kind !== tab.value || i.owned) return false;
     if (!categoryFilter.value) return true;
-    return (i.category || "").trim() === categoryFilter.value;
+    return (i.categories ?? []).some((c) => c.id === categoryFilter.value);
   }),
 );
+
+function itemCategoryLine(item: ShopItem): string {
+  return (item.categories ?? []).map((c) => c.name).join(" · ");
+}
 
 function shopSold(item: ShopItem): number {
   return Math.max(0, Math.floor(Number(item.sold_count ?? 0)));
@@ -84,9 +86,15 @@ async function load() {
     await loadCoins();
     if (seq !== shopLoadSeq) return;
 
-    const list = await listShopItems(auth.token, kind);
+    const [list, cats] = await Promise.all([
+      listShopItems(auth.token, kind),
+      shopCategories.value.length
+        ? Promise.resolve(shopCategories.value)
+        : listShopCategories(auth.token),
+    ]);
     if (seq !== shopLoadSeq) return;
 
+    if (!shopCategories.value.length) shopCategories.value = cats;
     items.value = list;
   } catch (e) {
     if (seq === shopLoadSeq) toastError(e);
@@ -154,7 +162,7 @@ watch(
       </button>
     </nav>
 
-    <nav v-if="categoriesInTab.length" class="filter-tabs shop-cats" aria-label="категории">
+    <nav v-if="shopCategories.length" class="filter-tabs shop-cats" aria-label="категории">
       <button
         type="button"
         class="filter-tab"
@@ -164,14 +172,14 @@ watch(
         все
       </button>
       <button
-        v-for="c in categoriesInTab"
-        :key="c"
+        v-for="c in shopCategories"
+        :key="c.id"
         type="button"
         class="filter-tab"
-        :class="{ on: categoryFilter === c }"
-        @click="categoryFilter = c"
+        :class="{ on: categoryFilter === c.id }"
+        @click="categoryFilter = c.id"
       >
-        {{ c }}
+        {{ c.name }}
       </button>
     </nav>
 
@@ -201,7 +209,7 @@ watch(
           </template>
         </div>
         <p class="item-name">{{ item.name }}</p>
-        <p v-if="item.category" class="item-category muted small">{{ item.category }}</p>
+        <p v-if="itemCategoryLine(item)" class="item-category muted small">{{ itemCategoryLine(item) }}</p>
         <p v-if="shopStockCap(item) !== null" class="stock-line muted">
           {{ shopSoldOut(item) ? "распродано" : `ещё ${shopStockLeft(item)}` }}
         </p>

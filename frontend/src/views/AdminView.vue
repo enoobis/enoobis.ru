@@ -27,11 +27,16 @@ import {
 } from "../api/adminUsers";
 import { useAuthStore } from "../stores/auth";
 import {
+  adminCreateShopCategory,
+  adminDeleteShopCategory,
   adminDeleteShopItem,
+  adminListShopCategories,
   adminPatchShopItem,
+  adminUpdateShopCategory,
   adminUploadShopItem,
   listShopItems,
   type ImageShopKind,
+  type ShopCategory,
   type ShopItem,
   type ShopItemKind,
 } from "../api/shop";
@@ -80,7 +85,12 @@ const shopLoading = ref(false);
 const shopUploadName = ref("");
 const shopUploadPrice = ref(0);
 const shopUploadStock = ref("");
-const shopUploadCategory = ref("");
+const shopCategories = ref<ShopCategory[]>([]);
+const shopCatNames = ref<Record<string, string>>({});
+const shopNewCatId = ref("");
+const shopNewCatName = ref("");
+const shopCatBusy = ref(false);
+const shopUploadCategoryIds = ref<string[]>([]);
 const shopUploadKind = ref<ImageShopKind>("avatar");
 const shopUploadBusy = ref(false);
 const shopKindOptions: { value: ImageShopKind; label: string }[] = [
@@ -92,7 +102,7 @@ const shopKindOptions: { value: ImageShopKind; label: string }[] = [
 const shopEditOpen = ref(false);
 const shopEditTarget = ref<ShopItem | null>(null);
 const shopEditKind = ref<ImageShopKind>("avatar");
-const shopEditCategory = ref("");
+const shopEditCategoryIds = ref<string[]>([]);
 const shopEditName = ref("");
 const shopEditPrice = ref(0);
 const shopEditStock = ref("");
@@ -274,10 +284,106 @@ function presetBan(target: "blog" | "micro" | "comment" | "chat", unit: "day" | 
   box.value = { ...box.value, ban_forever: false, ban_until: d.toISOString().slice(0, 16) };
 }
 
+function syncShopCatNames() {
+  const m: Record<string, string> = {};
+  for (const c of shopCategories.value) m[c.id] = c.name;
+  shopCatNames.value = m;
+}
+
+async function loadShopCategories() {
+  if (!auth.token) return;
+  try {
+    shopCategories.value = await adminListShopCategories(auth.token);
+    syncShopCatNames();
+  } catch {
+    /* ignore */
+  }
+}
+
+function toggleShopCatIds(ids: string[], id: string) {
+  const i = ids.indexOf(id);
+  if (i >= 0) ids.splice(i, 1);
+  else ids.push(id);
+}
+
+function toggleUploadCat(id: string) {
+  toggleShopCatIds(shopUploadCategoryIds.value, id);
+}
+
+function toggleEditCat(id: string) {
+  toggleShopCatIds(shopEditCategoryIds.value, id);
+}
+
+async function saveShopCategoryName(id: string) {
+  if (!auth.token) return;
+  const name = (shopCatNames.value[id] ?? "").trim();
+  if (!name) {
+    shopMsg.value = "нужно название";
+    return;
+  }
+  shopCatBusy.value = true;
+  shopMsg.value = "";
+  try {
+    await adminUpdateShopCategory(auth.token, id, name);
+    shopMsg.value = "сохранено";
+    await loadShopCategories();
+  } catch (ex) {
+    shopMsg.value = ex instanceof Error ? ex.message : "ошибка";
+  } finally {
+    shopCatBusy.value = false;
+  }
+}
+
+async function addShopCategory() {
+  if (!auth.token) return;
+  const id = shopNewCatId.value.trim().toLowerCase();
+  const name = shopNewCatName.value.trim().toLowerCase();
+  if (!id || !name) {
+    shopMsg.value = "id и название";
+    return;
+  }
+  shopCatBusy.value = true;
+  shopMsg.value = "";
+  try {
+    await adminCreateShopCategory(auth.token, id, name);
+    shopNewCatId.value = "";
+    shopNewCatName.value = "";
+    shopMsg.value = "категория добавлена";
+    await loadShopCategories();
+  } catch (ex) {
+    shopMsg.value = ex instanceof Error ? ex.message : "ошибка";
+  } finally {
+    shopCatBusy.value = false;
+  }
+}
+
+async function removeShopCategory(id: string) {
+  if (!auth.token) return;
+  shopCatBusy.value = true;
+  shopMsg.value = "";
+  try {
+    await adminDeleteShopCategory(auth.token, id);
+    shopUploadCategoryIds.value = shopUploadCategoryIds.value.filter((x) => x !== id);
+    shopEditCategoryIds.value = shopEditCategoryIds.value.filter((x) => x !== id);
+    await loadShopCategories();
+    await loadShopItems();
+    shopMsg.value = "удалено";
+  } catch (ex) {
+    shopMsg.value = ex instanceof Error ? ex.message : "ошибка";
+  } finally {
+    shopCatBusy.value = false;
+  }
+}
+
+function shopItemCatsLine(item: ShopItem): string {
+  return (item.categories ?? []).map((c) => c.name).join(" · ");
+}
+
 async function loadShopItems() {
   if (!auth.token) return;
   shopLoading.value = true;
   try {
+    await loadShopCategories();
     shopItems.value = await listShopItems(auth.token);
   } catch {
     /* ignore */
@@ -295,7 +401,7 @@ function shopStockToInput(limit: number | null) {
 function openShopEdit(item: ShopItem) {
   shopEditTarget.value = item;
   shopEditKind.value = item.kind;
-  shopEditCategory.value = item.category ?? "";
+  shopEditCategoryIds.value = (item.categories ?? []).map((c) => c.id);
   shopEditName.value = item.name;
   shopEditPrice.value = item.price;
   shopEditStock.value = shopStockToInput(item.stock_limit);
@@ -333,7 +439,7 @@ async function saveShopEdit() {
   try {
     await adminPatchShopItem(auth.token, item.id, {
       kind: shopEditKind.value,
-      category: shopEditCategory.value.trim().toLowerCase(),
+      categories: [...shopEditCategoryIds.value],
       name,
       price: Math.max(0, Math.floor(Number(shopEditPrice.value) || 0)),
       stock_limit: stock,
@@ -393,12 +499,12 @@ async function onShopItemFile(e: Event) {
       name,
       price,
       stockLimit,
-      shopUploadCategory.value,
+      [...shopUploadCategoryIds.value],
     );
     shopUploadName.value = "";
     shopUploadPrice.value = 0;
     shopUploadStock.value = "";
-    shopUploadCategory.value = "";
+    shopUploadCategoryIds.value = [];
     (e.target as HTMLInputElement).value = "";
     shopMsg.value = "добавлено";
     await loadShopItems();
@@ -1036,6 +1142,27 @@ async function restoreComment(id: string | null) {
     <template v-else-if="tab === 'shop'">
       <h2>товары магазина</h2>
       <p v-if="shopMsg" class="ok-msg small">{{ shopMsg }}</p>
+
+      <section class="shop-cats-block">
+        <h3 class="shop-cats-title">категории</h3>
+        <ul v-if="shopCategories.length" class="shop-cats-list">
+          <li v-for="c in shopCategories" :key="c.id" class="shop-cats-row">
+            <input v-model="shopCatNames[c.id]" class="shop-input shop-cat-name" :aria-label="c.id" />
+            <button type="button" class="secondary" :disabled="shopCatBusy" @click="saveShopCategoryName(c.id)">
+              ок
+            </button>
+            <button type="button" class="secondary danger" :disabled="shopCatBusy" @click="removeShopCategory(c.id)">
+              ×
+            </button>
+          </li>
+        </ul>
+        <div class="shop-cats-add">
+          <input v-model="shopNewCatId" class="shop-input shop-cat-id" placeholder="id" aria-label="id категории" />
+          <input v-model="shopNewCatName" class="shop-input shop-cat-name" placeholder="название" />
+          <button type="button" :disabled="shopCatBusy" @click="addShopCategory">добавить</button>
+        </div>
+      </section>
+
       <div class="shop-add">
         <label class="shop-add-field">
           <span class="muted small">тип</span>
@@ -1043,12 +1170,6 @@ async function restoreComment(id: string | null) {
             <option v-for="k in shopKindOptions" :key="k.value" :value="k.value">{{ k.label }}</option>
           </select>
         </label>
-        <input
-          v-model="shopUploadCategory"
-          placeholder="категория"
-          class="shop-input shop-category"
-          aria-label="категория"
-        />
         <input v-model="shopUploadName" placeholder="название" class="shop-input" />
         <input v-model.number="shopUploadPrice" type="number" min="0" step="1" placeholder="цена" class="shop-input shop-price" />
         <input v-model="shopUploadStock" inputmode="numeric" placeholder="тираж" class="shop-input shop-stock" aria-label="тираж" />
@@ -1057,7 +1178,19 @@ async function restoreComment(id: string | null) {
           {{ shopUploadBusy ? "загрузка…" : "загрузить" }}
         </label>
       </div>
-      <p class="muted small gif">категория: аниме, природа… · тираж пустой — без лимита</p>
+      <div v-if="shopCategories.length" class="cat-chips" role="group" aria-label="категории товара">
+        <button
+          v-for="c in shopCategories"
+          :key="c.id"
+          type="button"
+          class="cat-chip"
+          :class="{ on: shopUploadCategoryIds.includes(c.id) }"
+          @click="toggleUploadCat(c.id)"
+        >
+          {{ c.name }}
+        </button>
+      </div>
+      <p class="muted small">категории — несколько · тираж пустой — без лимита</p>
       <p v-if="shopLoading" class="muted small">загрузка…</p>
       <ul v-else-if="shopItems.length" class="shop-grid">
         <li v-for="a in shopItems" :key="a.id" class="shop-item">
@@ -1065,7 +1198,7 @@ async function restoreComment(id: string | null) {
           <span class="shop-avatar-meta">
             <span>{{ a.name }}</span>
             <span class="muted small">
-              {{ shopKindRu(a.kind) }}<template v-if="a.category"> · {{ a.category }}</template> ·
+              {{ shopKindRu(a.kind) }}<template v-if="shopItemCatsLine(a)"> · {{ shopItemCatsLine(a) }}</template> ·
               {{ a.price }}{{ a.is_animated ? " · gif" : "" }}{{ shopStockLine(a) }}
             </span>
           </span>
@@ -1092,14 +1225,21 @@ async function restoreComment(id: string | null) {
                 <option v-for="k in shopKindOptions" :key="k.value" :value="k.value">{{ k.label }}</option>
               </select>
             </label>
-            <label class="shop-edit-field">
-              <span class="muted small">категория</span>
-              <input
-                v-model="shopEditCategory"
-                class="shop-input shop-category"
-                placeholder="аниме, природа…"
-              />
-            </label>
+            <div v-if="shopCategories.length" class="shop-edit-field">
+              <span class="muted small">категории</span>
+              <div class="cat-chips" role="group">
+                <button
+                  v-for="c in shopCategories"
+                  :key="c.id"
+                  type="button"
+                  class="cat-chip"
+                  :class="{ on: shopEditCategoryIds.includes(c.id) }"
+                  @click="toggleEditCat(c.id)"
+                >
+                  {{ c.name }}
+                </button>
+              </div>
+            </div>
             <label class="shop-edit-field">
               <span class="muted small">название</span>
               <input v-model="shopEditName" class="shop-input" placeholder="название" />
@@ -1413,9 +1553,60 @@ strong {
   max-width: 120px;
   flex: none;
 }
-.shop-category {
-  max-width: 140px;
+.shop-cats-block {
+  margin-bottom: 1rem;
+  display: grid;
+  gap: 0.45rem;
+}
+.shop-cats-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+.shop-cats-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+.shop-cats-row,
+.shop-cats-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+}
+.shop-cat-id {
+  max-width: 100px;
   flex: none;
+  min-width: 0;
+}
+.shop-cat-name {
+  flex: 1;
+  min-width: 120px;
+  max-width: 200px;
+}
+.cat-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.35rem;
+}
+.cat-chip {
+  font: inherit;
+  font-size: 0.82rem;
+  padding: 0.28rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--muted);
+  cursor: pointer;
+}
+.cat-chip.on {
+  border-color: var(--text);
+  color: var(--text);
+  background: var(--surface2);
 }
 .shop-stock {
   max-width: 88px;

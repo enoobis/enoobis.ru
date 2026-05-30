@@ -2,10 +2,16 @@ import { api } from "./http";
 
 export type ShopItemKind = "avatar" | "frame" | "wallpaper" | "cover";
 
+export type ShopCategory = {
+  id: string;
+  name: string;
+  sort_order?: number;
+};
+
 export type ShopItem = {
   id: string;
   kind: ShopItemKind;
-  category: string;
+  categories: ShopCategory[];
   name: string;
   url: string;
   price: number;
@@ -19,7 +25,7 @@ export type ShopItem = {
 export type OwnedShopItem = {
   id: string;
   kind: ShopItemKind;
-  category: string;
+  categories: ShopCategory[];
   name: string;
   url: string;
   price: number;
@@ -36,8 +42,15 @@ export type EquipResult = {
   profile_cover_url: string;
 };
 
-export function listShopItems(token: string, kind?: ShopItemKind): Promise<ShopItem[]> {
-  const q = kind ? `?kind=${encodeURIComponent(kind)}` : "";
+export function listShopCategories(token: string): Promise<ShopCategory[]> {
+  return api("/api/shop/categories", { token });
+}
+
+export function listShopItems(token: string, kind?: ShopItemKind, category?: string): Promise<ShopItem[]> {
+  const qs = new URLSearchParams();
+  if (kind) qs.set("kind", kind);
+  if (category) qs.set("category", category);
+  const q = qs.toString() ? `?${qs}` : "";
   return api(`/api/shop/items${q}`, { token });
 }
 
@@ -78,25 +91,15 @@ export async function adminUploadShopItem(
   name: string,
   price: number,
   stockLimit?: number | null,
-  category?: string,
-): Promise<{
-  ok: boolean;
-  id: string;
-  url: string;
-  name: string;
-  price: number;
-  kind: string;
-  is_animated: number;
-  stock_limit: number | null;
-}> {
+  categoryIds?: string[],
+): Promise<ShopItem & { ok: boolean }> {
   const form = new FormData();
   form.append("file", file);
   form.append("kind", kind);
   form.append("name", name);
   form.append("price", String(price));
   if (stockLimit != null && stockLimit >= 1) form.append("stock_limit", String(stockLimit));
-  const cat = (category ?? "").trim();
-  if (cat) form.append("category", cat);
+  if (categoryIds?.length) form.append("categories", JSON.stringify(categoryIds));
   const res = await fetch("/api/admin/shop/items", {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
@@ -109,12 +112,47 @@ export async function adminUploadShopItem(
   return res.json();
 }
 
+export function adminListShopCategories(token: string): Promise<ShopCategory[]> {
+  return api("/api/admin/shop/categories", { token });
+}
+
+export function adminCreateShopCategory(
+  token: string,
+  id: string,
+  name: string,
+): Promise<ShopCategory> {
+  return api("/api/admin/shop/categories", {
+    method: "POST",
+    token,
+    body: JSON.stringify({ id, name }),
+  });
+}
+
+export function adminUpdateShopCategory(
+  token: string,
+  id: string,
+  name: string,
+): Promise<ShopCategory> {
+  return api(`/api/admin/shop/categories/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    token,
+    body: JSON.stringify({ name }),
+  });
+}
+
+export function adminDeleteShopCategory(token: string, id: string): Promise<{ ok: boolean }> {
+  return api(`/api/admin/shop/categories/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
 export function adminPatchShopItem(
   token: string,
   itemId: string,
   payload: {
     kind?: ShopItemKind;
-    category?: string;
+    categories?: string[];
     name?: string;
     price?: number;
     stock_limit?: number | null;

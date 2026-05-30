@@ -1,4 +1,5 @@
 import Database from "better-sqlite3";
+import { ensureShopCategoryTables } from "./utils/shopCategories.js";
 
 const dbPath = process.env.DATABASE_FILE ?? "./edu.db";
 export const db = new Database(dbPath);
@@ -845,6 +846,12 @@ try {
   } catch {
     // ignore
   }
+}
+
+try {
+  ensureShopCategoryTables();
+} catch {
+  // ignore
 }
 
 try {

@@ -7,6 +7,15 @@ import { nowIso, run, get } from "../db.js";
 import { authRequired } from "../auth.js";
 import { isRasterImageMimetype, optimizeUploadedFile } from "../utils/imageOptimize.js";
 import { SHOP_KINDS } from "../utils/shopPresets.js";
+import {
+  attachCategoriesToItems,
+  createShopCategory,
+  deleteShopCategory,
+  listShopCategories,
+  parseCategoryIdsInput,
+  setItemCategories,
+  updateShopCategory,
+} from "../utils/shopCategories.js";
 
 const router = express.Router();
 
@@ -197,7 +206,7 @@ router.post("/admin/shop/items", authRequired, uploadSingle(shopItemUpload, "fil
   const kind = String(req.body?.kind ?? "avatar").trim();
   if (!SHOP_KINDS.has(kind)) return res.status(400).json({ error: "bad kind" });
   const name = String(req.body?.name ?? "").trim() || req.file.originalname;
-  const category = String(req.body?.category ?? "").trim().toLowerCase();
+  const categoryIds = parseCategoryIdsInput(req.body);
   const price = Math.max(0, parseInt(req.body?.price ?? "0", 10) || 0);
   const rawStock = req.body?.stock_limit;
   /** @type {number | null} */
@@ -219,11 +228,10 @@ router.post("/admin/shop/items", authRequired, uploadSingle(shopItemUpload, "fil
   const url = `/uploads/shop-items/${req.file.filename}`;
   const id = uuidv4();
   run(
-    `INSERT INTO shop_items (id, kind, category, name, url, price, is_animated, stock_limit, preset_value, added_by, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)`,
+    `INSERT INTO shop_items (id, kind, name, url, price, is_animated, stock_limit, preset_value, added_by, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)`,
     id,
     kind,
-    category,
     name,
     url,
     price,
@@ -232,17 +240,52 @@ router.post("/admin/shop/items", authRequired, uploadSingle(shopItemUpload, "fil
     req.user.id,
     nowIso(),
   );
-  return res.json({
-    ok: true,
-    id,
-    url,
-    name,
-    price,
-    kind,
-    category,
-    is_animated: isAnimated,
-    stock_limit: stockLimit,
-  });
+  setItemCategories(id, categoryIds);
+  const item = attachCategoriesToItems([
+    {
+      id,
+      kind,
+      name,
+      url,
+      price,
+      is_animated: isAnimated,
+      stock_limit: stockLimit,
+      sold_count: 0,
+    },
+  ])[0];
+  return res.json({ ok: true, ...item });
+});
+
+router.get("/admin/shop/categories", authRequired, (req, res) => {
+  if (req.user.role !== "admin") return res.status(403).json({ error: "forbidden" });
+  return res.json(listShopCategories());
+});
+
+router.post("/admin/shop/categories", authRequired, (req, res) => {
+  if (req.user.role !== "admin") return res.status(403).json({ error: "forbidden" });
+  try {
+    const row = createShopCategory(req.body?.id, req.body?.name);
+    return res.json(row);
+  } catch (e) {
+    return res.status(400).json({ error: e.message ?? "error" });
+  }
+});
+
+router.patch("/admin/shop/categories/:id", authRequired, (req, res) => {
+  if (req.user.role !== "admin") return res.status(403).json({ error: "forbidden" });
+  try {
+    const row = updateShopCategory(req.params.id, req.body?.name);
+    if (!row) return res.status(404).json({ error: "not found" });
+    return res.json(row);
+  } catch (e) {
+    return res.status(400).json({ error: e.message ?? "error" });
+  }
+});
+
+router.delete("/admin/shop/categories/:id", authRequired, (req, res) => {
+  if (req.user.role !== "admin") return res.status(403).json({ error: "forbidden" });
+  deleteShopCategory(req.params.id);
+  return res.json({ ok: true });
 });
 
 router.patch("/admin/shop/items/:id", authRequired, (req, res) => {
@@ -256,10 +299,6 @@ router.patch("/admin/shop/items/:id", authRequired, (req, res) => {
     if (!SHOP_KINDS.has(kind)) return res.status(400).json({ error: "bad kind" });
     sets.push("kind = ?");
     params.push(kind);
-  }
-  if (req.body?.category !== undefined) {
-    sets.push("category = ?");
-    params.push(String(req.body.category).trim().toLowerCase());
   }
   if (req.body?.name !== undefined) {
     const name = String(req.body.name).trim();
@@ -293,21 +332,25 @@ router.patch("/admin/shop/items/:id", authRequired, (req, res) => {
       params.push(lim);
     }
   }
-  if (!sets.length) return res.status(400).json({ error: "nothing to update" });
-  params.push(req.params.id);
-  run(`UPDATE shop_items SET ${sets.join(", ")} WHERE id = ?`, ...params);
+  const categoryIds = req.body?.categories !== undefined ? parseCategoryIdsInput(req.body) : null;
+
+  if (!sets.length && categoryIds === null) {
+    return res.status(400).json({ error: "nothing to update" });
+  }
+  if (sets.length) {
+    params.push(req.params.id);
+    run(`UPDATE shop_items SET ${sets.join(", ")} WHERE id = ?`, ...params);
+  }
+  if (categoryIds !== null) setItemCategories(req.params.id, categoryIds);
+
   const item = get(
-    "SELECT id, kind, category, name, url, price, is_animated, stock_limit, preset_value FROM shop_items WHERE id = ?",
+    "SELECT id, kind, name, url, price, is_animated, stock_limit, preset_value FROM shop_items WHERE id = ?",
     req.params.id,
   );
+  if (!item) return res.status(404).json({ error: "not found" });
   const soldRow = get("SELECT COUNT(*) as c FROM user_owned_shop_items WHERE item_id = ?", req.params.id);
-  return res.json({
-    ok: true,
-    item: {
-      ...item,
-      sold_count: soldRow?.c ?? 0,
-    },
-  });
+  const full = attachCategoriesToItems([{ ...item, sold_count: soldRow?.c ?? 0 }])[0];
+  return res.json({ ok: true, item: full });
 });
 
 router.delete("/admin/shop/items/:id", authRequired, (req, res) => {
@@ -315,6 +358,7 @@ router.delete("/admin/shop/items/:id", authRequired, (req, res) => {
   const row = get("SELECT url FROM shop_items WHERE id = ?", req.params.id);
   if (!row) return res.status(404).json({ error: "not found" });
   run("DELETE FROM user_owned_shop_items WHERE item_id = ?", req.params.id);
+  run("DELETE FROM shop_item_categories WHERE item_id = ?", req.params.id);
   if (row.url?.startsWith("/uploads/shop-items/") || row.url?.startsWith("/uploads/shop-avatars/")) {
     try {
       fs.unlinkSync(path.join(UPLOAD_ROOT, row.url.replace(/^\/uploads\//, "")));

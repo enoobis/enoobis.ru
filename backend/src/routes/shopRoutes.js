@@ -2,6 +2,7 @@ import express from "express";
 import { run, get, all, nowIso, db } from "../db.js";
 import { authRequired } from "../auth.js";
 import { SHOP_KINDS } from "../utils/shopPresets.js";
+import { attachCategoriesToItems, listShopCategories } from "../utils/shopCategories.js";
 
 const router = express.Router();
 
@@ -19,7 +20,7 @@ function ownedIdsForUser(userId) {
 function listItemsQuery(kinds) {
   const placeholders = kinds.map(() => "?").join(", ");
   return all(
-    `SELECT si.id, si.kind, si.category, si.name, si.url, si.price, si.is_animated, si.created_at, si.stock_limit,
+    `SELECT si.id, si.kind, si.name, si.url, si.price, si.is_animated, si.created_at, si.stock_limit,
       si.preset_value,
       (SELECT COUNT(*) FROM user_owned_shop_items uoi WHERE uoi.item_id = si.id) AS sold_count
      FROM shop_items si
@@ -93,8 +94,13 @@ function cosmeticRow(userId) {
   );
 }
 
+router.get("/shop/categories", authRequired, (_req, res) => {
+  return res.json(listShopCategories());
+});
+
 router.get("/shop/items", authRequired, (req, res) => {
   const raw = String(req.query.kind ?? "").trim();
+  const catFilter = String(req.query.category ?? "").trim();
   /** @type {string[]} */
   let kinds;
   if (raw && SHOP_KINDS.has(raw)) {
@@ -102,27 +108,30 @@ router.get("/shop/items", authRequired, (req, res) => {
   } else {
     kinds = DEFAULT_LIST_KINDS;
   }
-  const items = listItemsQuery(kinds);
+  let items = attachCategoriesToItems(listItemsQuery(kinds));
+  if (catFilter) {
+    items = items.filter((i) => i.categories.some((c) => c.id === catFilter));
+  }
   const owned = ownedIdsForUser(req.user.id);
   return res.json(items.map((i) => ({ ...i, owned: owned.has(i.id) })));
 });
 
 router.get("/shop/avatars", authRequired, (req, res) => {
-  const items = listItemsQuery(["avatar"]);
+  const items = attachCategoriesToItems(listItemsQuery(["avatar"]));
   const owned = ownedIdsForUser(req.user.id);
   return res.json(items.map((i) => ({ ...i, owned: owned.has(i.id) })));
 });
 
 router.get("/shop/my-items", authRequired, (req, res) => {
   const rows = all(
-    `SELECT si.id, si.kind, si.category, si.name, si.url, si.price, si.is_animated, si.preset_value, uoi.acquired_at
+    `SELECT si.id, si.kind, si.name, si.url, si.price, si.is_animated, si.preset_value, uoi.acquired_at
      FROM user_owned_shop_items uoi
      JOIN shop_items si ON si.id = uoi.item_id
      WHERE uoi.user_id = ? AND si.kind IN ${IMAGE_KINDS_SQL}
      ORDER BY uoi.acquired_at DESC`,
     req.user.id,
   );
-  return res.json(rows);
+  return res.json(attachCategoriesToItems(rows));
 });
 
 router.get("/shop/my-avatars", authRequired, (req, res) => {
