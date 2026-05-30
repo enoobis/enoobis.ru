@@ -91,6 +91,8 @@ const shopNewCatId = ref("");
 const shopNewCatName = ref("");
 const shopCatBusy = ref(false);
 const shopUploadCategoryIds = ref<string[]>([]);
+const shopAddOpen = ref(false);
+const shopPendingFile = ref<File | null>(null);
 const shopUploadKind = ref<ImageShopKind>("avatar");
 const shopUploadBusy = ref(false);
 const shopKindOptions: { value: ImageShopKind; label: string }[] = [
@@ -454,8 +456,16 @@ async function saveShopEdit() {
   }
 }
 
+function closeShopAdd() {
+  shopAddOpen.value = false;
+  shopPendingFile.value = null;
+  shopUploadCategoryIds.value = [];
+}
+
 function onShopEditEscape(e: KeyboardEvent) {
-  if (e.key === "Escape" && shopEditOpen.value) closeShopEdit();
+  if (e.key !== "Escape") return;
+  if (shopAddOpen.value) closeShopAdd();
+  else if (shopEditOpen.value) closeShopEdit();
 }
 
 function shopKindRu(k: ShopItemKind): string {
@@ -474,17 +484,31 @@ function shopStockLine(a: ShopItem): string {
   return ` · ${sold}/${lim}`;
 }
 
-async function onShopItemFile(e: Event) {
+function onShopItemFile(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0];
+  (e.target as HTMLInputElement).value = "";
   if (!file || !auth.token) return;
-  const name = shopUploadName.value.trim() || file.name;
+  shopPendingFile.value = file;
+  if (!shopUploadName.value.trim()) shopUploadName.value = file.name.replace(/\.[^.]+$/, "");
+  shopUploadCategoryIds.value = [];
+  shopAddOpen.value = true;
+}
+
+async function confirmShopUpload() {
+  const file = shopPendingFile.value;
+  if (!file || !auth.token) return;
+  const name = shopUploadName.value.trim();
+  if (!name) {
+    shopMsg.value = "нужно название";
+    return;
+  }
   const price = Math.max(0, Math.floor(Number(shopUploadPrice.value) || 0));
   const rawStock = shopUploadStock.value.trim();
   let stockLimit: number | null = null;
   if (rawStock !== "") {
     const n = parseInt(rawStock, 10);
     if (!Number.isFinite(n) || n < 1) {
-      shopMsg.value = "тираж: целое число от 1";
+      shopMsg.value = "тираж: целое от 1";
       return;
     }
     stockLimit = n;
@@ -504,8 +528,7 @@ async function onShopItemFile(e: Event) {
     shopUploadName.value = "";
     shopUploadPrice.value = 0;
     shopUploadStock.value = "";
-    shopUploadCategoryIds.value = [];
-    (e.target as HTMLInputElement).value = "";
+    closeShopAdd();
     shopMsg.value = "добавлено";
     await loadShopItems();
   } catch (ex) {
@@ -1143,26 +1166,6 @@ async function restoreComment(id: string | null) {
       <h2>товары магазина</h2>
       <p v-if="shopMsg" class="ok-msg small">{{ shopMsg }}</p>
 
-      <section class="shop-cats-block">
-        <h3 class="shop-cats-title">категории</h3>
-        <ul v-if="shopCategories.length" class="shop-cats-list">
-          <li v-for="c in shopCategories" :key="c.id" class="shop-cats-row">
-            <input v-model="shopCatNames[c.id]" class="shop-input shop-cat-name" :aria-label="c.id" />
-            <button type="button" class="secondary" :disabled="shopCatBusy" @click="saveShopCategoryName(c.id)">
-              ок
-            </button>
-            <button type="button" class="secondary danger" :disabled="shopCatBusy" @click="removeShopCategory(c.id)">
-              ×
-            </button>
-          </li>
-        </ul>
-        <div class="shop-cats-add">
-          <input v-model="shopNewCatId" class="shop-input shop-cat-id" placeholder="id" aria-label="id категории" />
-          <input v-model="shopNewCatName" class="shop-input shop-cat-name" placeholder="название" />
-          <button type="button" :disabled="shopCatBusy" @click="addShopCategory">добавить</button>
-        </div>
-      </section>
-
       <div class="shop-add">
         <label class="shop-add-field">
           <span class="muted small">тип</span>
@@ -1178,19 +1181,7 @@ async function restoreComment(id: string | null) {
           {{ shopUploadBusy ? "загрузка…" : "загрузить" }}
         </label>
       </div>
-      <div v-if="shopCategories.length" class="cat-chips" role="group" aria-label="категории товара">
-        <button
-          v-for="c in shopCategories"
-          :key="c.id"
-          type="button"
-          class="cat-chip"
-          :class="{ on: shopUploadCategoryIds.includes(c.id) }"
-          @click="toggleUploadCat(c.id)"
-        >
-          {{ c.name }}
-        </button>
-      </div>
-      <p class="muted small">категории — несколько · тираж пустой — без лимита</p>
+      <p class="muted small">файл → выбор категорий · тираж пустой — без лимита</p>
       <p v-if="shopLoading" class="muted small">загрузка…</p>
       <ul v-else-if="shopItems.length" class="shop-grid">
         <li v-for="a in shopItems" :key="a.id" class="shop-item">
@@ -1267,12 +1258,85 @@ async function restoreComment(id: string | null) {
             <p v-if="shopEditTarget.stock_limit != null" class="muted small">
               продано {{ shopEditTarget.sold_count ?? 0 }} из {{ shopEditTarget.stock_limit }}
             </p>
+            <details class="shop-cats-manage">
+              <summary>список категорий</summary>
+              <ul v-if="shopCategories.length" class="shop-cats-list">
+                <li v-for="c in shopCategories" :key="c.id" class="shop-cats-row">
+                  <input v-model="shopCatNames[c.id]" class="shop-input shop-cat-name" :aria-label="c.id" />
+                  <button type="button" class="secondary" :disabled="shopCatBusy" @click="saveShopCategoryName(c.id)">
+                    ок
+                  </button>
+                  <button type="button" class="secondary danger" :disabled="shopCatBusy" @click="removeShopCategory(c.id)">
+                    ×
+                  </button>
+                </li>
+              </ul>
+              <div class="shop-cats-add">
+                <input v-model="shopNewCatId" class="shop-input shop-cat-id" placeholder="id" />
+                <input v-model="shopNewCatName" class="shop-input shop-cat-name" placeholder="название" />
+                <button type="button" class="secondary" :disabled="shopCatBusy" @click="addShopCategory">добавить</button>
+              </div>
+            </details>
             <div class="shop-edit-actions">
               <button type="button" class="secondary" :disabled="shopEditBusy" @click="closeShopEdit">
                 отмена
               </button>
               <button type="button" :disabled="shopEditBusy" @click="saveShopEdit">
                 {{ shopEditBusy ? "сохранение…" : "сохранить" }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </Teleport>
+
+      <Teleport to="body">
+        <div v-if="shopAddOpen && shopPendingFile" class="shop-edit-root" role="presentation">
+          <button type="button" class="shop-edit-backdrop" aria-label="закрыть" @click="closeShopAdd" />
+          <div class="shop-edit-dialog card" role="dialog" aria-modal="true" aria-label="новый товар">
+            <h3 class="shop-edit-title">новый товар</h3>
+            <label class="shop-edit-field">
+              <span class="muted small">тип</span>
+              <select v-model="shopUploadKind" class="shop-input shop-kind">
+                <option v-for="k in shopKindOptions" :key="k.value" :value="k.value">{{ k.label }}</option>
+              </select>
+            </label>
+            <label class="shop-edit-field">
+              <span class="muted small">название</span>
+              <input v-model="shopUploadName" class="shop-input" placeholder="название" />
+            </label>
+            <label class="shop-edit-field">
+              <span class="muted small">цена</span>
+              <input
+                v-model.number="shopUploadPrice"
+                type="number"
+                min="0"
+                step="1"
+                class="shop-input shop-price"
+              />
+            </label>
+            <label class="shop-edit-field">
+              <span class="muted small">тираж</span>
+              <input v-model="shopUploadStock" inputmode="numeric" class="shop-input shop-stock" placeholder="пусто" />
+            </label>
+            <div v-if="shopCategories.length" class="shop-edit-field">
+              <span class="muted small">категории</span>
+              <div class="cat-chips" role="group">
+                <button
+                  v-for="c in shopCategories"
+                  :key="c.id"
+                  type="button"
+                  class="cat-chip"
+                  :class="{ on: shopUploadCategoryIds.includes(c.id) }"
+                  @click="toggleUploadCat(c.id)"
+                >
+                  {{ c.name }}
+                </button>
+              </div>
+            </div>
+            <div class="shop-edit-actions">
+              <button type="button" class="secondary" :disabled="shopUploadBusy" @click="closeShopAdd">отмена</button>
+              <button type="button" :disabled="shopUploadBusy" @click="confirmShopUpload">
+                {{ shopUploadBusy ? "загрузка…" : "загрузить" }}
               </button>
             </div>
           </div>
@@ -1553,15 +1617,13 @@ strong {
   max-width: 120px;
   flex: none;
 }
-.shop-cats-block {
-  margin-bottom: 1rem;
-  display: grid;
-  gap: 0.45rem;
+.shop-cats-manage {
+  margin-top: 0.35rem;
 }
-.shop-cats-title {
-  margin: 0;
-  font-size: 0.95rem;
-  font-weight: 500;
+.shop-cats-manage summary {
+  cursor: pointer;
+  font-size: 0.82rem;
+  color: var(--muted);
 }
 .shop-cats-list {
   list-style: none;
