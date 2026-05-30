@@ -107,7 +107,7 @@ export async function adminUploadShopItem(
 export function adminPatchShopItem(
   token: string,
   itemId: string,
-  payload: { name?: string; price?: number },
+  payload: { kind?: ShopItemKind; name?: string; price?: number; stock_limit?: number | null },
 ): Promise<{ ok: boolean; item: ShopItem }> {
   return api(`/api/admin/shop/items/${itemId}`, {
     method: "PATCH",

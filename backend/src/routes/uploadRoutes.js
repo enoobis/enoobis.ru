@@ -239,6 +239,12 @@ router.patch("/admin/shop/items/:id", authRequired, (req, res) => {
   if (!row) return res.status(404).json({ error: "not found" });
   const sets = [];
   const params = [];
+  if (req.body?.kind !== undefined) {
+    const kind = String(req.body.kind).trim();
+    if (!SHOP_KINDS.has(kind)) return res.status(400).json({ error: "bad kind" });
+    sets.push("kind = ?");
+    params.push(kind);
+  }
   if (req.body?.name !== undefined) {
     const name = String(req.body.name).trim();
     if (!name) return res.status(400).json({ error: "нужно название" });
@@ -249,6 +255,27 @@ router.patch("/admin/shop/items/:id", authRequired, (req, res) => {
     const price = Math.max(0, Math.floor(Number(req.body.price) || 0));
     sets.push("price = ?");
     params.push(price);
+  }
+  if (req.body?.stock_limit !== undefined) {
+    if (req.body.stock_limit === null || req.body.stock_limit === "") {
+      sets.push("stock_limit = ?");
+      params.push(null);
+    } else {
+      const lim = Math.floor(Number(req.body.stock_limit));
+      if (!Number.isFinite(lim) || lim < 1) {
+        return res.status(400).json({ error: "тираж: целое от 1" });
+      }
+      const soldRow = get(
+        "SELECT COUNT(*) as c FROM user_owned_shop_items WHERE item_id = ?",
+        req.params.id,
+      );
+      const sold = Math.max(0, Math.floor(Number(soldRow?.c ?? 0)));
+      if (sold > lim) {
+        return res.status(400).json({ error: "тираж меньше уже проданного" });
+      }
+      sets.push("stock_limit = ?");
+      params.push(lim);
+    }
   }
   if (!sets.length) return res.status(400).json({ error: "nothing to update" });
   params.push(req.params.id);
