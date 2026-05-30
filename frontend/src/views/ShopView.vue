@@ -153,39 +153,46 @@ watch(
       </div>
     </header>
 
-    <nav class="filter-tabs" aria-label="разделы">
-      <button
-        v-for="t in tabs"
-        :key="t.key"
-        type="button"
-        class="filter-tab"
-        :class="{ on: tab === t.key }"
-        @click="tab = t.key"
-      >
-        {{ t.label }}
-      </button>
-    </nav>
-
-    <nav v-if="shopCategories.length" class="filter-tabs shop-cats" aria-label="категории">
-      <button
-        type="button"
-        class="filter-tab"
-        :class="{ on: !categoryFilter }"
-        @click="categoryFilter = ''"
-      >
-        все
-      </button>
-      <button
-        v-for="c in shopCategories"
-        :key="c.id"
-        type="button"
-        class="filter-tab"
-        :class="{ on: categoryFilter === c.id }"
-        @click="categoryFilter = categoryFilter === c.id ? '' : c.id"
-      >
-        {{ c.name }}
-      </button>
-    </nav>
+    <div class="shop-filters">
+      <div class="shop-kind" role="tablist" aria-label="разделы">
+        <button
+          v-for="t in tabs"
+          :key="t.key"
+          type="button"
+          role="tab"
+          class="shop-pill shop-pill-kind"
+          :class="{ on: tab === t.key }"
+          :aria-selected="tab === t.key"
+          @click="tab = t.key"
+        >
+          {{ t.label }}
+        </button>
+      </div>
+      <div v-if="shopCategories.length" class="shop-cats" role="tablist" aria-label="категории">
+        <button
+          type="button"
+          role="tab"
+          class="shop-pill"
+          :class="{ on: !categoryFilter }"
+          :aria-selected="!categoryFilter"
+          @click="categoryFilter = ''"
+        >
+          все
+        </button>
+        <button
+          v-for="c in shopCategories"
+          :key="c.id"
+          type="button"
+          role="tab"
+          class="shop-pill"
+          :class="{ on: categoryFilter === c.id }"
+          :aria-selected="categoryFilter === c.id"
+          @click="categoryFilter = categoryFilter === c.id ? '' : c.id"
+        >
+          {{ c.name }}
+        </button>
+      </div>
+    </div>
 
     <div v-if="loading" class="page-empty muted">загрузка</div>
     <div v-else-if="!shown.length" class="page-empty muted">пусто</div>
@@ -241,11 +248,60 @@ watch(
   display: grid;
   gap: 0.5rem;
 }
-.shop .filter-tabs {
-  margin-bottom: 0.35rem;
+.shop-filters {
+  display: grid;
+  gap: 0.5rem;
+  margin-bottom: 0.15rem;
+}
+.shop-kind {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.35rem;
 }
 .shop-cats {
-  margin-bottom: 0.5rem;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.35rem;
+  overflow-x: auto;
+  padding-bottom: 0.1rem;
+  scrollbar-width: none;
+}
+.shop-cats::-webkit-scrollbar {
+  display: none;
+}
+.shop-pill {
+  font: inherit;
+  font-size: 0.8rem;
+  line-height: 1.2;
+  padding: 0.38rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+.shop-pill-kind {
+  border-radius: var(--radius);
+  padding: 0.45rem 0.35rem;
+  text-align: center;
+}
+.shop-pill:hover {
+  color: var(--text);
+  border-color: var(--hover-border);
+}
+.shop-pill.on,
+.shop-pill[aria-selected="true"] {
+  background: var(--text);
+  color: var(--bg);
+  border-color: var(--text);
+}
+.shop-cats .shop-pill {
+  flex: 0 0 auto;
 }
 .item-category {
   margin: -0.15rem 0 0;
