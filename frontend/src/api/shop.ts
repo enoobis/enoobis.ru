@@ -104,6 +104,18 @@ export async function adminUploadShopItem(
   return res.json();
 }
 
+export function adminPatchShopItem(
+  token: string,
+  itemId: string,
+  payload: { name?: string; price?: number },
+): Promise<{ ok: boolean; item: ShopItem }> {
+  return api(`/api/admin/shop/items/${itemId}`, {
+    method: "PATCH",
+    token,
+    body: JSON.stringify(payload),
+  });
+}
+
 export function adminDeleteShopItem(token: string, itemId: string): Promise<{ ok: boolean }> {
   return api(`/api/admin/shop/items/${itemId}`, { method: "DELETE", token });
 }

@@ -233,6 +233,40 @@ router.post("/admin/shop/items", authRequired, uploadSingle(shopItemUpload, "fil
   return res.json({ ok: true, id, url, name, price, kind, is_animated: isAnimated, stock_limit: stockLimit });
 });
 
+router.patch("/admin/shop/items/:id", authRequired, (req, res) => {
+  if (req.user.role !== "admin") return res.status(403).json({ error: "forbidden" });
+  const row = get("SELECT id FROM shop_items WHERE id = ?", req.params.id);
+  if (!row) return res.status(404).json({ error: "not found" });
+  const sets = [];
+  const params = [];
+  if (req.body?.name !== undefined) {
+    const name = String(req.body.name).trim();
+    if (!name) return res.status(400).json({ error: "нужно название" });
+    sets.push("name = ?");
+    params.push(name);
+  }
+  if (req.body?.price !== undefined) {
+    const price = Math.max(0, Math.floor(Number(req.body.price) || 0));
+    sets.push("price = ?");
+    params.push(price);
+  }
+  if (!sets.length) return res.status(400).json({ error: "nothing to update" });
+  params.push(req.params.id);
+  run(`UPDATE shop_items SET ${sets.join(", ")} WHERE id = ?`, ...params);
+  const item = get(
+    "SELECT id, kind, name, url, price, is_animated, stock_limit, preset_value FROM shop_items WHERE id = ?",
+    req.params.id,
+  );
+  const soldRow = get("SELECT COUNT(*) as c FROM user_owned_shop_items WHERE item_id = ?", req.params.id);
+  return res.json({
+    ok: true,
+    item: {
+      ...item,
+      sold_count: soldRow?.c ?? 0,
+    },
+  });
+});
+
 router.delete("/admin/shop/items/:id", authRequired, (req, res) => {
   if (req.user.role !== "admin") return res.status(403).json({ error: "forbidden" });
   const row = get("SELECT url FROM shop_items WHERE id = ?", req.params.id);

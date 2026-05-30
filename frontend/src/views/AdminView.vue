@@ -28,6 +28,7 @@ import {
 import { useAuthStore } from "../stores/auth";
 import {
   adminDeleteShopItem,
+  adminPatchShopItem,
   adminUploadShopItem,
   listShopItems,
   type ImageShopKind,
@@ -81,6 +82,8 @@ const shopUploadPrice = ref(0);
 const shopUploadStock = ref("");
 const shopUploadKind = ref<ImageShopKind>("avatar");
 const shopUploadBusy = ref(false);
+const shopEdits = ref<Record<string, { name: string; price: number }>>({});
+const shopSaveBusy = ref<string | null>(null);
 const shopMsg = ref("");
 
 const ADMIN_POLL_MS = 12000;
@@ -258,15 +261,48 @@ function presetBan(target: "blog" | "micro" | "comment" | "chat", unit: "day" | 
   box.value = { ...box.value, ban_forever: false, ban_until: d.toISOString().slice(0, 16) };
 }
 
+function syncShopEdits() {
+  const next: Record<string, { name: string; price: number }> = {};
+  for (const a of shopItems.value) {
+    next[a.id] = { name: a.name, price: a.price };
+  }
+  shopEdits.value = next;
+}
+
 async function loadShopItems() {
   if (!auth.token) return;
   shopLoading.value = true;
   try {
     shopItems.value = await listShopItems(auth.token);
+    syncShopEdits();
   } catch {
     /* ignore */
   } finally {
     shopLoading.value = false;
+  }
+}
+
+async function saveShopItemEdit(id: string) {
+  const ed = shopEdits.value[id];
+  if (!ed || !auth.token) return;
+  const name = ed.name.trim();
+  if (!name) {
+    shopMsg.value = "нужно название";
+    return;
+  }
+  shopSaveBusy.value = id;
+  shopMsg.value = "";
+  try {
+    await adminPatchShopItem(auth.token, id, {
+      name,
+      price: Math.max(0, Math.floor(Number(ed.price) || 0)),
+    });
+    shopMsg.value = "сохранено";
+    await loadShopItems();
+  } catch (ex) {
+    shopMsg.value = ex instanceof Error ? ex.message : "ошибка";
+  } finally {
+    shopSaveBusy.value = null;
   }
 }
 
@@ -963,13 +999,34 @@ async function restoreComment(id: string | null) {
       <ul v-else-if="shopItems.length" class="shop-grid">
         <li v-for="a in shopItems" :key="a.id" class="shop-item">
           <img v-if="a.url" :src="a.url" :alt="a.name" class="shop-avatar-img" loading="lazy" />
-          <span class="shop-avatar-meta">
-            <span>{{ a.name }}</span>
+          <div v-if="shopEdits[a.id]" class="shop-avatar-meta">
+            <input
+              v-model="shopEdits[a.id].name"
+              class="shop-input shop-edit-name"
+              placeholder="название"
+            />
             <span class="muted small">
-              {{ shopKindRu(a.kind) }} · {{ a.price }} ·
-              {{ a.is_animated ? "gif" : "" }}{{ shopStockLine(a) }}
+              {{ shopKindRu(a.kind) }}{{ a.is_animated ? " · gif" : "" }}{{ shopStockLine(a) }}
             </span>
-          </span>
+            <div class="shop-edit-row">
+              <input
+                v-model.number="shopEdits[a.id].price"
+                type="number"
+                min="0"
+                step="1"
+                class="shop-input shop-price"
+                placeholder="цена"
+              />
+              <button
+                type="button"
+                class="secondary"
+                :disabled="shopSaveBusy === a.id"
+                @click="saveShopItemEdit(a.id)"
+              >
+                {{ shopSaveBusy === a.id ? "…" : "сохранить" }}
+              </button>
+            </div>
+          </div>
           <button class="secondary danger shop-del" type="button" @click="removeShopItem(a.id)">удалить</button>
         </li>
       </ul>
@@ -1321,14 +1378,23 @@ strong {
 .shop-avatar-meta {
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
+  gap: 0.35rem;
   flex: 1;
   min-width: 0;
   font-size: 0.88rem;
-  overflow: hidden;
+}
+.shop-edit-name {
+  width: 100%;
+}
+.shop-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
 }
 .shop-del {
   margin-left: auto;
+  flex-shrink: 0;
 }
 .ok-msg {
   color: var(--text);
