@@ -28,6 +28,7 @@ const categoryMenuRoot = ref<HTMLElement | null>(null);
 const shopCategories = ref<ShopCategory[]>([]);
 const items = ref<ShopItem[]>([]);
 const page = ref(1);
+const pageDraft = ref(1);
 const total = ref(0);
 const loading = ref(true);
 const busy = ref<string | null>(null);
@@ -54,6 +55,10 @@ function onDocumentClick(e: MouseEvent) {
 }
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / SHOP_PAGE_SIZE)));
+
+watch(page, (p) => {
+  pageDraft.value = p;
+});
 
 function itemCategoryLine(item: ShopItem): string {
   return (item.categories ?? []).map((c) => c.name).join(" · ");
@@ -132,10 +137,15 @@ async function load() {
 }
 
 function goPage(next: number) {
-  const p = Math.min(totalPages.value, Math.max(1, next));
+  const p = Math.min(totalPages.value, Math.max(1, Math.floor(Number(next)) || 1));
+  pageDraft.value = p;
   if (p === page.value) return;
   page.value = p;
   void load();
+}
+
+function applyPageDraft() {
+  goPage(pageDraft.value);
 }
 
 async function onBuy(item: ShopItem) {
@@ -305,7 +315,19 @@ watch(
       <button type="button" class="shop-page-btn secondary" :disabled="page <= 1" @click="goPage(page - 1)">
         назад
       </button>
-      <span class="shop-page-num muted small">{{ page }} / {{ totalPages }}</span>
+      <label class="shop-page-jump">
+        <input
+          v-model.number="pageDraft"
+          type="number"
+          min="1"
+          :max="totalPages"
+          class="shop-page-input"
+          aria-label="страница"
+          @keyup.enter="applyPageDraft"
+          @blur="applyPageDraft"
+        />
+        <span class="muted small">/ {{ totalPages }}</span>
+      </label>
       <button
         type="button"
         class="shop-page-btn secondary"
@@ -538,8 +560,31 @@ watch(
   padding: 0.35rem 0.75rem;
   font-size: 0.82rem;
 }
-.shop-page-num {
-  min-width: 3.5rem;
+.shop-page-jump {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+}
+.shop-page-input {
+  width: 2.75rem;
+  font: inherit;
+  font-size: 0.82rem;
+  padding: 0.3rem 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
   text-align: center;
+  -moz-appearance: textfield;
+}
+.shop-page-input::-webkit-outer-spin-button,
+.shop-page-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.shop-page-input:focus {
+  outline: none;
+  border-color: var(--text);
 }
 </style>
