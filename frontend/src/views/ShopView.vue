@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import {
   listShopCategories,
   listShopItems,
@@ -22,6 +22,8 @@ const tabs: { key: ShopItemKind; label: string }[] = [
 
 const tab = ref<ShopItemKind>("avatar");
 const categoryFilter = ref("");
+const categoryOpen = ref(false);
+const categoryMenuRoot = ref<HTMLElement | null>(null);
 const shopCategories = ref<ShopCategory[]>([]);
 const items = ref<ShopItem[]>([]);
 const loading = ref(true);
@@ -29,6 +31,24 @@ const busy = ref<string | null>(null);
 const profileCoins = ref(0);
 
 let shopLoadSeq = 0;
+
+const categoryButtonLabel = computed(() => {
+  if (!categoryFilter.value) return "категория · все";
+  const name = shopCategories.value.find((c) => c.id === categoryFilter.value)?.name;
+  return name ? `категория · ${name}` : "категория";
+});
+
+function selectCategory(id: string) {
+  categoryFilter.value = id;
+  categoryOpen.value = false;
+}
+
+function onDocumentClick(e: MouseEvent) {
+  if (!categoryOpen.value) return;
+  const t = e.target as HTMLElement | null;
+  if (categoryMenuRoot.value?.contains(t)) return;
+  categoryOpen.value = false;
+}
 
 const shown = computed(() =>
   items.value.filter((i) => {
@@ -118,9 +138,18 @@ async function onBuy(item: ShopItem) {
   }
 }
 
-onMounted(load);
+onMounted(() => {
+  document.addEventListener("click", onDocumentClick);
+  void load();
+});
+
+onUnmounted(() => {
+  document.removeEventListener("click", onDocumentClick);
+});
+
 watch(tab, () => {
   categoryFilter.value = "";
+  categoryOpen.value = false;
   void load();
 });
 
@@ -168,29 +197,43 @@ watch(
           {{ t.label }}
         </button>
       </div>
-      <div v-if="shopCategories.length" class="shop-cats" role="tablist" aria-label="категории">
+      <div
+        v-if="shopCategories.length"
+        ref="categoryMenuRoot"
+        class="shop-cat-picker filter-menu-wrap"
+      >
         <button
           type="button"
-          role="tab"
-          class="shop-pill"
-          :class="{ on: !categoryFilter }"
-          :aria-selected="!categoryFilter"
-          @click="categoryFilter = ''"
+          class="shop-cat-btn"
+          :class="{ on: categoryOpen || categoryFilter }"
+          aria-haspopup="listbox"
+          :aria-expanded="categoryOpen"
+          @click.stop="categoryOpen = !categoryOpen"
         >
-          все
+          {{ categoryButtonLabel }}
         </button>
-        <button
-          v-for="c in shopCategories"
-          :key="c.id"
-          type="button"
-          role="tab"
-          class="shop-pill"
-          :class="{ on: categoryFilter === c.id }"
-          :aria-selected="categoryFilter === c.id"
-          @click="categoryFilter = categoryFilter === c.id ? '' : c.id"
-        >
-          {{ c.name }}
-        </button>
+        <div v-if="categoryOpen" class="filter-menu card shop-cat-menu" role="listbox" aria-label="категории">
+          <button
+            type="button"
+            class="filter-menu-opt"
+            :class="{ on: !categoryFilter }"
+            role="option"
+            @click="selectCategory('')"
+          >
+            все
+          </button>
+          <button
+            v-for="c in shopCategories"
+            :key="c.id"
+            type="button"
+            class="filter-menu-opt"
+            :class="{ on: categoryFilter === c.id }"
+            role="option"
+            @click="selectCategory(c.id)"
+          >
+            {{ c.name }}
+          </button>
+        </div>
       </div>
     </div>
 
@@ -258,16 +301,43 @@ watch(
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.35rem;
 }
-.shop-cats {
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 0.35rem;
-  overflow-x: auto;
-  padding-bottom: 0.1rem;
-  scrollbar-width: none;
+.shop-cat-picker {
+  width: 100%;
 }
-.shop-cats::-webkit-scrollbar {
-  display: none;
+.shop-cat-btn {
+  width: 100%;
+  min-height: 38px;
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.82rem;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+.shop-cat-btn:hover {
+  color: var(--text);
+  border-color: var(--hover-border);
+  background: var(--surface2);
+}
+.shop-cat-btn.on {
+  color: var(--text);
+  border-color: var(--text);
+  background: var(--surface2);
+}
+.shop-cat-menu {
+  left: 0;
+  right: 0;
+  width: 100%;
+  max-width: none;
+  max-height: min(14rem, 45vh);
+  overflow-y: auto;
 }
 .shop-pill {
   font: inherit;
@@ -299,9 +369,6 @@ watch(
   background: var(--text);
   color: var(--bg);
   border-color: var(--text);
-}
-.shop-cats .shop-pill {
-  flex: 0 0 auto;
 }
 .item-category {
   margin: -0.15rem 0 0;
