@@ -7,6 +7,8 @@ import { attachCategoriesToItems, listShopCategories } from "../utils/shopCatego
 const router = express.Router();
 
 const DEFAULT_LIST_KINDS = ["avatar", "frame", "wallpaper", "cover"];
+const SHOP_PAGE_SIZE_DEFAULT = 24;
+const SHOP_PAGE_SIZE_MAX = 48;
 
 const IMAGE_KINDS_SQL = "('avatar','frame','wallpaper','cover')";
 
@@ -101,6 +103,8 @@ router.get("/shop/categories", authRequired, (_req, res) => {
 router.get("/shop/items", authRequired, (req, res) => {
   const raw = String(req.query.kind ?? "").trim();
   const catFilter = String(req.query.category ?? "").trim();
+  const pageRaw = req.query.page;
+  const paginated = pageRaw !== undefined && pageRaw !== "";
   /** @type {string[]} */
   let kinds;
   if (raw && SHOP_KINDS.has(raw)) {
@@ -113,7 +117,21 @@ router.get("/shop/items", authRequired, (req, res) => {
     items = items.filter((i) => i.categories.some((c) => c.id === catFilter));
   }
   const owned = ownedIdsForUser(req.user.id);
-  return res.json(items.map((i) => ({ ...i, owned: owned.has(i.id) })));
+  const withOwned = items.map((i) => ({ ...i, owned: owned.has(i.id) }));
+
+  if (!paginated) {
+    return res.json(withOwned);
+  }
+
+  const page = Math.max(1, Number(pageRaw) || 1);
+  const pageSize = Math.min(
+    SHOP_PAGE_SIZE_MAX,
+    Math.max(1, Number(req.query.page_size ?? SHOP_PAGE_SIZE_DEFAULT) || SHOP_PAGE_SIZE_DEFAULT),
+  );
+  const available = withOwned.filter((i) => !i.owned);
+  const total = available.length;
+  const slice = available.slice((page - 1) * pageSize, page * pageSize);
+  return res.json({ items: slice, page, page_size: pageSize, total });
 });
 
 router.get("/shop/avatars", authRequired, (req, res) => {

@@ -2,7 +2,8 @@
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import {
   listShopCategories,
-  listShopItems,
+  listShopItemsPage,
+  SHOP_PAGE_SIZE,
   buyShopItem,
   type ShopCategory,
   type ShopItem,
@@ -26,6 +27,8 @@ const categoryOpen = ref(false);
 const categoryMenuRoot = ref<HTMLElement | null>(null);
 const shopCategories = ref<ShopCategory[]>([]);
 const items = ref<ShopItem[]>([]);
+const page = ref(1);
+const total = ref(0);
 const loading = ref(true);
 const busy = ref<string | null>(null);
 const profileCoins = ref(0);
@@ -50,13 +53,7 @@ function onDocumentClick(e: MouseEvent) {
   categoryOpen.value = false;
 }
 
-const shown = computed(() =>
-  items.value.filter((i) => {
-    if (i.kind !== tab.value || i.owned) return false;
-    if (!categoryFilter.value) return true;
-    return (i.categories ?? []).some((c) => c.id === categoryFilter.value);
-  }),
-);
+const totalPages = computed(() => Math.max(1, Math.ceil(total.value / SHOP_PAGE_SIZE)));
 
 function itemCategoryLine(item: ShopItem): string {
   return (item.categories ?? []).map((c) => c.name).join(" · ");
@@ -106,8 +103,12 @@ async function load() {
     await loadCoins();
     if (seq !== shopLoadSeq) return;
 
-    const [list, cats] = await Promise.all([
-      listShopItems(auth.token, kind, categoryFilter.value || undefined),
+    const [listPage, cats] = await Promise.all([
+      listShopItemsPage(auth.token, {
+        kind,
+        category: categoryFilter.value || undefined,
+        page: page.value,
+      }),
       shopCategories.value.length
         ? Promise.resolve(shopCategories.value)
         : listShopCategories(auth.token),
@@ -115,12 +116,26 @@ async function load() {
     if (seq !== shopLoadSeq) return;
 
     if (!shopCategories.value.length) shopCategories.value = cats;
-    items.value = list;
+    const maxPage = Math.max(1, Math.ceil(listPage.total / SHOP_PAGE_SIZE));
+    if (page.value > maxPage) {
+      page.value = maxPage;
+      if (seq === shopLoadSeq) void load();
+      return;
+    }
+    items.value = listPage.items;
+    total.value = listPage.total;
   } catch (e) {
     if (seq === shopLoadSeq) toastError(e);
   } finally {
     if (seq === shopLoadSeq) loading.value = false;
   }
+}
+
+function goPage(next: number) {
+  const p = Math.min(totalPages.value, Math.max(1, next));
+  if (p === page.value) return;
+  page.value = p;
+  void load();
 }
 
 async function onBuy(item: ShopItem) {
@@ -129,8 +144,8 @@ async function onBuy(item: ShopItem) {
   try {
     const r = await buyShopItem(auth.token, item.id);
     profileCoins.value = r.coins;
-    items.value = items.value.filter((x) => x.id !== item.id);
     toastSuccess(item.name);
+    await load();
   } catch (e) {
     toastError(e);
   } finally {
@@ -150,10 +165,12 @@ onUnmounted(() => {
 watch(tab, () => {
   categoryFilter.value = "";
   categoryOpen.value = false;
+  page.value = 1;
   void load();
 });
 
 watch(categoryFilter, () => {
+  page.value = 1;
   void load();
 });
 watch(
@@ -238,9 +255,9 @@ watch(
     </div>
 
     <div v-if="loading" class="page-empty muted">загрузка</div>
-    <div v-else-if="!shown.length" class="page-empty muted">пусто</div>
+    <div v-else-if="!items.length" class="page-empty muted">пусто</div>
     <ul v-else class="grid">
-      <li v-for="item in shown" :key="item.id" class="card item-card">
+      <li v-for="item in items" :key="item.id" class="card item-card">
         <div class="preview">
           <template v-if="item.kind === 'avatar'">
             <div class="avatar-wrap">
@@ -283,6 +300,21 @@ watch(
         </div>
       </li>
     </ul>
+
+    <nav v-if="!loading && totalPages > 1" class="shop-pages" aria-label="страницы">
+      <button type="button" class="shop-page-btn secondary" :disabled="page <= 1" @click="goPage(page - 1)">
+        назад
+      </button>
+      <span class="shop-page-num muted small">{{ page }} / {{ totalPages }}</span>
+      <button
+        type="button"
+        class="shop-page-btn secondary"
+        :disabled="page >= totalPages"
+        @click="goPage(page + 1)"
+      >
+        вперёд
+      </button>
+    </nav>
   </section>
 </template>
 
@@ -492,5 +524,22 @@ watch(
 .btn-buy:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+.shop-pages {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  margin-top: 0.35rem;
+  padding-top: 0.25rem;
+}
+.shop-page-btn {
+  min-height: 0;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.82rem;
+}
+.shop-page-num {
+  min-width: 3.5rem;
+  text-align: center;
 }
 </style>

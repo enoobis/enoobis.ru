@@ -46,12 +46,33 @@ export function listShopCategories(token: string): Promise<ShopCategory[]> {
   return api("/api/shop/categories", { token });
 }
 
+export type ShopItemsPage = {
+  items: ShopItem[];
+  page: number;
+  page_size: number;
+  total: number;
+};
+
+export const SHOP_PAGE_SIZE = 24;
+
 export function listShopItems(token: string, kind?: ShopItemKind, category?: string): Promise<ShopItem[]> {
   const qs = new URLSearchParams();
   if (kind) qs.set("kind", kind);
   if (category) qs.set("category", category);
   const q = qs.toString() ? `?${qs}` : "";
   return api(`/api/shop/items${q}`, { token });
+}
+
+export function listShopItemsPage(
+  token: string,
+  opts: { kind: ShopItemKind; category?: string; page?: number },
+): Promise<ShopItemsPage> {
+  const qs = new URLSearchParams();
+  qs.set("kind", opts.kind);
+  qs.set("page", String(Math.max(1, opts.page ?? 1)));
+  qs.set("page_size", String(SHOP_PAGE_SIZE));
+  if (opts.category) qs.set("category", opts.category);
+  return api(`/api/shop/items?${qs}`, { token });
 }
 
 export function listShopAvatars(token: string): Promise<ShopItem[]> {
