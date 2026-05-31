@@ -159,6 +159,11 @@ function logoutFromMenu() {
   void clearOnlinePresence().finally(() => auth.logout());
 }
 
+async function onProfileAvatarError() {
+  await loadMePresentation();
+  if (!profileAvatarUrl.value) profileAvatarBroken.value = true;
+}
+
 async function loadMePresentation() {
   if (!auth.token) {
     profileAvatarUrl.value = "";
@@ -383,7 +388,7 @@ watch(
                 :src="profileAvatarUrl"
                 alt=""
                 class="profile-trigger-avatar-img"
-                @error="profileAvatarBroken = true"
+                @error="onProfileAvatarError"
               />
               <span v-else>{{ initials }}</span>
             </span>

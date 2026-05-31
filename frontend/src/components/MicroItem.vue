@@ -50,6 +50,7 @@ const canEdit = computed(() => {
   return Date.now() - t < EDIT_WINDOW_MS;
 });
 const initials = computed(() => props.post.author_nickname.slice(0, 2));
+const authorAvatarBroken = ref(false);
 const timeAgo = computed(() => formatAgo(props.post.created_at));
 
 function formatAgo(iso: string) {
@@ -154,7 +155,12 @@ async function share() {
 <template>
   <article class="item" :class="{ clickable: clickable && !editing }" @click="openDetail">
     <RouterLink :to="`/u/${post.author_nickname}`" class="avatar" @click.stop>
-      <img v-if="post.author_avatar" :src="post.author_avatar" alt="" />
+      <img
+        v-if="post.author_avatar && !authorAvatarBroken"
+        :src="post.author_avatar"
+        alt=""
+        @error="authorAvatarBroken = true"
+      />
       <span v-else>{{ initials }}</span>
     </RouterLink>
 

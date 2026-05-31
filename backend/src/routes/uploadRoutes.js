@@ -16,6 +16,7 @@ import {
   setItemCategories,
   updateShopCategory,
 } from "../utils/shopCategories.js";
+import { detachShopItemFromUsers } from "../utils/profileCosmetics.js";
 
 const router = express.Router();
 
@@ -355,8 +356,9 @@ router.patch("/admin/shop/items/:id", authRequired, (req, res) => {
 
 router.delete("/admin/shop/items/:id", authRequired, (req, res) => {
   if (req.user.role !== "admin") return res.status(403).json({ error: "forbidden" });
-  const row = get("SELECT url FROM shop_items WHERE id = ?", req.params.id);
+  const row = get("SELECT kind, url FROM shop_items WHERE id = ?", req.params.id);
   if (!row) return res.status(404).json({ error: "not found" });
+  detachShopItemFromUsers(row.kind, row.url);
   run("DELETE FROM user_owned_shop_items WHERE item_id = ?", req.params.id);
   run("DELETE FROM shop_item_categories WHERE item_id = ?", req.params.id);
   if (row.url?.startsWith("/uploads/shop-items/") || row.url?.startsWith("/uploads/shop-avatars/")) {

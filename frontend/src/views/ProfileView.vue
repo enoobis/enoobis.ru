@@ -42,6 +42,10 @@ const micro = ref<MicroPost[]>([]);
 const tab = ref<Tab>("blog");
 const err = ref("");
 const avatarBroken = ref(false);
+const frameBroken = ref(false);
+const wallpaperBroken = ref(false);
+const coverBroken = ref(false);
+const avatarHealTried = ref(false);
 const following = ref(false);
 const followBusy = ref(false);
 
@@ -63,9 +67,65 @@ const presenceLabel = computed(() => {
   return "";
 });
 
+const showWallpaper = computed(
+  () => !!profile.value?.wallpaper_url && !wallpaperBroken.value,
+);
+const showCover = computed(
+  () => !!profile.value?.profile_cover_url && !coverBroken.value,
+);
+const showFrame = computed(
+  () => !!profile.value?.avatar_frame_url && !frameBroken.value,
+);
+
+function probeImage(url: string, onFail: () => void) {
+  const img = new Image();
+  img.onerror = onFail;
+  img.src = url;
+}
+
+watch(
+  () => profile.value?.wallpaper_url ?? "",
+  (url) => {
+    wallpaperBroken.value = false;
+    if (url) probeImage(url, () => { wallpaperBroken.value = true; });
+  },
+);
+
+watch(
+  () => profile.value?.profile_cover_url ?? "",
+  (url) => {
+    coverBroken.value = false;
+    if (url) probeImage(url, () => { coverBroken.value = true; });
+  },
+);
+
+async function onAvatarError() {
+  if (avatarHealTried.value) {
+    avatarBroken.value = true;
+    return;
+  }
+  avatarHealTried.value = true;
+  try {
+    const p = await api<Profile>(`/api/profile/${nick.value}`);
+    profile.value = { ...profile.value!, ...p };
+    avatarBroken.value = false;
+  } catch {
+    avatarBroken.value = true;
+  }
+}
+
+function onFrameError() {
+  frameBroken.value = true;
+  if (profile.value) profile.value.avatar_frame_url = "";
+}
+
 async function load() {
   err.value = "";
   avatarBroken.value = false;
+  frameBroken.value = false;
+  wallpaperBroken.value = false;
+  coverBroken.value = false;
+  avatarHealTried.value = false;
   profile.value = null;
   posts.value = [];
   micro.value = [];
@@ -134,6 +194,10 @@ async function refreshPublicProfile() {
     const p = await api<Profile>(`/api/profile/${nick.value}`);
     profile.value = p;
     avatarBroken.value = false;
+    frameBroken.value = false;
+    wallpaperBroken.value = false;
+    coverBroken.value = false;
+    avatarHealTried.value = false;
     const microData = await listMicroByAuthor(nick.value, auth.token);
     micro.value = microData.items;
   } catch {
@@ -164,36 +228,37 @@ watch(nick, load);
 <template>
   <div v-if="profile" class="profile-wrap">
     <div
-      v-if="profile.wallpaper_url"
+      v-if="showWallpaper"
       class="profile-bg-layer"
       aria-hidden="true"
       :style="{ backgroundImage: `url(${profile.wallpaper_url})` }"
     />
-    <section class="profile" :class="{ 'on-wallpaper': !!profile.wallpaper_url }">
+    <section class="profile" :class="{ 'on-wallpaper': showWallpaper }">
     <div
-      v-if="profile.profile_cover_url"
+      v-if="showCover"
       class="cover-banner"
       :style="{ backgroundImage: `url(${profile.profile_cover_url})` }"
     />
-    <header class="head" :class="{ 'head-with-cover': !!profile.profile_cover_url }">
+    <header class="head" :class="{ 'head-with-cover': showCover }">
       <div class="avatar-cell">
         <div
           class="avatar-stack"
-          :class="{ framed: !!profile.avatar_frame_url, online: isOnline }"
+          :class="{ framed: showFrame, online: isOnline }"
         >
           <img
             v-if="profile.avatar_url && !avatarBroken"
             class="avatar"
             :src="profile.avatar_url"
             alt=""
-            @error="avatarBroken = true"
+            @error="onAvatarError"
           />
           <div v-else class="avatar fallback">{{ profile.nickname.slice(0, 2) }}</div>
           <img
-            v-if="profile.avatar_frame_url"
+            v-if="showFrame"
             class="avatar-frame"
             :src="profile.avatar_frame_url"
             alt=""
+            @error="onFrameError"
           />
           <span v-if="isOnline" class="online-star" title="онлайн">
             <AppIcon name="spark" :size="11" />

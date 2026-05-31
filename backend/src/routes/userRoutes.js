@@ -9,6 +9,7 @@ import {
 } from "../utils/achievements.js";
 import { buildModerationNotices, parseContentLimits } from "../utils/contentLimits.js";
 import { onlinePayload } from "../utils/onlineStatus.js";
+import { regenerateUserAvatar, sanitizeUserCosmetics } from "../utils/profileCosmetics.js";
 const JWT_SECRET = process.env.JWT_SECRET ?? "dev-secret-change-me";
 
 function viewerId(req) {
@@ -96,7 +97,9 @@ router.get("/me", authRequired, (req, res) => {
      FROM users WHERE id = ?`,
     req.user.id,
   );
-  const me = buildMe(row);
+  if (!row) return res.status(404).json({ error: "not found" });
+  const cosmetics = sanitizeUserCosmetics(row);
+  const me = buildMe({ ...row, ...cosmetics });
   if (!me) return res.status(404).json({ error: "not found" });
   return res.json(me);
 });
@@ -187,9 +190,13 @@ router.patch("/me", authRequired, (req, res) => {
     body.theme_preference = theme;
   }
   for (const field of allowed) {
-    if (body[field] !== undefined) {
-      run(`UPDATE users SET ${field} = ? WHERE id = ?`, body[field] ?? "", req.user.id);
+    if (body[field] === undefined) continue;
+    if (field === "avatar_url" && (body[field] === null || body[field] === "")) {
+      const nick = get("SELECT nickname FROM users WHERE id = ?", req.user.id)?.nickname;
+      regenerateUserAvatar(req.user.id, nick ?? req.user.id);
+      continue;
     }
+    run(`UPDATE users SET ${field} = ? WHERE id = ?`, body[field] ?? "", req.user.id);
   }
   if (Array.isArray(body.social_links)) {
     run(
@@ -599,6 +606,7 @@ router.get("/profile/:nickname", (req, res) => {
     req.params.nickname,
   );
   if (!p) return res.status(404).json({ error: "not found" });
+  const cosmetics = sanitizeUserCosmetics(p);
   let socialLinks = [];
   try {
     socialLinks = JSON.parse(p.social_links_json ?? "[]");
@@ -625,10 +633,10 @@ router.get("/profile/:nickname", (req, res) => {
     nickname: p.nickname,
     role: p.role,
     bio: p.bio ?? "",
-    wallpaper_url: p.wallpaper_url ?? "",
-    avatar_url: p.avatar_url ?? "",
-    avatar_frame_url: p.avatar_frame_url ?? "",
-    profile_cover_url: p.profile_cover_url ?? "",
+    wallpaper_url: cosmetics.wallpaper_url,
+    avatar_url: cosmetics.avatar_url,
+    avatar_frame_url: cosmetics.avatar_frame_url,
+    profile_cover_url: cosmetics.profile_cover_url,
     theme_preference: p.theme_preference ?? "black",
     language_preference: p.language_preference ?? "ru",
     font_preference: p.font_preference ?? "normal",
