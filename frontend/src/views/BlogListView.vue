@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { RouterLink } from "vue-router";
+import { RouterLink, useRoute } from "vue-router";
 import AppIcon from "../components/AppIcon.vue";
 import PostMetaStats from "../components/PostMetaStats.vue";
 import {
@@ -16,6 +16,7 @@ type SortKey = "new" | "popular" | "discussed";
 type Mode = "all" | "bookmarks";
 
 const auth = useAuthStore();
+const route = useRoute();
 const posts = ref<BlogListItem[]>([]);
 const tags = ref<TaxonomyItem[]>([]);
 const err = ref("");
@@ -54,6 +55,10 @@ const activeChips = computed(() => {
   }
   return chips;
 });
+
+function syncModeFromRoute() {
+  mode.value = route.query.mode === "bookmarks" ? "bookmarks" : "all";
+}
 
 async function loadTaxonomy() {
   try {
@@ -117,7 +122,16 @@ function next() {
 
 watch([tag, mode], reload);
 
+watch(
+  () => route.query.mode,
+  () => {
+    syncModeFromRoute();
+    reload();
+  },
+);
+
 onMounted(async () => {
+  syncModeFromRoute();
   await Promise.all([loadTaxonomy(), load()]);
 });
 </script>
