@@ -21,21 +21,18 @@ const profileMenuOpen = ref(false);
 const navDrawerOpen = ref(false);
 const searchOpen = ref(false);
 const navEl = ref<HTMLElement | null>(null);
-const navBurgerEl = ref<HTMLElement | null>(null);
-const profileTriggerEl = ref<HTMLElement | null>(null);
 const sheetMobile = ref(
   typeof window !== "undefined" ? window.innerWidth <= 640 : false,
 );
 const sheetGeom = ref({ top: 0, left: 0, width: 0 });
 const SHEET_MOBILE_MAX = 640;
-const DESKTOP_MENU_WIDTH = 240;
 const profileAvatarUrl = ref("");
 const profileAvatarBroken = ref(false);
 const profileCoins = ref(0);
 const headerSheetOpen = computed(
   () => navDrawerOpen.value || profileMenuOpen.value || searchOpen.value,
 );
-const navFullSheetOpen = computed(() => searchOpen.value && !sheetMobile.value);
+const navFullSheetOpen = computed(() => headerSheetOpen.value && !sheetMobile.value);
 const initials = computed(() => (auth.nickname || "U").slice(0, 2).toUpperCase());
 const chatBadge = computed(() => (chatStore.unread > 9 ? "9+" : String(chatStore.unread)));
 let activityTickStart = Date.now();
@@ -133,52 +130,14 @@ function onSheetLayoutChange() {
 
 function desktopFullSheetStyle() {
   if (sheetMobile.value) return undefined;
+  const top = sheetGeom.value.top;
   return {
-    top: `${sheetGeom.value.top}px`,
+    top: `${top}px`,
     left: `${sheetGeom.value.left}px`,
     width: `${sheetGeom.value.width}px`,
+    maxHeight: `calc(100vh - ${top}px)`,
+    minHeight: `calc(100vh - ${top}px)`,
   };
-}
-
-function clampSheetLeft(left: number, width: number, nav: HTMLElement | null) {
-  if (!nav) return left;
-  const navRect = nav.getBoundingClientRect();
-  const minLeft = Math.round(navRect.left);
-  const maxLeft = Math.round(navRect.right - width);
-  return Math.max(minLeft, Math.min(left, maxLeft));
-}
-
-function desktopTriggerSheetStyle(
-  trigger: HTMLElement | null,
-  align: "left" | "right",
-) {
-  if (sheetMobile.value) return undefined;
-  const top = sheetGeom.value.top;
-  const width = DESKTOP_MENU_WIDTH;
-  const nav = resolveNavEl();
-  if (trigger) {
-    const triggerRect = trigger.getBoundingClientRect();
-    const rawLeft =
-      align === "right"
-        ? Math.round(triggerRect.right - width)
-        : Math.round(triggerRect.left);
-    const left = clampSheetLeft(rawLeft, width, nav);
-    return { top: `${top}px`, left: `${left}px`, width: `${width}px` };
-  }
-  const fallbackLeft =
-    align === "right"
-      ? sheetGeom.value.left + sheetGeom.value.width - width
-      : sheetGeom.value.left;
-  const left = clampSheetLeft(fallbackLeft, width, nav);
-  return { top: `${top}px`, left: `${left}px`, width: `${width}px` };
-}
-
-function desktopNavSheetStyle() {
-  return desktopTriggerSheetStyle(navBurgerEl.value, "left");
-}
-
-function desktopProfileSheetStyle() {
-  return desktopTriggerSheetStyle(profileTriggerEl.value, "right");
 }
 
 function closeSearch() {
@@ -428,7 +387,6 @@ watch(
       <span v-if="routeNavPending" class="nav-route-loading muted" aria-live="polite">загрузка…</span>
       <div v-if="auth.token" class="nav-menu-anchor">
         <button
-          ref="navBurgerEl"
           type="button"
           class="icon-btn nav-burger"
           :aria-expanded="navDrawerOpen"
@@ -494,7 +452,6 @@ watch(
         </div>
         <div class="profile-menu-wrap">
           <button
-            ref="profileTriggerEl"
             class="profile-trigger"
             type="button"
             :aria-expanded="profileMenuOpen"
@@ -530,8 +487,8 @@ watch(
           @click="closeNavDrawer"
         >
           <div
-            class="nav-menu-sheet nav-menu-sheet--compact"
-            :style="desktopNavSheetStyle()"
+            class="nav-menu-sheet nav-menu-sheet--full"
+            :style="desktopFullSheetStyle()"
             role="dialog"
             aria-modal="true"
             aria-label="разделы"
@@ -573,8 +530,8 @@ watch(
           @click="closeProfileMenu"
         >
           <div
-            class="nav-menu-sheet profile-menu-sheet nav-menu-sheet--compact card"
-            :style="desktopProfileSheetStyle()"
+            class="nav-menu-sheet profile-menu-sheet nav-menu-sheet--full card"
+            :style="desktopFullSheetStyle()"
             role="dialog"
             aria-modal="true"
             aria-label="профиль"
@@ -722,25 +679,6 @@ watch(
   transform-origin: top center;
 }
 
-.nav-menu-root:not(.nav-menu-root--mobile) .nav-menu-sheet--compact {
-  position: fixed;
-  margin: 0;
-  padding: 0.35rem;
-  border: 1px solid var(--border);
-  border-radius: 0 0 var(--radius) var(--radius);
-  background: var(--bg);
-  z-index: 91;
-}
-
-.nav-menu-root:not(.nav-menu-root--mobile) .nav-menu-sheet--compact:not(.profile-menu-sheet) {
-  transform-origin: top left;
-}
-
-.nav-menu-root:not(.nav-menu-root--mobile) .nav-menu-sheet--compact.profile-menu-sheet {
-  transform-origin: top right;
-  padding: 0.35rem 0.35rem 0.5rem;
-}
-
 .nav-menu-root:not(.nav-menu-root--mobile) .nav-menu-sheet--full {
   position: fixed;
   margin: 0;
@@ -748,15 +686,16 @@ watch(
   border-top: none;
   border-left: 1px solid var(--border);
   border-right: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
-  border-radius: 0 0 var(--radius) var(--radius);
+  border-bottom: none;
+  border-radius: 0;
   background: var(--bg);
   transform-origin: top center;
   z-index: 91;
+  overflow-y: auto;
 }
 
-.nav-menu-root:not(.nav-menu-root--mobile) .search-menu-sheet {
-  max-height: min(75vh, 36rem);
+.nav-menu-root:not(.nav-menu-root--mobile) .profile-menu-sheet {
+  padding: 0.35rem 0.6rem 0.65rem;
 }
 
 .nav-menu-root--mobile .nav-menu-sheet {
@@ -836,22 +775,9 @@ watch(
   transition: background 0.2s ease;
 }
 
-.nav-menu-enter-from:not(.nav-menu-root--mobile) .nav-menu-sheet--compact:not(.profile-menu-sheet),
-.nav-menu-leave-to:not(.nav-menu-root--mobile) .nav-menu-sheet--compact:not(.profile-menu-sheet) {
-  transform: scaleY(0);
-  transform-origin: top left;
-}
-
-.nav-menu-enter-from:not(.nav-menu-root--mobile) .nav-menu-sheet--compact.profile-menu-sheet,
-.nav-menu-leave-to:not(.nav-menu-root--mobile) .nav-menu-sheet--compact.profile-menu-sheet {
-  transform: scaleY(0);
-  transform-origin: top right;
-}
-
 .nav-menu-enter-from:not(.nav-menu-root--mobile) .nav-menu-sheet--full,
 .nav-menu-leave-to:not(.nav-menu-root--mobile) .nav-menu-sheet--full {
   transform: scaleY(0);
-  transform-origin: top center;
 }
 
 .nav-menu-root--mobile.nav-menu-enter-from .nav-menu-sheet,
