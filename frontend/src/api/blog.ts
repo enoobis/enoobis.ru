@@ -6,7 +6,7 @@ export type BlogListItem = {
   slug: string;
   excerpt: string;
   cover_image_url: string;
-  status: "draft" | "published" | "archived";
+  status: "draft" | "pending" | "published" | "archived";
   author_nickname: string;
   created_at: string;
   published_at: string | null;
@@ -25,7 +25,7 @@ export type BlogPost = {
   excerpt: string;
   body: string;
   cover_image_url: string;
-  status: "draft" | "published" | "archived";
+  status: "draft" | "pending" | "published" | "archived";
   author_id: string;
   author_nickname: string;
   created_at: string;
@@ -131,8 +131,8 @@ export function listAuthorPosts(nickname: string, query: BlogListQuery = {}) {
   return api<PagedPosts>(withQuery(`/api/blog/author/${encodeURIComponent(nickname)}`, query));
 }
 
-export function getPost(id: string) {
-  return api<BlogPost>(`/api/blog/${id}`);
+export function getPost(id: string, token?: string | null) {
+  return api<BlogPost>(`/api/blog/${id}`, { token });
 }
 
 export function getPostForEdit(id: string, token: string) {
@@ -151,7 +151,7 @@ export function createPost(
     excerpt?: string;
     slug?: string;
     cover_image_url?: string;
-    status?: "draft" | "published" | "archived";
+    status?: "draft" | "pending" | "published" | "archived";
     tags?: string[];
     categories?: string[];
   },
@@ -168,7 +168,7 @@ export function updatePost(
     excerpt?: string;
     slug?: string;
     cover_image_url?: string;
-    status?: "draft" | "published" | "archived";
+    status?: "draft" | "pending" | "published" | "archived";
     tags?: string[];
     categories?: string[];
   },
@@ -181,7 +181,7 @@ export function updatePost(
 }
 
 export function publishPost(id: string, token: string) {
-  return api<{ ok: boolean }>(`/api/blog/${id}/publish`, { method: "POST", token });
+  return api<{ ok: boolean; status?: string }>(`/api/blog/${id}/publish`, { method: "POST", token });
 }
 
 export function archivePost(id: string, token: string) {
@@ -274,6 +274,30 @@ export async function uploadBlogImage(file: File, token: string, postId?: string
   const data = await res.json();
   if (!res.ok) throw new Error(data?.error ?? res.statusText);
   return data as { url: string };
+}
+
+export type PendingBlogPost = {
+  id: string;
+  title: string;
+  slug: string;
+  excerpt: string;
+  cover_image_url: string;
+  status: "pending";
+  author_nickname: string;
+  created_at: string;
+  published_at: string | null;
+  updated_at: string;
+};
+
+export function listPendingBlogPosts(token: string) {
+  return api<PendingBlogPost[]>("/api/admin/blog/pending", { token });
+}
+
+export function approveBlogPost(id: string, token: string) {
+  return api<{ ok: boolean; status: string }>(`/api/admin/blog/posts/${id}/approve`, {
+    method: "POST",
+    token,
+  });
 }
 
 export function listBlogReports(token: string) {

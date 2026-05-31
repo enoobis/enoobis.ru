@@ -4,11 +4,11 @@ import jwtLib from "jsonwebtoken";
 import { all, get, nowIso, run } from "../db.js";
 import { authRequired } from "../auth.js";
 import {
-  awardAchievement,
   checkBlogLikeMilestone,
 } from "../utils/achievements.js";
 import { applyVote, voteSummary } from "../utils/votes.js";
 import { assertBlogComment, assertBlogPublish } from "../utils/contentLimits.js";
+import { finalizeBlogPublish } from "../utils/blogPublish.js";
 
 const router = express.Router();
 
@@ -143,7 +143,7 @@ router.get("/blog/bookmarks/me", authRequired, (req, res) => {
     get(
       `SELECT COUNT(*) as v
        FROM blog_post_bookmarks b JOIN blog_posts bp ON bp.id = b.post_id
-       WHERE b.user_id = ? AND bp.is_deleted = 0`,
+       WHERE b.user_id = ? AND bp.is_deleted = 0 AND bp.status = 'published'`,
       req.user.id,
     )?.v ?? 0;
   const items = all(
@@ -153,7 +153,7 @@ router.get("/blog/bookmarks/me", authRequired, (req, res) => {
      FROM blog_post_bookmarks b
      JOIN blog_posts bp ON bp.id = b.post_id
      JOIN users u ON u.id = bp.author_id
-     WHERE b.user_id = ? AND bp.is_deleted = 0
+     WHERE b.user_id = ? AND bp.is_deleted = 0 AND bp.status = 'published'
      ORDER BY b.created_at DESC
      LIMIT ? OFFSET ?`,
     req.user.id,
@@ -187,7 +187,8 @@ router.get("/blog/categories", (_req, res) => {
   return res.json(rows);
 });
 
-function fetchPostFull(id, viewerId) {
+function fetchPostFull(id, viewer) {
+  const viewerId = viewer?.id ?? null;
   const row = get(
     `SELECT bp.*, u.nickname as author_nickname
      FROM blog_posts bp JOIN users u ON u.id = bp.author_id
@@ -203,7 +204,8 @@ function fetchPostFull(id, viewerId) {
         id,
       )
     : false;
-  const can_edit = viewerId === row.author_id;
+  const can_edit =
+    !!viewer && (viewerId === row.author_id || viewer.role === "admin");
   const image_urls = all(
     "SELECT url FROM blog_post_images WHERE post_id = ? ORDER BY created_at",
     id,
@@ -232,30 +234,44 @@ function fetchPostFull(id, viewerId) {
   };
 }
 
-function authorizeBearer(req) {
+function optionalViewer(req) {
   const auth = req.headers.authorization ?? "";
   if (!auth.startsWith("Bearer ")) return null;
   try {
     const token = auth.slice(7);
     const claims = jwtLib.verify(token, process.env.JWT_SECRET ?? "dev-secret-change-me");
-    return claims?.sub ?? null;
+    if (!claims?.sub) return null;
+    const row = get("SELECT id, role FROM users WHERE id = ?", claims.sub);
+    return row ?? null;
   } catch {
     return null;
   }
 }
 
+function canViewPost(post, viewer) {
+  if (post.status === "published") return true;
+  if (!viewer) return false;
+  return viewer.id === post.author_id || viewer.role === "admin";
+}
+
+function publishedPostOr404(postId) {
+  const row = get(
+    "SELECT id, status FROM blog_posts WHERE id = ? AND is_deleted = 0",
+    postId,
+  );
+  if (!row || row.status !== "published") return null;
+  return row;
+}
+
 router.get("/blog/:id", (req, res) => {
-  const viewerId = authorizeBearer(req);
-  const post = fetchPostFull(req.params.id, viewerId);
-  if (!post) return res.status(404).json({ error: "not found" });
-  if (post.status !== "published" && viewerId !== post.author_id) {
-    return res.status(404).json({ error: "not found" });
-  }
+  const viewer = optionalViewer(req);
+  const post = fetchPostFull(req.params.id, viewer);
+  if (!post || !canViewPost(post, viewer)) return res.status(404).json({ error: "not found" });
   return res.json(post);
 });
 
 router.get("/blog/:id/edit", authRequired, (req, res) => {
-  const post = fetchPostFull(req.params.id, req.user.id);
+  const post = fetchPostFull(req.params.id, req.user);
   if (!post) return res.status(404).json({ error: "not found" });
   if (post.author_id !== req.user.id && req.user.role !== "admin")
     return res.status(403).json({ error: "forbidden" });
@@ -271,12 +287,12 @@ router.get("/blog/:id/me", authRequired, (req, res) => {
   );
   const post = get("SELECT author_id FROM blog_posts WHERE id = ?", req.params.id);
   const isAuthor = !!post && post.author_id === req.user.id;
+  const isAdmin = req.user.role === "admin";
   return res.json({
     my_vote: votes.my_vote,
     bookmarked,
-    can_edit: isAuthor,
-    can_delete:
-      !!post && (isAuthor || req.user.role === "admin"),
+    can_edit: isAuthor || isAdmin,
+    can_delete: !!post && (isAuthor || isAdmin),
   });
 });
 
@@ -333,8 +349,19 @@ router.post("/blog", authRequired, (req, res) => {
   if (!body.title || !body.body) {
     return res.status(400).json({ error: "нужны заголовок и текст" });
   }
-  const status = body.status === "published" ? "published" : "draft";
-  if (status === "published") {
+  const wantsPublish = body.status === "published";
+  let status = "draft";
+  if (wantsPublish) {
+    if (req.user.role === "admin") {
+      status = "published";
+    } else {
+      status = "pending";
+    }
+    const lim = userLimitsJson(req.user.id);
+    const a = assertBlogPublish(req.user.id, lim);
+    if (!a.ok) return res.status(403).json({ error: a.error });
+  } else if (body.status === "pending") {
+    status = "pending";
     const lim = userLimitsJson(req.user.id);
     const a = assertBlogPublish(req.user.id, lim);
     if (!a.ok) return res.status(403).json({ error: a.error });
@@ -361,10 +388,9 @@ router.post("/blog", authRequired, (req, res) => {
   if (Array.isArray(body.tags)) syncTags(id, body.tags);
   if (Array.isArray(body.categories)) syncCategories(id, body.categories);
   if (status === "published") {
-    awardAchievement(req.user.id, "first_blog");
-    run("UPDATE users SET coins = coins + 2 WHERE id = ?", req.user.id);
+    finalizeBlogPublish(id, req.user.id);
   }
-  return res.json(fetchPostFull(id, req.user.id));
+  return res.json(fetchPostFull(id, req.user));
 });
 
 router.patch("/blog/:id", authRequired, (req, res) => {
@@ -385,21 +411,34 @@ router.patch("/blog/:id", authRequired, (req, res) => {
   if (typeof body.slug === "string" && body.slug.trim()) {
     run("UPDATE blog_posts SET slug = ? WHERE id = ?", slugify(body.slug), req.params.id);
   }
-  if (typeof body.status === "string" && ["draft", "published", "archived"].includes(body.status)) {
-    if (body.status === "published" && row.status !== "published") {
-      const lim = userLimitsJson(row.author_id);
-      const a = assertBlogPublish(row.author_id, lim);
-      if (!a.ok) return res.status(403).json({ error: a.error });
+  if (typeof body.status === "string") {
+    const teacherStatuses = ["draft", "pending", "archived"];
+    const adminStatuses = ["draft", "pending", "published", "archived"];
+    const allowed =
+      req.user.role === "admin" ? adminStatuses : teacherStatuses;
+    let nextStatus = body.status;
+    if (nextStatus === "published" && req.user.role !== "admin") {
+      nextStatus = "pending";
     }
-    run("UPDATE blog_posts SET status = ? WHERE id = ?", body.status, req.params.id);
-    if (body.status === "published" && !row.published_at) {
-      run("UPDATE blog_posts SET published_at = ? WHERE id = ?", nowIso(), req.params.id);
+    if (!allowed.includes(nextStatus) && nextStatus !== "published") {
+      /* ignore unknown */
+    } else if (allowed.includes(nextStatus) || (nextStatus === "published" && req.user.role === "admin")) {
+      if (nextStatus === "pending" && row.status !== "pending" && row.status !== "published") {
+        const lim = userLimitsJson(row.author_id);
+        const a = assertBlogPublish(row.author_id, lim);
+        if (!a.ok) return res.status(403).json({ error: a.error });
+      }
+      if (nextStatus === "published" && row.status !== "published") {
+        finalizeBlogPublish(req.params.id, row.author_id);
+      } else if (nextStatus !== "published") {
+        run("UPDATE blog_posts SET status = ? WHERE id = ?", nextStatus, req.params.id);
+      }
     }
   }
   if (Array.isArray(body.tags)) syncTags(req.params.id, body.tags);
   if (Array.isArray(body.categories)) syncCategories(req.params.id, body.categories);
   run("UPDATE blog_posts SET updated_at = ? WHERE id = ?", nowIso(), req.params.id);
-  return res.json(fetchPostFull(req.params.id, req.user.id));
+  return res.json(fetchPostFull(req.params.id, req.user));
 });
 
 router.post("/blog/:id/publish", authRequired, (req, res) => {
@@ -407,22 +446,17 @@ router.post("/blog/:id/publish", authRequired, (req, res) => {
   if (!row) return res.status(404).json({ error: "not found" });
   if (row.author_id !== req.user.id && req.user.role !== "admin")
     return res.status(403).json({ error: "forbidden" });
-  if (row.status !== "published") {
-    const lim = userLimitsJson(row.author_id);
-    const a = assertBlogPublish(row.author_id, lim);
-    if (!a.ok) return res.status(403).json({ error: a.error });
+  if (row.status === "published") return res.json({ ok: true, status: "published" });
+  if (req.user.role === "admin") {
+    finalizeBlogPublish(req.params.id, row.author_id);
+    return res.json({ ok: true, status: "published" });
   }
-  run(
-    "UPDATE blog_posts SET status = 'published', published_at = COALESCE(published_at, ?), updated_at = ? WHERE id = ?",
-    nowIso(),
-    nowIso(),
-    req.params.id,
-  );
-  awardAchievement(row.author_id, "first_blog");
-  if (row.status !== "published") {
-    run("UPDATE users SET coins = coins + 2 WHERE id = ?", row.author_id);
-  }
-  return res.json({ ok: true });
+  if (row.status === "pending") return res.json({ ok: true, status: "pending" });
+  const lim = userLimitsJson(row.author_id);
+  const a = assertBlogPublish(row.author_id, lim);
+  if (!a.ok) return res.status(403).json({ error: a.error });
+  run("UPDATE blog_posts SET status = 'pending', updated_at = ? WHERE id = ?", nowIso(), req.params.id);
+  return res.json({ ok: true, status: "pending" });
 });
 
 router.post("/blog/:id/archive", authRequired, (req, res) => {
@@ -452,6 +486,7 @@ router.delete("/blog/:id", authRequired, (req, res) => {
 });
 
 router.get("/blog/:id/comments", (req, res) => {
+  if (!publishedPostOr404(req.params.id)) return res.status(404).json({ error: "not found" });
   const rows = all(
     `SELECT c.id, c.post_id, c.user_id, u.nickname as author_nickname, c.body, c.status,
             c.parent_comment_id, c.created_at, c.updated_at
@@ -464,6 +499,7 @@ router.get("/blog/:id/comments", (req, res) => {
 });
 
 router.post("/blog/:id/comments", authRequired, (req, res) => {
+  if (!publishedPostOr404(req.params.id)) return res.status(404).json({ error: "not found" });
   const body = String(req.body?.body ?? "").trim();
   if (!body) return res.status(400).json({ error: "empty comment" });
   const lim = userLimitsJson(req.user.id);
@@ -525,10 +561,10 @@ router.post("/blog/:id/vote", authRequired, (req, res) => {
   const vote = Number(req.body?.vote);
   if (vote !== 1 && vote !== -1) return res.status(400).json({ error: "invalid vote" });
   const post = get(
-    "SELECT author_id FROM blog_posts WHERE id = ? AND is_deleted = 0",
+    "SELECT author_id, status FROM blog_posts WHERE id = ? AND is_deleted = 0",
     req.params.id,
   );
-  if (!post) return res.status(404).json({ error: "not found" });
+  if (!post || post.status !== "published") return res.status(404).json({ error: "not found" });
   if (post.author_id === req.user.id) return res.status(403).json({ error: "cannot vote own post" });
   applyVote({
     table: "blog_post_likes",
@@ -542,6 +578,7 @@ router.post("/blog/:id/vote", authRequired, (req, res) => {
   return res.json(voteSummary("blog_post_likes", "post_id", req.params.id, req.user.id));
 });
 router.post("/blog/:id/bookmark", authRequired, (req, res) => {
+  if (!publishedPostOr404(req.params.id)) return res.status(404).json({ error: "not found" });
   run(
     "INSERT OR IGNORE INTO blog_post_bookmarks (user_id, post_id, created_at) VALUES (?, ?, ?)",
     req.user.id,
@@ -560,8 +597,8 @@ router.delete("/blog/:id/bookmark", authRequired, (req, res) => {
 });
 
 router.post("/blog/:id/report", authRequired, (req, res) => {
-  const post = get("SELECT author_id FROM blog_posts WHERE id = ?", req.params.id);
-  if (!post) return res.status(404).json({ error: "not found" });
+  const post = get("SELECT author_id, status FROM blog_posts WHERE id = ?", req.params.id);
+  if (!post || post.status !== "published") return res.status(404).json({ error: "not found" });
   if (post.author_id === req.user.id) return res.status(403).json({ error: "cannot report own post" });
   const id = uuidv4();
   run(

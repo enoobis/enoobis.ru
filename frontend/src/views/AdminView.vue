@@ -3,13 +3,16 @@ import { computed, onMounted, onUnmounted, ref, type Ref } from "vue";
 import { RouterLink } from "vue-router";
 import { api } from "../api/http";
 import {
+  approveBlogPost,
   deleteBlogReport,
   hideCommentByAdmin,
   hidePostByAdmin,
   listBlogReports,
+  listPendingBlogPosts,
   resolveBlogReport,
   restoreCommentByAdmin,
   type BlogReport,
+  type PendingBlogPost,
 } from "../api/blog";
 import {
   deleteAdminUserInvite,
@@ -57,11 +60,12 @@ type AdminUser = {
   avatar_url: string;
   coins?: number;
 };
-type Tab = "pending" | "users" | "reports" | "shop";
+type Tab = "pending" | "users" | "reports" | "shop" | "blogs";
 
 const auth = useAuthStore();
 const tab = ref<Tab>("pending");
 const pending = ref<Pending[]>([]);
+const blogPending = ref<PendingBlogPost[]>([]);
 const users = ref<AdminUser[]>([]);
 const reports = ref<BlogReport[]>([]);
 const err = ref("");
@@ -551,6 +555,9 @@ async function load() {
   err.value = "";
   try {
     pending.value = await api<Pending[]>("/api/admin/pending", { token: auth.token });
+    if (auth.token) {
+      blogPending.value = await listPendingBlogPosts(auth.token);
+    }
     users.value = await api<AdminUser[]>("/api/admin/users", { token: auth.token });
     reports.value = await listBlogReports(auth.token ?? "");
     if (moderateUserId.value && auth.token) {
@@ -814,6 +821,16 @@ async function restoreComment(id: string | null) {
   await restoreCommentByAdmin(id, auth.token);
   reports.value = await listBlogReports(auth.token);
 }
+
+async function approveBlog(id: string) {
+  if (!auth.token) return;
+  try {
+    await approveBlogPost(id, auth.token);
+    blogPending.value = blogPending.value.filter((p) => p.id !== id);
+  } catch (e) {
+    err.value = e instanceof Error ? e.message : "ошибка";
+  }
+}
 </script>
 
 <template>
@@ -830,6 +847,9 @@ async function restoreComment(id: string | null) {
       </button>
       <button class="filter-tab" :class="{ on: tab === 'shop' }" type="button" @click="tab = 'shop'">
         магазин
+      </button>
+      <button class="filter-tab" :class="{ on: tab === 'blogs' }" type="button" @click="tab = 'blogs'">
+        блоги <span v-if="blogPending.length" class="muted small">{{ blogPending.length }}</span>
       </button>
     </nav>
 
@@ -849,6 +869,25 @@ async function restoreComment(id: string | null) {
             <button class="secondary danger" type="button" @click="removeUser(u.id, u.nickname)">
               удалить
             </button>
+          </div>
+        </li>
+      </ul>
+    </template>
+
+    <template v-else-if="tab === 'blogs'">
+      <p v-if="!blogPending.length" class="muted">пусто</p>
+      <ul v-else class="list">
+        <li v-for="p in blogPending" :key="p.id">
+          <div>
+            <strong>{{ p.title }}</strong>
+            <span class="muted small">
+              · {{ p.author_nickname }} · {{ (p.updated_at || p.created_at).slice(0, 10) }}
+            </span>
+          </div>
+          <div class="row-actions">
+            <RouterLink :to="`/blogs/${p.id}/edit`" class="secondary">редактировать</RouterLink>
+            <RouterLink :to="`/blogs/${p.id}`" class="secondary">просмотр</RouterLink>
+            <button type="button" @click="approveBlog(p.id)">одобрить</button>
           </div>
         </li>
       </ul>

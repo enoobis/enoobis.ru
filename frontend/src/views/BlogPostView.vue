@@ -6,6 +6,7 @@ import {
   createComment,
   deleteComment,
   deletePost,
+  approveBlogPost,
   getMyPostState,
   getPost,
   listComments,
@@ -58,9 +59,11 @@ async function load() {
   post.value = null;
   comments.value = [];
   try {
-    post.value = await getPost(postId.value);
+    post.value = await getPost(postId.value, auth.token ?? undefined);
     addRecentPost(post.value);
-    comments.value = await listComments(postId.value);
+    if (post.value.status === "published") {
+      comments.value = await listComments(postId.value);
+    }
     if (auth.token) {
       myState.value = await getMyPostState(postId.value, auth.token);
     } else {
@@ -74,9 +77,12 @@ async function load() {
 async function softRefreshPost() {
   if (document.visibilityState === "hidden" || !postId.value) return;
   try {
-    const [p, c] = await Promise.all([getPost(postId.value), listComments(postId.value)]);
+    const [p, c] = await Promise.all([
+      getPost(postId.value, auth.token ?? undefined),
+      post.value?.status === "published" ? listComments(postId.value) : Promise.resolve([] as CommentItem[]),
+    ]);
     post.value = p;
-    comments.value = c;
+    comments.value = p.status === "published" ? c : [];
     addRecentPost(p);
     if (auth.token) {
       myState.value = await getMyPostState(postId.value, auth.token);
@@ -103,6 +109,8 @@ function persistProgress() {
 }
 
 const isAuthor = computed(() => !!post.value && auth.user?.id === post.value.author_id);
+const isPending = computed(() => post.value?.status === "pending");
+const isPublished = computed(() => post.value?.status === "published");
 
 async function castVote(vote: 1 | -1) {
   if (!auth.token || !post.value || working.value || isAuthor.value) return;
@@ -213,6 +221,19 @@ async function sendCommentReport(commentId: string) {
   }
 }
 
+async function approvePost() {
+  if (!auth.token || !post.value || working.value || auth.role !== "admin") return;
+  working.value = true;
+  try {
+    await approveBlogPost(post.value.id, auth.token);
+    await load();
+  } catch (e) {
+    err.value = e instanceof Error ? e.message : "ошибка";
+  } finally {
+    working.value = false;
+  }
+}
+
 onMounted(() => {
   window.addEventListener("scroll", persistProgress, { passive: true });
   document.addEventListener("visibilitychange", onPostVisibility);
@@ -238,7 +259,7 @@ watch(() => route.params.id, load);
         <AppIcon name="back" :size="ACT" />
       </button>
       <button
-        v-if="auth.token"
+        v-if="auth.token && isPublished"
         class="act"
         type="button"
         :class="{ on: myState.bookmarked }"
@@ -247,7 +268,7 @@ watch(() => route.params.id, load);
       >
         <AppIcon :name="myState.bookmarked ? 'bookmarked' : 'bookmark'" :size="ACT" />
       </button>
-      <div v-if="auth.token && !isAuthor" class="votes">
+      <div v-if="auth.token && isPublished && !isAuthor" class="votes">
         <button class="act" type="button" :class="{ on: myState.my_vote === 1 }" title="вверх" @click="castVote(1)">
           <AppIcon name="voteUp" :size="ACT" />
         </button>
@@ -260,7 +281,7 @@ watch(() => route.params.id, load);
           <AppIcon name="voteDown" :size="ACT" />
         </button>
       </div>
-      <span v-else-if="post.up_count || post.down_count" class="votes votes-readonly">
+      <span v-else-if="isPublished && (post.up_count || post.down_count)" class="votes votes-readonly">
         <span class="act" aria-hidden="true"><AppIcon name="voteUp" :size="ACT" /></span>
         <span class="vote-score">
           <span v-if="post.up_count">{{ post.up_count }}</span>
@@ -279,11 +300,23 @@ watch(() => route.params.id, load);
       <button v-if="myState.can_delete" class="act danger" type="button" title="удалить" :disabled="working" @click="removePost">
         <AppIcon name="delete" :size="ACT" />
       </button>
-      <button v-if="auth.token && !isAuthor" class="act" type="button" title="пожаловаться" @click="sendPostReport">
+      <button v-if="auth.token && isPublished && !isAuthor" class="act" type="button" title="пожаловаться" @click="sendPostReport">
         <AppIcon name="report" :size="ACT" />
       </button>
     </div>
 
+    <p v-if="isPending" class="pending-note">
+      <span class="muted">на модерации</span>
+      <button
+        v-if="auth.role === 'admin'"
+        type="button"
+        class="pending-approve"
+        :disabled="working"
+        @click="approvePost"
+      >
+        одобрить
+      </button>
+    </p>
     <h1>{{ post.title }}</h1>
     <p class="meta muted">
       <RouterLink :to="`/u/${post.author_nickname}`">{{ post.author_nickname }}</RouterLink>
@@ -298,7 +331,7 @@ watch(() => route.params.id, load);
     />
     <div class="markdown-body" v-html="renderedBody" />
 
-    <section class="comments">
+    <section v-if="isPublished" class="comments">
       <h2>комментарии · {{ comments.length }}</h2>
       <div v-if="auth.token" class="comment-form">
         <textarea v-model="commentBody" rows="2" placeholder="комментарий" />
@@ -351,6 +384,18 @@ h1 {
 .meta {
   font-size: 0.85rem;
   margin-bottom: 1.5rem;
+}
+.pending-note {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+  margin-bottom: 0.75rem;
+}
+.pending-approve {
+  padding: 0.2rem 0.55rem;
+  min-height: 28px;
+  font-size: 0.85rem;
 }
 .cover {
   width: 100%;

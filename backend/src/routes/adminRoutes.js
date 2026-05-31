@@ -9,6 +9,7 @@ import { awardAchievement } from "../utils/achievements.js";
 import { saveIdenticon } from "../utils/identicon.js";
 import { limitsFromAdminBody, limitsToJson, parseContentLimits } from "../utils/contentLimits.js";
 import { optimizeUploadedFile } from "../utils/imageOptimize.js";
+import { finalizeBlogPublish } from "../utils/blogPublish.js";
 
 const router = express.Router();
 
@@ -608,6 +609,43 @@ router.post("/admin/blog/reports/:id/resolve", (req, res) => {
 router.post("/admin/blog/posts/:id/hide", (req, res) => {
   run("UPDATE blog_posts SET status = 'archived' WHERE id = ?", req.params.id);
   return res.json({ ok: true });
+});
+
+router.get("/admin/blog/pending", (_req, res) => {
+  const rows = all(
+    `SELECT bp.id, bp.title, bp.slug, bp.excerpt, bp.cover_image_url, bp.status,
+            bp.created_at, bp.published_at, bp.updated_at,
+            u.nickname as author_nickname
+     FROM blog_posts bp
+     JOIN users u ON u.id = bp.author_id
+     WHERE bp.is_deleted = 0 AND bp.status = 'pending'
+     ORDER BY bp.updated_at DESC`,
+  );
+  return res.json(
+    rows.map((row) => ({
+      id: row.id,
+      title: row.title,
+      slug: row.slug ?? "",
+      excerpt: row.excerpt ?? "",
+      cover_image_url: row.cover_image_url ?? "",
+      status: row.status,
+      author_nickname: row.author_nickname ?? "",
+      created_at: row.created_at ?? "",
+      published_at: row.published_at ?? null,
+      updated_at: row.updated_at ?? "",
+    })),
+  );
+});
+
+router.post("/admin/blog/posts/:id/approve", (req, res) => {
+  const row = get(
+    "SELECT author_id, status FROM blog_posts WHERE id = ? AND is_deleted = 0",
+    req.params.id,
+  );
+  if (!row) return res.status(404).json({ error: "not found" });
+  if (row.status !== "pending") return res.status(400).json({ error: "not pending" });
+  finalizeBlogPublish(req.params.id, row.author_id);
+  return res.json({ ok: true, status: "published" });
 });
 
 router.post("/admin/blog/comments/:id/hide", (req, res) => {

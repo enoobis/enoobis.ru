@@ -14,6 +14,7 @@ import { renderMarkdown } from "../utils/markdown";
 import AppIcon from "../components/AppIcon.vue";
 
 type ViewMode = "edit" | "split" | "preview";
+type SaveTarget = "draft" | "submit";
 
 const auth = useAuthStore();
 const route = useRoute();
@@ -53,6 +54,7 @@ const wordCount = computed(
 );
 const readMinutes = computed(() => Math.max(1, Math.ceil(wordCount.value / 220)));
 const previewHtml = computed(() => renderMarkdown(body.value));
+const submitLabel = computed(() => (auth.role === "admin" ? "опубликовать" : "на модерацию"));
 
 let autosaveTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -132,7 +134,7 @@ function clearDraft() {
   }
 }
 
-async function save(targetStatus: "draft" | "published") {
+async function save(target: SaveTarget) {
   if (!auth.token || saving.value) return;
   err.value = "";
   saving.value = true;
@@ -142,21 +144,21 @@ async function save(targetStatus: "draft" | "published") {
       body: body.value,
       excerpt: excerpt.value || undefined,
       slug: slug.value || undefined,
-      status: targetStatus,
+      status: target === "draft" ? ("draft" as const) : ("published" as const),
       tags: parseCsv(tagsText.value),
       categories: [] as string[],
     };
 
     if (isEdit.value) {
       const updated = await updatePost(editId.value, auth.token, payload);
-      if (targetStatus === "published" && updated.status !== "published") {
+      if (target === "submit" && updated.status !== "published") {
         await publishPost(updated.id, auth.token);
       }
       clearDraft();
       await router.push(`/blogs/${editId.value}`);
     } else {
       const created = await createPost(auth.token, payload);
-      if (targetStatus === "published" && created.status !== "published") {
+      if (target === "submit" && created.status !== "published") {
         await publishPost(created.id, auth.token);
       }
       clearDraft();
@@ -331,13 +333,13 @@ function onKeydown(e: KeyboardEvent) {
     insertWrap("`", "`", "code");
   } else if (k === "s") {
     e.preventDefault();
-    void save("published");
+    void save("submit");
   } else if (k === "p" && e.shiftKey) {
     e.preventDefault();
     cycleViewMode();
   } else if (k === "enter" && e.shiftKey) {
     e.preventDefault();
-    void save("published");
+    void save("submit");
   }
 }
 
@@ -508,8 +510,8 @@ onBeforeUnmount(() => {
     <footer class="editor-actions">
       <div class="actions">
         <button v-if="isEdit" class="secondary danger" type="button" @click="remove">удалить</button>
-        <button type="button" :disabled="saving" @click="save('published')">
-          {{ saving ? "…" : "опубликовать" }}
+        <button type="button" :disabled="saving" @click="save('submit')">
+          {{ saving ? "…" : submitLabel }}
         </button>
       </div>
     </footer>

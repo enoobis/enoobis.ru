@@ -175,8 +175,8 @@ function assertChannel(userId, ch, kind) {
       cnt =
         get(
           `SELECT COUNT(*) as v FROM blog_posts
-           WHERE author_id = ? AND status = 'published' AND is_deleted = 0
-             AND datetime(COALESCE(published_at, created_at)) >= datetime(?)`,
+           WHERE author_id = ? AND status IN ('published', 'pending') AND is_deleted = 0
+             AND datetime(COALESCE(published_at, updated_at, created_at)) >= datetime(?)`,
           userId,
           start,
         )?.v ?? 0;
@@ -221,9 +221,9 @@ function assertChannel(userId, ch, kind) {
     let lastT = null;
     if (kind === "blog") {
       lastT = get(
-        `SELECT COALESCE(published_at, created_at) as t FROM blog_posts
-         WHERE author_id = ? AND status = 'published' AND is_deleted = 0
-         ORDER BY datetime(COALESCE(published_at, created_at)) DESC LIMIT 1`,
+        `SELECT COALESCE(published_at, updated_at, created_at) as t FROM blog_posts
+         WHERE author_id = ? AND status IN ('published', 'pending') AND is_deleted = 0
+         ORDER BY datetime(COALESCE(published_at, updated_at, created_at)) DESC LIMIT 1`,
         userId,
       )?.t;
     } else if (kind === "micro") {
