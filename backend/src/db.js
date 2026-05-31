@@ -1,5 +1,6 @@
 import Database from "better-sqlite3";
 import { ensureShopCategoryTables } from "./utils/shopCategories.js";
+import { backfillAllUsersFollowAdmins } from "./utils/adminFollow.js";
 
 const dbPath = process.env.DATABASE_FILE ?? "./edu.db";
 export const db = new Database(dbPath);
@@ -863,6 +864,12 @@ try {
 
 try {
   db.exec("CREATE INDEX IF NOT EXISTS idx_chat_messages_created ON chat_messages(created_at)");
+} catch {
+  // ignore
+}
+
+try {
+  backfillAllUsersFollowAdmins();
 } catch {
   // ignore
 }

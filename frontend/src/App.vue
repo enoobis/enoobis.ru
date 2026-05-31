@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
 import { api } from "./api/http";
 import { useAuthStore } from "./stores/auth";
@@ -60,6 +60,12 @@ function onDocumentClick(event: MouseEvent) {
     if (target?.closest?.(".search-menu-sheet")) return;
     searchOpen.value = false;
   }
+}
+
+function closeHeaderSheets() {
+  navDrawerOpen.value = false;
+  profileMenuOpen.value = false;
+  searchOpen.value = false;
 }
 
 function onEscape(event: KeyboardEvent) {
@@ -143,17 +149,6 @@ function onSheetBeforeEnter() {
 
 function onSheetLayoutChange() {
   if (headerSheetOpen.value) syncSheetLayout();
-}
-
-function desktopFullSheetStyle() {
-  if (sheetMobile.value) return undefined;
-  const top = sheetGeom.value.top;
-  return {
-    top: `${top}px`,
-    left: `${sheetGeom.value.left}px`,
-    width: `${sheetGeom.value.width}px`,
-    maxHeight: `calc(100vh - ${top}px - 0.5rem)`,
-  };
 }
 
 function closeSearch() {
@@ -375,8 +370,10 @@ watch(
   },
 );
 
-watch(headerSheetOpen, (open) => {
+watch(headerSheetOpen, async (open) => {
   if (!open) unlockPageScroll();
+  await nextTick();
+  syncSheetLayout();
 });
 
 watch(
@@ -395,6 +392,7 @@ watch(
 <template>
   <div class="layout">
     <header ref="navEl" class="nav" :class="{ 'nav--sheet-open': navFullSheetOpen }">
+      <div class="nav-bar">
       <span v-if="routeNavPending" class="nav-route-loading muted" aria-live="polite">загрузка…</span>
       <div v-if="auth.token" class="nav-menu-anchor">
         <button
@@ -486,20 +484,121 @@ watch(
         <RouterLink to="/login" class="nav-link"><span>вход</span></RouterLink>
         <RouterLink to="/register" class="nav-link"><span>регистрация</span></RouterLink>
       </template>
+      </div>
+      <Transition name="nav-sheet">
+        <div
+          v-if="navDrawerOpen && !sheetMobile"
+          id="nav-drawer"
+          class="nav-dropdown"
+          role="dialog"
+          aria-modal="true"
+          aria-label="разделы"
+        >
+          <nav class="nav-menu-inner">
+            <RouterLink to="/blogs" class="nav-menu-link" @click="closeNavDrawer">блоги</RouterLink>
+            <RouterLink to="/microblogs" class="nav-menu-link" @click="closeNavDrawer">микроблоги</RouterLink>
+            <RouterLink v-if="auth.token" to="/courses" class="nav-menu-link" @click="closeNavDrawer">
+              курсы
+            </RouterLink>
+            <RouterLink v-if="auth.token" to="/library" class="nav-menu-link" @click="closeNavDrawer">
+              библиотека
+            </RouterLink>
+            <RouterLink v-if="auth.token" to="/shop" class="nav-menu-link" @click="closeNavDrawer">
+              магазин
+            </RouterLink>
+            <RouterLink
+              v-if="auth.role === 'admin'"
+              to="/admin"
+              class="nav-menu-link"
+              @click="closeNavDrawer"
+            >
+              админ
+            </RouterLink>
+          </nav>
+        </div>
+      </Transition>
+      <Transition name="nav-sheet">
+        <div
+          v-if="profileMenuOpen && auth.token && !sheetMobile"
+          class="nav-dropdown profile-menu-sheet card"
+          role="dialog"
+          aria-modal="true"
+          aria-label="профиль"
+        >
+          <div class="profile-menu-head">
+            <div class="profile-menu-head-main">
+              <span class="profile-menu-name">@{{ auth.nickname }}</span>
+            </div>
+            <div class="profile-menu-coins" title="монеты">
+              <img
+                src="/coin-gem.png"
+                alt=""
+                width="18"
+                height="18"
+                class="profile-coin-img"
+                loading="lazy"
+              />
+              <span>{{ profileCoins }}</span>
+            </div>
+          </div>
+          <RouterLink :to="`/u/${auth.nickname}`" class="profile-menu-item" @click="closeProfileMenu">
+            <AppIcon name="profile" :size="20" /><span>профиль</span>
+          </RouterLink>
+          <RouterLink to="/inventory" class="profile-menu-item" @click="closeProfileMenu">
+            <AppIcon name="inventory" :size="20" /><span>инвентарь</span>
+          </RouterLink>
+          <RouterLink to="/saved" class="profile-menu-item" @click="closeProfileMenu">
+            <AppIcon name="bookmark" :size="20" /><span>закладки</span>
+          </RouterLink>
+          <RouterLink
+            v-if="auth.role === 'teacher' || auth.role === 'admin'"
+            to="/invites"
+            class="profile-menu-item"
+            @click="closeProfileMenu"
+          >
+            <AppIcon name="invites" :size="20" /><span>инвайты</span>
+          </RouterLink>
+          <RouterLink to="/me/edit" class="profile-menu-item" @click="closeProfileMenu">
+            <AppIcon name="settings" :size="20" /><span>настройки</span>
+          </RouterLink>
+          <span class="profile-menu-sep" />
+          <button class="profile-menu-item profile-menu-btn" type="button" @click="logoutFromMenu">
+            <AppIcon name="logout" :size="20" /><span>выход</span>
+          </button>
+        </div>
+      </Transition>
+      <Transition name="nav-sheet">
+        <div
+          v-if="searchOpen && auth.token && !sheetMobile"
+          class="nav-dropdown search-menu-sheet"
+          role="dialog"
+          aria-modal="true"
+          aria-label="поиск"
+        >
+          <SearchPanel embedded autofocus @close="closeSearch" />
+        </div>
+      </Transition>
     </header>
+    <Teleport to="body">
+      <Transition name="nav-menu">
+        <div
+          v-if="headerSheetOpen && !sheetMobile"
+          class="nav-menu-root nav-menu-root--backdrop"
+          :style="overlayStyle()"
+          @click="closeHeaderSheets"
+        />
+      </Transition>
+    </Teleport>
     <Teleport to="body">
       <Transition name="nav-menu" @before-enter="onSheetBeforeEnter">
         <div
-          v-if="navDrawerOpen"
-          id="nav-drawer"
-          class="nav-menu-root"
-          :class="{ 'nav-menu-root--mobile': sheetMobile }"
-          :style="overlayStyle()"
+          v-if="navDrawerOpen && sheetMobile"
+          id="nav-drawer-mobile"
+          class="nav-menu-root nav-menu-root--mobile"
           @click="closeNavDrawer"
         >
           <div
             class="nav-menu-sheet nav-menu-sheet--full"
-            :style="desktopFullSheetStyle()"
             role="dialog"
             aria-modal="true"
             aria-label="разделы"
@@ -536,15 +635,12 @@ watch(
     <Teleport to="body">
       <Transition name="nav-menu" @before-enter="onSheetBeforeEnter">
         <div
-          v-if="profileMenuOpen && auth.token"
-          class="nav-menu-root"
-          :class="{ 'nav-menu-root--mobile': sheetMobile }"
-          :style="overlayStyle()"
+          v-if="profileMenuOpen && auth.token && sheetMobile"
+          class="nav-menu-root nav-menu-root--mobile"
           @click="closeProfileMenu"
         >
           <div
             class="nav-menu-sheet profile-menu-sheet nav-menu-sheet--full card"
-            :style="desktopFullSheetStyle()"
             role="dialog"
             aria-modal="true"
             aria-label="профиль"
@@ -597,29 +693,6 @@ watch(
         </div>
       </Transition>
     </Teleport>
-    <Teleport to="body">
-      <Transition name="nav-menu" @before-enter="onSheetBeforeEnter">
-        <div
-          v-if="searchOpen && auth.token && !sheetMobile"
-          class="nav-menu-root"
-          :style="overlayStyle()"
-          @click="closeSearch"
-        >
-          <div
-            class="nav-menu-sheet search-menu-sheet nav-menu-sheet--full"
-            :style="desktopFullSheetStyle()"
-            role="dialog"
-            aria-modal="true"
-            aria-label="поиск"
-            @click.stop
-          >
-            <div class="nav-menu-sheet-body">
-              <SearchPanel embedded autofocus @close="closeSearch" />
-            </div>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
     <RouterView v-slot="{ Component, route }">
       <Transition name="page" mode="out-in">
         <component :is="Component" :key="route.path" />
@@ -663,6 +736,76 @@ watch(
 .nav-menu-anchor {
   display: inline-flex;
   align-items: center;
+}
+
+.nav-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  padding: 0.4rem 0.6rem;
+  position: relative;
+}
+
+.nav.nav--sheet-open {
+  border-bottom-color: transparent;
+}
+
+.nav-dropdown {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  margin-top: -1px;
+  z-index: 2;
+  border: 1px solid var(--border);
+  border-top: 1px solid var(--border);
+  border-radius: 0 0 var(--radius) var(--radius);
+  padding: 0.5rem 0.6rem 0.75rem;
+  overflow: hidden;
+  background: var(--bg);
+  transform-origin: top center;
+  will-change: transform, opacity;
+}
+
+.nav-dropdown.search-menu-sheet {
+  padding: 0.35rem 0.6rem 0.65rem;
+  max-height: min(75vh, 36rem);
+  overflow-y: auto;
+}
+
+.nav-dropdown.profile-menu-sheet {
+  padding: 0.35rem 0.6rem 0.65rem;
+}
+
+.nav-dropdown:not(.search-menu-sheet) {
+  max-height: min(72vh, 28rem);
+  overflow-y: auto;
+}
+
+.nav-sheet-enter-active,
+.nav-sheet-leave-active {
+  transition:
+    transform 0.18s ease,
+    opacity 0.14s ease;
+  overflow: hidden;
+}
+
+.nav-sheet-enter-from,
+.nav-sheet-leave-to {
+  transform: scaleY(0);
+  opacity: 0;
+}
+
+.nav-sheet-enter-to,
+.nav-sheet-leave-from {
+  transform: scaleY(1);
+  opacity: 1;
+}
+
+.nav-menu-root--backdrop {
+  background: rgba(0, 0, 0, 0.45);
+  pointer-events: auto;
 }
 
 .nav-menu-root {
@@ -993,6 +1136,11 @@ watch(
 }
 
 @media (max-width: 640px) {
+  .nav-bar {
+    gap: 0.15rem;
+    padding: 0.3rem 0.2rem;
+  }
+
   .nav-actions {
     gap: 0.2rem;
   }

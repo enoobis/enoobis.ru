@@ -10,6 +10,7 @@ import { saveIdenticon } from "../utils/identicon.js";
 import { limitsFromAdminBody, limitsToJson, parseContentLimits } from "../utils/contentLimits.js";
 import { optimizeUploadedFile } from "../utils/imageOptimize.js";
 import { finalizeBlogPublish } from "../utils/blogPublish.js";
+import { ensureUserFollowsAdmins } from "../utils/adminFollow.js";
 
 const router = express.Router();
 
@@ -244,6 +245,7 @@ router.post(
 
 router.post("/admin/users/:id/approve", (req, res) => {
   run("UPDATE users SET status = 'approved' WHERE id = ?", req.params.id);
+  ensureUserFollowsAdmins(req.params.id);
   return res.json({ ok: true });
 });
 

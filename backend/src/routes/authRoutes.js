@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from "uuid";
 import { get, nowIso, run } from "../db.js";
 import { hashPassword, mintToken, verifyPassword } from "../auth.js";
 import { saveIdenticon } from "../utils/identicon.js";
+import { ensureUserFollowsAdmins } from "../utils/adminFollow.js";
 
 const router = express.Router();
 
@@ -55,6 +56,7 @@ router.post("/register", async (req, res) => {
       avatarUrl,
       nowIso(),
     );
+    ensureUserFollowsAdmins(id);
 
     if (status === "pending") {
       return res.json({ pending: true, message: "Ожидайте одобрения администратора" });

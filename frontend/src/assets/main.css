@@ -556,11 +556,8 @@ input[type="search"]::-webkit-search-cancel-button:hover {
 }
 
 .nav {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  flex-wrap: wrap;
-  padding: 0.4rem 0.6rem;
+  display: block;
+  padding: 0;
   border: 1px solid transparent;
   border-bottom-color: var(--border);
   margin-bottom: 1.5rem;
@@ -572,9 +569,8 @@ input[type="search"]::-webkit-search-cancel-button:hover {
 }
 
 .nav.nav--sheet-open {
+  z-index: 101;
   border-bottom-color: transparent;
-  border-left-color: var(--border);
-  border-right-color: var(--border);
 }
 .nav-route-loading {
   position: absolute;
@@ -594,8 +590,6 @@ input[type="search"]::-webkit-search-cancel-button:hover {
 }
 @media (max-width: 640px) {
   .nav {
-    gap: 0.15rem;
-    padding: 0.3rem 0.2rem;
     margin-bottom: 0.9rem;
   }
 }
