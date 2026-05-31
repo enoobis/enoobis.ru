@@ -120,6 +120,23 @@ function syncSheetLayout() {
   };
 }
 
+function lockPageScroll() {
+  if (typeof document === "undefined" || !sheetMobile.value) return;
+  const root = document.documentElement;
+  root.style.overflow = "hidden";
+}
+
+function unlockPageScroll() {
+  if (typeof document === "undefined") return;
+  document.documentElement.style.overflow = "";
+  document.documentElement.style.paddingRight = "";
+}
+
+function prepareSheetOpen() {
+  lockPageScroll();
+  syncSheetLayout();
+}
+
 function onSheetBeforeEnter() {
   syncSheetLayout();
 }
@@ -150,7 +167,7 @@ function toggleSearch() {
   }
   closeNavDrawer();
   closeProfileMenu();
-  syncSheetLayout();
+  prepareSheetOpen();
   searchOpen.value = true;
 }
 
@@ -166,7 +183,7 @@ function toggleNavDrawer() {
   }
   profileMenuOpen.value = false;
   searchOpen.value = false;
-  syncSheetLayout();
+  prepareSheetOpen();
   navDrawerOpen.value = true;
 }
 
@@ -181,7 +198,7 @@ function toggleProfileMenu() {
   }
   closeNavDrawer();
   closeSearch();
-  syncSheetLayout();
+  prepareSheetOpen();
   profileMenuOpen.value = true;
 }
 
@@ -338,9 +355,8 @@ onUnmounted(() => {
   window.removeEventListener("online", syncOnlineStatus);
   window.removeEventListener("offline", syncOnlineStatus);
   window.removeEventListener("keydown", onEscape);
-  document.documentElement.style.overflow = "";
-  document.documentElement.style.paddingRight = "";
   window.removeEventListener("keydown", onGlobalKey);
+  unlockPageScroll();
   document.removeEventListener("visibilitychange", onVisibilityChange);
   document.removeEventListener("click", onDocumentClick);
   window.removeEventListener("resize", onSheetLayoutChange);
@@ -360,17 +376,7 @@ watch(
 );
 
 watch(headerSheetOpen, (open) => {
-  if (typeof document === "undefined") return;
-  const root = document.documentElement;
-  if (open) {
-    const scrollbar = window.innerWidth - root.clientWidth;
-    root.style.overflow = "hidden";
-    if (scrollbar > 0) root.style.paddingRight = `${scrollbar}px`;
-    syncSheetLayout();
-    return;
-  }
-  root.style.overflow = "";
-  root.style.paddingRight = "";
+  if (!open) unlockPageScroll();
 });
 
 watch(
@@ -805,7 +811,7 @@ watch(
 
 .nav-menu-enter-active .nav-menu-sheet,
 .nav-menu-leave-active .nav-menu-sheet {
-  transition: transform 0.2s ease, opacity 0.18s ease;
+  transition: opacity 0.16s ease;
 }
 
 .nav-menu-enter-active.nav-menu-root,
@@ -816,7 +822,6 @@ watch(
 .nav-menu-enter-from:not(.nav-menu-root--mobile) .nav-menu-sheet--full,
 .nav-menu-leave-to:not(.nav-menu-root--mobile) .nav-menu-sheet--full {
   opacity: 0;
-  transform: translateY(-8px);
 }
 
 .nav-menu-root--mobile.nav-menu-enter-from .nav-menu-sheet,
