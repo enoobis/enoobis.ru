@@ -1,35 +1,215 @@
 <script setup lang="ts">
-import { computed } from "vue";
-import { doodleIconData, type DoodleIconName } from "../icons/doodleIconData";
+import { computed, type Component } from "vue";
+import {
+  Ban,
+  Bold,
+  Bookmark,
+  ChevronLeft,
+  Code,
+  Contrast,
+  Copy,
+  Eraser,
+  Eye,
+  FileText,
+  Filter,
+  Flag,
+  Folder,
+  GraduationCap,
+  Heading,
+  Heart,
+  House,
+  Image,
+  Italic,
+  Link,
+  List,
+  LogIn,
+  LogOut,
+  Menu,
+  MessageCircle,
+  MessageSquare,
+  Moon,
+  Package,
+  PenLine,
+  Pencil,
+  Pin,
+  Play,
+  Quote,
+  Reply,
+  Search,
+  Send,
+  Settings,
+  Shield,
+  ShoppingBag,
+  Sparkles,
+  Sun,
+  Tag,
+  Ticket,
+  Trash2,
+  Triangle,
+  Trophy,
+  Upload,
+  User,
+  UserPlus,
+  X,
+} from "@lucide/vue";
+
+export type AppIconName =
+  | "home"
+  | "blog"
+  | "courses"
+  | "invites"
+  | "write"
+  | "admin"
+  | "profile"
+  | "login"
+  | "register"
+  | "logout"
+  | "like"
+  | "liked"
+  | "voteUp"
+  | "voteDown"
+  | "comment"
+  | "tag"
+  | "bookmark"
+  | "bookmarked"
+  | "report"
+  | "send"
+  | "delete"
+  | "edit"
+  | "settings"
+  | "menu"
+  | "play"
+  | "sun"
+  | "moon"
+  | "contrast"
+  | "close"
+  | "filter"
+  | "spark"
+  | "import"
+  | "block"
+  | "search"
+  | "back"
+  | "chat"
+  | "folder"
+  | "copy"
+  | "image"
+  | "pin"
+  | "pinned"
+  | "trophy"
+  | "inventory"
+  | "shop"
+  | "bold"
+  | "italic"
+  | "code"
+  | "heading"
+  | "list"
+  | "quote"
+  | "link"
+  | "seen"
+  | "reply"
+  | "clear";
+
+const icons: Record<AppIconName, Component> = {
+  home: House,
+  blog: FileText,
+  courses: GraduationCap,
+  invites: Ticket,
+  write: PenLine,
+  admin: Shield,
+  profile: User,
+  login: LogIn,
+  register: UserPlus,
+  logout: LogOut,
+  like: Heart,
+  liked: Heart,
+  voteUp: Triangle,
+  voteDown: Triangle,
+  comment: MessageSquare,
+  tag: Tag,
+  bookmark: Bookmark,
+  bookmarked: Bookmark,
+  report: Flag,
+  send: Send,
+  delete: Trash2,
+  edit: Pencil,
+  settings: Settings,
+  menu: Menu,
+  play: Play,
+  sun: Sun,
+  moon: Moon,
+  contrast: Contrast,
+  close: X,
+  filter: Filter,
+  spark: Sparkles,
+  import: Upload,
+  block: Ban,
+  search: Search,
+  back: ChevronLeft,
+  chat: MessageCircle,
+  folder: Folder,
+  copy: Copy,
+  image: Image,
+  pin: Pin,
+  pinned: Pin,
+  trophy: Trophy,
+  inventory: Package,
+  shop: ShoppingBag,
+  bold: Bold,
+  italic: Italic,
+  code: Code,
+  heading: Heading,
+  list: List,
+  quote: Quote,
+  link: Link,
+  seen: Eye,
+  reply: Reply,
+  clear: Eraser,
+};
+
+const FILLED = new Set<AppIconName>([
+  "liked",
+  "bookmarked",
+  "voteUp",
+  "voteDown",
+  "pinned",
+]);
 
 const props = withDefaults(
   defineProps<{
-    name: DoodleIconName;
+    name: AppIconName;
     size?: number;
   }>(),
   { size: 16 },
 );
 
-const icon = computed(() => doodleIconData[props.name]);
+const icon = computed(() => icons[props.name]);
+
+const iconClass = computed(() => {
+  if (props.name === "voteDown") return "app-icon app-icon--flip";
+  return "app-icon";
+});
+
+const iconProps = computed(() => {
+  const filled = FILLED.has(props.name);
+  return {
+    size: props.size,
+    strokeWidth: 2,
+    ...(filled ? { fill: "currentColor" as const } : {}),
+  };
+});
 </script>
 
 <template>
-  <svg
-    class="app-icon"
-    :width="size"
-    :height="size"
-    :viewBox="icon.viewBox"
-    fill="currentColor"
-    xmlns="http://www.w3.org/2000/svg"
-    aria-hidden="true"
-  >
-    <path v-for="(d, i) in icon.paths" :key="i" :d="d" />
-  </svg>
+  <component :is="icon" :class="iconClass" v-bind="iconProps" aria-hidden="true" />
 </template>
 
 <style scoped>
 .app-icon {
   display: block;
   flex-shrink: 0;
+}
+
+.app-icon--flip {
+  transform: rotate(180deg);
 }
 </style>

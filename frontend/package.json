@@ -6,10 +6,10 @@
   "scripts": {
     "dev": "node ./node_modules/vite/bin/vite.js",
     "build": "vue-tsc -b && node ./node_modules/vite/bin/vite.js build",
-    "preview": "node ./node_modules/vite/bin/vite.js preview",
-    "icons:generate": "node ./scripts/generate-doodle-icons.mjs"
+    "preview": "node ./node_modules/vite/bin/vite.js preview"
   },
   "dependencies": {
+    "@lucide/vue": "^1.17.0",
     "dompurify": "^3.4.0",
     "highlight.js": "^11.11.1",
     "marked": "^18.0.0",
