@@ -239,8 +239,8 @@ async function approvePost() {
 }
 
 async function recallPost() {
-  if (!auth.token || !post.value || working.value || !isAuthor.value || !isPublished.value) return;
-  if (!confirm("отозвать блог?")) return;
+  if (!auth.token || !post.value || working.value || auth.role !== "admin" || !isPublished.value) return;
+  if (!confirm("отозвать пост?")) return;
   working.value = true;
   try {
     await recallBlogPost(post.value.id, auth.token);
@@ -312,6 +312,16 @@ watch(() => route.params.id, load);
       <button v-if="isPublished" class="act" type="button" title="поделиться" @click="sharePost">
         <AppIcon name="send" :size="ACT" />
       </button>
+      <button
+        v-if="auth.role === 'admin' && isPublished"
+        class="act"
+        type="button"
+        title="отозвать"
+        :disabled="working"
+        @click="recallPost"
+      >
+        <AppIcon name="recall" :size="ACT" />
+      </button>
       <RouterLink v-if="myState.can_edit" :to="`/blogs/${post.id}/edit`" class="act" title="редактировать">
         <AppIcon name="edit" :size="ACT" />
       </RouterLink>
@@ -336,7 +346,7 @@ watch(() => route.params.id, load);
       </button>
     </p>
     <p v-else-if="isRecalled" class="pending-note">
-      <span class="muted">отозван · на рассмотрении у администратора</span>
+      <span class="muted">отозван администратором</span>
       <button
         v-if="auth.role === 'admin'"
         type="button"
@@ -346,9 +356,6 @@ watch(() => route.params.id, load);
       >
         одобрить
       </button>
-    </p>
-    <p v-if="isAuthor && isPublished" class="recall-row">
-      <button type="button" class="link-btn" :disabled="working" @click="recallPost">отозвать</button>
     </p>
     <h1>{{ post.title }}</h1>
     <p class="meta muted">
@@ -429,9 +436,6 @@ h1 {
   padding: 0.2rem 0.55rem;
   min-height: 28px;
   font-size: 0.85rem;
-}
-.recall-row {
-  margin-bottom: 0.75rem;
 }
 .cover {
   width: 100%;

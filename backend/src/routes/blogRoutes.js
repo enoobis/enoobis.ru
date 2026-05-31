@@ -478,7 +478,7 @@ router.post("/blog/:id/recall", authRequired, (req, res) => {
     req.params.id,
   );
   if (!row) return res.status(404).json({ error: "not found" });
-  if (row.author_id !== req.user.id) return res.status(403).json({ error: "forbidden" });
+  if (req.user.role !== "admin") return res.status(403).json({ error: "forbidden" });
   if (row.status !== "published") return res.status(400).json({ error: "not published" });
   run(
     "UPDATE blog_posts SET status = 'recalled', updated_at = ? WHERE id = ?",

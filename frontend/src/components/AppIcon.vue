@@ -47,6 +47,7 @@ import {
   Trash2,
   Triangle,
   Trophy,
+  Undo2,
   Upload,
   User,
   UserPlus,
@@ -74,6 +75,7 @@ export type AppIconName =
   | "bookmarked"
   | "report"
   | "send"
+  | "recall"
   | "delete"
   | "edit"
   | "settings"
@@ -130,6 +132,7 @@ const icons: Record<AppIconName, Component> = {
   bookmarked: Bookmark,
   report: Flag,
   send: Send,
+  recall: Undo2,
   delete: Trash2,
   edit: Pencil,
   settings: Settings,
