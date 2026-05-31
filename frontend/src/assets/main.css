@@ -540,9 +540,11 @@ input[type="radio"]:focus-visible {
   padding: 0.4rem 0.6rem;
   border-bottom: 1px solid var(--border);
   margin-bottom: 1.5rem;
-  background: transparent;
+  background: var(--bg);
   border-radius: 0;
-  position: relative;
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
 .nav-route-loading {
   position: absolute;

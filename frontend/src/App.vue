@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
 import { api } from "./api/http";
 import { useAuthStore } from "./stores/auth";
@@ -19,10 +19,10 @@ const isOnline = ref(typeof navigator !== "undefined" ? navigator.onLine : true)
 const profileMenuOpen = ref(false);
 const navDrawerOpen = ref(false);
 const navEl = ref<HTMLElement | null>(null);
-const sheetTopPx = ref(0);
 const sheetMobile = ref(
   typeof window !== "undefined" ? window.innerWidth <= 640 : false,
 );
+const sheetGeom = ref({ top: 0, left: 0, width: 0 });
 const SHEET_MOBILE_MAX = 640;
 const profileAvatarUrl = ref("");
 const profileAvatarBroken = ref(false);
@@ -85,34 +85,53 @@ function isSheetMobile() {
   return typeof window !== "undefined" && window.innerWidth <= SHEET_MOBILE_MAX;
 }
 
+function resolveNavEl() {
+  return navEl.value ?? document.querySelector<HTMLElement>(".nav");
+}
+
 function syncSheetLayout() {
   sheetMobile.value = isSheetMobile();
-  if (sheetMobile.value) {
-    sheetTopPx.value = 0;
-    return;
-  }
-  const nav = navEl.value;
-  if (!nav) {
-    sheetTopPx.value = 0;
-    return;
-  }
-  const { bottom } = nav.getBoundingClientRect();
-  sheetTopPx.value = Math.round(bottom);
+  const nav = resolveNavEl();
+  if (!nav) return;
+  const rect = nav.getBoundingClientRect();
+  sheetGeom.value = {
+    top: Math.round(rect.bottom),
+    left: Math.round(rect.left),
+    width: Math.round(rect.width),
+  };
+}
+
+function onSheetBeforeEnter() {
+  syncSheetLayout();
 }
 
 function onSheetLayoutChange() {
   if (navDrawerOpen.value || profileMenuOpen.value) syncSheetLayout();
 }
 
-function sheetRootStyle() {
+function overlayStyle() {
+  if (sheetMobile.value) return { top: "0" };
+  return { top: `${sheetGeom.value.top}px` };
+}
+
+function desktopSheetStyle() {
   if (sheetMobile.value) return undefined;
-  return { top: `${sheetTopPx.value}px` };
+  return {
+    top: `${sheetGeom.value.top}px`,
+    left: `${sheetGeom.value.left}px`,
+    width: `${sheetGeom.value.width}px`,
+  };
 }
 
 function toggleNavDrawer() {
-  if (!navDrawerOpen.value) profileMenuOpen.value = false;
-  navDrawerOpen.value = !navDrawerOpen.value;
-  if (navDrawerOpen.value) void nextTick(() => syncSheetLayout());
+  if (navDrawerOpen.value) {
+    navDrawerOpen.value = false;
+    return;
+  }
+  profileMenuOpen.value = false;
+  syncSheetLayout();
+  navDrawerOpen.value = true;
+  requestAnimationFrame(syncSheetLayout);
 }
 
 function closeNavDrawer() {
@@ -120,9 +139,14 @@ function closeNavDrawer() {
 }
 
 function toggleProfileMenu() {
-  if (!profileMenuOpen.value) closeNavDrawer();
-  profileMenuOpen.value = !profileMenuOpen.value;
-  if (profileMenuOpen.value) void nextTick(() => syncSheetLayout());
+  if (profileMenuOpen.value) {
+    profileMenuOpen.value = false;
+    return;
+  }
+  closeNavDrawer();
+  syncSheetLayout();
+  profileMenuOpen.value = true;
+  requestAnimationFrame(syncSheetLayout);
 }
 
 function closeProfileMenu() {
@@ -266,6 +290,7 @@ onMounted(async () => {
   window.addEventListener("resize", onSheetLayoutChange);
   window.addEventListener("scroll", onSheetLayoutChange, true);
   await loadMePresentation();
+  syncSheetLayout();
   startActivityTracking();
   void chatStore.refresh();
   startChatPoll();
@@ -299,7 +324,7 @@ watch(
 watch([navDrawerOpen, profileMenuOpen], ([navOpen, profileOpen]) => {
   if (typeof document === "undefined") return;
   document.documentElement.style.overflow = navOpen || profileOpen ? "hidden" : "";
-  if (navOpen || profileOpen) void nextTick(() => syncSheetLayout());
+  if (navOpen || profileOpen) syncSheetLayout();
 });
 
 watch(
@@ -394,17 +419,18 @@ watch(
       </template>
     </header>
     <Teleport to="body">
-      <Transition name="nav-menu">
+      <Transition name="nav-menu" @before-enter="onSheetBeforeEnter">
         <div
           v-if="navDrawerOpen"
           id="nav-drawer"
           class="nav-menu-root"
           :class="{ 'nav-menu-root--mobile': sheetMobile }"
-          :style="sheetRootStyle()"
+          :style="overlayStyle()"
           @click="closeNavDrawer"
         >
           <div
             class="nav-menu-sheet"
+            :style="desktopSheetStyle()"
             role="dialog"
             aria-modal="true"
             aria-label="разделы"
@@ -437,16 +463,17 @@ watch(
       </Transition>
     </Teleport>
     <Teleport to="body">
-      <Transition name="nav-menu">
+      <Transition name="nav-menu" @before-enter="onSheetBeforeEnter">
         <div
           v-if="profileMenuOpen && auth.token"
           class="nav-menu-root"
           :class="{ 'nav-menu-root--mobile': sheetMobile }"
-          :style="sheetRootStyle()"
+          :style="overlayStyle()"
           @click="closeProfileMenu"
         >
           <div
             class="nav-menu-sheet profile-menu-sheet card"
+            :style="desktopSheetStyle()"
             role="dialog"
             aria-modal="true"
             aria-label="профиль"
@@ -574,12 +601,15 @@ watch(
 }
 
 .nav-menu-root:not(.nav-menu-root--mobile) .nav-menu-sheet {
+  position: fixed;
   max-width: none;
+  margin: 0;
   padding-top: 0;
   border-top: none;
   border-left: none;
   border-right: none;
   border-radius: 0 0 var(--radius) var(--radius);
+  z-index: 91;
 }
 
 .nav-menu-root--mobile .nav-menu-sheet {
