@@ -436,6 +436,14 @@ watch(
           >
             <AppIcon name="search" :size="18" />
           </RouterLink>
+          <RouterLink
+            to="/leaderboard"
+            class="icon-btn"
+            aria-label="лидерборд"
+            title="лидерборд"
+          >
+            <AppIcon name="leaderboard" :size="18" />
+          </RouterLink>
           <RouterLink to="/chats" class="icon-btn chat-btn" aria-label="чаты" title="чаты">
             <AppIcon name="chat" :size="18" />
             <span v-if="chatStore.unread > 0" class="chat-badge">{{ chatBadge }}</span>

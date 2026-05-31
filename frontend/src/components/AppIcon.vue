@@ -12,6 +12,7 @@ import {
   Eye,
   FileText,
   Filter,
+  Flame,
   Flag,
   Folder,
   GraduationCap,
@@ -98,6 +99,7 @@ export type AppIconName =
   | "pin"
   | "pinned"
   | "trophy"
+  | "leaderboard"
   | "inventory"
   | "shop"
   | "bold"
@@ -155,6 +157,7 @@ const icons: Record<AppIconName, Component> = {
   pin: Pin,
   pinned: Pin,
   trophy: Trophy,
+  leaderboard: Flame,
   inventory: Package,
   shop: ShoppingBag,
   bold: Bold,

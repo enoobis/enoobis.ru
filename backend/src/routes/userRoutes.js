@@ -597,6 +597,27 @@ function fetchPinnedPost(userId) {
   return null;
 }
 
+router.get("/leaderboard", authRequired, (req, res) => {
+  const limit = Math.min(100, Math.max(1, Number(req.query.limit ?? 50) || 50));
+  const rows = all(
+    `SELECT id, nickname, avatar_url, coins
+     FROM users
+     WHERE status = 'approved'
+     ORDER BY coins DESC, created_at ASC
+     LIMIT ?`,
+    limit,
+  );
+  return res.json(
+    rows.map((r, i) => ({
+      rank: i + 1,
+      id: r.id,
+      nickname: r.nickname,
+      avatar_url: r.avatar_url ?? "",
+      coins: Math.max(0, Math.floor(Number(r.coins ?? 0))),
+    })),
+  );
+});
+
 router.get("/profile/:nickname", (req, res) => {
   const p = get(
     `SELECT id, nickname, role, bio, wallpaper_url, avatar_url, avatar_frame_url, profile_cover_url, theme_preference,
