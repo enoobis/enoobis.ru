@@ -454,6 +454,101 @@ function assignmentsForLecture(lecId: string): Assignment[] {
   return classroom.value.assignments.filter((a) => a.lecture_id === lecId);
 }
 
+function formatCourseDate(iso: string) {
+  return iso.slice(0, 16).replace("T", " ");
+}
+
+function lectureTaskCount(lecId: string) {
+  return assignmentsForLecture(lecId).length;
+}
+
+function lectureOpenTaskCount(lecId: string) {
+  if (isTeacherInCurrent.value) return 0;
+  return assignmentsForLecture(lecId).filter((a) => !assignmentIsHandedIn(a)).length;
+}
+
+const selectedLecture = computed(() => {
+  const id = typeof route.query.lecture === "string" ? route.query.lecture : "";
+  if (!id || !classroom.value) return null;
+  return classroom.value.lectures.find((l) => l.id === id) ?? null;
+});
+
+const selectedAssignment = computed(() => {
+  const id = typeof route.query.assignment === "string" ? route.query.assignment : "";
+  if (!id || !classroom.value) return null;
+  return classroom.value.assignments.find((a) => a.id === id) ?? null;
+});
+
+const expandedTaskId = ref<string | null>(null);
+
+function openLecture(id: string) {
+  expandedTaskId.value = null;
+  editingLecture.value = null;
+  if (tab.value !== "lectures") tab.value = "lectures";
+  router
+    .replace({
+      name: "course-classroom",
+      params: { ...route.params, tab: "lectures" },
+      query: { lecture: id },
+    })
+    .catch(() => undefined);
+}
+
+function closeLecture() {
+  expandedTaskId.value = null;
+  editingLecture.value = null;
+  addTaskForLectureId.value = null;
+  router
+    .replace({
+      name: "course-classroom",
+      params: route.params,
+      query: {},
+    })
+    .catch(() => undefined);
+}
+
+function openAssignmentDetail(id: string) {
+  editingAssignment.value = null;
+  if (tab.value !== "assignments") tab.value = "assignments";
+  router
+    .replace({
+      name: "course-classroom",
+      params: { ...route.params, tab: "assignments" },
+      query: { assignment: id },
+    })
+    .catch(() => undefined);
+}
+
+function closeAssignmentDetail() {
+  editingAssignment.value = null;
+  router
+    .replace({
+      name: "course-classroom",
+      params: route.params,
+      query: {},
+    })
+    .catch(() => undefined);
+}
+
+function toggleTaskExpand(id: string) {
+  expandedTaskId.value = expandedTaskId.value === id ? null : id;
+}
+
+function assignmentStatusLabel(a: Assignment): string {
+  if (isTeacherInCurrent.value) return "";
+  if (!a.my_submission) return "не сдано";
+  if (a.my_submission.status === "graded" && a.my_submission.grade_points !== null) {
+    return `${a.my_submission.grade_points}/${a.max_points}`;
+  }
+  if (assignmentIsHandedIn(a)) return "сдано";
+  return a.my_submission.status;
+}
+
+function lectureTitleForAssignment(a: Assignment): string | null {
+  if (!a.lecture_id || !classroom.value) return null;
+  return classroom.value.lectures.find((l) => l.id === a.lecture_id)?.title ?? null;
+}
+
 watch(
   () => classroom.value?.course.id,
   () => {
@@ -561,6 +656,22 @@ watch(
 watch(tab, async (next) => {
   if (selectedCourseId.value) syncRouteState(selectedCourseId.value, next);
   if (next === "grades") await loadTeacherGradebook();
+  const q = { ...(route.query as Record<string, string | string[]>) };
+  let changed = false;
+  if (next !== "lectures" && q.lecture) {
+    delete q.lecture;
+    expandedTaskId.value = null;
+    changed = true;
+  }
+  if (next !== "assignments" && q.assignment) {
+    delete q.assignment;
+    changed = true;
+  }
+  if (changed) {
+    router
+      .replace({ name: "course-classroom", params: route.params, query: q })
+      .catch(() => undefined);
+  }
 });
 
 async function onCreateCourse() {
@@ -936,6 +1047,8 @@ async function onCreateLecture() {
     lecturePendingFiles.value = [];
     addingLecture.value = false;
     await loadClassroom(classroom.value.course.id);
+    const newest = classroom.value?.lectures[0];
+    if (newest) openLecture(newest.id);
   } catch (e) {
     err.value = e instanceof Error ? e.message : "ошибка";
   }
@@ -1483,240 +1596,256 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
           </button>
         </div>
 
-        <div v-for="lec in classroom.lectures" :key="lec.id" class="lecture-card">
-          <template v-if="editingLecture?.id === lec.id">
-            <input v-model="editingLecture.title" placeholder="название" />
-            <textarea v-model="editingLecture.body_text" rows="4" placeholder="текст" />
-            <input v-model="editingLecture.video_url" placeholder="видео url" />
-            <div class="upload-row">
-              <input
-                type="file"
-                :disabled="lectureEditUploading"
-                @change="onLectureEditFileChange"
-              />
-              <span class="muted small">
-                {{ lectureEditUploading ? "загрузка…" : "вложения" }}
-              </span>
-            </div>
-            <ul v-if="editingLecture.attachments.length" class="files">
-              <li v-for="(f, i) in editingLecture.attachments" :key="f.url + i">
-                <span>{{ f.file_name }}</span>
-                <button
-                  type="button"
-                  class="ghost-x"
-                  @click="removeEditLectureFile(i)"
-                >
-                  ×
-                </button>
-              </li>
-            </ul>
-            <div class="row-actions">
-              <button
-                type="button"
-                :disabled="lectureEditUploading"
-                @click="onSaveLectureEdit"
-              >
-                сохранить
-              </button>
-              <button type="button" class="secondary" @click="cancelEditLecture">
-                отмена
-              </button>
-            </div>
-          </template>
-          <template v-else>
-            <div class="lecture-head">
-              <h3>{{ lec.title }}</h3>
-              <button
-                v-if="isTeacherInCurrent"
-                type="button"
-                class="icon-btn-sm"
-                aria-label="редактировать"
-                title="редактировать"
-                @click="startEditLecture(lec)"
-              >
-                <AppIcon name="edit" :size="14" />
-              </button>
-            </div>
-            <p class="muted small">
-              <RouterLink :to="`/u/${lec.author_nickname}`">{{ lec.author_nickname }}</RouterLink>
-              · {{ lec.created_at.slice(0, 16).replace("T", " ") }}
-            </p>
-            <template v-for="ev in [lectureVideoEmbed(lec.video_url)]" :key="'v-' + lec.id">
-              <div v-if="ev" class="lecture-video">
-                <iframe
-                  v-if="ev.kind === 'iframe'"
-                  :src="ev.src"
-                  title="video"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                  allowfullscreen
+        <template v-if="selectedLecture">
+          <article class="lecture-detail">
+            <button type="button" class="detail-back" @click="closeLecture">← лекции</button>
+
+            <template v-if="editingLecture?.id === selectedLecture.id">
+              <input v-model="editingLecture.title" placeholder="название" />
+              <textarea v-model="editingLecture.body_text" rows="4" placeholder="текст" />
+              <input v-model="editingLecture.video_url" placeholder="видео url" />
+              <div class="upload-row">
+                <input
+                  type="file"
+                  :disabled="lectureEditUploading"
+                  @change="onLectureEditFileChange"
                 />
-                <video v-else-if="ev.kind === 'video'" :src="ev.src" controls />
-                <a
-                  v-else-if="ev.kind === 'link'"
-                  :href="ev.href"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  открыть видео →
-                </a>
+                <span class="muted small">
+                  {{ lectureEditUploading ? "загрузка…" : "вложения" }}
+                </span>
+              </div>
+              <ul v-if="editingLecture.attachments.length" class="files">
+                <li v-for="(f, i) in editingLecture.attachments" :key="f.url + i">
+                  <span>{{ f.file_name }}</span>
+                  <button type="button" class="ghost-x" @click="removeEditLectureFile(i)">×</button>
+                </li>
+              </ul>
+              <div class="row-actions">
+                <button type="button" :disabled="lectureEditUploading" @click="onSaveLectureEdit">
+                  сохранить
+                </button>
+                <button type="button" class="secondary" @click="cancelEditLecture">отмена</button>
               </div>
             </template>
-            <p v-if="lec.body_text" class="lecture-body">{{ lec.body_text }}</p>
-            <ul v-if="lec.attachments.length" class="attach-list">
-              <li v-for="att in lec.attachments" :key="att.id">
-                <a :href="att.url" target="_blank" rel="noopener noreferrer">
-                  {{ att.file_name }}
-                </a>
-              </li>
-            </ul>
 
-            <div v-if="assignmentsForLecture(lec.id).length" class="lecture-tasks">
-              <div
-                v-for="a in assignmentsForLecture(lec.id)"
-                :key="a.id"
-                class="task-row"
+            <template v-else>
+              <div class="lecture-head">
+                <h2>{{ selectedLecture.title }}</h2>
+                <button
+                  v-if="isTeacherInCurrent"
+                  type="button"
+                  class="icon-btn-sm"
+                  aria-label="редактировать"
+                  @click="startEditLecture(selectedLecture)"
+                >
+                  <AppIcon name="edit" :size="14" />
+                </button>
+              </div>
+              <p class="muted small">
+                <RouterLink :to="`/u/${selectedLecture.author_nickname}`">
+                  {{ selectedLecture.author_nickname }}
+                </RouterLink>
+                · {{ formatCourseDate(selectedLecture.created_at) }}
+              </p>
+              <template
+                v-for="ev in [lectureVideoEmbed(selectedLecture.video_url)]"
+                :key="'v-' + selectedLecture.id"
               >
-                <template v-if="editingAssignment?.id === a.id">
-                  <input v-model="editingAssignment.title" placeholder="название" />
-                  <textarea
-                    v-model="editingAssignment.description"
-                    rows="2"
-                    placeholder="описание"
+                <div v-if="ev" class="lecture-video">
+                  <iframe
+                    v-if="ev.kind === 'iframe'"
+                    :src="ev.src"
+                    title="video"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allowfullscreen
                   />
+                  <video v-else-if="ev.kind === 'video'" :src="ev.src" controls />
+                  <a
+                    v-else-if="ev.kind === 'link'"
+                    :href="ev.href"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    открыть видео →
+                  </a>
+                </div>
+              </template>
+              <p v-if="selectedLecture.body_text" class="lecture-body">
+                {{ selectedLecture.body_text }}
+              </p>
+              <ul v-if="selectedLecture.attachments.length" class="attach-list">
+                <li v-for="att in selectedLecture.attachments" :key="att.id">
+                  <a :href="att.url" target="_blank" rel="noopener noreferrer">{{ att.file_name }}</a>
+                </li>
+              </ul>
+
+              <section v-if="assignmentsForLecture(selectedLecture.id).length" class="lecture-tasks">
+                <h3 class="section-label">задания</h3>
+                <ul class="task-list">
+                  <li
+                    v-for="a in assignmentsForLecture(selectedLecture.id)"
+                    :key="a.id"
+                    class="task-list-item"
+                  >
+                    <button
+                      type="button"
+                      class="task-list-row"
+                      :class="{ open: expandedTaskId === a.id }"
+                      @click="toggleTaskExpand(a.id)"
+                    >
+                      <span class="task-list-title">{{ a.title }}</span>
+                      <span class="task-list-meta muted small">
+                        {{ a.max_points }} б
+                        <span v-if="assignmentStatusLabel(a)"> · {{ assignmentStatusLabel(a) }}</span>
+                      </span>
+                    </button>
+                    <div v-if="expandedTaskId === a.id" class="task-row">
+                      <template v-if="editingAssignment?.id === a.id">
+                        <input v-model="editingAssignment.title" placeholder="название" />
+                        <textarea
+                          v-model="editingAssignment.description"
+                          rows="2"
+                          placeholder="описание"
+                        />
+                        <input
+                          v-model.number="editingAssignment.max_points"
+                          type="number"
+                          min="1"
+                          max="1000"
+                          placeholder="баллы"
+                        />
+                        <div class="row-actions">
+                          <button type="button" @click="onSaveAssignmentEdit">сохранить</button>
+                          <button type="button" class="secondary" @click="cancelEditAssignment">
+                            отмена
+                          </button>
+                        </div>
+                      </template>
+                      <template v-else>
+                        <p v-if="a.description" class="muted small">{{ a.description }}</p>
+                        <template v-if="isTeacherInCurrent">
+                          <div class="row-actions">
+                            <button type="button" class="secondary" @click="startEditAssignment(a)">
+                              изменить
+                            </button>
+                            <button type="button" class="secondary" @click="openSubmissions(a.id)">
+                              проверить
+                            </button>
+                          </div>
+                        </template>
+                        <template v-else>
+                          <textarea
+                            v-model="submissionBody[a.id]"
+                            rows="2"
+                            placeholder="ответ — текст или ссылка"
+                          />
+                          <ul v-if="attachmentsFor(a).length" class="files">
+                            <li v-for="(f, i) in attachmentsFor(a)" :key="'kept-' + a.id + '-' + i">
+                              <a :href="f.url" target="_blank" rel="noopener noreferrer">
+                                {{ f.file_name }}
+                              </a>
+                              <button
+                                type="button"
+                                class="ghost-x"
+                                @click="removeSubmissionAttachment(a, i)"
+                              >
+                                ×
+                              </button>
+                            </li>
+                          </ul>
+                          <ul v-if="pendingFor(a).length" class="files">
+                            <li v-for="(f, i) in pendingFor(a)" :key="'p-' + a.id + '-' + i">
+                              <span>
+                                {{ f.name }}
+                                <span class="muted small">{{ formatFileSize(f.size) }}</span>
+                              </span>
+                              <button type="button" class="ghost-x" @click="removePendingFile(a, i)">
+                                ×
+                              </button>
+                            </li>
+                          </ul>
+                          <div class="upload-row">
+                            <label class="attach-label secondary">
+                              <AppIcon name="image" :size="14" />
+                              <span>прикрепить</span>
+                              <input
+                                type="file"
+                                multiple
+                                hidden
+                                @change="onPickSubmissionFiles(a, $event)"
+                              />
+                            </label>
+                            <span class="muted small">до 2 мб · до 10 файлов</span>
+                          </div>
+                          <div class="row-actions">
+                            <button
+                              type="button"
+                              :disabled="submissionUploading[a.id]"
+                              @click="onSubmitAssignment(a)"
+                            >
+                              {{ submissionUploading[a.id] ? "отправка…" : "сдать" }}
+                            </button>
+                            <span v-if="a.my_submission" class="muted small">
+                              {{ a.my_submission.status }}
+                              <span v-if="a.my_submission.grade_points !== null">
+                                · {{ a.my_submission.grade_points }} / {{ a.max_points }}
+                              </span>
+                            </span>
+                          </div>
+                        </template>
+                      </template>
+                    </div>
+                  </li>
+                </ul>
+              </section>
+
+              <div v-if="isTeacherInCurrent" class="lecture-add-task">
+                <template v-if="addTaskForLectureId === selectedLecture.id">
+                  <input v-model="addTaskTitle" placeholder="название задания" />
+                  <textarea v-model="addTaskDesc" rows="2" placeholder="описание" />
                   <input
-                    v-model.number="editingAssignment.max_points"
+                    v-model.number="addTaskMaxPoints"
                     type="number"
                     min="1"
                     max="1000"
                     placeholder="баллы"
                   />
                   <div class="row-actions">
-                    <button type="button" @click="onSaveAssignmentEdit">сохранить</button>
-                    <button type="button" class="secondary" @click="cancelEditAssignment">
-                      отмена
+                    <button type="button" @click="onSaveAddTaskToLecture(selectedLecture.id)">
+                      добавить
                     </button>
+                    <button type="button" class="secondary" @click="cancelAddTask">отмена</button>
                   </div>
                 </template>
-                <template v-else>
-                  <div class="task-row-head">
-                    <strong>{{ a.title }}</strong>
-                    <span class="muted small">{{ a.max_points }} б</span>
-                  </div>
-                  <p v-if="a.description" class="muted small">{{ a.description }}</p>
-                  <template v-if="isTeacherInCurrent">
-                    <div class="row-actions">
-                      <button
-                        type="button"
-                        class="secondary"
-                        @click="startEditAssignment(a)"
-                      >
-                        изменить
-                      </button>
-                      <button
-                        type="button"
-                        class="secondary"
-                        @click="openSubmissions(a.id)"
-                      >
-                        проверить
-                      </button>
-                    </div>
-                  </template>
-                  <template v-else>
-                    <textarea
-                      v-model="submissionBody[a.id]"
-                      rows="2"
-                      placeholder="ответ — текст или ссылка"
-                    />
-                    <ul v-if="attachmentsFor(a).length" class="files">
-                      <li v-for="(f, i) in attachmentsFor(a)" :key="'kept-' + a.id + '-' + i">
-                        <a :href="f.url" target="_blank" rel="noopener noreferrer">
-                          {{ f.file_name }}
-                        </a>
-                        <button
-                          type="button"
-                          class="ghost-x"
-                          @click="removeSubmissionAttachment(a, i)"
-                        >
-                          ×
-                        </button>
-                      </li>
-                    </ul>
-                    <ul v-if="pendingFor(a).length" class="files">
-                      <li v-for="(f, i) in pendingFor(a)" :key="'p-' + a.id + '-' + i">
-                        <span>{{ f.name }} <span class="muted small">{{ formatFileSize(f.size) }}</span></span>
-                        <button
-                          type="button"
-                          class="ghost-x"
-                          @click="removePendingFile(a, i)"
-                        >
-                          ×
-                        </button>
-                      </li>
-                    </ul>
-                    <div class="upload-row">
-                      <label class="attach-label secondary">
-                        <AppIcon name="image" :size="14" />
-                        <span>прикрепить</span>
-                        <input
-                          type="file"
-                          multiple
-                          hidden
-                          @change="onPickSubmissionFiles(a, $event)"
-                        />
-                      </label>
-                      <span class="muted small">до 2 мб · до 10 файлов</span>
-                    </div>
-                    <div class="row-actions">
-                      <button
-                        type="button"
-                        :disabled="submissionUploading[a.id]"
-                        @click="onSubmitAssignment(a)"
-                      >
-                        {{ submissionUploading[a.id] ? "отправка…" : "сдать" }}
-                      </button>
-                      <span v-if="a.my_submission" class="muted small">
-                        статус: {{ a.my_submission.status }}
-                        <span v-if="a.my_submission.grade_points !== null">
-                          · {{ a.my_submission.grade_points }} / {{ a.max_points }}
-                        </span>
-                      </span>
-                    </div>
-                  </template>
-                </template>
+                <button
+                  v-else
+                  type="button"
+                  class="secondary small"
+                  @click="openAddTaskForm(selectedLecture.id)"
+                >
+                  + задание
+                </button>
               </div>
-            </div>
+            </template>
+          </article>
+        </template>
 
-            <div v-if="isTeacherInCurrent" class="lecture-add-task">
-              <template v-if="addTaskForLectureId === lec.id">
-                <input v-model="addTaskTitle" placeholder="название задания" />
-                <textarea v-model="addTaskDesc" rows="2" placeholder="описание" />
-                <input
-                  v-model.number="addTaskMaxPoints"
-                  type="number"
-                  min="1"
-                  max="1000"
-                  placeholder="баллы"
-                />
-                <div class="row-actions">
-                  <button type="button" @click="onSaveAddTaskToLecture(lec.id)">
-                    добавить
-                  </button>
-                  <button type="button" class="secondary" @click="cancelAddTask">
-                    отмена
-                  </button>
-                </div>
-              </template>
-              <button
-                v-else
-                type="button"
-                class="secondary small"
-                @click="openAddTaskForm(lec.id)"
-              >
-                + задание
-              </button>
-            </div>
-          </template>
-        </div>
+        <ul v-else-if="classroom.lectures.length" class="lecture-list">
+          <li v-for="lec in classroom.lectures" :key="lec.id">
+            <button type="button" class="lecture-row" @click="openLecture(lec.id)">
+              <span class="lecture-row-main">
+                <span class="lecture-row-title">{{ lec.title }}</span>
+                <span class="lecture-row-date muted small">{{ formatCourseDate(lec.created_at) }}</span>
+              </span>
+              <span class="lecture-row-side">
+                <span v-if="lectureTaskCount(lec.id)" class="muted small">
+                  {{ lectureTaskCount(lec.id) }} зад.
+                </span>
+                <span v-if="lectureOpenTaskCount(lec.id)" class="row-badge">не сдано</span>
+              </span>
+            </button>
+          </li>
+        </ul>
         <p v-if="!classroom.lectures.length" class="muted center empty">
           {{ isTeacherInCurrent ? "опубликуйте первую лекцию" : "лекций пока нет" }}
         </p>
@@ -1789,93 +1918,148 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
           </button>
         </div>
 
-        <div
-          v-for="a in visibleCourseAssignments"
-          :key="a.id"
-          class="task-card"
-        >
-          <div class="task-card-head">
-            <h3>{{ a.title }}</h3>
-            <span class="muted small">{{ a.max_points }} б</span>
-          </div>
-          <p class="muted small">
-            <RouterLink :to="`/u/${a.author_nickname}`">{{ a.author_nickname }}</RouterLink>
-            <span v-if="a.lecture_id"> · к лекции</span>
-          </p>
-          <p v-if="a.description" class="lecture-body">{{ a.description }}</p>
+        <template v-if="selectedAssignment">
+          <article class="task-detail">
+            <button type="button" class="detail-back" @click="closeAssignmentDetail">← задания</button>
 
-          <template v-if="!isTeacherInCurrent">
-            <textarea
-              v-model="submissionBody[a.id]"
-              rows="2"
-              placeholder="ответ — текст или ссылка"
-            />
-            <ul v-if="attachmentsFor(a).length" class="files">
-              <li v-for="(f, i) in attachmentsFor(a)" :key="'kept-' + a.id + '-' + i">
-                <a :href="f.url" target="_blank" rel="noopener noreferrer">
-                  {{ f.file_name }}
-                </a>
+            <template v-if="editingAssignment?.id === selectedAssignment.id">
+              <input v-model="editingAssignment.title" placeholder="название" />
+              <textarea v-model="editingAssignment.description" rows="3" placeholder="описание" />
+              <input
+                v-model.number="editingAssignment.max_points"
+                type="number"
+                min="1"
+                max="1000"
+                placeholder="баллы"
+              />
+              <div class="row-actions">
+                <button type="button" @click="onSaveAssignmentEdit">сохранить</button>
+                <button type="button" class="secondary" @click="cancelEditAssignment">отмена</button>
+              </div>
+            </template>
+
+            <template v-else>
+              <div class="task-card-head">
+                <h2>{{ selectedAssignment.title }}</h2>
+                <span class="muted small">{{ selectedAssignment.max_points }} б</span>
+              </div>
+              <p class="muted small">
+                <RouterLink :to="`/u/${selectedAssignment.author_nickname}`">
+                  {{ selectedAssignment.author_nickname }}
+                </RouterLink>
                 <button
+                  v-if="selectedAssignment.lecture_id && lectureTitleForAssignment(selectedAssignment)"
                   type="button"
-                  class="ghost-x"
-                  @click="removeSubmissionAttachment(a, i)"
+                  class="linkish muted small"
+                  @click="openLecture(selectedAssignment.lecture_id!)"
                 >
-                  ×
+                  · {{ lectureTitleForAssignment(selectedAssignment) }}
                 </button>
-              </li>
-            </ul>
-            <ul v-if="pendingFor(a).length" class="files">
-              <li v-for="(f, i) in pendingFor(a)" :key="'p-' + a.id + '-' + i">
-                <span>{{ f.name }} <span class="muted small">{{ formatFileSize(f.size) }}</span></span>
-                <button
-                  type="button"
-                  class="ghost-x"
-                  @click="removePendingFile(a, i)"
-                >
-                  ×
-                </button>
-              </li>
-            </ul>
-            <div class="upload-row">
-              <label class="attach-label secondary">
-                <AppIcon name="image" :size="14" />
-                <span>прикрепить</span>
-                <input
-                  type="file"
-                  multiple
-                  hidden
-                  @change="onPickSubmissionFiles(a, $event)"
+              </p>
+              <p v-if="selectedAssignment.description" class="lecture-body">
+                {{ selectedAssignment.description }}
+              </p>
+
+              <template v-if="!isTeacherInCurrent">
+                <textarea
+                  v-model="submissionBody[selectedAssignment.id]"
+                  rows="3"
+                  placeholder="ответ — текст или ссылка"
                 />
-              </label>
-              <span class="muted small">до 2 мб · до 10 файлов</span>
-            </div>
-            <div class="row-actions">
-              <button
-                type="button"
-                :disabled="submissionUploading[a.id]"
-                @click="onSubmitAssignment(a)"
-              >
-                {{ submissionUploading[a.id] ? "отправка…" : "сдать" }}
-              </button>
-              <span v-if="a.my_submission" class="muted small">
-                {{ a.my_submission.status }}
-                <span v-if="a.my_submission.grade_points !== null">
-                  · {{ a.my_submission.grade_points }} / {{ a.max_points }}
-                </span>
-                <span v-if="a.my_submission.teacher_comment">
-                  · {{ a.my_submission.teacher_comment }}
-                </span>
+                <ul v-if="attachmentsFor(selectedAssignment).length" class="files">
+                  <li
+                    v-for="(f, i) in attachmentsFor(selectedAssignment)"
+                    :key="'kept-' + selectedAssignment.id + '-' + i"
+                  >
+                    <a :href="f.url" target="_blank" rel="noopener noreferrer">{{ f.file_name }}</a>
+                    <button
+                      type="button"
+                      class="ghost-x"
+                      @click="removeSubmissionAttachment(selectedAssignment, i)"
+                    >
+                      ×
+                    </button>
+                  </li>
+                </ul>
+                <ul v-if="pendingFor(selectedAssignment).length" class="files">
+                  <li
+                    v-for="(f, i) in pendingFor(selectedAssignment)"
+                    :key="'p-' + selectedAssignment.id + '-' + i"
+                  >
+                    <span>
+                      {{ f.name }}
+                      <span class="muted small">{{ formatFileSize(f.size) }}</span>
+                    </span>
+                    <button
+                      type="button"
+                      class="ghost-x"
+                      @click="removePendingFile(selectedAssignment, i)"
+                    >
+                      ×
+                    </button>
+                  </li>
+                </ul>
+                <div class="upload-row">
+                  <label class="attach-label secondary">
+                    <AppIcon name="image" :size="14" />
+                    <span>прикрепить</span>
+                    <input
+                      type="file"
+                      multiple
+                      hidden
+                      @change="onPickSubmissionFiles(selectedAssignment, $event)"
+                    />
+                  </label>
+                  <span class="muted small">до 2 мб · до 10 файлов</span>
+                </div>
+                <div class="row-actions">
+                  <button
+                    type="button"
+                    :disabled="submissionUploading[selectedAssignment.id]"
+                    @click="onSubmitAssignment(selectedAssignment)"
+                  >
+                    {{ submissionUploading[selectedAssignment.id] ? "отправка…" : "сдать" }}
+                  </button>
+                  <span v-if="selectedAssignment.my_submission" class="muted small">
+                    {{ selectedAssignment.my_submission.status }}
+                    <span v-if="selectedAssignment.my_submission.grade_points !== null">
+                      · {{ selectedAssignment.my_submission.grade_points }} /
+                      {{ selectedAssignment.max_points }}
+                    </span>
+                    <span v-if="selectedAssignment.my_submission.teacher_comment">
+                      · {{ selectedAssignment.my_submission.teacher_comment }}
+                    </span>
+                  </span>
+                </div>
+              </template>
+              <template v-else>
+                <div class="row-actions">
+                  <button type="button" class="secondary" @click="startEditAssignment(selectedAssignment)">
+                    изменить
+                  </button>
+                  <button type="button" class="secondary" @click="openSubmissions(selectedAssignment.id)">
+                    проверить
+                  </button>
+                </div>
+              </template>
+            </template>
+          </article>
+        </template>
+
+        <ul v-else-if="visibleCourseAssignments.length" class="task-list">
+          <li v-for="a in visibleCourseAssignments" :key="a.id">
+            <button type="button" class="task-list-row" @click="openAssignmentDetail(a.id)">
+              <span class="task-list-title">{{ a.title }}</span>
+              <span class="task-list-meta muted small">
+                {{ a.max_points }} б
+                <span v-if="assignmentStatusLabel(a)"> · {{ assignmentStatusLabel(a) }}</span>
+                <span v-if="lectureTitleForAssignment(a)"> · {{ lectureTitleForAssignment(a) }}</span>
               </span>
-            </div>
-          </template>
-          <template v-else>
-            <div class="row-actions">
-              <button type="button" class="secondary" @click="openSubmissions(a.id)">
-                проверить
-              </button>
-            </div>
-          </template>
-         </div>
+            </button>
+          </li>
+        </ul>
+
+
         <p v-if="!classroom.assignments.length" class="muted center empty">
           {{ isTeacherInCurrent ? "создайте первое задание" : "заданий пока нет" }}
         </p>
@@ -2607,6 +2791,131 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
+}
+
+.detail-back {
+  background: transparent;
+  border: none;
+  padding: 0;
+  min-height: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+  cursor: pointer;
+  margin-bottom: 0.65rem;
+}
+.detail-back:hover {
+  color: var(--text);
+  background: transparent;
+}
+
+.lecture-detail,
+.task-detail {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.2rem 0 0.5rem;
+}
+.lecture-detail h2,
+.task-detail h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 500;
+}
+
+.lecture-list,
+.task-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.lecture-row,
+.task-list-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.72rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  min-height: 0;
+  font: inherit;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.lecture-row:hover,
+.task-list-row:hover {
+  background: var(--surface2);
+  border-color: var(--hover-border);
+}
+.task-list-row.open {
+  border-color: var(--focus-border);
+  background: var(--surface2);
+}
+
+.lecture-row-main {
+  display: grid;
+  gap: 0.12rem;
+  min-width: 0;
+}
+.lecture-row-title,
+.task-list-title {
+  font-weight: 500;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lecture-row-side {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-shrink: 0;
+}
+.row-badge {
+  font-size: 0.72rem;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.08rem 0.4rem;
+}
+
+.task-list-meta {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.task-list-item {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.section-label {
+  margin: 0.35rem 0 0;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.linkish {
+  background: transparent;
+  border: none;
+  padding: 0;
+  min-height: 0;
+  cursor: pointer;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.linkish:hover {
+  color: var(--text);
+  background: transparent;
 }
 .lecture-head {
   display: flex;
