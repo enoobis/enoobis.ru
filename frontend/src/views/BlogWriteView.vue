@@ -30,7 +30,6 @@ const loading = ref(false);
 const saving = ref(false);
 const uploading = ref(false);
 const dragOver = ref(false);
-const fullscreen = ref(false);
 const viewMode = ref<ViewMode>("split");
 const autosaveStatus = ref<"" | "saving" | "saved">("");
 const showSettings = ref(false);
@@ -348,10 +347,6 @@ function cycleViewMode() {
   viewMode.value = order[(idx + 1) % order.length];
 }
 
-function toggleFullscreen() {
-  fullscreen.value = !fullscreen.value;
-}
-
 watch(
   [title, body, excerpt, slug, tagsText],
   () => scheduleAutosave(),
@@ -367,7 +362,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="editorRoot" class="editor-shell" :class="{ fullscreen }">
+  <div ref="editorRoot" class="editor-shell">
     <header class="editor-top">
       <div class="editor-top-left">
         <span class="muted small">{{ wordCount }} слов · ~{{ readMinutes }} мин</span>
@@ -401,9 +396,6 @@ onBeforeUnmount(() => {
             превью
           </button>
         </div>
-        <button class="icon-only" type="button" :title="fullscreen ? 'свернуть' : 'весь экран'" @click="toggleFullscreen">
-          <AppIcon :name="fullscreen ? 'close' : 'spark'" :size="16" />
-        </button>
         <button
           class="icon-only"
           type="button"
@@ -529,15 +521,6 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 0.7rem;
-}
-
-.editor-shell.fullscreen {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  background: var(--bg);
-  padding: 1rem;
-  overflow: auto;
 }
 
 .editor-top {

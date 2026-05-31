@@ -19,13 +19,14 @@ const isOnline = ref(typeof navigator !== "undefined" ? navigator.onLine : true)
 const profileMenuOpen = ref(false);
 const navDrawerOpen = ref(false);
 const navEl = ref<HTMLElement | null>(null);
+const navBurgerEl = ref<HTMLElement | null>(null);
 const profileTriggerEl = ref<HTMLElement | null>(null);
 const sheetMobile = ref(
   typeof window !== "undefined" ? window.innerWidth <= 640 : false,
 );
 const sheetGeom = ref({ top: 0, left: 0, width: 0 });
 const SHEET_MOBILE_MAX = 640;
-const PROFILE_SHEET_WIDTH = 268;
+const DESKTOP_SHEET_WIDTH = 268;
 const profileAvatarUrl = ref("");
 const profileAvatarBroken = ref(false);
 const profileCoins = ref(0);
@@ -116,34 +117,45 @@ function overlayStyle() {
   return { top: `${sheetGeom.value.top}px` };
 }
 
-function desktopNavSheetStyle() {
-  if (sheetMobile.value) return undefined;
-  return {
-    top: `${sheetGeom.value.top}px`,
-    left: `${sheetGeom.value.left}px`,
-    width: `${sheetGeom.value.width}px`,
-  };
+function clampSheetLeft(left: number, width: number, nav: HTMLElement | null) {
+  if (!nav) return left;
+  const navRect = nav.getBoundingClientRect();
+  const minLeft = Math.round(navRect.left);
+  const maxLeft = Math.round(navRect.right - width);
+  return Math.max(minLeft, Math.min(left, maxLeft));
 }
 
-function desktopProfileSheetStyle() {
+function desktopTriggerSheetStyle(
+  trigger: HTMLElement | null,
+  align: "left" | "right",
+) {
   if (sheetMobile.value) return undefined;
   const top = sheetGeom.value.top;
-  const width = PROFILE_SHEET_WIDTH;
-  const trigger = profileTriggerEl.value;
+  const width = DESKTOP_SHEET_WIDTH;
   const nav = resolveNavEl();
   if (trigger) {
     const triggerRect = trigger.getBoundingClientRect();
-    let left = Math.round(triggerRect.right - width);
-    if (nav) {
-      const navRect = nav.getBoundingClientRect();
-      const minLeft = Math.round(navRect.left);
-      const maxLeft = Math.round(navRect.right - width);
-      left = Math.max(minLeft, Math.min(left, maxLeft));
-    }
+    const rawLeft =
+      align === "right"
+        ? Math.round(triggerRect.right - width)
+        : Math.round(triggerRect.left);
+    const left = clampSheetLeft(rawLeft, width, nav);
     return { top: `${top}px`, left: `${left}px`, width: `${width}px` };
   }
-  const left = sheetGeom.value.left + sheetGeom.value.width - width;
+  const fallbackLeft =
+    align === "right"
+      ? sheetGeom.value.left + sheetGeom.value.width - width
+      : sheetGeom.value.left;
+  const left = clampSheetLeft(fallbackLeft, width, nav);
   return { top: `${top}px`, left: `${left}px`, width: `${width}px` };
+}
+
+function desktopNavSheetStyle() {
+  return desktopTriggerSheetStyle(navBurgerEl.value, "left");
+}
+
+function desktopProfileSheetStyle() {
+  return desktopTriggerSheetStyle(profileTriggerEl.value, "right");
 }
 
 function toggleNavDrawer() {
@@ -369,6 +381,7 @@ watch(
       <span v-if="routeNavPending" class="nav-route-loading muted" aria-live="polite">загрузка…</span>
       <div v-if="auth.token" class="nav-menu-anchor">
         <button
+          ref="navBurgerEl"
           type="button"
           class="icon-btn nav-burger"
           :aria-expanded="navDrawerOpen"
@@ -624,19 +637,7 @@ watch(
   transform-origin: top center;
 }
 
-.nav-menu-root:not(.nav-menu-root--mobile) .nav-menu-sheet:not(.profile-menu-sheet) {
-  position: fixed;
-  max-width: none;
-  margin: 0;
-  padding-top: 0;
-  border-top: none;
-  border-left: none;
-  border-right: none;
-  border-radius: 0 0 var(--radius) var(--radius);
-  z-index: 91;
-}
-
-.nav-menu-root:not(.nav-menu-root--mobile) .profile-menu-sheet {
+.nav-menu-root:not(.nav-menu-root--mobile) .nav-menu-sheet {
   position: fixed;
   margin: 0;
   padding: 0.4rem;
@@ -645,8 +646,15 @@ watch(
   border-right: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
   border-radius: 0 0 var(--radius) var(--radius);
-  transform-origin: top right;
   z-index: 91;
+}
+
+.nav-menu-root:not(.nav-menu-root--mobile) .nav-menu-sheet:not(.profile-menu-sheet) {
+  transform-origin: top left;
+}
+
+.nav-menu-root:not(.nav-menu-root--mobile) .profile-menu-sheet {
+  transform-origin: top right;
 }
 
 .nav-menu-root--mobile .nav-menu-sheet {
@@ -708,6 +716,14 @@ watch(
   text-decoration: none;
 }
 
+.nav-menu-root:not(.nav-menu-root--mobile) .nav-menu-link {
+  min-height: 44px;
+  padding: 0.55rem 0.6rem;
+  font-size: 1rem;
+  text-align: left;
+  border-radius: 8px;
+}
+
 .nav-menu-enter-active .nav-menu-sheet,
 .nav-menu-leave-active .nav-menu-sheet {
   transition: transform 0.24s ease, opacity 0.18s ease;
@@ -721,6 +737,7 @@ watch(
 .nav-menu-enter-from:not(.nav-menu-root--mobile) .nav-menu-sheet:not(.profile-menu-sheet),
 .nav-menu-leave-to:not(.nav-menu-root--mobile) .nav-menu-sheet:not(.profile-menu-sheet) {
   transform: scaleY(0);
+  transform-origin: top left;
 }
 
 .nav-menu-enter-from:not(.nav-menu-root--mobile) .profile-menu-sheet,
