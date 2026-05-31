@@ -604,9 +604,9 @@ input[type="radio"]:focus-visible {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  min-height: 40px;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
   padding: 0;
   border-radius: 999px;
   background: transparent;
@@ -617,9 +617,9 @@ input[type="radio"]:focus-visible {
 }
 @media (max-width: 640px) {
   .icon-btn {
-    width: 36px;
-    height: 36px;
-    min-height: 36px;
+    width: 40px;
+    height: 40px;
+    min-height: 40px;
   }
 }
 .icon-btn:hover {

@@ -102,7 +102,7 @@ function syncNavMenuSheetPos() {
     return;
   }
   const r = btn.getBoundingClientRect();
-  const panelW = 236;
+  const panelW = 248;
   const gap = 6;
   const margin = 8;
   let left = Math.round(r.left);
@@ -411,13 +411,13 @@ watch(
               </div>
             </div>
             <RouterLink :to="`/u/${auth.nickname}`" class="profile-menu-item" @click="profileMenuOpen = false">
-              <AppIcon name="profile" :size="18" /><span>профиль</span>
+              <AppIcon name="profile" :size="20" /><span>профиль</span>
             </RouterLink>
             <RouterLink to="/inventory" class="profile-menu-item" @click="profileMenuOpen = false">
-              <AppIcon name="inventory" :size="18" /><span>инвентарь</span>
+              <AppIcon name="inventory" :size="20" /><span>инвентарь</span>
             </RouterLink>
             <RouterLink to="/saved" class="profile-menu-item" @click="profileMenuOpen = false">
-              <AppIcon name="bookmark" :size="18" /><span>закладки</span>
+              <AppIcon name="bookmark" :size="20" /><span>закладки</span>
             </RouterLink>
             <RouterLink
               v-if="auth.role === 'teacher' || auth.role === 'admin'"
@@ -425,14 +425,14 @@ watch(
               class="profile-menu-item"
               @click="profileMenuOpen = false"
             >
-              <AppIcon name="invites" :size="18" /><span>инвайты</span>
+              <AppIcon name="invites" :size="20" /><span>инвайты</span>
             </RouterLink>
             <RouterLink to="/me/edit" class="profile-menu-item" @click="profileMenuOpen = false">
-              <AppIcon name="settings" :size="18" /><span>настройки</span>
+              <AppIcon name="settings" :size="20" /><span>настройки</span>
             </RouterLink>
             <span class="profile-menu-sep" />
             <button class="profile-menu-item profile-menu-btn" type="button" @click="logoutFromMenu">
-              <AppIcon name="logout" :size="18" /><span>выход</span>
+              <AppIcon name="logout" :size="20" /><span>выход</span>
             </button>
           </div>
         </div>
@@ -462,20 +462,16 @@ watch(
           >
             <span class="nav-menu-handle" aria-hidden="true" />
             <nav class="nav-menu-inner">
-              <RouterLink to="/blogs" class="nav-menu-link" @click="closeNavDrawer">
-                <AppIcon name="blog" :size="18" /><span>блоги</span>
-              </RouterLink>
-              <RouterLink to="/microblogs" class="nav-menu-link" @click="closeNavDrawer">
-                <AppIcon name="spark" :size="18" /><span>микроблоги</span>
-              </RouterLink>
+              <RouterLink to="/blogs" class="nav-menu-link" @click="closeNavDrawer">блоги</RouterLink>
+              <RouterLink to="/microblogs" class="nav-menu-link" @click="closeNavDrawer">микроблоги</RouterLink>
               <RouterLink v-if="auth.token" to="/courses" class="nav-menu-link" @click="closeNavDrawer">
-                <AppIcon name="courses" :size="18" /><span>курсы</span>
+                курсы
               </RouterLink>
               <RouterLink v-if="auth.token" to="/library" class="nav-menu-link" @click="closeNavDrawer">
-                <AppIcon name="folder" :size="18" /><span>библиотека</span>
+                библиотека
               </RouterLink>
               <RouterLink v-if="auth.token" to="/shop" class="nav-menu-link" @click="closeNavDrawer">
-                <AppIcon name="shop" :size="18" /><span>магазин</span>
+                магазин
               </RouterLink>
               <RouterLink
                 v-if="auth.role === 'admin'"
@@ -483,7 +479,7 @@ watch(
                 class="nav-menu-link"
                 @click="closeNavDrawer"
               >
-                <AppIcon name="admin" :size="18" /><span>админ</span>
+                админ
               </RouterLink>
             </nav>
           </div>
@@ -588,36 +584,29 @@ watch(
 .nav-menu-inner {
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
+  gap: 0.2rem;
 }
 
 .nav-menu-link {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
+  display: block;
   width: 100%;
-  min-height: 40px;
-  padding: 0.5rem 0.65rem;
-  color: var(--muted);
+  min-height: 48px;
+  padding: 0.75rem 0.85rem;
+  color: var(--text);
   text-transform: lowercase;
-  font-size: 0.9rem;
+  font-size: 1rem;
   font-weight: 500;
+  line-height: 1.35;
   border: none;
   border-radius: 8px;
   background: transparent;
   text-align: left;
 }
 
-.nav-menu-link :deep(.app-icon) {
-  flex-shrink: 0;
-  opacity: 0.85;
-}
-
 .nav-menu-root--sheet .nav-menu-link {
-  justify-content: center;
-  min-height: 48px;
-  padding: 0.75rem 0.5rem;
-  font-size: 0.92rem;
+  min-height: 52px;
+  padding: 0.9rem 0.75rem;
+  font-size: 1.05rem;
   border-radius: 0;
   text-align: center;
 }
@@ -628,12 +617,8 @@ watch(
   text-decoration: none;
 }
 
-.nav-menu-link:hover :deep(.app-icon) {
-  opacity: 1;
-}
-
 .nav-menu-root--sheet .nav-menu-link:hover {
-  background: transparent;
+  background: var(--surface2);
   color: var(--text);
 }
 
@@ -697,9 +682,9 @@ watch(
 
 .profile-trigger {
   border-radius: var(--avatar-radius);
-  min-height: 40px;
-  width: 40px;
-  height: 40px;
+  min-height: 44px;
+  width: 44px;
+  height: 44px;
   padding: 0;
   overflow: hidden;
   background: var(--surface);
@@ -710,9 +695,9 @@ watch(
 
 @media (max-width: 640px) {
   .profile-trigger {
-    min-height: 36px;
-    width: 36px;
-    height: 36px;
+    min-height: 40px;
+    width: 40px;
+    height: 40px;
   }
 }
 
@@ -746,13 +731,13 @@ watch(
   position: absolute;
   right: 0;
   top: calc(100% + 0.4rem);
-  width: 236px;
-  padding: 0.4rem;
+  width: 260px;
+  padding: 0.45rem;
   z-index: 40;
 }
 @media (max-width: 640px) {
   .profile-menu {
-    width: min(240px, calc(100vw - 1.2rem));
+    width: min(280px, calc(100vw - 1.2rem));
   }
   .nav-actions {
     gap: 0.2rem;
@@ -792,7 +777,7 @@ watch(
 }
 .profile-menu-name {
   color: var(--text);
-  font-size: 0.88rem;
+  font-size: 1rem;
   font-weight: 500;
   text-transform: lowercase;
 }
@@ -811,18 +796,19 @@ watch(
 .profile-menu-item {
   display: flex;
   align-items: center;
-  gap: 0.65rem;
+  gap: 0.75rem;
   width: 100%;
-  color: var(--muted);
-  padding: 0.55rem 0.7rem;
+  color: var(--text);
+  padding: 0.65rem 0.85rem;
   border-radius: 8px;
   border: none;
   background: transparent;
   text-align: left;
   text-transform: lowercase;
   font: inherit;
-  font-size: 0.9rem;
-  min-height: 40px;
+  font-size: 1rem;
+  line-height: 1.35;
+  min-height: 48px;
   cursor: pointer;
 }
 
