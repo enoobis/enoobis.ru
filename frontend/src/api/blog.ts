@@ -6,7 +6,7 @@ export type BlogListItem = {
   slug: string;
   excerpt: string;
   cover_image_url: string;
-  status: "draft" | "pending" | "published" | "archived";
+  status: "draft" | "pending" | "recalled" | "published" | "archived";
   author_nickname: string;
   created_at: string;
   published_at: string | null;
@@ -25,7 +25,7 @@ export type BlogPost = {
   excerpt: string;
   body: string;
   cover_image_url: string;
-  status: "draft" | "pending" | "published" | "archived";
+  status: "draft" | "pending" | "recalled" | "published" | "archived";
   author_id: string;
   author_nickname: string;
   created_at: string;
@@ -151,7 +151,7 @@ export function createPost(
     excerpt?: string;
     slug?: string;
     cover_image_url?: string;
-    status?: "draft" | "pending" | "published" | "archived";
+    status?: "draft" | "pending" | "recalled" | "published" | "archived";
     tags?: string[];
     categories?: string[];
   },
@@ -168,7 +168,7 @@ export function updatePost(
     excerpt?: string;
     slug?: string;
     cover_image_url?: string;
-    status?: "draft" | "pending" | "published" | "archived";
+    status?: "draft" | "pending" | "recalled" | "published" | "archived";
     tags?: string[];
     categories?: string[];
   },
@@ -186,6 +186,10 @@ export function publishPost(id: string, token: string) {
 
 export function archivePost(id: string, token: string) {
   return api<{ ok: boolean }>(`/api/blog/${id}/archive`, { method: "POST", token });
+}
+
+export function recallBlogPost(id: string, token: string) {
+  return api<{ ok: boolean; status: string }>(`/api/blog/${id}/recall`, { method: "POST", token });
 }
 
 export function deletePost(id: string, token: string) {
@@ -282,7 +286,7 @@ export type PendingBlogPost = {
   slug: string;
   excerpt: string;
   cover_image_url: string;
-  status: "pending";
+  status: "pending" | "recalled";
   author_nickname: string;
   created_at: string;
   published_at: string | null;

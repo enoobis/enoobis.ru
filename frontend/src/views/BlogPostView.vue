@@ -10,6 +10,7 @@ import {
   getMyPostState,
   getPost,
   listComments,
+  recallBlogPost,
   reportComment,
   reportPost,
   votePost,
@@ -110,7 +111,9 @@ function persistProgress() {
 
 const isAuthor = computed(() => !!post.value && auth.user?.id === post.value.author_id);
 const isPending = computed(() => post.value?.status === "pending");
+const isRecalled = computed(() => post.value?.status === "recalled");
 const isPublished = computed(() => post.value?.status === "published");
+const needsReview = computed(() => isPending.value || isRecalled.value);
 
 async function castVote(vote: 1 | -1) {
   if (!auth.token || !post.value || working.value || isAuthor.value) return;
@@ -223,9 +226,24 @@ async function sendCommentReport(commentId: string) {
 
 async function approvePost() {
   if (!auth.token || !post.value || working.value || auth.role !== "admin") return;
+  if (!needsReview.value) return;
   working.value = true;
   try {
     await approveBlogPost(post.value.id, auth.token);
+    await load();
+  } catch (e) {
+    err.value = e instanceof Error ? e.message : "ошибка";
+  } finally {
+    working.value = false;
+  }
+}
+
+async function recallPost() {
+  if (!auth.token || !post.value || working.value || !isAuthor.value || !isPublished.value) return;
+  if (!confirm("отозвать блог?")) return;
+  working.value = true;
+  try {
+    await recallBlogPost(post.value.id, auth.token);
     await load();
   } catch (e) {
     err.value = e instanceof Error ? e.message : "ошибка";
@@ -291,7 +309,7 @@ watch(() => route.params.id, load);
         <span class="act" aria-hidden="true"><AppIcon name="voteDown" :size="ACT" /></span>
       </span>
       <span class="post-actions-gap" aria-hidden="true" />
-      <button class="act" type="button" title="поделиться" @click="sharePost">
+      <button v-if="isPublished" class="act" type="button" title="поделиться" @click="sharePost">
         <AppIcon name="send" :size="ACT" />
       </button>
       <RouterLink v-if="myState.can_edit" :to="`/blogs/${post.id}/edit`" class="act" title="редактировать">
@@ -316,6 +334,21 @@ watch(() => route.params.id, load);
       >
         одобрить
       </button>
+    </p>
+    <p v-else-if="isRecalled" class="pending-note">
+      <span class="muted">отозван · на рассмотрении у администратора</span>
+      <button
+        v-if="auth.role === 'admin'"
+        type="button"
+        class="pending-approve"
+        :disabled="working"
+        @click="approvePost"
+      >
+        одобрить
+      </button>
+    </p>
+    <p v-if="isAuthor && isPublished" class="recall-row">
+      <button type="button" class="link-btn" :disabled="working" @click="recallPost">отозвать</button>
     </p>
     <h1>{{ post.title }}</h1>
     <p class="meta muted">
@@ -396,6 +429,9 @@ h1 {
   padding: 0.2rem 0.55rem;
   min-height: 28px;
   font-size: 0.85rem;
+}
+.recall-row {
+  margin-bottom: 0.75rem;
 }
 .cover {
   width: 100%;

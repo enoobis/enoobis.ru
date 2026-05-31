@@ -618,7 +618,7 @@ router.get("/admin/blog/pending", (_req, res) => {
             u.nickname as author_nickname
      FROM blog_posts bp
      JOIN users u ON u.id = bp.author_id
-     WHERE bp.is_deleted = 0 AND bp.status = 'pending'
+     WHERE bp.is_deleted = 0 AND bp.status IN ('pending', 'recalled')
      ORDER BY bp.updated_at DESC`,
   );
   return res.json(
@@ -643,7 +643,9 @@ router.post("/admin/blog/posts/:id/approve", (req, res) => {
     req.params.id,
   );
   if (!row) return res.status(404).json({ error: "not found" });
-  if (row.status !== "pending") return res.status(400).json({ error: "not pending" });
+  if (row.status !== "pending" && row.status !== "recalled") {
+    return res.status(400).json({ error: "not pending" });
+  }
   finalizeBlogPublish(req.params.id, row.author_id);
   return res.json({ ok: true, status: "published" });
 });

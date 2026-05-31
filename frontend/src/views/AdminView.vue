@@ -882,6 +882,7 @@ async function approveBlog(id: string) {
             <strong>{{ p.title }}</strong>
             <span class="muted small">
               · {{ p.author_nickname }} · {{ (p.updated_at || p.created_at).slice(0, 10) }}
+              · {{ p.status === "recalled" ? "отозван" : "новый" }}
             </span>
           </div>
           <div class="row-actions">

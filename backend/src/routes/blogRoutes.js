@@ -472,6 +472,22 @@ router.post("/blog/:id/archive", authRequired, (req, res) => {
   return res.json({ ok: true });
 });
 
+router.post("/blog/:id/recall", authRequired, (req, res) => {
+  const row = get(
+    "SELECT author_id, status FROM blog_posts WHERE id = ? AND is_deleted = 0",
+    req.params.id,
+  );
+  if (!row) return res.status(404).json({ error: "not found" });
+  if (row.author_id !== req.user.id) return res.status(403).json({ error: "forbidden" });
+  if (row.status !== "published") return res.status(400).json({ error: "not published" });
+  run(
+    "UPDATE blog_posts SET status = 'recalled', updated_at = ? WHERE id = ?",
+    nowIso(),
+    req.params.id,
+  );
+  return res.json({ ok: true, status: "recalled" });
+});
+
 router.delete("/blog/:id", authRequired, (req, res) => {
   const row = get("SELECT author_id FROM blog_posts WHERE id = ?", req.params.id);
   if (!row) return res.status(404).json({ error: "not found" });
