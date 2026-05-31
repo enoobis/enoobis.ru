@@ -137,6 +137,8 @@ const editingAssignment = ref<AssignEditDraft | null>(null);
 
 type AssignmentHandInFilter = "all" | "done" | "undone";
 const assignmentHandInFilter = ref<AssignmentHandInFilter>("all");
+const lectureQuery = ref("");
+const assignmentQuery = ref("");
 
 function assignmentIsHandedIn(a: Assignment): boolean {
   const s = a.my_submission;
@@ -150,6 +152,29 @@ const visibleCourseAssignments = computed(() => {
   if (isTeacherInCurrent.value || assignmentHandInFilter.value === "all") return list;
   if (assignmentHandInFilter.value === "done") return list.filter(assignmentIsHandedIn);
   return list.filter((a) => !assignmentIsHandedIn(a));
+});
+
+const filteredLectures = computed(() => {
+  if (!classroom.value) return [];
+  const q = lectureQuery.value.trim().toLowerCase();
+  if (!q) return classroom.value.lectures;
+  return classroom.value.lectures.filter(
+    (l) => l.title.toLowerCase().includes(q) || l.body_text.toLowerCase().includes(q),
+  );
+});
+
+const filteredListAssignments = computed(() => {
+  const q = assignmentQuery.value.trim().toLowerCase();
+  const list = visibleCourseAssignments.value;
+  if (!q) return list;
+  return list.filter((a) => {
+    const lectureTitle = lectureTitleForAssignment(a)?.toLowerCase() ?? "";
+    return (
+      a.title.toLowerCase().includes(q) ||
+      a.description.toLowerCase().includes(q) ||
+      lectureTitle.includes(q)
+    );
+  });
 });
 
 const addTaskForLectureId = ref<string | null>(null);
@@ -372,6 +397,7 @@ watch(activeAssignmentForGrading, (id) => {
 
 onUnmounted(() => {
   document.removeEventListener("keydown", onGradingEscape);
+  document.removeEventListener("keydown", onDetailEscape);
   document.body.style.overflow = "";
 });
 
@@ -505,6 +531,7 @@ function closeLecture() {
       query: {},
     })
     .catch(() => undefined);
+  scrollCoursePanelTop();
 }
 
 function openAssignmentDetail(id: string) {
@@ -528,6 +555,7 @@ function closeAssignmentDetail() {
       query: {},
     })
     .catch(() => undefined);
+  scrollCoursePanelTop();
 }
 
 function toggleTaskExpand(id: string) {
@@ -549,10 +577,36 @@ function lectureTitleForAssignment(a: Assignment): string | null {
   return classroom.value.lectures.find((l) => l.id === a.lecture_id)?.title ?? null;
 }
 
+function scrollCoursePanelTop() {
+  if (typeof window === "undefined") return;
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function onDetailEscape(e: KeyboardEvent) {
+  if (e.key !== "Escape") return;
+  if (activeAssignmentForGrading.value) return;
+  if (selectedAssignment.value) closeAssignmentDetail();
+  else if (selectedLecture.value) closeLecture();
+}
+
+watch(
+  () => [selectedLecture.value?.id ?? "", selectedAssignment.value?.id ?? ""] as const,
+  ([lecId, asnId]) => {
+    if (lecId || asnId) {
+      document.addEventListener("keydown", onDetailEscape);
+      scrollCoursePanelTop();
+    } else {
+      document.removeEventListener("keydown", onDetailEscape);
+    }
+  },
+);
+
 watch(
   () => classroom.value?.course.id,
   () => {
     assignmentHandInFilter.value = "all";
+    lectureQuery.value = "";
+    assignmentQuery.value = "";
   },
 );
 
@@ -1371,7 +1425,6 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
               </p>
               <footer class="course-card-foot">
                 <span class="muted small">{{ c.teacher_nickname }}</span>
-                <span class="muted small">код {{ c.course_code }}</span>
               </footer>
             </div>
             <div class="course-card-thumb" aria-hidden="true">
@@ -1402,26 +1455,8 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
     <!-- внутри курса -->
     <template v-else>
       <header class="course-head">
-        <button class="back" type="button" @click="closeCourse">← к курсам</button>
-        <div class="course-head-row">
-          <div class="course-head-title">
-            <h2>{{ classroom.course.title }}</h2>
-            <p class="muted small course-head-teacher">{{ classroom.course.teacher_nickname }}</p>
-          </div>
-          <div
-            v-if="classroom.course.icon_url"
-            class="course-card-thumb course-card-thumb--head"
-            aria-hidden="true"
-          >
-            <img :src="classroom.course.icon_url" alt="" class="course-card-thumb-img" />
-          </div>
-          <div
-            v-else
-            class="course-card-thumb course-card-thumb--head"
-            aria-hidden="true"
-          >
-            <span class="course-card-thumb-letter">{{ courseInitial(classroom.course.title) }}</span>
-          </div>
+        <div class="course-head-top">
+          <button class="back" type="button" @click="closeCourse">← к курсам</button>
           <div class="course-head-actions">
             <span
               v-if="classroom.course.is_pinned"
@@ -1485,21 +1520,33 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
             </details>
           </div>
         </div>
-        <p v-if="classroom.course.description" class="muted">
+        <div class="course-head-row">
+          <div
+            class="course-card-thumb course-card-thumb--head"
+            aria-hidden="true"
+          >
+            <img
+              v-if="classroom.course.icon_url"
+              :src="classroom.course.icon_url"
+              alt=""
+              class="course-card-thumb-img"
+            />
+            <span v-else class="course-card-thumb-letter">{{
+              courseInitial(classroom.course.title)
+            }}</span>
+          </div>
+          <div class="course-head-title">
+            <h2>{{ classroom.course.title }}</h2>
+            <p class="course-head-meta muted small">
+              <RouterLink :to="`/u/${classroom.course.teacher_nickname}`">
+                {{ classroom.course.teacher_nickname }}
+              </RouterLink>
+              · {{ classroom.course.course_code }}
+            </p>
+          </div>
+        </div>
+        <p v-if="classroom.course.description" class="course-head-desc muted small">
           {{ classroom.course.description }}
-        </p>
-        <p class="muted small">
-          ведёт
-          <RouterLink :to="`/u/${classroom.course.teacher_nickname}`">
-            {{ classroom.course.teacher_nickname }}
-          </RouterLink>
-          <template v-if="classroom.co_teachers.length">
-            <template v-for="(co, i) in classroom.co_teachers" :key="co.id">
-              <span>{{ i === 0 ? " · соучители " : ", " }}</span>
-              <RouterLink :to="`/u/${co.nickname}`">{{ co.nickname }}</RouterLink>
-            </template>
-          </template>
-          · код <strong>{{ classroom.course.course_code }}</strong>
         </p>
       </header>
 
@@ -1551,8 +1598,16 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 
       <!-- лекции -->
       <template v-if="tab === 'lectures'">
-        <div v-if="isTeacherInCurrent" class="add-bar">
+        <div v-if="!selectedLecture" class="panel-toolbar">
+          <input
+            v-model="lectureQuery"
+            type="search"
+            class="panel-search"
+            placeholder="поиск лекции"
+            autocomplete="off"
+          />
           <button
+            v-if="isTeacherInCurrent"
             type="button"
             class="secondary"
             :class="{ active: addingLecture }"
@@ -1561,7 +1616,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
             {{ addingLecture ? "отмена" : "+ лекция" }}
           </button>
         </div>
-        <div v-if="isTeacherInCurrent && addingLecture" class="form-card">
+        <div v-if="isTeacherInCurrent && addingLecture && !selectedLecture" class="form-card">
           <input v-model="lectureTitle" placeholder="название" />
           <textarea v-model="lectureBody" rows="4" placeholder="текст" />
           <input v-model="lectureVideoUrl" placeholder="ссылка на видео" />
@@ -1597,7 +1652,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
         </div>
 
         <template v-if="selectedLecture">
-          <article class="lecture-detail">
+          <article class="lecture-detail detail-panel">
             <button type="button" class="detail-back" @click="closeLecture">← лекции</button>
 
             <template v-if="editingLecture?.id === selectedLecture.id">
@@ -1693,11 +1748,14 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
                       :class="{ open: expandedTaskId === a.id }"
                       @click="toggleTaskExpand(a.id)"
                     >
-                      <span class="task-list-title">{{ a.title }}</span>
-                      <span class="task-list-meta muted small">
-                        {{ a.max_points }} б
-                        <span v-if="assignmentStatusLabel(a)"> · {{ assignmentStatusLabel(a) }}</span>
+                      <span class="list-row-main">
+                        <span class="list-row-title">{{ a.title }}</span>
+                        <span class="list-row-meta muted small">
+                          {{ a.max_points }} б
+                          <span v-if="assignmentStatusLabel(a)"> · {{ assignmentStatusLabel(a) }}</span>
+                        </span>
                       </span>
+                      <span class="list-row-chevron" aria-hidden="true">›</span>
                     </button>
                     <div v-if="expandedTaskId === a.id" class="task-row">
                       <template v-if="editingAssignment?.id === a.id">
@@ -1830,18 +1888,19 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
           </article>
         </template>
 
-        <ul v-else-if="classroom.lectures.length" class="lecture-list">
-          <li v-for="lec in classroom.lectures" :key="lec.id">
+        <ul v-else-if="filteredLectures.length" class="lecture-list">
+          <li v-for="lec in filteredLectures" :key="lec.id">
             <button type="button" class="lecture-row" @click="openLecture(lec.id)">
-              <span class="lecture-row-main">
-                <span class="lecture-row-title">{{ lec.title }}</span>
-                <span class="lecture-row-date muted small">{{ formatCourseDate(lec.created_at) }}</span>
+              <span class="list-row-main">
+                <span class="list-row-title">{{ lec.title }}</span>
+                <span class="list-row-meta muted small">{{ formatCourseDate(lec.created_at) }}</span>
               </span>
               <span class="lecture-row-side">
                 <span v-if="lectureTaskCount(lec.id)" class="muted small">
                   {{ lectureTaskCount(lec.id) }} зад.
                 </span>
                 <span v-if="lectureOpenTaskCount(lec.id)" class="row-badge">не сдано</span>
+                <span class="list-row-chevron" aria-hidden="true">›</span>
               </span>
             </button>
           </li>
@@ -1849,47 +1908,53 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
         <p v-if="!classroom.lectures.length" class="muted center empty">
           {{ isTeacherInCurrent ? "опубликуйте первую лекцию" : "лекций пока нет" }}
         </p>
+        <p v-else-if="!filteredLectures.length" class="muted center empty">ничего не найдено</p>
       </template>
 
       <!-- задания -->
       <template v-else-if="tab === 'assignments'">
-        <div
-          v-if="isTeacherInCurrent || (!isTeacherInCurrent && classroom.assignments.length)"
-          class="assignments-toolbar"
-        >
-          <div
-            v-if="!isTeacherInCurrent && classroom.assignments.length"
-            class="submission-filter"
-            role="group"
-            aria-label="фильтр сдачи"
-          >
-            <button
-              type="button"
-              class="secondary small"
-              :class="{ active: assignmentHandInFilter === 'all' }"
-              @click="assignmentHandInFilter = 'all'"
+        <div v-if="!selectedAssignment" class="panel-toolbar">
+          <input
+            v-model="assignmentQuery"
+            type="search"
+            class="panel-search"
+            placeholder="поиск задания"
+            autocomplete="off"
+          />
+          <div class="panel-toolbar-actions">
+            <div
+              v-if="!isTeacherInCurrent && classroom.assignments.length"
+              class="submission-filter"
+              role="group"
+              aria-label="фильтр сдачи"
             >
-              все
-            </button>
+              <button
+                type="button"
+                class="secondary small"
+                :class="{ active: assignmentHandInFilter === 'all' }"
+                @click="assignmentHandInFilter = 'all'"
+              >
+                все
+              </button>
+              <button
+                type="button"
+                class="secondary small"
+                :class="{ active: assignmentHandInFilter === 'done' }"
+                @click="assignmentHandInFilter = 'done'"
+              >
+                сдано
+              </button>
+              <button
+                type="button"
+                class="secondary small"
+                :class="{ active: assignmentHandInFilter === 'undone' }"
+                @click="assignmentHandInFilter = 'undone'"
+              >
+                не сдано
+              </button>
+            </div>
             <button
-              type="button"
-              class="secondary small"
-              :class="{ active: assignmentHandInFilter === 'done' }"
-              @click="assignmentHandInFilter = 'done'"
-            >
-              сдано
-            </button>
-            <button
-              type="button"
-              class="secondary small"
-              :class="{ active: assignmentHandInFilter === 'undone' }"
-              @click="assignmentHandInFilter = 'undone'"
-            >
-              не сдано
-            </button>
-          </div>
-          <div v-if="isTeacherInCurrent" class="add-bar">
-            <button
+              v-if="isTeacherInCurrent"
               type="button"
               class="secondary"
               :class="{ active: addingAssignment }"
@@ -1899,7 +1964,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
             </button>
           </div>
         </div>
-        <div v-if="isTeacherInCurrent && addingAssignment" class="form-card">
+        <div v-if="isTeacherInCurrent && addingAssignment && !selectedAssignment" class="form-card">
           <input v-model="assignmentTitle" placeholder="название" />
           <textarea v-model="assignmentDescription" rows="3" placeholder="описание" />
           <input
@@ -1919,7 +1984,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
         </div>
 
         <template v-if="selectedAssignment">
-          <article class="task-detail">
+          <article class="task-detail detail-panel">
             <button type="button" class="detail-back" @click="closeAssignmentDetail">← задания</button>
 
             <template v-if="editingAssignment?.id === selectedAssignment.id">
@@ -2046,14 +2111,19 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
           </article>
         </template>
 
-        <ul v-else-if="visibleCourseAssignments.length" class="task-list">
-          <li v-for="a in visibleCourseAssignments" :key="a.id">
+        <ul v-else-if="filteredListAssignments.length" class="task-list">
+          <li v-for="a in filteredListAssignments" :key="a.id">
             <button type="button" class="task-list-row" @click="openAssignmentDetail(a.id)">
-              <span class="task-list-title">{{ a.title }}</span>
-              <span class="task-list-meta muted small">
-                {{ a.max_points }} б
-                <span v-if="assignmentStatusLabel(a)"> · {{ assignmentStatusLabel(a) }}</span>
-                <span v-if="lectureTitleForAssignment(a)"> · {{ lectureTitleForAssignment(a) }}</span>
+              <span class="list-row-main">
+                <span class="list-row-title">{{ a.title }}</span>
+                <span class="list-row-meta muted small">
+                  {{ a.max_points }} б
+                  <span v-if="lectureTitleForAssignment(a)"> · {{ lectureTitleForAssignment(a) }}</span>
+                </span>
+              </span>
+              <span class="lecture-row-side">
+                <span v-if="assignmentStatusLabel(a)" class="row-badge">{{ assignmentStatusLabel(a) }}</span>
+                <span class="list-row-chevron" aria-hidden="true">›</span>
               </span>
             </button>
           </li>
@@ -2069,6 +2139,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
         >
           нет заданий по фильтру
         </p>
+        <p v-else-if="!filteredListAssignments.length" class="muted center empty">ничего не найдено</p>
       </template>
 
       <!-- лента -->
@@ -2422,8 +2493,153 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   }
 }
 .course-tabs {
-  margin: 0.75rem 0;
+  margin: 0.65rem 0 0.85rem;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.course-tabs::-webkit-scrollbar {
+  display: none;
+}
+.course-tabs .filter-tab {
+  flex-shrink: 0;
+}
+
+.panel-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
+}
+.panel-search {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.92rem;
+}
+.panel-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
   flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.panel-toolbar .secondary.active {
+  background: var(--surface2);
+  color: var(--text);
+}
+@media (max-width: 560px) {
+  .panel-toolbar {
+    flex-wrap: wrap;
+  }
+  .panel-search {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+  .panel-toolbar-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  .submission-filter {
+    flex: 1;
+  }
+  .submission-filter button {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 760px) {
+  .course-tabs.filter-tabs {
+    display: flex;
+    width: 100%;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+  .course-tabs .filter-tab {
+    flex: 0 0 auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .courses {
+    gap: 0.75rem;
+  }
+  .lecture-row,
+  .task-list-row {
+    min-height: 44px;
+    padding: 0.72rem 0.7rem;
+  }
+  .lecture-row-side .muted.small {
+    display: none;
+  }
+  .detail-panel {
+    padding: 0.75rem;
+  }
+  .course-head h2 {
+    font-size: 1.05rem;
+    line-height: 1.3;
+  }
+  .course-card-thumb--head {
+    width: 48px;
+    height: 48px;
+  }
+  .course-card-thumb--head .course-card-thumb-letter {
+    font-size: 1.1rem;
+  }
+  .grid-2 {
+    grid-template-columns: 1fr;
+  }
+  .grade-modal {
+    width: 100%;
+    max-height: min(94vh, 44rem);
+  }
+}
+
+@media (min-width: 720px) {
+  .lecture-detail.detail-panel,
+  .task-detail.detail-panel {
+    padding: 1rem 1.05rem;
+  }
+  .lecture-list,
+  .task-list {
+    gap: 0.35rem;
+  }
+}
+
+.detail-panel {
+  padding: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.list-row-main {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+  flex: 1;
+}
+.list-row-title {
+  font-weight: 500;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.list-row-meta {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.list-row-chevron {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  margin-left: 0.25rem;
 }
 
 .form-card {
@@ -2645,20 +2861,30 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 
 .course-head {
   display: grid;
-  gap: 0.3rem;
+  gap: 0.55rem;
+  margin-bottom: 0.25rem;
+}
+.course-head-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
 }
 .course-head-row {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.65rem;
+  align-items: center;
+  gap: 0.75rem;
 }
 .course-head-title {
   flex: 1;
   min-width: 0;
 }
-.course-head-teacher {
-  margin: 0.2rem 0 0;
+.course-head-meta {
+  margin: 0.15rem 0 0;
+}
+.course-head-desc {
+  margin: 0;
+  line-height: 1.45;
 }
 .course-head-actions {
   display: flex;
@@ -2668,10 +2894,12 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 }
 .course-head h2 {
   margin: 0;
-  font-size: 1.3rem;
+  font-size: 1.2rem;
+  font-weight: 500;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 .back {
-  align-self: flex-start;
   background: transparent;
   border: none;
   color: var(--muted);
@@ -2682,6 +2910,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 }
 .back:hover {
   color: var(--text);
+  background: transparent;
 }
 
 .tab-count {
@@ -2811,14 +3040,19 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 .lecture-detail,
 .task-detail {
   display: grid;
-  gap: 0.55rem;
-  padding: 0.2rem 0 0.5rem;
+  gap: 0.65rem;
+}
+.lecture-detail.detail-panel,
+.task-detail.detail-panel {
+  padding: 0.85rem;
 }
 .lecture-detail h2,
 .task-detail h2 {
   margin: 0;
-  font-size: 1.15rem;
+  font-size: 1.1rem;
   font-weight: 500;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
 }
 
 .lecture-list,
@@ -2827,7 +3061,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 0.35rem;
+  gap: 0.3rem;
 }
 
 .lecture-row,
@@ -2836,16 +3070,18 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.72rem 0.85rem;
+  gap: 0.65rem;
+  padding: 0.68rem 0.8rem;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
   color: var(--text);
   text-align: left;
   cursor: pointer;
-  min-height: 0;
+  min-height: 44px;
   font: inherit;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
   transition: background 0.15s ease, border-color 0.15s ease;
 }
 .lecture-row:hover,
@@ -2856,6 +3092,13 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 .task-list-row.open {
   border-color: var(--focus-border);
   background: var(--surface2);
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.task-list-item .task-row {
+  border-top: none;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
 }
 
 .lecture-row-main {
@@ -2883,6 +3126,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 0.08rem 0.4rem;
+  white-space: nowrap;
 }
 
 .task-list-meta {
@@ -2897,7 +3141,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 }
 
 .section-label {
-  margin: 0.35rem 0 0;
+  margin: 0.75rem 0 0.35rem;
   font-size: 0.82rem;
   font-weight: 500;
   color: var(--muted);
@@ -2919,9 +3163,13 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 }
 .lecture-head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 0.5rem;
+}
+.lecture-head h2,
+.lecture-head h3 {
+  overflow-wrap: anywhere;
 }
 .lecture-head h3 {
   margin: 0;
@@ -2951,6 +3199,11 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   color: #ff8b8b;
 }
 
+.lecture-video {
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+}
 .lecture-video iframe {
   width: 100%;
   max-width: 100%;
@@ -2975,10 +3228,22 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   padding: 0;
   list-style: none;
   display: grid;
-  gap: 0.25rem;
+  gap: 0.3rem;
 }
 .attach-list a {
+  display: block;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   font-size: 0.88rem;
+  background: var(--surface2);
+}
+.attach-list a:hover {
+  border-color: var(--hover-border);
+}
+
+.empty {
+  padding: 1.5rem 0;
 }
 
 .lecture-tasks {
@@ -3030,7 +3295,8 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   display: flex;
   justify-content: space-between;
   gap: 0.5rem;
-  align-items: baseline;
+  align-items: flex-start;
+  flex-wrap: wrap;
 }
 .task-card-head h3 {
   margin: 0;
