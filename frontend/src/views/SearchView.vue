@@ -76,7 +76,6 @@ onUnmounted(() => {
         @input="onInput"
         @keydown.enter.prevent="run"
       />
-      <kbd class="hint">esc</kbd>
     </div>
 
     <p v-if="err" class="error">{{ err }}</p>
@@ -163,16 +162,6 @@ onUnmounted(() => {
 }
 .bar input:focus {
   outline: none;
-}
-.hint {
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 0.05rem 0.35rem;
-  font-size: 0.7rem;
-  color: var(--muted);
-  background: var(--surface);
-  font-family: var(--mono, inherit);
-  text-transform: lowercase;
 }
 
 .block {

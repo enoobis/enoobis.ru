@@ -557,6 +557,7 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_chat_messages_thread ON chat_messages(thread_id, created_at);
   CREATE INDEX IF NOT EXISTS idx_chat_messages_unread ON chat_messages(thread_id, read_at);
+  CREATE INDEX IF NOT EXISTS idx_chat_messages_created ON chat_messages(created_at);
 
   CREATE TABLE IF NOT EXISTS chat_thread_hidden (
     user_id TEXT NOT NULL,
@@ -856,6 +857,12 @@ try {
 
 try {
   db.exec("DROP TABLE IF EXISTS call_sessions");
+} catch {
+  // ignore
+}
+
+try {
+  db.exec("CREATE INDEX IF NOT EXISTS idx_chat_messages_created ON chat_messages(created_at)");
 } catch {
   // ignore
 }

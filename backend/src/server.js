@@ -7,6 +7,7 @@ import { all, db, get, nowIso, run } from "./db.js";
 import { hashPassword } from "./auth.js";
 import { v4 as uuidv4 } from "uuid";
 import { saveIdenticon } from "./utils/identicon.js";
+import { scheduleChatRetention } from "./utils/chatRetention.js";
 import authRoutes from "./routes/authRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import blogRoutes from "./routes/blogRoutes.js";
@@ -119,6 +120,11 @@ server.listen(port, async () => {
     purgeLegacyUnlimitedInvites();
   } catch (e) {
     console.warn("purge invites warn:", e?.message ?? e);
+  }
+  try {
+    scheduleChatRetention();
+  } catch (e) {
+    console.warn("chat retention warn:", e?.message ?? e);
   }
   console.log(`JS backend listening on http://localhost:${port}`);
 });
