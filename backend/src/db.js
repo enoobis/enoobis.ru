@@ -1,6 +1,7 @@
 import Database from "better-sqlite3";
 import { ensureShopCategoryTables } from "./utils/shopCategories.js";
 import { backfillAllUsersFollowAdmins } from "./utils/adminFollow.js";
+import { enforceAllTeachersStorageQuota } from "./utils/teacherStorageQuota.js";
 
 const dbPath = process.env.DATABASE_FILE ?? "./edu.db";
 export const db = new Database(dbPath);
@@ -870,6 +871,12 @@ try {
 
 try {
   backfillAllUsersFollowAdmins();
+} catch {
+  // ignore
+}
+
+try {
+  enforceAllTeachersStorageQuota();
 } catch {
   // ignore
 }

@@ -5,13 +5,13 @@ import fs from "node:fs";
 import { v4 as uuidv4 } from "uuid";
 import { all, get, nowIso, run } from "../db.js";
 import { authRequired } from "../auth.js";
+import { TEACHER_QUOTA_BYTES, enforceTeacherStorageQuota } from "../utils/teacherStorageQuota.js";
 
 const router = express.Router();
 
 const FILES_ROOT = path.resolve(process.env.PRIVATE_FILES_DIR ?? "./data/private-files");
 fs.mkdirSync(FILES_ROOT, { recursive: true });
 
-const TEACHER_QUOTA_BYTES = 30 * 1024 * 1024;
 const ADMIN_QUOTA_BYTES = 3 * 1024 * 1024 * 1024;
 
 function quotaBytesForRole(role) {
@@ -42,6 +42,9 @@ function totalUsed(userId) {
 }
 
 router.get("/files", authRequired, staffOnly, (req, res) => {
+  if (req.user.role === "teacher") {
+    enforceTeacherStorageQuota(req.user.id);
+  }
   const items = all(
     `SELECT id, original_name, mime_type, size_bytes, created_at
      FROM user_files WHERE owner_id = ? ORDER BY created_at DESC`,
