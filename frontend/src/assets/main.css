@@ -546,6 +546,13 @@ input[type="radio"]:focus-visible {
   top: 0;
   z-index: 100;
 }
+
+.nav.nav--sheet-open {
+  border-bottom: none;
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  margin-bottom: 0;
+}
 .nav-route-loading {
   position: absolute;
   left: 50%;
