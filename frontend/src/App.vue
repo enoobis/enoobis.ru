@@ -6,6 +6,7 @@ import { useAuthStore } from "./stores/auth";
 import { useChatStore } from "./stores/chat";
 import AppIcon from "./components/AppIcon.vue";
 import AppToast from "./components/AppToast.vue";
+import SearchPanel from "./components/SearchPanel.vue";
 import { rememberViewerPreferences } from "./utils/preferences";
 import { routeNavPending } from "./sync/routeNavPending";
 
@@ -18,18 +19,20 @@ const chatStore = useChatStore();
 const isOnline = ref(typeof navigator !== "undefined" ? navigator.onLine : true);
 const profileMenuOpen = ref(false);
 const navDrawerOpen = ref(false);
+const searchOpen = ref(false);
 const navEl = ref<HTMLElement | null>(null);
-const navBurgerEl = ref<HTMLElement | null>(null);
 const profileTriggerEl = ref<HTMLElement | null>(null);
 const sheetMobile = ref(
   typeof window !== "undefined" ? window.innerWidth <= 640 : false,
 );
 const sheetGeom = ref({ top: 0, left: 0, width: 0 });
 const SHEET_MOBILE_MAX = 640;
-const DESKTOP_SHEET_WIDTH = 240;
 const profileAvatarUrl = ref("");
 const profileAvatarBroken = ref(false);
 const profileCoins = ref(0);
+const headerSheetOpen = computed(
+  () => navDrawerOpen.value || profileMenuOpen.value || searchOpen.value,
+);
 const initials = computed(() => (auth.nickname || "U").slice(0, 2).toUpperCase());
 const chatBadge = computed(() => (chatStore.unread > 9 ? "9+" : String(chatStore.unread)));
 let activityTickStart = Date.now();
@@ -44,6 +47,7 @@ function onDocumentClick(event: MouseEvent) {
   const target = event.target as HTMLElement | null;
   if (target?.closest?.(".nav-burger")) return;
   if (target?.closest?.(".profile-trigger")) return;
+  if (target?.closest?.(".nav-search-trigger")) return;
   if (profileMenuOpen.value) {
     if (target?.closest?.(".profile-menu-sheet")) return;
     profileMenuOpen.value = false;
@@ -52,13 +56,17 @@ function onDocumentClick(event: MouseEvent) {
     if (target?.closest?.(".nav-menu-sheet")) return;
     navDrawerOpen.value = false;
   }
+  if (searchOpen.value) {
+    if (target?.closest?.(".search-menu-sheet")) return;
+    searchOpen.value = false;
+  }
 }
 
 function onEscape(event: KeyboardEvent) {
-  if (event.key === "Escape") {
-    profileMenuOpen.value = false;
-    navDrawerOpen.value = false;
-  }
+  if (event.key !== "Escape") return;
+  if (searchOpen.value) return;
+  profileMenuOpen.value = false;
+  navDrawerOpen.value = false;
 }
 
 function isTypingTarget(t: EventTarget | null) {
@@ -71,12 +79,20 @@ function isTypingTarget(t: EventTarget | null) {
 function onGlobalKey(event: KeyboardEvent) {
   if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
     event.preventDefault();
-    router.push("/search");
+    if (isSheetMobile()) {
+      router.push("/search");
+    } else {
+      toggleSearch();
+    }
     return;
   }
   if (event.key === "/" && !isTypingTarget(event.target)) {
     event.preventDefault();
-    router.push("/search");
+    if (isSheetMobile()) {
+      router.push("/search");
+    } else {
+      toggleSearch();
+    }
   }
 }
 
@@ -109,53 +125,37 @@ function onSheetBeforeEnter() {
 }
 
 function onSheetLayoutChange() {
-  if (navDrawerOpen.value || profileMenuOpen.value) syncSheetLayout();
+  if (headerSheetOpen.value) syncSheetLayout();
+}
+
+function desktopSheetStyle() {
+  if (sheetMobile.value) return undefined;
+  return {
+    top: `${sheetGeom.value.top}px`,
+    left: `${sheetGeom.value.left}px`,
+    width: `${sheetGeom.value.width}px`,
+  };
+}
+
+function closeSearch() {
+  searchOpen.value = false;
+}
+
+function toggleSearch() {
+  if (searchOpen.value) {
+    searchOpen.value = false;
+    return;
+  }
+  closeNavDrawer();
+  closeProfileMenu();
+  syncSheetLayout();
+  searchOpen.value = true;
+  requestAnimationFrame(syncSheetLayout);
 }
 
 function overlayStyle() {
   if (sheetMobile.value) return { top: "0" };
   return { top: `${sheetGeom.value.top}px` };
-}
-
-function clampSheetLeft(left: number, width: number, nav: HTMLElement | null) {
-  if (!nav) return left;
-  const navRect = nav.getBoundingClientRect();
-  const minLeft = Math.round(navRect.left);
-  const maxLeft = Math.round(navRect.right - width);
-  return Math.max(minLeft, Math.min(left, maxLeft));
-}
-
-function desktopTriggerSheetStyle(
-  trigger: HTMLElement | null,
-  align: "left" | "right",
-) {
-  if (sheetMobile.value) return undefined;
-  const top = sheetGeom.value.top;
-  const width = DESKTOP_SHEET_WIDTH;
-  const nav = resolveNavEl();
-  if (trigger) {
-    const triggerRect = trigger.getBoundingClientRect();
-    const rawLeft =
-      align === "right"
-        ? Math.round(triggerRect.right - width)
-        : Math.round(triggerRect.left);
-    const left = clampSheetLeft(rawLeft, width, nav);
-    return { top: `${top}px`, left: `${left}px`, width: `${width}px` };
-  }
-  const fallbackLeft =
-    align === "right"
-      ? sheetGeom.value.left + sheetGeom.value.width - width
-      : sheetGeom.value.left;
-  const left = clampSheetLeft(fallbackLeft, width, nav);
-  return { top: `${top}px`, left: `${left}px`, width: `${width}px` };
-}
-
-function desktopNavSheetStyle() {
-  return desktopTriggerSheetStyle(navBurgerEl.value, "left");
-}
-
-function desktopProfileSheetStyle() {
-  return desktopTriggerSheetStyle(profileTriggerEl.value, "right");
 }
 
 function toggleNavDrawer() {
@@ -164,6 +164,7 @@ function toggleNavDrawer() {
     return;
   }
   profileMenuOpen.value = false;
+  searchOpen.value = false;
   syncSheetLayout();
   navDrawerOpen.value = true;
   requestAnimationFrame(syncSheetLayout);
@@ -179,6 +180,7 @@ function toggleProfileMenu() {
     return;
   }
   closeNavDrawer();
+  closeSearch();
   syncSheetLayout();
   profileMenuOpen.value = true;
   requestAnimationFrame(syncSheetLayout);
@@ -353,13 +355,14 @@ watch(
   () => {
     closeNavDrawer();
     closeProfileMenu();
+    closeSearch();
   },
 );
 
-watch([navDrawerOpen, profileMenuOpen], ([navOpen, profileOpen]) => {
+watch(headerSheetOpen, (open) => {
   if (typeof document === "undefined") return;
-  document.documentElement.style.overflow = navOpen || profileOpen ? "hidden" : "";
-  if (navOpen || profileOpen) syncSheetLayout();
+  document.documentElement.style.overflow = open ? "hidden" : "";
+  if (open) syncSheetLayout();
 });
 
 watch(
@@ -377,11 +380,10 @@ watch(
 
 <template>
   <div class="layout">
-    <header ref="navEl" class="nav">
+    <header ref="navEl" class="nav" :class="{ 'nav--sheet-open': headerSheetOpen && !sheetMobile }">
       <span v-if="routeNavPending" class="nav-route-loading muted" aria-live="polite">загрузка…</span>
       <div v-if="auth.token" class="nav-menu-anchor">
         <button
-          ref="navBurgerEl"
           type="button"
           class="icon-btn nav-burger"
           :aria-expanded="navDrawerOpen"
@@ -402,7 +404,24 @@ watch(
       <span class="nav-spacer" />
       <template v-if="auth.token">
         <div class="nav-actions">
-          <RouterLink to="/search" class="icon-btn" aria-label="поиск" title="поиск">
+          <button
+            v-if="!sheetMobile"
+            type="button"
+            class="icon-btn nav-search-trigger"
+            aria-label="поиск"
+            title="поиск"
+            :aria-expanded="searchOpen"
+            @click.stop="toggleSearch"
+          >
+            <AppIcon name="search" :size="18" />
+          </button>
+          <RouterLink
+            v-else
+            to="/search"
+            class="icon-btn nav-search-trigger"
+            aria-label="поиск"
+            title="поиск"
+          >
             <AppIcon name="search" :size="18" />
           </RouterLink>
           <RouterLink to="/chats" class="icon-btn chat-btn" aria-label="чаты" title="чаты">
@@ -467,7 +486,7 @@ watch(
         >
           <div
             class="nav-menu-sheet"
-            :style="desktopNavSheetStyle()"
+            :style="desktopSheetStyle()"
             role="dialog"
             aria-modal="true"
             aria-label="разделы"
@@ -510,7 +529,7 @@ watch(
         >
           <div
             class="nav-menu-sheet profile-menu-sheet card"
-            :style="desktopProfileSheetStyle()"
+            :style="desktopSheetStyle()"
             role="dialog"
             aria-modal="true"
             aria-label="профиль"
@@ -557,6 +576,27 @@ watch(
             <button class="profile-menu-item profile-menu-btn" type="button" @click="logoutFromMenu">
               <AppIcon name="logout" :size="20" /><span>выход</span>
             </button>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+    <Teleport to="body">
+      <Transition name="nav-menu" @before-enter="onSheetBeforeEnter">
+        <div
+          v-if="searchOpen && auth.token && !sheetMobile"
+          class="nav-menu-root"
+          :style="overlayStyle()"
+          @click="closeSearch"
+        >
+          <div
+            class="nav-menu-sheet search-menu-sheet"
+            :style="desktopSheetStyle()"
+            role="dialog"
+            aria-modal="true"
+            aria-label="поиск"
+            @click.stop
+          >
+            <SearchPanel embedded autofocus @close="closeSearch" />
           </div>
         </div>
       </Transition>
@@ -640,20 +680,23 @@ watch(
 .nav-menu-root:not(.nav-menu-root--mobile) .nav-menu-sheet {
   position: fixed;
   margin: 0;
-  padding: 0.35rem;
-  border: 1px solid var(--border);
+  padding: 0.5rem 0.6rem 0.75rem;
+  border-top: none;
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
   border-radius: 0 0 var(--radius) var(--radius);
   background: var(--bg);
+  transform-origin: top center;
   z-index: 91;
 }
 
-.nav-menu-root:not(.nav-menu-root--mobile) .nav-menu-sheet:not(.profile-menu-sheet) {
-  transform-origin: top left;
+.nav-menu-root:not(.nav-menu-root--mobile) .search-menu-sheet {
+  max-height: min(75vh, 36rem);
 }
 
 .nav-menu-root:not(.nav-menu-root--mobile) .profile-menu-sheet {
-  transform-origin: top right;
-  padding: 0.35rem 0.35rem 0.5rem;
+  padding: 0.35rem 0.6rem 0.65rem;
 }
 
 .nav-menu-root--mobile .nav-menu-sheet {
@@ -733,16 +776,9 @@ watch(
   transition: background 0.2s ease;
 }
 
-.nav-menu-enter-from:not(.nav-menu-root--mobile) .nav-menu-sheet:not(.profile-menu-sheet),
-.nav-menu-leave-to:not(.nav-menu-root--mobile) .nav-menu-sheet:not(.profile-menu-sheet) {
+.nav-menu-enter-from:not(.nav-menu-root--mobile) .nav-menu-sheet,
+.nav-menu-leave-to:not(.nav-menu-root--mobile) .nav-menu-sheet {
   transform: scaleY(0);
-  transform-origin: top left;
-}
-
-.nav-menu-enter-from:not(.nav-menu-root--mobile) .profile-menu-sheet,
-.nav-menu-leave-to:not(.nav-menu-root--mobile) .profile-menu-sheet {
-  transform: scaleY(0);
-  transform-origin: top right;
 }
 
 .nav-menu-root--mobile.nav-menu-enter-from .nav-menu-sheet,
