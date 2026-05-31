@@ -19,12 +19,14 @@ const isOnline = ref(typeof navigator !== "undefined" ? navigator.onLine : true)
 const profileMenuOpen = ref(false);
 const navDrawerOpen = ref(false);
 const navEl = ref<HTMLElement | null>(null);
+const navBurgerEl = ref<HTMLElement | null>(null);
 const profileTriggerEl = ref<HTMLElement | null>(null);
 const sheetMobile = ref(
   typeof window !== "undefined" ? window.innerWidth <= 640 : false,
 );
 const sheetGeom = ref({ top: 0, left: 0, width: 0 });
 const SHEET_MOBILE_MAX = 640;
+const DESKTOP_SHEET_WIDTH = 240;
 const profileAvatarUrl = ref("");
 const profileAvatarBroken = ref(false);
 const profileCoins = ref(0);
@@ -115,13 +117,45 @@ function overlayStyle() {
   return { top: `${sheetGeom.value.top}px` };
 }
 
-function desktopSheetStyle() {
+function clampSheetLeft(left: number, width: number, nav: HTMLElement | null) {
+  if (!nav) return left;
+  const navRect = nav.getBoundingClientRect();
+  const minLeft = Math.round(navRect.left);
+  const maxLeft = Math.round(navRect.right - width);
+  return Math.max(minLeft, Math.min(left, maxLeft));
+}
+
+function desktopTriggerSheetStyle(
+  trigger: HTMLElement | null,
+  align: "left" | "right",
+) {
   if (sheetMobile.value) return undefined;
-  return {
-    top: `${sheetGeom.value.top}px`,
-    left: `${sheetGeom.value.left}px`,
-    width: `${sheetGeom.value.width}px`,
-  };
+  const top = sheetGeom.value.top;
+  const width = DESKTOP_SHEET_WIDTH;
+  const nav = resolveNavEl();
+  if (trigger) {
+    const triggerRect = trigger.getBoundingClientRect();
+    const rawLeft =
+      align === "right"
+        ? Math.round(triggerRect.right - width)
+        : Math.round(triggerRect.left);
+    const left = clampSheetLeft(rawLeft, width, nav);
+    return { top: `${top}px`, left: `${left}px`, width: `${width}px` };
+  }
+  const fallbackLeft =
+    align === "right"
+      ? sheetGeom.value.left + sheetGeom.value.width - width
+      : sheetGeom.value.left;
+  const left = clampSheetLeft(fallbackLeft, width, nav);
+  return { top: `${top}px`, left: `${left}px`, width: `${width}px` };
+}
+
+function desktopNavSheetStyle() {
+  return desktopTriggerSheetStyle(navBurgerEl.value, "left");
+}
+
+function desktopProfileSheetStyle() {
+  return desktopTriggerSheetStyle(profileTriggerEl.value, "right");
 }
 
 function toggleNavDrawer() {
@@ -343,10 +377,11 @@ watch(
 
 <template>
   <div class="layout">
-    <header ref="navEl" class="nav" :class="{ 'nav--sheet-open': navDrawerOpen || profileMenuOpen }">
+    <header ref="navEl" class="nav">
       <span v-if="routeNavPending" class="nav-route-loading muted" aria-live="polite">загрузка…</span>
       <div v-if="auth.token" class="nav-menu-anchor">
         <button
+          ref="navBurgerEl"
           type="button"
           class="icon-btn nav-burger"
           :aria-expanded="navDrawerOpen"
@@ -432,7 +467,7 @@ watch(
         >
           <div
             class="nav-menu-sheet"
-            :style="desktopSheetStyle()"
+            :style="desktopNavSheetStyle()"
             role="dialog"
             aria-modal="true"
             aria-label="разделы"
@@ -475,7 +510,7 @@ watch(
         >
           <div
             class="nav-menu-sheet profile-menu-sheet card"
-            :style="desktopSheetStyle()"
+            :style="desktopProfileSheetStyle()"
             role="dialog"
             aria-modal="true"
             aria-label="профиль"
@@ -605,15 +640,20 @@ watch(
 .nav-menu-root:not(.nav-menu-root--mobile) .nav-menu-sheet {
   position: fixed;
   margin: 0;
-  padding: 0.4rem 0.6rem 0.65rem;
-  border-top: none;
-  border-left: 1px solid var(--border);
-  border-right: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
+  padding: 0.35rem;
+  border: 1px solid var(--border);
   border-radius: 0 0 var(--radius) var(--radius);
   background: var(--bg);
-  transform-origin: top center;
   z-index: 91;
+}
+
+.nav-menu-root:not(.nav-menu-root--mobile) .nav-menu-sheet:not(.profile-menu-sheet) {
+  transform-origin: top left;
+}
+
+.nav-menu-root:not(.nav-menu-root--mobile) .profile-menu-sheet {
+  transform-origin: top right;
+  padding: 0.35rem 0.35rem 0.5rem;
 }
 
 .nav-menu-root--mobile .nav-menu-sheet {
@@ -676,11 +716,11 @@ watch(
 }
 
 .nav-menu-root:not(.nav-menu-root--mobile) .nav-menu-link {
-  min-height: 44px;
-  padding: 0.55rem 0.6rem;
-  font-size: 1rem;
+  min-height: 40px;
+  padding: 0.45rem 0.45rem;
+  font-size: 0.95rem;
   text-align: left;
-  border-radius: 8px;
+  border-radius: 6px;
 }
 
 .nav-menu-enter-active .nav-menu-sheet,
@@ -693,9 +733,16 @@ watch(
   transition: background 0.2s ease;
 }
 
-.nav-menu-enter-from:not(.nav-menu-root--mobile) .nav-menu-sheet,
-.nav-menu-leave-to:not(.nav-menu-root--mobile) .nav-menu-sheet {
+.nav-menu-enter-from:not(.nav-menu-root--mobile) .nav-menu-sheet:not(.profile-menu-sheet),
+.nav-menu-leave-to:not(.nav-menu-root--mobile) .nav-menu-sheet:not(.profile-menu-sheet) {
   transform: scaleY(0);
+  transform-origin: top left;
+}
+
+.nav-menu-enter-from:not(.nav-menu-root--mobile) .profile-menu-sheet,
+.nav-menu-leave-to:not(.nav-menu-root--mobile) .profile-menu-sheet {
+  transform: scaleY(0);
+  transform-origin: top right;
 }
 
 .nav-menu-root--mobile.nav-menu-enter-from .nav-menu-sheet,
@@ -792,9 +839,9 @@ watch(
   align-items: flex-start;
   justify-content: space-between;
   gap: 0.65rem;
-  padding: 0.35rem 0.55rem 0.55rem;
+  padding: 0.35rem 0.45rem 0.45rem;
   border-bottom: 1px solid var(--border);
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.15rem;
 }
 
 .nav-menu-root--mobile .profile-menu-head {
@@ -844,19 +891,19 @@ watch(
 .profile-menu-item {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.65rem;
   width: 100%;
   color: var(--text);
-  padding: 0.55rem 0.6rem;
-  border-radius: 8px;
+  padding: 0.45rem 0.45rem;
+  border-radius: 6px;
   border: none;
   background: transparent;
   text-align: left;
   text-transform: lowercase;
   font: inherit;
-  font-size: 1rem;
+  font-size: 0.95rem;
   line-height: 1.35;
-  min-height: 44px;
+  min-height: 40px;
   cursor: pointer;
 }
 
