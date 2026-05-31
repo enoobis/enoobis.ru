@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
 import { api } from "./api/http";
 import { useAuthStore } from "./stores/auth";
@@ -18,6 +18,12 @@ const chatStore = useChatStore();
 const isOnline = ref(typeof navigator !== "undefined" ? navigator.onLine : true);
 const profileMenuOpen = ref(false);
 const navDrawerOpen = ref(false);
+const navEl = ref<HTMLElement | null>(null);
+const sheetTopPx = ref(0);
+const sheetMobile = ref(
+  typeof window !== "undefined" ? window.innerWidth <= 640 : false,
+);
+const SHEET_MOBILE_MAX = 640;
 const profileAvatarUrl = ref("");
 const profileAvatarBroken = ref(false);
 const profileCoins = ref(0);
@@ -75,9 +81,33 @@ function refreshPage() {
   window.location.reload();
 }
 
+function isSheetMobile() {
+  return typeof window !== "undefined" && window.innerWidth <= SHEET_MOBILE_MAX;
+}
+
+function syncSheetLayout() {
+  sheetMobile.value = isSheetMobile();
+  if (sheetMobile.value) {
+    sheetTopPx.value = 0;
+    return;
+  }
+  const nav = navEl.value;
+  sheetTopPx.value = nav ? Math.round(nav.getBoundingClientRect().bottom) : 0;
+}
+
+function onSheetLayoutChange() {
+  if (navDrawerOpen.value || profileMenuOpen.value) syncSheetLayout();
+}
+
+function sheetRootStyle() {
+  if (sheetMobile.value) return undefined;
+  return { top: `${sheetTopPx.value}px` };
+}
+
 function toggleNavDrawer() {
   if (!navDrawerOpen.value) profileMenuOpen.value = false;
   navDrawerOpen.value = !navDrawerOpen.value;
+  if (navDrawerOpen.value) void nextTick(() => syncSheetLayout());
 }
 
 function closeNavDrawer() {
@@ -87,6 +117,7 @@ function closeNavDrawer() {
 function toggleProfileMenu() {
   if (!profileMenuOpen.value) closeNavDrawer();
   profileMenuOpen.value = !profileMenuOpen.value;
+  if (profileMenuOpen.value) void nextTick(() => syncSheetLayout());
 }
 
 function closeProfileMenu() {
@@ -227,6 +258,8 @@ onMounted(async () => {
   window.addEventListener("keydown", onGlobalKey);
   document.addEventListener("visibilitychange", onVisibilityChange);
   document.addEventListener("click", onDocumentClick);
+  window.addEventListener("resize", onSheetLayoutChange);
+  window.addEventListener("scroll", onSheetLayoutChange, true);
   await loadMePresentation();
   startActivityTracking();
   void chatStore.refresh();
@@ -243,6 +276,8 @@ onUnmounted(() => {
   window.removeEventListener("keydown", onGlobalKey);
   document.removeEventListener("visibilitychange", onVisibilityChange);
   document.removeEventListener("click", onDocumentClick);
+  window.removeEventListener("resize", onSheetLayoutChange);
+  window.removeEventListener("scroll", onSheetLayoutChange, true);
   void flushActivity(true, false);
   stopActivityTracking();
   stopChatPoll();
@@ -259,6 +294,7 @@ watch(
 watch([navDrawerOpen, profileMenuOpen], ([navOpen, profileOpen]) => {
   if (typeof document === "undefined") return;
   document.documentElement.style.overflow = navOpen || profileOpen ? "hidden" : "";
+  if (navOpen || profileOpen) void nextTick(() => syncSheetLayout());
 });
 
 watch(
@@ -276,7 +312,7 @@ watch(
 
 <template>
   <div class="layout">
-    <header class="nav">
+    <header ref="navEl" class="nav">
       <span v-if="routeNavPending" class="nav-route-loading muted" aria-live="polite">загрузка…</span>
       <div v-if="auth.token" class="nav-menu-anchor">
         <button
@@ -358,6 +394,8 @@ watch(
           v-if="navDrawerOpen"
           id="nav-drawer"
           class="nav-menu-root"
+          :class="{ 'nav-menu-root--mobile': sheetMobile }"
+          :style="sheetRootStyle()"
           @click="closeNavDrawer"
         >
           <div
@@ -398,6 +436,8 @@ watch(
         <div
           v-if="profileMenuOpen && auth.token"
           class="nav-menu-root"
+          :class="{ 'nav-menu-root--mobile': sheetMobile }"
+          :style="sheetRootStyle()"
           @click="closeProfileMenu"
         >
           <div
@@ -499,7 +539,9 @@ watch(
 
 .nav-menu-root {
   position: fixed;
-  inset: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   z-index: 90;
   display: flex;
   align-items: flex-start;
@@ -507,11 +549,16 @@ watch(
   background: rgba(0, 0, 0, 0.45);
 }
 
+.nav-menu-root--mobile {
+  top: 0;
+  align-items: flex-end;
+}
+
 .nav-menu-sheet {
   width: 100%;
   max-width: 640px;
   margin: 0;
-  padding: calc(0.5rem + env(safe-area-inset-top, 0px)) 0.85rem 0.85rem;
+  padding: 0.5rem 0.85rem 0.85rem;
   border-top: none;
   border-radius: 0 0 var(--radius) var(--radius);
   max-height: min(72vh, 28rem);
@@ -520,17 +567,32 @@ watch(
   overflow-y: auto;
 }
 
+.nav-menu-root--mobile .nav-menu-sheet {
+  padding: 0.5rem 0.85rem calc(0.85rem + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+
 .profile-menu-sheet {
   padding-bottom: 1rem;
 }
 
+.nav-menu-root--mobile .profile-menu-sheet {
+  padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+}
+
 .nav-menu-handle {
-  display: block;
+  display: none;
   width: 2.25rem;
   height: 3px;
   margin: 0.35rem auto 0.65rem;
   border-radius: 999px;
   background: var(--border);
+}
+
+.nav-menu-root--mobile .nav-menu-handle {
+  display: block;
 }
 
 .nav-menu-inner {
@@ -574,6 +636,13 @@ watch(
 .nav-menu-enter-from .nav-menu-sheet,
 .nav-menu-leave-to .nav-menu-sheet {
   transform: translateY(-100%);
+}
+
+@media (max-width: 640px) {
+  .nav-menu-enter-from .nav-menu-sheet,
+  .nav-menu-leave-to .nav-menu-sheet {
+    transform: translateY(100%);
+  }
 }
 
 .nav-menu-enter-from.nav-menu-root,
