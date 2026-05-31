@@ -135,8 +135,6 @@ function desktopFullSheetStyle() {
     top: `${top}px`,
     left: `${sheetGeom.value.left}px`,
     width: `${sheetGeom.value.width}px`,
-    maxHeight: `calc(100vh - ${top}px)`,
-    minHeight: `calc(100vh - ${top}px)`,
   };
 }
 
@@ -683,15 +681,21 @@ watch(
   position: fixed;
   margin: 0;
   padding: 0.5rem 0.6rem 0.75rem;
+  max-width: none;
+  max-height: min(72vh, 28rem);
   border-top: none;
   border-left: 1px solid var(--border);
   border-right: 1px solid var(--border);
-  border-bottom: none;
-  border-radius: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0 0 var(--radius) var(--radius);
   background: var(--bg);
   transform-origin: top center;
   z-index: 91;
   overflow-y: auto;
+}
+
+.nav-menu-root:not(.nav-menu-root--mobile) .search-menu-sheet {
+  max-height: min(75vh, 36rem);
 }
 
 .nav-menu-root:not(.nav-menu-root--mobile) .profile-menu-sheet {

@@ -564,6 +564,12 @@ input[type="radio"]:focus-visible {
   z-index: 1;
 }
 @media (max-width: 640px) {
+  .nav-route-loading {
+    left: 2.65rem;
+    transform: translateY(-50%);
+  }
+}
+@media (max-width: 640px) {
   .nav {
     gap: 0.15rem;
     padding: 0.3rem 0.2rem;
