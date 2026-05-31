@@ -19,11 +19,13 @@ const isOnline = ref(typeof navigator !== "undefined" ? navigator.onLine : true)
 const profileMenuOpen = ref(false);
 const navDrawerOpen = ref(false);
 const navEl = ref<HTMLElement | null>(null);
+const profileTriggerEl = ref<HTMLElement | null>(null);
 const sheetMobile = ref(
   typeof window !== "undefined" ? window.innerWidth <= 640 : false,
 );
 const sheetGeom = ref({ top: 0, left: 0, width: 0 });
 const SHEET_MOBILE_MAX = 640;
+const PROFILE_SHEET_WIDTH = 268;
 const profileAvatarUrl = ref("");
 const profileAvatarBroken = ref(false);
 const profileCoins = ref(0);
@@ -114,13 +116,34 @@ function overlayStyle() {
   return { top: `${sheetGeom.value.top}px` };
 }
 
-function desktopSheetStyle() {
+function desktopNavSheetStyle() {
   if (sheetMobile.value) return undefined;
   return {
     top: `${sheetGeom.value.top}px`,
     left: `${sheetGeom.value.left}px`,
     width: `${sheetGeom.value.width}px`,
   };
+}
+
+function desktopProfileSheetStyle() {
+  if (sheetMobile.value) return undefined;
+  const top = sheetGeom.value.top;
+  const width = PROFILE_SHEET_WIDTH;
+  const trigger = profileTriggerEl.value;
+  const nav = resolveNavEl();
+  if (trigger) {
+    const triggerRect = trigger.getBoundingClientRect();
+    let left = Math.round(triggerRect.right - width);
+    if (nav) {
+      const navRect = nav.getBoundingClientRect();
+      const minLeft = Math.round(navRect.left);
+      const maxLeft = Math.round(navRect.right - width);
+      left = Math.max(minLeft, Math.min(left, maxLeft));
+    }
+    return { top: `${top}px`, left: `${left}px`, width: `${width}px` };
+  }
+  const left = sheetGeom.value.left + sheetGeom.value.width - width;
+  return { top: `${top}px`, left: `${left}px`, width: `${width}px` };
 }
 
 function toggleNavDrawer() {
@@ -394,6 +417,7 @@ watch(
         </div>
         <div class="profile-menu-wrap">
           <button
+            ref="profileTriggerEl"
             class="profile-trigger"
             type="button"
             :aria-expanded="profileMenuOpen"
@@ -430,7 +454,7 @@ watch(
         >
           <div
             class="nav-menu-sheet"
-            :style="desktopSheetStyle()"
+            :style="desktopNavSheetStyle()"
             role="dialog"
             aria-modal="true"
             aria-label="разделы"
@@ -473,7 +497,7 @@ watch(
         >
           <div
             class="nav-menu-sheet profile-menu-sheet card"
-            :style="desktopSheetStyle()"
+            :style="desktopProfileSheetStyle()"
             role="dialog"
             aria-modal="true"
             aria-label="профиль"
@@ -600,7 +624,7 @@ watch(
   transform-origin: top center;
 }
 
-.nav-menu-root:not(.nav-menu-root--mobile) .nav-menu-sheet {
+.nav-menu-root:not(.nav-menu-root--mobile) .nav-menu-sheet:not(.profile-menu-sheet) {
   position: fixed;
   max-width: none;
   margin: 0;
@@ -609,6 +633,19 @@ watch(
   border-left: none;
   border-right: none;
   border-radius: 0 0 var(--radius) var(--radius);
+  z-index: 91;
+}
+
+.nav-menu-root:not(.nav-menu-root--mobile) .profile-menu-sheet {
+  position: fixed;
+  margin: 0;
+  padding: 0.4rem;
+  border-top: none;
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  border-radius: 0 0 var(--radius) var(--radius);
+  transform-origin: top right;
   z-index: 91;
 }
 
@@ -681,9 +718,15 @@ watch(
   transition: background 0.2s ease;
 }
 
-.nav-menu-enter-from:not(.nav-menu-root--mobile) .nav-menu-sheet,
-.nav-menu-leave-to:not(.nav-menu-root--mobile) .nav-menu-sheet {
+.nav-menu-enter-from:not(.nav-menu-root--mobile) .nav-menu-sheet:not(.profile-menu-sheet),
+.nav-menu-leave-to:not(.nav-menu-root--mobile) .nav-menu-sheet:not(.profile-menu-sheet) {
   transform: scaleY(0);
+}
+
+.nav-menu-enter-from:not(.nav-menu-root--mobile) .profile-menu-sheet,
+.nav-menu-leave-to:not(.nav-menu-root--mobile) .profile-menu-sheet {
+  transform: scaleY(0);
+  transform-origin: top right;
 }
 
 .nav-menu-root--mobile.nav-menu-enter-from .nav-menu-sheet,
@@ -780,8 +823,13 @@ watch(
   align-items: flex-start;
   justify-content: space-between;
   gap: 0.65rem;
-  padding: 0.2rem 0.85rem 0.65rem;
+  padding: 0.35rem 0.55rem 0.55rem;
   border-bottom: 1px solid var(--border);
+  margin-bottom: 0.25rem;
+}
+
+.nav-menu-root--mobile .profile-menu-head {
+  padding: 0.2rem 0.85rem 0.65rem;
   margin-bottom: 0.35rem;
 }
 .profile-menu-head-main {
@@ -830,7 +878,7 @@ watch(
   gap: 0.75rem;
   width: 100%;
   color: var(--text);
-  padding: 0.65rem 0.85rem;
+  padding: 0.55rem 0.6rem;
   border-radius: 8px;
   border: none;
   background: transparent;
@@ -839,8 +887,13 @@ watch(
   font: inherit;
   font-size: 1rem;
   line-height: 1.35;
-  min-height: 48px;
+  min-height: 44px;
   cursor: pointer;
+}
+
+.nav-menu-root--mobile .profile-menu-item {
+  padding: 0.65rem 0.85rem;
+  min-height: 48px;
 }
 
 @media (max-width: 640px) {
