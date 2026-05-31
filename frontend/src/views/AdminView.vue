@@ -1425,11 +1425,20 @@ strong {
   color: var(--text);
   border-radius: var(--radius);
 }
-.mod-avatar img {
+.mod-avatar {
   width: 48px;
   height: 48px;
   border-radius: var(--avatar-radius);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+.mod-avatar img {
+  width: 100%;
+  height: 100%;
   object-fit: cover;
+  display: block;
+  border-radius: var(--avatar-radius);
 }
 .mod-bio {
   width: 100%;

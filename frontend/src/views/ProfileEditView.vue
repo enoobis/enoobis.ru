@@ -6,7 +6,7 @@ import { uploadAvatar } from "../api/uploadAvatar";
 import { changeMyPassword, getMyPrivacy, patchMyPrivacy } from "../api/profile";
 import AppIcon from "../components/AppIcon.vue";
 import { useAuthStore } from "../stores/auth";
-import { applyUserPreferences } from "../utils/preferences";
+import { setViewerPreferences } from "../utils/preferences";
 import { THEMES, normalizeThemeId, type ThemeId } from "../utils/themes";
 import { toastError, toastSuccess } from "../utils/toast";
 
@@ -116,7 +116,7 @@ function applyMeMerge(oldMe: Me, fresh: Me) {
     socialLinks.value = Array.isArray(fresh.social_links) ? [...fresh.social_links] : [];
   }
   me.value = fresh;
-  applyUserPreferences({
+  setViewerPreferences({
     language_preference: fresh.language_preference,
     theme_preference: fresh.theme_preference,
   });
@@ -142,7 +142,7 @@ async function refreshMeFromServer() {
       socialLinks.value = Array.isArray(fresh.social_links) ? [...fresh.social_links] : [];
       birthday.value = fresh.birthday ?? "";
       country.value = fresh.country ?? "";
-      applyUserPreferences({
+      setViewerPreferences({
         language_preference: fresh.language_preference,
         theme_preference: fresh.theme_preference,
       });
@@ -283,7 +283,7 @@ onMounted(async () => {
     socialLinks.value = Array.isArray(me.value.social_links) ? [...me.value.social_links] : [];
     birthday.value = me.value.birthday ?? "";
     country.value = me.value.country ?? "";
-    applyUserPreferences({
+    setViewerPreferences({
       language_preference: me.value.language_preference,
       theme_preference: me.value.theme_preference,
     });
@@ -381,7 +381,7 @@ async function save() {
     if (showOnlineStatus.value) {
       window.dispatchEvent(new CustomEvent("enoobis:online-preference-updated"));
     }
-    applyUserPreferences({
+    setViewerPreferences({
       language_preference: languagePreference.value,
       theme_preference: themePreference.value,
     });
@@ -397,7 +397,7 @@ async function save() {
 
 function pickTheme(id: ThemeId) {
   themePreference.value = id;
-  applyUserPreferences({
+  setViewerPreferences({
     language_preference: languagePreference.value,
     theme_preference: id,
   });

@@ -4,6 +4,7 @@ import { RouterLink, useRoute, useRouter } from "vue-router";
 import AppIcon from "../components/AppIcon.vue";
 import { api } from "../api/http";
 import { useAuthStore } from "../stores/auth";
+import { useProfileOwnerThemeFromApi } from "../composables/useProfileOwnerTheme";
 
 type Tab = "followers" | "following";
 type FollowItem = {
@@ -80,6 +81,8 @@ function back() {
 
 onMounted(load);
 watch(nick, load);
+
+useProfileOwnerThemeFromApi(nick);
 </script>
 
 <template>

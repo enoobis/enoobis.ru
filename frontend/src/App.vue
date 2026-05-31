@@ -6,7 +6,7 @@ import { useAuthStore } from "./stores/auth";
 import { useChatStore } from "./stores/chat";
 import AppIcon from "./components/AppIcon.vue";
 import AppToast from "./components/AppToast.vue";
-import { applyUserPreferences } from "./utils/preferences";
+import { rememberViewerPreferences } from "./utils/preferences";
 import { routeNavPending } from "./sync/routeNavPending";
 
 const router = useRouter();
@@ -169,7 +169,7 @@ async function loadMePresentation() {
     profileAvatarUrl.value = "";
     profileAvatarBroken.value = false;
     profileCoins.value = 0;
-    applyUserPreferences({});
+    rememberViewerPreferences({});
     return;
   }
   try {
@@ -183,7 +183,7 @@ async function loadMePresentation() {
     profileAvatarUrl.value = me.avatar_url || "";
     profileAvatarBroken.value = false;
     profileCoins.value = Math.max(0, Math.floor(Number(me.coins ?? 0)));
-    applyUserPreferences(me);
+    rememberViewerPreferences(me);
   } catch {
     // ignore preference/profile load failures
   }
@@ -677,31 +677,33 @@ watch(
 }
 
 .profile-trigger {
-  border-radius: 999px;
+  border-radius: var(--avatar-radius);
   min-height: 36px;
   width: 36px;
   height: 36px;
   padding: 0;
-  background: transparent;
-  border: 1px solid transparent;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
   color: var(--text);
-  transition: background 0.18s ease;
+  transition: background 0.18s ease, border-color 0.18s ease;
 }
 
 .profile-trigger:hover {
   background: var(--hover-surface);
+  border-color: var(--hover-border);
 }
 
 .profile-trigger-avatar {
-  width: 24px;
-  height: 24px;
-  border-radius: var(--avatar-radius);
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   font-size: 0.68rem;
   font-weight: 600;
-  background: #1a1a1a;
+  background: transparent;
   color: var(--muted);
   overflow: hidden;
 }

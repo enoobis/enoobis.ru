@@ -9,6 +9,12 @@
   --danger: #e07b8a;
 }
 
+/* user portraits — square via --avatar-radius */
+.user-portrait,
+.user-portrait > img {
+  border-radius: var(--avatar-radius);
+}
+
 html[data-theme="black"],
 html:not([data-theme]) {
   --bg: #0a0a0a;

@@ -11,6 +11,7 @@ import type { Achievement } from "../api/profile";
 import { useAuthStore } from "../stores/auth";
 import { renderMarkdown } from "../utils/markdown";
 import { formatLastSeen } from "../utils/lastSeen";
+import { useProfileOwnerThemeFromValue } from "../composables/useProfileOwnerTheme";
 type Profile = {
   nickname: string;
   role: string;
@@ -19,6 +20,7 @@ type Profile = {
   avatar_frame_url: string;
   wallpaper_url: string;
   profile_cover_url: string;
+  theme_preference: string;
   full_name: string;
   website_url: string;
   social_links: { name: string; url: string }[];
@@ -223,6 +225,8 @@ onUnmounted(() => {
 });
 
 watch(nick, load);
+
+useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
 </script>
 
 <template>
@@ -508,6 +512,7 @@ watch(nick, load);
   font-weight: 500;
   color: var(--muted);
   text-transform: lowercase;
+  border-radius: var(--avatar-radius);
 }
 .info h1 {
   font-size: 1.2rem;

@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from "vue-router";
 import { useAuthStore } from "../stores/auth";
 import { routeNavPending } from "../sync/routeNavPending";
 import { applyDocumentSeo } from "../utils/seo";
+import { clearProfileOwnerTheme, isProfileThemeRoute } from "../utils/preferences";
 
 const router = createRouter({
   history: createWebHistory(),
@@ -150,9 +151,12 @@ router.beforeEach((to) => {
   return true;
 });
 
-router.afterEach(() => {
+router.afterEach((to) => {
   routeNavPending.value = false;
   applyDocumentSeo();
+  if (!isProfileThemeRoute(to.path)) {
+    clearProfileOwnerTheme();
+  }
 });
 
 router.onError(() => {
