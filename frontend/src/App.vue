@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
 import { api } from "./api/http";
 import { useAuthStore } from "./stores/auth";
@@ -17,14 +17,7 @@ const auth = useAuthStore();
 const chatStore = useChatStore();
 const isOnline = ref(typeof navigator !== "undefined" ? navigator.onLine : true);
 const profileMenuOpen = ref(false);
-const profileMenuRoot = ref<HTMLElement | null>(null);
 const navDrawerOpen = ref(false);
-const navMenuAnchor = ref<HTMLElement | null>(null);
-const navMenuSheetStyle = ref<Record<string, string>>({});
-const navMenuMobile = ref(
-  typeof window !== "undefined" ? window.innerWidth <= 640 : false,
-);
-const MOBILE_NAV_MAX = 640;
 const profileAvatarUrl = ref("");
 const profileAvatarBroken = ref(false);
 const profileCoins = ref(0);
@@ -41,9 +34,9 @@ function syncOnlineStatus() {
 function onDocumentClick(event: MouseEvent) {
   const target = event.target as HTMLElement | null;
   if (target?.closest?.(".nav-burger")) return;
+  if (target?.closest?.(".profile-trigger")) return;
   if (profileMenuOpen.value) {
-    const root = profileMenuRoot.value;
-    if (root && target && root.contains(target)) return;
+    if (target?.closest?.(".profile-menu-sheet")) return;
     profileMenuOpen.value = false;
   }
   if (navDrawerOpen.value) {
@@ -82,51 +75,9 @@ function refreshPage() {
   window.location.reload();
 }
 
-function isMobileNav() {
-  return typeof window !== "undefined" && window.innerWidth <= MOBILE_NAV_MAX;
-}
-
-function refreshNavMenuMode() {
-  navMenuMobile.value = isMobileNav();
-  syncNavMenuSheetPos();
-}
-
-function syncNavMenuSheetPos() {
-  if (!navDrawerOpen.value || navMenuMobile.value) {
-    navMenuSheetStyle.value = {};
-    return;
-  }
-  const btn = navMenuAnchor.value?.querySelector(".nav-burger") as HTMLElement | null;
-  if (!btn) {
-    navMenuSheetStyle.value = {};
-    return;
-  }
-  const r = btn.getBoundingClientRect();
-  const panelW = 248;
-  const gap = 6;
-  const margin = 8;
-  let left = Math.round(r.left);
-  const maxLeft = Math.max(margin, window.innerWidth - panelW - margin);
-  if (left > maxLeft) left = maxLeft;
-  navMenuSheetStyle.value = {
-    position: "fixed",
-    top: `${Math.round(r.bottom + gap)}px`,
-    left: `${left}px`,
-    width: `${panelW}px`,
-    maxWidth: `min(${panelW}px, calc(100vw - ${margin * 2}px))`,
-  };
-}
-
-function onNavMenuLayoutChange() {
-  if (navDrawerOpen.value) refreshNavMenuMode();
-}
-
 function toggleNavDrawer() {
+  if (!navDrawerOpen.value) profileMenuOpen.value = false;
   navDrawerOpen.value = !navDrawerOpen.value;
-  if (navDrawerOpen.value) {
-    refreshNavMenuMode();
-    void nextTick(() => syncNavMenuSheetPos());
-  }
 }
 
 function closeNavDrawer() {
@@ -134,7 +85,12 @@ function closeNavDrawer() {
 }
 
 function toggleProfileMenu() {
+  if (!profileMenuOpen.value) closeNavDrawer();
   profileMenuOpen.value = !profileMenuOpen.value;
+}
+
+function closeProfileMenu() {
+  profileMenuOpen.value = false;
 }
 
 async function clearOnlinePresence() {
@@ -271,8 +227,6 @@ onMounted(async () => {
   window.addEventListener("keydown", onGlobalKey);
   document.addEventListener("visibilitychange", onVisibilityChange);
   document.addEventListener("click", onDocumentClick);
-  window.addEventListener("resize", onNavMenuLayoutChange);
-  window.addEventListener("scroll", onNavMenuLayoutChange, true);
   await loadMePresentation();
   startActivityTracking();
   void chatStore.refresh();
@@ -289,8 +243,6 @@ onUnmounted(() => {
   window.removeEventListener("keydown", onGlobalKey);
   document.removeEventListener("visibilitychange", onVisibilityChange);
   document.removeEventListener("click", onDocumentClick);
-  window.removeEventListener("resize", onNavMenuLayoutChange);
-  window.removeEventListener("scroll", onNavMenuLayoutChange, true);
   void flushActivity(true, false);
   stopActivityTracking();
   stopChatPoll();
@@ -300,19 +252,13 @@ watch(
   () => route.path,
   () => {
     closeNavDrawer();
+    closeProfileMenu();
   },
 );
 
-watch(navDrawerOpen, (open) => {
+watch([navDrawerOpen, profileMenuOpen], ([navOpen, profileOpen]) => {
   if (typeof document === "undefined") return;
-  if (open) {
-    refreshNavMenuMode();
-    void nextTick(() => syncNavMenuSheetPos());
-    if (navMenuMobile.value) document.documentElement.style.overflow = "hidden";
-  } else {
-    navMenuSheetStyle.value = {};
-    document.documentElement.style.overflow = "";
-  }
+  document.documentElement.style.overflow = navOpen || profileOpen ? "hidden" : "";
 });
 
 watch(
@@ -332,7 +278,7 @@ watch(
   <div class="layout">
     <header class="nav">
       <span v-if="routeNavPending" class="nav-route-loading muted" aria-live="polite">загрузка…</span>
-      <div v-if="auth.token" ref="navMenuAnchor" class="nav-menu-anchor">
+      <div v-if="auth.token" class="nav-menu-anchor">
         <button
           type="button"
           class="icon-btn nav-burger"
@@ -380,8 +326,14 @@ watch(
             <AppIcon name="write" :size="18" />
           </RouterLink>
         </div>
-        <div ref="profileMenuRoot" class="profile-menu-wrap">
-          <button class="profile-trigger" type="button" @click.stop="toggleProfileMenu">
+        <div class="profile-menu-wrap">
+          <button
+            class="profile-trigger"
+            type="button"
+            :aria-expanded="profileMenuOpen"
+            aria-label="меню профиля"
+            @click.stop="toggleProfileMenu"
+          >
             <span class="profile-trigger-avatar">
               <img
                 v-if="profileAvatarUrl && !profileAvatarBroken"
@@ -393,48 +345,6 @@ watch(
               <span v-else>{{ initials }}</span>
             </span>
           </button>
-          <div v-if="profileMenuOpen" class="profile-menu card">
-            <div class="profile-menu-head">
-              <div class="profile-menu-head-main">
-                <span class="profile-menu-name">@{{ auth.nickname }}</span>
-              </div>
-              <div class="profile-menu-coins" title="монеты">
-                <img
-                  src="/coin-gem.png"
-                  alt=""
-                  width="18"
-                  height="18"
-                  class="profile-coin-img"
-                  loading="lazy"
-                />
-                <span>{{ profileCoins }}</span>
-              </div>
-            </div>
-            <RouterLink :to="`/u/${auth.nickname}`" class="profile-menu-item" @click="profileMenuOpen = false">
-              <AppIcon name="profile" :size="20" /><span>профиль</span>
-            </RouterLink>
-            <RouterLink to="/inventory" class="profile-menu-item" @click="profileMenuOpen = false">
-              <AppIcon name="inventory" :size="20" /><span>инвентарь</span>
-            </RouterLink>
-            <RouterLink to="/saved" class="profile-menu-item" @click="profileMenuOpen = false">
-              <AppIcon name="bookmark" :size="20" /><span>закладки</span>
-            </RouterLink>
-            <RouterLink
-              v-if="auth.role === 'teacher' || auth.role === 'admin'"
-              to="/invites"
-              class="profile-menu-item"
-              @click="profileMenuOpen = false"
-            >
-              <AppIcon name="invites" :size="20" /><span>инвайты</span>
-            </RouterLink>
-            <RouterLink to="/me/edit" class="profile-menu-item" @click="profileMenuOpen = false">
-              <AppIcon name="settings" :size="20" /><span>настройки</span>
-            </RouterLink>
-            <span class="profile-menu-sep" />
-            <button class="profile-menu-item profile-menu-btn" type="button" @click="logoutFromMenu">
-              <AppIcon name="logout" :size="20" /><span>выход</span>
-            </button>
-          </div>
         </div>
       </template>
       <template v-else>
@@ -448,13 +358,10 @@ watch(
           v-if="navDrawerOpen"
           id="nav-drawer"
           class="nav-menu-root"
-          :class="{ 'nav-menu-root--sheet': navMenuMobile }"
           @click="closeNavDrawer"
         >
           <div
             class="nav-menu-sheet"
-            :class="{ 'nav-menu-sheet--popover': !navMenuMobile }"
-            :style="navMenuSheetStyle"
             role="dialog"
             aria-modal="true"
             aria-label="разделы"
@@ -482,6 +389,65 @@ watch(
                 админ
               </RouterLink>
             </nav>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+    <Teleport to="body">
+      <Transition name="nav-menu">
+        <div
+          v-if="profileMenuOpen && auth.token"
+          class="nav-menu-root"
+          @click="closeProfileMenu"
+        >
+          <div
+            class="nav-menu-sheet profile-menu-sheet card"
+            role="dialog"
+            aria-modal="true"
+            aria-label="профиль"
+            @click.stop
+          >
+            <span class="nav-menu-handle" aria-hidden="true" />
+            <div class="profile-menu-head">
+              <div class="profile-menu-head-main">
+                <span class="profile-menu-name">@{{ auth.nickname }}</span>
+              </div>
+              <div class="profile-menu-coins" title="монеты">
+                <img
+                  src="/coin-gem.png"
+                  alt=""
+                  width="18"
+                  height="18"
+                  class="profile-coin-img"
+                  loading="lazy"
+                />
+                <span>{{ profileCoins }}</span>
+              </div>
+            </div>
+            <RouterLink :to="`/u/${auth.nickname}`" class="profile-menu-item" @click="closeProfileMenu">
+              <AppIcon name="profile" :size="20" /><span>профиль</span>
+            </RouterLink>
+            <RouterLink to="/inventory" class="profile-menu-item" @click="closeProfileMenu">
+              <AppIcon name="inventory" :size="20" /><span>инвентарь</span>
+            </RouterLink>
+            <RouterLink to="/saved" class="profile-menu-item" @click="closeProfileMenu">
+              <AppIcon name="bookmark" :size="20" /><span>закладки</span>
+            </RouterLink>
+            <RouterLink
+              v-if="auth.role === 'teacher' || auth.role === 'admin'"
+              to="/invites"
+              class="profile-menu-item"
+              @click="closeProfileMenu"
+            >
+              <AppIcon name="invites" :size="20" /><span>инвайты</span>
+            </RouterLink>
+            <RouterLink to="/me/edit" class="profile-menu-item" @click="closeProfileMenu">
+              <AppIcon name="settings" :size="20" /><span>настройки</span>
+            </RouterLink>
+            <span class="profile-menu-sep" />
+            <button class="profile-menu-item profile-menu-btn" type="button" @click="logoutFromMenu">
+              <AppIcon name="logout" :size="20" /><span>выход</span>
+            </button>
           </div>
         </div>
       </Transition>
@@ -535,10 +501,6 @@ watch(
   position: fixed;
   inset: 0;
   z-index: 90;
-  background: rgba(0, 0, 0, 0.2);
-}
-
-.nav-menu-root--sheet {
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -546,19 +508,6 @@ watch(
 }
 
 .nav-menu-sheet {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  overflow-y: auto;
-}
-
-.nav-menu-sheet--popover {
-  padding: 0.4rem;
-  border-radius: var(--radius);
-  max-height: min(70vh, 22rem);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-}
-
-.nav-menu-root--sheet .nav-menu-sheet {
   width: 100%;
   max-width: 640px;
   margin: 0;
@@ -566,6 +515,13 @@ watch(
   border-bottom: none;
   border-radius: var(--radius) var(--radius) 0 0;
   max-height: min(72vh, 28rem);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  overflow-y: auto;
+}
+
+.profile-menu-sheet {
+  padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
 }
 
 .nav-menu-handle {
@@ -577,10 +533,6 @@ watch(
   background: var(--border);
 }
 
-.nav-menu-root:not(.nav-menu-root--sheet) .nav-menu-handle {
-  display: none;
-}
-
 .nav-menu-inner {
   display: flex;
   flex-direction: column;
@@ -590,24 +542,16 @@ watch(
 .nav-menu-link {
   display: block;
   width: 100%;
-  min-height: 48px;
-  padding: 0.75rem 0.85rem;
+  min-height: 52px;
+  padding: 0.9rem 0.75rem;
   color: var(--text);
   text-transform: lowercase;
-  font-size: 1rem;
+  font-size: 1.05rem;
   font-weight: 500;
   line-height: 1.35;
   border: none;
-  border-radius: 8px;
-  background: transparent;
-  text-align: left;
-}
-
-.nav-menu-root--sheet .nav-menu-link {
-  min-height: 52px;
-  padding: 0.9rem 0.75rem;
-  font-size: 1.05rem;
   border-radius: 0;
+  background: transparent;
   text-align: center;
 }
 
@@ -615,11 +559,6 @@ watch(
   background: var(--surface2);
   color: var(--text);
   text-decoration: none;
-}
-
-.nav-menu-root--sheet .nav-menu-link:hover {
-  background: var(--surface2);
-  color: var(--text);
 }
 
 .nav-menu-enter-active .nav-menu-sheet,
@@ -632,15 +571,9 @@ watch(
   transition: background 0.2s ease;
 }
 
-.nav-menu-root--sheet.nav-menu-enter-from .nav-menu-sheet,
-.nav-menu-root--sheet.nav-menu-leave-to .nav-menu-sheet {
+.nav-menu-enter-from .nav-menu-sheet,
+.nav-menu-leave-to .nav-menu-sheet {
   transform: translateY(100%);
-}
-
-.nav-menu-root:not(.nav-menu-root--sheet).nav-menu-enter-from .nav-menu-sheet,
-.nav-menu-root:not(.nav-menu-root--sheet).nav-menu-leave-to .nav-menu-sheet {
-  transform: translateY(-6px);
-  opacity: 0;
 }
 
 .nav-menu-enter-from.nav-menu-root,
@@ -727,31 +660,14 @@ watch(
   display: block;
 }
 
-.profile-menu {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 0.4rem);
-  width: 260px;
-  padding: 0.45rem;
-  z-index: 40;
-}
-@media (max-width: 640px) {
-  .profile-menu {
-    width: min(280px, calc(100vw - 1.2rem));
-  }
-  .nav-actions {
-    gap: 0.2rem;
-  }
-}
-
 .profile-menu-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 0.65rem;
-  padding: 0.45rem 0.6rem 0.55rem;
+  padding: 0.2rem 0.85rem 0.65rem;
   border-bottom: 1px solid var(--border);
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.35rem;
 }
 .profile-menu-head-main {
   display: flex;
@@ -810,6 +726,12 @@ watch(
   line-height: 1.35;
   min-height: 48px;
   cursor: pointer;
+}
+
+@media (max-width: 640px) {
+  .nav-actions {
+    gap: 0.2rem;
+  }
 }
 
 .profile-menu-item:hover {
