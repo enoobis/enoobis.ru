@@ -209,7 +209,7 @@ onUnmounted(() => {
 .avatar {
   width: 32px;
   height: 32px;
-  border-radius: 999px;
+  border-radius: var(--avatar-radius);
   border: 1px solid var(--border);
   background: var(--surface);
   display: inline-flex;

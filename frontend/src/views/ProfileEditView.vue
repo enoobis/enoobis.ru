@@ -713,7 +713,7 @@ function closeSettings() {
 .avatar-placeholder {
   width: 78px;
   height: 78px;
-  border-radius: 16px;
+  border-radius: var(--avatar-radius);
   overflow: hidden;
   border: 1px solid var(--border);
   background: var(--surface2);

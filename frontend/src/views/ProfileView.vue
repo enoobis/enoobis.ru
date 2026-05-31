@@ -372,7 +372,7 @@ watch(nick, load);
 .avatar-stack .avatar {
   width: 100%;
   height: 100%;
-  border-radius: 999px;
+  border-radius: var(--avatar-radius);
   border: 1px solid var(--border);
   object-fit: cover;
   background: var(--surface);

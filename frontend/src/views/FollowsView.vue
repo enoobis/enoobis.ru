@@ -245,7 +245,7 @@ watch(nick, load);
 .user .ava-fb {
   width: 38px;
   height: 38px;
-  border-radius: 999px;
+  border-radius: var(--avatar-radius);
   border: 1px solid var(--border);
   object-fit: cover;
   background: var(--surface);

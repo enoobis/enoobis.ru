@@ -1,5 +1,6 @@
 :root {
   --radius: 10px;
+  --avatar-radius: 0;
   --profile-head-gap: 1.5rem;
   --font: "Outfit", system-ui, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, monospace;

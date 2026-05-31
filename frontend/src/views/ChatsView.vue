@@ -883,13 +883,13 @@ onUnmounted(() => {
   position: relative;
   width: 36px;
   height: 36px;
-  border-radius: 999px;
+  border-radius: var(--avatar-radius);
   border: 1px solid var(--border);
   background: var(--surface);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  overflow: visible;
+  overflow: hidden;
   color: var(--muted);
   font-weight: 500;
   font-size: 0.78rem;

@@ -1428,7 +1428,7 @@ strong {
 .mod-avatar img {
   width: 48px;
   height: 48px;
-  border-radius: var(--radius);
+  border-radius: var(--avatar-radius);
   object-fit: cover;
 }
 .mod-bio {
@@ -1752,7 +1752,7 @@ strong {
 .shop-avatar-img {
   width: 44px;
   height: 44px;
-  border-radius: 999px;
+  border-radius: var(--avatar-radius);
   object-fit: cover;
   border: 1px solid var(--border);
   flex-shrink: 0;

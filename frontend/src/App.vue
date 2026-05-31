@@ -690,7 +690,7 @@ watch(
 .profile-trigger-avatar {
   width: 24px;
   height: 24px;
-  border-radius: 999px;
+  border-radius: var(--avatar-radius);
   display: inline-flex;
   align-items: center;
   justify-content: center;

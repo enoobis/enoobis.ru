@@ -222,7 +222,7 @@ onMounted(load);
 .avatar-img {
   width: 80px;
   height: 80px;
-  border-radius: 999px;
+  border-radius: var(--avatar-radius);
   object-fit: cover;
   border: 1px solid var(--border);
   display: block;
@@ -248,7 +248,7 @@ onMounted(load);
 .frame-inner {
   position: absolute;
   inset: 10px;
-  border-radius: 999px;
+  border-radius: var(--avatar-radius);
   background: var(--surface2);
   border: 1px solid var(--border);
 }
