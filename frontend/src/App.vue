@@ -102,7 +102,7 @@ function syncNavMenuSheetPos() {
     return;
   }
   const r = btn.getBoundingClientRect();
-  const panelW = 208;
+  const panelW = 236;
   const gap = 6;
   const margin = 8;
   let left = Math.round(r.left);
@@ -411,13 +411,13 @@ watch(
               </div>
             </div>
             <RouterLink :to="`/u/${auth.nickname}`" class="profile-menu-item" @click="profileMenuOpen = false">
-              <AppIcon name="profile" :size="16" /><span>профиль</span>
+              <AppIcon name="profile" :size="18" /><span>профиль</span>
             </RouterLink>
             <RouterLink to="/inventory" class="profile-menu-item" @click="profileMenuOpen = false">
-              <AppIcon name="inventory" :size="16" /><span>инвентарь</span>
+              <AppIcon name="inventory" :size="18" /><span>инвентарь</span>
             </RouterLink>
             <RouterLink to="/saved" class="profile-menu-item" @click="profileMenuOpen = false">
-              <AppIcon name="bookmark" :size="16" /><span>закладки</span>
+              <AppIcon name="bookmark" :size="18" /><span>закладки</span>
             </RouterLink>
             <RouterLink
               v-if="auth.role === 'teacher' || auth.role === 'admin'"
@@ -425,14 +425,14 @@ watch(
               class="profile-menu-item"
               @click="profileMenuOpen = false"
             >
-              <AppIcon name="invites" :size="16" /><span>инвайты</span>
+              <AppIcon name="invites" :size="18" /><span>инвайты</span>
             </RouterLink>
             <RouterLink to="/me/edit" class="profile-menu-item" @click="profileMenuOpen = false">
-              <AppIcon name="settings" :size="16" /><span>настройки</span>
+              <AppIcon name="settings" :size="18" /><span>настройки</span>
             </RouterLink>
             <span class="profile-menu-sep" />
             <button class="profile-menu-item profile-menu-btn" type="button" @click="logoutFromMenu">
-              <AppIcon name="logout" :size="16" /><span>выход</span>
+              <AppIcon name="logout" :size="18" /><span>выход</span>
             </button>
           </div>
         </div>
@@ -462,16 +462,20 @@ watch(
           >
             <span class="nav-menu-handle" aria-hidden="true" />
             <nav class="nav-menu-inner">
-              <RouterLink to="/blogs" class="nav-menu-link" @click="closeNavDrawer">блоги</RouterLink>
-              <RouterLink to="/microblogs" class="nav-menu-link" @click="closeNavDrawer">микроблоги</RouterLink>
+              <RouterLink to="/blogs" class="nav-menu-link" @click="closeNavDrawer">
+                <AppIcon name="blog" :size="18" /><span>блоги</span>
+              </RouterLink>
+              <RouterLink to="/microblogs" class="nav-menu-link" @click="closeNavDrawer">
+                <AppIcon name="spark" :size="18" /><span>микроблоги</span>
+              </RouterLink>
               <RouterLink v-if="auth.token" to="/courses" class="nav-menu-link" @click="closeNavDrawer">
-                курсы
+                <AppIcon name="courses" :size="18" /><span>курсы</span>
               </RouterLink>
               <RouterLink v-if="auth.token" to="/library" class="nav-menu-link" @click="closeNavDrawer">
-                библиотека
+                <AppIcon name="folder" :size="18" /><span>библиотека</span>
               </RouterLink>
               <RouterLink v-if="auth.token" to="/shop" class="nav-menu-link" @click="closeNavDrawer">
-                магазин
+                <AppIcon name="shop" :size="18" /><span>магазин</span>
               </RouterLink>
               <RouterLink
                 v-if="auth.role === 'admin'"
@@ -479,7 +483,7 @@ watch(
                 class="nav-menu-link"
                 @click="closeNavDrawer"
               >
-                админ
+                <AppIcon name="admin" :size="18" /><span>админ</span>
               </RouterLink>
             </nav>
           </div>
@@ -552,9 +556,9 @@ watch(
 }
 
 .nav-menu-sheet--popover {
-  padding: 0.35rem;
+  padding: 0.4rem;
   border-radius: var(--radius);
-  max-height: min(70vh, 20rem);
+  max-height: min(70vh, 22rem);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
@@ -584,24 +588,35 @@ watch(
 .nav-menu-inner {
   display: flex;
   flex-direction: column;
-  gap: 0.1rem;
+  gap: 0.15rem;
 }
 
 .nav-menu-link {
-  display: block;
-  padding: 0.55rem 0.5rem;
-  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  min-height: 40px;
+  padding: 0.5rem 0.65rem;
+  color: var(--muted);
   text-transform: lowercase;
   font-size: 0.9rem;
   font-weight: 500;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   background: transparent;
   text-align: left;
 }
 
+.nav-menu-link :deep(.app-icon) {
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
 .nav-menu-root--sheet .nav-menu-link {
-  padding: 0.75rem 0.25rem;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0.75rem 0.5rem;
   font-size: 0.92rem;
   border-radius: 0;
   text-align: center;
@@ -613,9 +628,13 @@ watch(
   text-decoration: none;
 }
 
+.nav-menu-link:hover :deep(.app-icon) {
+  opacity: 1;
+}
+
 .nav-menu-root--sheet .nav-menu-link:hover {
   background: transparent;
-  color: var(--muted);
+  color: var(--text);
 }
 
 .nav-menu-enter-active .nav-menu-sheet,
@@ -678,15 +697,23 @@ watch(
 
 .profile-trigger {
   border-radius: var(--avatar-radius);
-  min-height: 36px;
-  width: 36px;
-  height: 36px;
+  min-height: 40px;
+  width: 40px;
+  height: 40px;
   padding: 0;
   overflow: hidden;
   background: var(--surface);
   border: 1px solid var(--border);
   color: var(--text);
   transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+@media (max-width: 640px) {
+  .profile-trigger {
+    min-height: 36px;
+    width: 36px;
+    height: 36px;
+  }
 }
 
 .profile-trigger:hover {
@@ -719,8 +746,8 @@ watch(
   position: absolute;
   right: 0;
   top: calc(100% + 0.4rem);
-  width: 220px;
-  padding: 0.35rem;
+  width: 236px;
+  padding: 0.4rem;
   z-index: 40;
 }
 @media (max-width: 640px) {
@@ -784,18 +811,18 @@ watch(
 .profile-menu-item {
   display: flex;
   align-items: center;
-  gap: 0.55rem;
+  gap: 0.65rem;
   width: 100%;
   color: var(--muted);
-  padding: 0.5rem 0.6rem;
-  border-radius: 6px;
+  padding: 0.55rem 0.7rem;
+  border-radius: 8px;
   border: none;
   background: transparent;
   text-align: left;
   text-transform: lowercase;
   font: inherit;
   font-size: 0.9rem;
-  min-height: 0;
+  min-height: 40px;
   cursor: pointer;
 }
 
