@@ -92,7 +92,12 @@ function syncSheetLayout() {
     return;
   }
   const nav = navEl.value;
-  sheetTopPx.value = nav ? Math.round(nav.getBoundingClientRect().bottom) : 0;
+  if (!nav) {
+    sheetTopPx.value = 0;
+    return;
+  }
+  const { bottom } = nav.getBoundingClientRect();
+  sheetTopPx.value = Math.round(bottom);
 }
 
 function onSheetLayoutChange() {
@@ -565,13 +570,26 @@ watch(
   background: var(--surface);
   border: 1px solid var(--border);
   overflow-y: auto;
+  transform-origin: top center;
+}
+
+.nav-menu-root:not(.nav-menu-root--mobile) .nav-menu-sheet {
+  max-width: none;
+  padding-top: 0;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  border-radius: 0 0 var(--radius) var(--radius);
 }
 
 .nav-menu-root--mobile .nav-menu-sheet {
   padding: 0.5rem 0.85rem calc(0.85rem + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid var(--border);
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
   border-bottom: none;
   border-radius: var(--radius) var(--radius) 0 0;
+  transform-origin: bottom center;
 }
 
 .profile-menu-sheet {
@@ -633,16 +651,14 @@ watch(
   transition: background 0.2s ease;
 }
 
-.nav-menu-enter-from .nav-menu-sheet,
-.nav-menu-leave-to .nav-menu-sheet {
-  transform: translateY(-100%);
+.nav-menu-enter-from:not(.nav-menu-root--mobile) .nav-menu-sheet,
+.nav-menu-leave-to:not(.nav-menu-root--mobile) .nav-menu-sheet {
+  transform: scaleY(0);
 }
 
-@media (max-width: 640px) {
-  .nav-menu-enter-from .nav-menu-sheet,
-  .nav-menu-leave-to .nav-menu-sheet {
-    transform: translateY(100%);
-  }
+.nav-menu-root--mobile.nav-menu-enter-from .nav-menu-sheet,
+.nav-menu-root--mobile.nav-menu-leave-to .nav-menu-sheet {
+  transform: translateY(100%);
 }
 
 .nav-menu-enter-from.nav-menu-root,
