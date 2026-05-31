@@ -32,7 +32,7 @@ const isStaff = computed(() => auth.role === "teacher" || auth.role === "admin")
 
 const files = ref<StoredFile[]>([]);
 const used = ref(0);
-const quota = ref(100 * 1024 * 1024);
+const quota = ref(30 * 1024 * 1024);
 const filesLoading = ref(false);
 const uploading = ref(false);
 const dragOver = ref(false);

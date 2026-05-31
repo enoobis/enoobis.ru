@@ -11,7 +11,7 @@ const router = express.Router();
 const FILES_ROOT = path.resolve(process.env.PRIVATE_FILES_DIR ?? "./data/private-files");
 fs.mkdirSync(FILES_ROOT, { recursive: true });
 
-const TEACHER_QUOTA_BYTES = 100 * 1024 * 1024;
+const TEACHER_QUOTA_BYTES = 30 * 1024 * 1024;
 const ADMIN_QUOTA_BYTES = 3 * 1024 * 1024 * 1024;
 
 function quotaBytesForRole(role) {
