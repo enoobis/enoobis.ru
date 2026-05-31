@@ -174,12 +174,16 @@ const FILLED = new Set<AppIconName>([
   "pinned",
 ]);
 
+const DEFAULT_SIZE = 18;
+const STROKE_WIDTH = 2.5;
+const SIZE_SCALE = 1.125;
+
 const props = withDefaults(
   defineProps<{
     name: AppIconName;
     size?: number;
   }>(),
-  { size: 16 },
+  { size: DEFAULT_SIZE },
 );
 
 const icon = computed(() => icons[props.name]);
@@ -192,8 +196,8 @@ const iconClass = computed(() => {
 const iconProps = computed(() => {
   const filled = FILLED.has(props.name);
   return {
-    size: props.size,
-    strokeWidth: 2,
+    size: Math.round(props.size * SIZE_SCALE),
+    strokeWidth: STROKE_WIDTH,
     ...(filled ? { fill: "currentColor" as const } : {}),
   };
 });
