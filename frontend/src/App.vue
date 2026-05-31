@@ -502,7 +502,7 @@ watch(
   inset: 0;
   z-index: 90;
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   justify-content: center;
   background: rgba(0, 0, 0, 0.45);
 }
@@ -511,9 +511,9 @@ watch(
   width: 100%;
   max-width: 640px;
   margin: 0;
-  padding: 0.5rem 0.85rem calc(0.85rem + env(safe-area-inset-bottom, 0px));
-  border-bottom: none;
-  border-radius: var(--radius) var(--radius) 0 0;
+  padding: calc(0.5rem + env(safe-area-inset-top, 0px)) 0.85rem 0.85rem;
+  border-top: none;
+  border-radius: 0 0 var(--radius) var(--radius);
   max-height: min(72vh, 28rem);
   background: var(--surface);
   border: 1px solid var(--border);
@@ -521,7 +521,7 @@ watch(
 }
 
 .profile-menu-sheet {
-  padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  padding-bottom: 1rem;
 }
 
 .nav-menu-handle {
@@ -573,7 +573,7 @@ watch(
 
 .nav-menu-enter-from .nav-menu-sheet,
 .nav-menu-leave-to .nav-menu-sheet {
-  transform: translateY(100%);
+  transform: translateY(-100%);
 }
 
 .nav-menu-enter-from.nav-menu-root,
