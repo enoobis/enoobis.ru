@@ -135,6 +135,7 @@ function desktopFullSheetStyle() {
     top: `${top}px`,
     left: `${sheetGeom.value.left}px`,
     width: `${sheetGeom.value.width}px`,
+    maxHeight: `calc(100vh - ${top}px - 0.5rem)`,
   };
 }
 
@@ -151,7 +152,6 @@ function toggleSearch() {
   closeProfileMenu();
   syncSheetLayout();
   searchOpen.value = true;
-  requestAnimationFrame(syncSheetLayout);
 }
 
 function overlayStyle() {
@@ -168,7 +168,6 @@ function toggleNavDrawer() {
   searchOpen.value = false;
   syncSheetLayout();
   navDrawerOpen.value = true;
-  requestAnimationFrame(syncSheetLayout);
 }
 
 function closeNavDrawer() {
@@ -184,7 +183,6 @@ function toggleProfileMenu() {
   closeSearch();
   syncSheetLayout();
   profileMenuOpen.value = true;
-  requestAnimationFrame(syncSheetLayout);
 }
 
 function closeProfileMenu() {
@@ -341,6 +339,7 @@ onUnmounted(() => {
   window.removeEventListener("offline", syncOnlineStatus);
   window.removeEventListener("keydown", onEscape);
   document.documentElement.style.overflow = "";
+  document.documentElement.style.paddingRight = "";
   window.removeEventListener("keydown", onGlobalKey);
   document.removeEventListener("visibilitychange", onVisibilityChange);
   document.removeEventListener("click", onDocumentClick);
@@ -362,8 +361,16 @@ watch(
 
 watch(headerSheetOpen, (open) => {
   if (typeof document === "undefined") return;
-  document.documentElement.style.overflow = open ? "hidden" : "";
-  if (open) syncSheetLayout();
+  const root = document.documentElement;
+  if (open) {
+    const scrollbar = window.innerWidth - root.clientWidth;
+    root.style.overflow = "hidden";
+    if (scrollbar > 0) root.style.paddingRight = `${scrollbar}px`;
+    syncSheetLayout();
+    return;
+  }
+  root.style.overflow = "";
+  root.style.paddingRight = "";
 });
 
 watch(
@@ -493,27 +500,29 @@ watch(
             @click.stop
           >
             <span class="nav-menu-handle" aria-hidden="true" />
-            <nav class="nav-menu-inner">
-              <RouterLink to="/blogs" class="nav-menu-link" @click="closeNavDrawer">блоги</RouterLink>
-              <RouterLink to="/microblogs" class="nav-menu-link" @click="closeNavDrawer">микроблоги</RouterLink>
-              <RouterLink v-if="auth.token" to="/courses" class="nav-menu-link" @click="closeNavDrawer">
-                курсы
-              </RouterLink>
-              <RouterLink v-if="auth.token" to="/library" class="nav-menu-link" @click="closeNavDrawer">
-                библиотека
-              </RouterLink>
-              <RouterLink v-if="auth.token" to="/shop" class="nav-menu-link" @click="closeNavDrawer">
-                магазин
-              </RouterLink>
-              <RouterLink
-                v-if="auth.role === 'admin'"
-                to="/admin"
-                class="nav-menu-link"
-                @click="closeNavDrawer"
-              >
-                админ
-              </RouterLink>
-            </nav>
+            <div class="nav-menu-sheet-body">
+              <nav class="nav-menu-inner">
+                <RouterLink to="/blogs" class="nav-menu-link" @click="closeNavDrawer">блоги</RouterLink>
+                <RouterLink to="/microblogs" class="nav-menu-link" @click="closeNavDrawer">микроблоги</RouterLink>
+                <RouterLink v-if="auth.token" to="/courses" class="nav-menu-link" @click="closeNavDrawer">
+                  курсы
+                </RouterLink>
+                <RouterLink v-if="auth.token" to="/library" class="nav-menu-link" @click="closeNavDrawer">
+                  библиотека
+                </RouterLink>
+                <RouterLink v-if="auth.token" to="/shop" class="nav-menu-link" @click="closeNavDrawer">
+                  магазин
+                </RouterLink>
+                <RouterLink
+                  v-if="auth.role === 'admin'"
+                  to="/admin"
+                  class="nav-menu-link"
+                  @click="closeNavDrawer"
+                >
+                  админ
+                </RouterLink>
+              </nav>
+            </div>
           </div>
         </div>
       </Transition>
@@ -536,46 +545,48 @@ watch(
             @click.stop
           >
             <span class="nav-menu-handle" aria-hidden="true" />
-            <div class="profile-menu-head">
-              <div class="profile-menu-head-main">
-                <span class="profile-menu-name">@{{ auth.nickname }}</span>
+            <div class="nav-menu-sheet-body">
+              <div class="profile-menu-head">
+                <div class="profile-menu-head-main">
+                  <span class="profile-menu-name">@{{ auth.nickname }}</span>
+                </div>
+                <div class="profile-menu-coins" title="монеты">
+                  <img
+                    src="/coin-gem.png"
+                    alt=""
+                    width="18"
+                    height="18"
+                    class="profile-coin-img"
+                    loading="lazy"
+                  />
+                  <span>{{ profileCoins }}</span>
+                </div>
               </div>
-              <div class="profile-menu-coins" title="монеты">
-                <img
-                  src="/coin-gem.png"
-                  alt=""
-                  width="18"
-                  height="18"
-                  class="profile-coin-img"
-                  loading="lazy"
-                />
-                <span>{{ profileCoins }}</span>
-              </div>
+              <RouterLink :to="`/u/${auth.nickname}`" class="profile-menu-item" @click="closeProfileMenu">
+                <AppIcon name="profile" :size="20" /><span>профиль</span>
+              </RouterLink>
+              <RouterLink to="/inventory" class="profile-menu-item" @click="closeProfileMenu">
+                <AppIcon name="inventory" :size="20" /><span>инвентарь</span>
+              </RouterLink>
+              <RouterLink to="/saved" class="profile-menu-item" @click="closeProfileMenu">
+                <AppIcon name="bookmark" :size="20" /><span>закладки</span>
+              </RouterLink>
+              <RouterLink
+                v-if="auth.role === 'teacher' || auth.role === 'admin'"
+                to="/invites"
+                class="profile-menu-item"
+                @click="closeProfileMenu"
+              >
+                <AppIcon name="invites" :size="20" /><span>инвайты</span>
+              </RouterLink>
+              <RouterLink to="/me/edit" class="profile-menu-item" @click="closeProfileMenu">
+                <AppIcon name="settings" :size="20" /><span>настройки</span>
+              </RouterLink>
+              <span class="profile-menu-sep" />
+              <button class="profile-menu-item profile-menu-btn" type="button" @click="logoutFromMenu">
+                <AppIcon name="logout" :size="20" /><span>выход</span>
+              </button>
             </div>
-            <RouterLink :to="`/u/${auth.nickname}`" class="profile-menu-item" @click="closeProfileMenu">
-              <AppIcon name="profile" :size="20" /><span>профиль</span>
-            </RouterLink>
-            <RouterLink to="/inventory" class="profile-menu-item" @click="closeProfileMenu">
-              <AppIcon name="inventory" :size="20" /><span>инвентарь</span>
-            </RouterLink>
-            <RouterLink to="/saved" class="profile-menu-item" @click="closeProfileMenu">
-              <AppIcon name="bookmark" :size="20" /><span>закладки</span>
-            </RouterLink>
-            <RouterLink
-              v-if="auth.role === 'teacher' || auth.role === 'admin'"
-              to="/invites"
-              class="profile-menu-item"
-              @click="closeProfileMenu"
-            >
-              <AppIcon name="invites" :size="20" /><span>инвайты</span>
-            </RouterLink>
-            <RouterLink to="/me/edit" class="profile-menu-item" @click="closeProfileMenu">
-              <AppIcon name="settings" :size="20" /><span>настройки</span>
-            </RouterLink>
-            <span class="profile-menu-sep" />
-            <button class="profile-menu-item profile-menu-btn" type="button" @click="logoutFromMenu">
-              <AppIcon name="logout" :size="20" /><span>выход</span>
-            </button>
           </div>
         </div>
       </Transition>
@@ -596,7 +607,9 @@ watch(
             aria-label="поиск"
             @click.stop
           >
-            <SearchPanel embedded autofocus @close="closeSearch" />
+            <div class="nav-menu-sheet-body">
+              <SearchPanel embedded autofocus @close="closeSearch" />
+            </div>
           </div>
         </div>
       </Transition>
@@ -680,26 +693,40 @@ watch(
 .nav-menu-root:not(.nav-menu-root--mobile) .nav-menu-sheet--full {
   position: fixed;
   margin: 0;
-  padding: 0.5rem 0.6rem 0.75rem;
+  padding: 0;
   max-width: none;
-  max-height: min(72vh, 28rem);
   border-top: none;
   border-left: 1px solid var(--border);
   border-right: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
   border-radius: 0 0 var(--radius) var(--radius);
   background: var(--bg);
-  transform-origin: top center;
   z-index: 91;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.nav-menu-root:not(.nav-menu-root--mobile) .nav-menu-sheet-body {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.5rem 0.6rem 0.75rem;
+}
+
+.nav-menu-root:not(.nav-menu-root--mobile) .profile-menu-sheet .nav-menu-sheet-body {
+  padding: 0.35rem 0.6rem 0.65rem;
 }
 
 .nav-menu-root:not(.nav-menu-root--mobile) .search-menu-sheet {
   max-height: min(75vh, 36rem);
 }
 
-.nav-menu-root:not(.nav-menu-root--mobile) .profile-menu-sheet {
-  padding: 0.35rem 0.6rem 0.65rem;
+.nav-menu-root:not(.nav-menu-root--mobile) .nav-menu-sheet--full:not(.search-menu-sheet) {
+  max-height: min(72vh, 28rem);
 }
 
 .nav-menu-root--mobile .nav-menu-sheet {
@@ -710,6 +737,13 @@ watch(
   border-bottom: none;
   border-radius: var(--radius) var(--radius) 0 0;
   transform-origin: bottom center;
+  display: block;
+}
+
+.nav-menu-root--mobile .nav-menu-sheet-body {
+  overflow: visible;
+  padding: 0;
+  flex: none;
 }
 
 .profile-menu-sheet {
@@ -771,17 +805,18 @@ watch(
 
 .nav-menu-enter-active .nav-menu-sheet,
 .nav-menu-leave-active .nav-menu-sheet {
-  transition: transform 0.24s ease, opacity 0.18s ease;
+  transition: transform 0.2s ease, opacity 0.18s ease;
 }
 
 .nav-menu-enter-active.nav-menu-root,
 .nav-menu-leave-active.nav-menu-root {
-  transition: background 0.2s ease;
+  transition: background 0.18s ease;
 }
 
 .nav-menu-enter-from:not(.nav-menu-root--mobile) .nav-menu-sheet--full,
 .nav-menu-leave-to:not(.nav-menu-root--mobile) .nav-menu-sheet--full {
-  transform: scaleY(0);
+  opacity: 0;
+  transform: translateY(-8px);
 }
 
 .nav-menu-root--mobile.nav-menu-enter-from .nav-menu-sheet,
@@ -932,6 +967,7 @@ watch(
   align-items: center;
   gap: 0.65rem;
   width: 100%;
+  min-width: 0;
   color: var(--text);
   padding: 0.45rem 0.45rem;
   border-radius: 6px;
@@ -965,6 +1001,12 @@ watch(
 .profile-menu-item :deep(.app-icon) {
   flex-shrink: 0;
   opacity: 0.8;
+}
+.profile-menu-item > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .profile-menu-item:hover :deep(.app-icon) {
   opacity: 1;
