@@ -217,7 +217,7 @@ router.post("/admin/shop/items", authRequired, uploadSingle(shopItemUpload, "fil
     if (!Number.isFinite(n) || n < 1) return res.status(400).json({ error: "bad stock_limit" });
     stockLimit = n;
   }
-  const isAnimated = req.file.mimetype === "image/gif" ? 1 : 0;
+  let isAnimated = req.file.mimetype === "image/gif" ? 1 : 0;
   let presetKey = "avatar";
   if (kind === "frame") presetKey = "shop_frame";
   else if (kind === "wallpaper") presetKey = "shop_wallpaper";
@@ -225,6 +225,7 @@ router.post("/admin/shop/items", authRequired, uploadSingle(shopItemUpload, "fil
   if (isRasterImageMimetype(req.file.mimetype) && req.file.mimetype !== "image/gif") {
     const r = await optimizeUploadedFile(req.file.path, /** @type {"avatar"|"shop_frame"|"shop_wallpaper"|"shop_cover"} */ (presetKey));
     if (r.ok) req.file.filename = r.filename;
+    if (kind === "frame" && r.animated) isAnimated = 1;
   }
   const url = `/uploads/shop-items/${req.file.filename}`;
   const id = uuidv4();

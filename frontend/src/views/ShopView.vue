@@ -279,6 +279,7 @@ watch(
             <div class="frame-demo">
               <span class="frame-inner" />
               <img :src="item.url" alt="" class="frame-layer" loading="lazy" />
+              <span v-if="item.is_animated" class="anim-badge">anim</span>
             </div>
           </template>
           <template v-else-if="item.kind === 'wallpaper' || item.kind === 'cover'">

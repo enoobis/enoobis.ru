@@ -155,6 +155,7 @@ onMounted(load);
             <div class="frame-demo">
               <span class="frame-inner" />
               <img :src="a.url" alt="" class="frame-layer" loading="lazy" />
+              <span v-if="a.is_animated" class="anim-badge">anim</span>
             </div>
           </template>
           <template v-else-if="a.kind === 'wallpaper' || a.kind === 'cover'">
