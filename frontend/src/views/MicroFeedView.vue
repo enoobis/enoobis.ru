@@ -17,8 +17,10 @@ const err = ref("");
 const loading = ref(false);
 const q = ref(typeof route.query.q === "string" ? route.query.q : "");
 const feed = ref<Feed>("all");
+let loadSeq = 0;
 
 async function load() {
+  const seq = ++loadSeq;
   err.value = "";
   loading.value = true;
   try {
@@ -31,11 +33,13 @@ async function load() {
       },
       auth.token,
     );
+    if (seq !== loadSeq) return;
     posts.value = data.items;
   } catch (e) {
+    if (seq !== loadSeq) return;
     err.value = e instanceof Error ? e.message : "ошибка";
   } finally {
-    loading.value = false;
+    if (seq === loadSeq) loading.value = false;
   }
 }
 

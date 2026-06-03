@@ -10,13 +10,15 @@ import {
   type ShopItemKind,
 } from "../api/shop";
 import { useAuthStore } from "../stores/auth";
+import { useSessionStore } from "../stores/session";
 import { toastError, toastSuccess } from "../utils/toast";
 
 const auth = useAuthStore();
+const session = useSessionStore();
 const items = ref<OwnedShopItem[]>([]);
 const loading = ref(true);
 const busy = ref<string | null>(null);
-const profileCoins = ref(0);
+const profileCoins = computed(() => session.coins);
 
 const KIND_ORDER: ShopItemKind[] = ["frame", "cover", "wallpaper", "avatar"];
 
@@ -71,9 +73,9 @@ function isEquipped(a: OwnedShopItem): boolean {
 async function load() {
   loading.value = true;
   try {
+    await session.ensureMe();
     items.value = await listMyShopItems(auth.token!);
     const me = await api<Cosmetics & { coins?: number }>("/api/me", { token: auth.token! });
-    profileCoins.value = Math.max(0, Math.floor(Number(me.coins ?? 0)));
     cosmetics.value = {
       avatar_url: me.avatar_url ?? "",
       wallpaper_url: me.wallpaper_url ?? "",

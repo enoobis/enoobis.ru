@@ -187,41 +187,29 @@ const earnedAchievements = computed(() =>
 
 const moderationNotices = computed(() => profile.value?.moderation_notices ?? []);
 
-const POLL_MS = 12000;
-let profilePoll: ReturnType<typeof setInterval> | null = null;
-
-async function refreshPublicProfile() {
-  if (document.visibilityState === "hidden" || !nick.value) return;
+async function refreshPresence() {
+  if (document.visibilityState === "hidden" || !nick.value || !profile.value) return;
   try {
     const p = await api<Profile>(`/api/profile/${nick.value}`);
-    profile.value = p;
+    profile.value = { ...profile.value, online: p.online, avatar_url: p.avatar_url };
     avatarBroken.value = false;
-    frameBroken.value = false;
-    wallpaperBroken.value = false;
-    coverBroken.value = false;
     avatarHealTried.value = false;
-    const microData = await listMicroByAuthor(nick.value, auth.token);
-    micro.value = microData.items;
   } catch {
+    /* ignore */
   }
 }
 
 function onProfileVisibility() {
-  if (document.visibilityState === "visible") void refreshPublicProfile();
+  if (document.visibilityState === "visible") void refreshPresence();
 }
 
 onMounted(() => {
   void load();
   document.addEventListener("visibilitychange", onProfileVisibility);
-  profilePoll = setInterval(() => void refreshPublicProfile(), POLL_MS);
 });
 
 onUnmounted(() => {
   document.removeEventListener("visibilitychange", onProfileVisibility);
-  if (profilePoll) {
-    clearInterval(profilePoll);
-    profilePoll = null;
-  }
 });
 
 watch(nick, load);

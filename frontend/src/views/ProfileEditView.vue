@@ -6,6 +6,7 @@ import { uploadAvatar } from "../api/uploadAvatar";
 import { changeMyPassword, getMyPrivacy, patchMyPrivacy } from "../api/profile";
 import AppIcon from "../components/AppIcon.vue";
 import { useAuthStore } from "../stores/auth";
+import { useSessionStore } from "../stores/session";
 import { setViewerPreferences } from "../utils/preferences";
 import { THEMES, normalizeThemeId, type ThemeId } from "../utils/themes";
 import { toastError, toastSuccess } from "../utils/toast";
@@ -53,6 +54,7 @@ type InviteLink = {
 type SettingsTab = "profile" | "account" | "security" | "invites";
 
 const auth = useAuthStore();
+const session = useSessionStore();
 const router = useRouter();
 const me = ref<Me | null>(null);
 const tab = ref<SettingsTab>("profile");
@@ -85,9 +87,6 @@ const nickStatus = ref<"idle" | "checking" | "ok" | "err">("idle");
 const nickMessage = ref("");
 const changingNick = ref(false);
 let nickTimer: ReturnType<typeof setTimeout> | null = null;
-
-const POLL_MS = 12000;
-let mePoll: ReturnType<typeof setInterval> | null = null;
 
 function normStr(s: string | undefined | null) {
   return s ?? "";
@@ -299,7 +298,7 @@ onMounted(async () => {
       }
     }
     document.addEventListener("visibilitychange", onMeVisibility);
-    mePoll = setInterval(() => void refreshMeFromServer(), POLL_MS);
+    void session.ensureMe(true);
   } catch (e) {
     err.value = e instanceof Error ? e.message : "ошибка";
   }
@@ -307,10 +306,6 @@ onMounted(async () => {
 
 onUnmounted(() => {
   document.removeEventListener("visibilitychange", onMeVisibility);
-  if (mePoll) {
-    clearInterval(mePoll);
-    mePoll = null;
-  }
 });
 
 function addSocialLink() {
@@ -333,6 +328,8 @@ async function onAvatarFile(ev: Event) {
   try {
     const r = await uploadAvatar(auth.token, file);
     if (me.value) me.value.avatar_url = r.avatar_url;
+    void session.ensureMe(true);
+    window.dispatchEvent(new CustomEvent("enoobis:profile-cosmetics-updated"));
     avatarMsg.value = "аватар обновлён";
   } catch (e) {
     err.value = e instanceof Error ? e.message : "ошибка";
@@ -352,6 +349,8 @@ async function clearAvatar() {
       body: JSON.stringify({ avatar_url: "" }),
     });
     if (me.value) me.value.avatar_url = "";
+    void session.ensureMe(true);
+    window.dispatchEvent(new CustomEvent("enoobis:profile-cosmetics-updated"));
     avatarMsg.value = "аватар убран";
   } catch (e) {
     err.value = e instanceof Error ? e.message : "ошибка";
@@ -386,6 +385,7 @@ async function save() {
       language_preference: languagePreference.value,
       theme_preference: themePreference.value,
     });
+    void session.ensureMe(true);
     toastSuccess("сохранено");
     await router.push(`/u/${auth.nickname}`);
   } catch (e) {

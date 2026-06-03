@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import { api } from "../api/http";
+import { useSessionStore } from "./session";
 
 const LS = "edu_token";
 const LS_USER = "edu_user";
@@ -72,6 +73,7 @@ export const useAuthStore = defineStore("auth", () => {
   }
 
   function logout() {
+    useSessionStore().reset();
     token.value = null;
     user.value = null;
     persist(null, null);

@@ -10,9 +10,11 @@ import {
   type ShopItemKind,
 } from "../api/shop";
 import { useAuthStore } from "../stores/auth";
+import { useSessionStore } from "../stores/session";
 import { toastError, toastSuccess } from "../utils/toast";
 
 const auth = useAuthStore();
+const session = useSessionStore();
 
 const tabs: { key: ShopItemKind; label: string }[] = [
   { key: "avatar", label: "аватар" },
@@ -32,7 +34,7 @@ const pageDraft = ref(1);
 const total = ref(0);
 const loading = ref(true);
 const busy = ref<string | null>(null);
-const profileCoins = ref(0);
+const profileCoins = computed(() => session.coins);
 
 let shopLoadSeq = 0;
 
@@ -88,9 +90,7 @@ function shopSoldOut(item: ShopItem): boolean {
 
 async function loadCoins(): Promise<void> {
   if (!auth.token) return;
-  const me = await fetch("/api/me", { headers: { Authorization: `Bearer ${auth.token}` } });
-  const data = (await me.json()) as { coins?: unknown };
-  profileCoins.value = Math.max(0, Math.floor(Number(data.coins ?? 0)));
+  await session.ensureMe();
 }
 
 async function load() {
@@ -153,7 +153,7 @@ async function onBuy(item: ShopItem) {
   busy.value = item.id;
   try {
     const r = await buyShopItem(auth.token, item.id);
-    profileCoins.value = r.coins;
+    session.setCoins(r.coins);
     toastSuccess(item.name);
     await load();
   } catch (e) {

@@ -1,13 +1,12 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
-import { api } from "./api/http";
 import { useAuthStore } from "./stores/auth";
 import { useChatStore } from "./stores/chat";
+import { useSessionStore } from "./stores/session";
 import AppIcon from "./components/AppIcon.vue";
 import AppToast from "./components/AppToast.vue";
 import SearchPanel from "./components/SearchPanel.vue";
-import { rememberViewerPreferences } from "./utils/preferences";
 import { routeNavPending } from "./sync/routeNavPending";
 
 const router = useRouter();
@@ -16,6 +15,7 @@ const onHome = computed(() => route.path === "/");
 
 const auth = useAuthStore();
 const chatStore = useChatStore();
+const session = useSessionStore();
 const isOnline = ref(typeof navigator !== "undefined" ? navigator.onLine : true);
 const profileMenuOpen = ref(false);
 const navDrawerOpen = ref(false);
@@ -26,18 +26,30 @@ const sheetMobile = ref(
 );
 const sheetGeom = ref({ top: 0, left: 0, width: 0 });
 const SHEET_MOBILE_MAX = 640;
-const profileAvatarUrl = ref("");
-const profileAvatarBroken = ref(false);
-const profileCoins = ref(0);
+const profileCoins = computed(() => session.coins);
+const navLoadingVisible = ref(false);
+let navLoadingTimer: ReturnType<typeof setTimeout> | null = null;
 const headerSheetOpen = computed(
   () => navDrawerOpen.value || profileMenuOpen.value || searchOpen.value,
 );
 const navFullSheetOpen = computed(() => headerSheetOpen.value && !sheetMobile.value);
 const initials = computed(() => (auth.nickname || "U").slice(0, 2).toUpperCase());
 const chatBadge = computed(() => (chatStore.unread > 9 ? "9+" : String(chatStore.unread)));
-let activityTickStart = Date.now();
-let activityInterval: ReturnType<typeof setInterval> | null = null;
-let chatPollInterval: ReturnType<typeof setInterval> | null = null;
+
+watch(routeNavPending, (pending) => {
+  if (pending) {
+    if (navLoadingTimer) clearTimeout(navLoadingTimer);
+    navLoadingTimer = setTimeout(() => {
+      if (routeNavPending.value) navLoadingVisible.value = true;
+    }, 180);
+  } else {
+    if (navLoadingTimer) {
+      clearTimeout(navLoadingTimer);
+      navLoadingTimer = null;
+    }
+    navLoadingVisible.value = false;
+  }
+});
 
 function syncOnlineStatus() {
   isOnline.value = navigator.onLine;
@@ -201,132 +213,36 @@ function closeProfileMenu() {
   profileMenuOpen.value = false;
 }
 
-async function clearOnlinePresence() {
-  if (!auth.token) return;
-  try {
-    await api("/api/me/activity", {
-      method: "POST",
-      token: auth.token,
-      body: JSON.stringify({ seconds: 0, visible: false }),
-    });
-  } catch {
-    // ignore
-  }
-}
-
 function logoutFromMenu() {
   profileMenuOpen.value = false;
-  profileAvatarUrl.value = "";
-  profileAvatarBroken.value = false;
-  profileCoins.value = 0;
-  stopActivityTracking();
-  void clearOnlinePresence().finally(() => auth.logout());
+  void session.clearOnlinePresence().finally(() => auth.logout());
 }
 
-async function onProfileAvatarError() {
-  await loadMePresentation();
-  if (!profileAvatarUrl.value) profileAvatarBroken.value = true;
-}
-
-async function loadMePresentation() {
-  if (!auth.token) {
-    profileAvatarUrl.value = "";
-    profileAvatarBroken.value = false;
-    profileCoins.value = 0;
-    rememberViewerPreferences({});
-    return;
-  }
-  try {
-    const me = await api<{
-      theme_preference: string;
-      language_preference: string;
-      font_preference: string;
-      avatar_url: string;
-      coins?: number;
-    }>("/api/me", { token: auth.token });
-    profileAvatarUrl.value = me.avatar_url || "";
-    profileAvatarBroken.value = false;
-    profileCoins.value = Math.max(0, Math.floor(Number(me.coins ?? 0)));
-    rememberViewerPreferences(me);
-  } catch {
-    // ignore preference/profile load failures
-  }
-}
-
-async function flushActivity(force = false, visible = !document.hidden) {
-  if (!auth.token) return;
-  const now = Date.now();
-  const elapsed = Math.floor((now - activityTickStart) / 1000);
-  if (!force && elapsed < 10) return;
-  if (!force && document.hidden) return;
-  activityTickStart = now;
-  const seconds = visible && elapsed > 0 ? Math.min(elapsed, 600) : 0;
-  if (!visible && seconds <= 0 && !force) return;
-  try {
-    const data = await api<{ ok?: boolean; coins?: number }>("/api/me/activity", {
-      method: "POST",
-      token: auth.token,
-      body: JSON.stringify({ seconds, visible: !!visible }),
-    });
-    if (typeof data.coins === "number") profileCoins.value = data.coins;
-  } catch {
-    // ignore tracking errors
-  }
-}
-
-function pulseOnlinePresence() {
-  if (!auth.token || document.hidden) return;
-  void flushActivity(true, true);
-}
-
-function startActivityTracking() {
-  stopActivityTracking();
-  activityTickStart = Date.now();
-  if (!auth.token) return;
-  pulseOnlinePresence();
-  activityInterval = setInterval(() => {
-    void flushActivity(false, !document.hidden);
-  }, 30000);
-}
-
-function startChatPoll() {
-  stopChatPoll();
-  if (!auth.token) return;
-  chatPollInterval = setInterval(() => void chatStore.refresh(), 15000);
-}
-
-function stopChatPoll() {
-  if (chatPollInterval) {
-    clearInterval(chatPollInterval);
-    chatPollInterval = null;
-  }
-}
-
-function stopActivityTracking() {
-  if (activityInterval) {
-    clearInterval(activityInterval);
-    activityInterval = null;
-  }
-}
-
-function onVisibilityChange() {
-  if (document.hidden) {
-    void flushActivity(true, false);
-  } else {
-    activityTickStart = Date.now();
-    void flushActivity(true, true);
-  }
+function onProfileAvatarError() {
+  void session.onAvatarError();
 }
 
 function onProfileCosmeticsUpdated() {
-  void loadMePresentation();
+  void session.ensureMe(true);
 }
 
 function onOnlinePreferenceUpdated() {
-  pulseOnlinePresence();
+  void session.flushActivity(true, true);
 }
 
-onMounted(async () => {
+function onVisibilityChange() {
+  session.onVisibilityChange();
+}
+
+function syncShell() {
+  if (auth.token) void session.startShell();
+  else {
+    chatStore.reset();
+    session.stopShell();
+  }
+}
+
+onMounted(() => {
   window.addEventListener("enoobis:profile-cosmetics-updated", onProfileCosmeticsUpdated);
   window.addEventListener("enoobis:online-preference-updated", onOnlinePreferenceUpdated);
   window.addEventListener("online", syncOnlineStatus);
@@ -337,11 +253,8 @@ onMounted(async () => {
   document.addEventListener("click", onDocumentClick);
   window.addEventListener("resize", onSheetLayoutChange);
   window.addEventListener("scroll", onSheetLayoutChange, true);
-  await loadMePresentation();
   syncSheetLayout();
-  startActivityTracking();
-  void chatStore.refresh();
-  startChatPoll();
+  syncShell();
 });
 
 onUnmounted(() => {
@@ -356,9 +269,7 @@ onUnmounted(() => {
   document.removeEventListener("click", onDocumentClick);
   window.removeEventListener("resize", onSheetLayoutChange);
   window.removeEventListener("scroll", onSheetLayoutChange, true);
-  void flushActivity(true, false);
-  stopActivityTracking();
-  stopChatPoll();
+  session.stopShell();
 });
 
 watch(
@@ -378,13 +289,9 @@ watch(headerSheetOpen, async (open) => {
 
 watch(
   () => auth.token,
-  async (tok) => {
-    if (!tok) closeNavDrawer();
-    await loadMePresentation();
-    startActivityTracking();
-    if (!auth.token) chatStore.reset();
-    void chatStore.refresh();
-    startChatPoll();
+  () => {
+    if (!auth.token) closeNavDrawer();
+    syncShell();
   },
 );
 </script>
@@ -393,7 +300,7 @@ watch(
   <div class="layout">
     <header ref="navEl" class="nav" :class="{ 'nav--sheet-open': navFullSheetOpen }">
       <div class="nav-bar">
-      <span v-if="routeNavPending" class="nav-route-loading muted" aria-live="polite">загрузка…</span>
+      <span v-if="navLoadingVisible" class="nav-route-loading muted" aria-live="polite">загрузка…</span>
       <div v-if="auth.token" class="nav-menu-anchor">
         <button
           type="button"
@@ -477,8 +384,8 @@ watch(
           >
             <span class="profile-trigger-avatar">
               <img
-                v-if="profileAvatarUrl && !profileAvatarBroken"
-                :src="profileAvatarUrl"
+                v-if="session.avatarUrl && !session.avatarBroken"
+                :src="session.avatarUrl"
                 alt=""
                 class="profile-trigger-avatar-img"
                 @error="onProfileAvatarError"
@@ -701,9 +608,10 @@ watch(
         </div>
       </Transition>
     </Teleport>
-    <RouterView v-slot="{ Component, route }">
-      <Transition name="page" mode="out-in">
-        <component :is="Component" :key="route.path" />
+    <RouterView v-slot="{ Component, route: viewRoute }">
+      <component v-if="viewRoute.path === '/'" :is="Component" :key="viewRoute.path" />
+      <Transition v-else name="page" mode="out-in">
+        <component :is="Component" :key="viewRoute.path" />
       </Transition>
     </RouterView>
     <AppToast />
