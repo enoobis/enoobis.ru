@@ -6,6 +6,8 @@ backend/target/
 
 # Node
 frontend/node_modules/
+**/node_modules/
+*.node
 frontend/dist/
 frontend/tsconfig.tsbuildinfo
 backend/node_modules/
