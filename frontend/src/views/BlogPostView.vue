@@ -52,13 +52,13 @@ const readingMinutes = computed(() => {
   return Math.max(1, Math.round(words / 200));
 });
 
-const POLL_MS = 12000;
-let postPoll: ReturnType<typeof setInterval> | null = null;
-
 async function load() {
   err.value = "";
-  post.value = null;
-  comments.value = [];
+  const keep = post.value?.id === postId.value;
+  if (!keep) {
+    post.value = null;
+    comments.value = [];
+  }
   try {
     post.value = await getPost(postId.value, auth.token ?? undefined);
     addRecentPost(post.value);
@@ -255,17 +255,12 @@ async function recallPost() {
 onMounted(() => {
   window.addEventListener("scroll", persistProgress, { passive: true });
   document.addEventListener("visibilitychange", onPostVisibility);
-  postPoll = setInterval(() => void softRefreshPost(), POLL_MS);
   load();
 });
 onUnmounted(() => {
   persistProgress();
   window.removeEventListener("scroll", persistProgress);
   document.removeEventListener("visibilitychange", onPostVisibility);
-  if (postPoll) {
-    clearInterval(postPoll);
-    postPoll = null;
-  }
 });
 watch(() => route.params.id, load);
 </script>

@@ -184,7 +184,16 @@ async function share() {
 
       <template v-else>
         <p v-if="post.body" class="body"><RichText :text="post.body" /></p>
-        <img v-if="post.image_url" :src="post.image_url" alt="" class="image" />
+        <img
+          v-if="post.image_url"
+          :src="post.image_url"
+          alt=""
+          class="image"
+          width="640"
+          height="480"
+          loading="lazy"
+          decoding="async"
+        />
       </template>
 
       <div class="post-actions" @click.stop>

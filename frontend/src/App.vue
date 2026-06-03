@@ -369,6 +369,9 @@ watch(
                 :src="session.avatarUrl"
                 alt=""
                 class="profile-trigger-avatar-img"
+                width="44"
+                height="44"
+                decoding="async"
                 @error="onProfileAvatarError"
               />
               <span v-else>{{ initials }}</span>

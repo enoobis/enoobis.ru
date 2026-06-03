@@ -2,8 +2,8 @@
   --radius: 10px;
   --avatar-radius: 0;
   --profile-head-gap: 1.5rem;
-  --font: "Outfit", system-ui, sans-serif;
-  --mono: "JetBrains Mono", ui-monospace, monospace;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "Cascadia Code", "Segoe UI Mono", monospace;
   --icon-size: 16px;
   --app-font-scale: 1;
   --danger: #e07b8a;
@@ -614,6 +614,15 @@ input[type="search"]::-webkit-search-cancel-button:hover {
 }
 .nav-spacer {
   flex: 1;
+}
+
+.nav-actions {
+  min-height: 44px;
+  align-items: center;
+}
+
+.layout {
+  min-height: 100vh;
 }
 
 .icon-btn {

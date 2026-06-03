@@ -2,13 +2,17 @@ import { createRouter, createWebHistory } from "vue-router";
 import { useAuthStore } from "../stores/auth";
 import { applyDocumentSeo } from "../utils/seo";
 import { clearProfileOwnerTheme, isProfileThemeRoute } from "../utils/preferences";
+import HomeView from "../views/HomeView.vue";
+import MicroFeedView from "../views/MicroFeedView.vue";
+import BlogListView from "../views/BlogListView.vue";
+import LoginView from "../views/LoginView.vue";
 
 const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: "/", name: "home", component: () => import("../views/HomeView.vue") },
+    { path: "/", name: "home", component: HomeView },
 
-    { path: "/blogs", name: "blog", component: () => import("../views/BlogListView.vue") },
+    { path: "/blogs", name: "blog", component: BlogListView },
     {
       path: "/blogs/write",
       name: "blog-write",
@@ -34,7 +38,7 @@ const router = createRouter({
     {
       path: "/microblogs",
       name: "micro",
-      component: () => import("../views/MicroFeedView.vue"),
+      component: MicroFeedView,
     },
     {
       path: "/microblogs/saved",
@@ -80,7 +84,7 @@ const router = createRouter({
       name: "shared",
       component: () => import("../views/SharedView.vue"),
     },
-    { path: "/login", name: "login", component: () => import("../views/LoginView.vue") },
+    { path: "/login", name: "login", component: LoginView },
     { path: "/register", name: "register", component: () => import("../views/RegisterView.vue") },
     {
       path: "/courses",

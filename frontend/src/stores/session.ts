@@ -16,9 +16,36 @@ export type MePresentation = {
 
 let meInflight: Promise<void> | null = null;
 
+const LS_SESSION_ME = "enoobis_session_me";
+
+function readMeCache(): MePresentation | null {
+  try {
+    const raw = localStorage.getItem(LS_SESSION_ME);
+    if (!raw) return null;
+    const row = JSON.parse(raw) as MePresentation & { coins?: number };
+    return {
+      theme_preference: row.theme_preference ?? "black",
+      language_preference: row.language_preference ?? "ru",
+      font_preference: row.font_preference ?? "normal",
+      avatar_url: row.avatar_url ?? "",
+      coins: Math.max(0, Math.floor(Number(row.coins ?? 0))),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeMeCache(row: MePresentation) {
+  try {
+    localStorage.setItem(LS_SESSION_ME, JSON.stringify(row));
+  } catch {
+    /* ignore */
+  }
+}
+
 export const useSessionStore = defineStore("session", () => {
-  const me = ref<MePresentation | null>(null);
-  const meReady = ref(false);
+  const me = ref<MePresentation | null>(readMeCache());
+  const meReady = ref(!!me.value);
   const avatarBroken = ref(false);
   const shellActive = ref(false);
 
@@ -34,11 +61,19 @@ export const useSessionStore = defineStore("session", () => {
     meReady.value = false;
     avatarBroken.value = false;
     meInflight = null;
+    try {
+      localStorage.removeItem(LS_SESSION_ME);
+    } catch {
+      /* ignore */
+    }
     stopShell();
   }
 
   function setCoins(n: number) {
-    if (me.value) me.value.coins = Math.max(0, Math.floor(n));
+    if (me.value) {
+      me.value.coins = Math.max(0, Math.floor(n));
+      writeMeCache(me.value);
+    }
   }
 
   async function ensureMe(force = false) {
@@ -66,6 +101,7 @@ export const useSessionStore = defineStore("session", () => {
           avatar_url: row.avatar_url || "",
           coins: Math.max(0, Math.floor(Number(row.coins ?? 0))),
         };
+        writeMeCache(me.value);
         avatarBroken.value = false;
         rememberViewerPreferences(row);
       } catch {

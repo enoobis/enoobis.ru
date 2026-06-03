@@ -380,10 +380,15 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
     </section>
   </div>
   <p v-else-if="err" class="error">{{ err }}</p>
-  <p v-else class="muted">загрузка</p>
+  <div v-else class="profile-skeleton" aria-busy="true" />
 </template>
 
 <style scoped>
+.profile-skeleton {
+  min-height: 72vh;
+  max-width: 640px;
+  margin: 0 auto;
+}
 .profile-bg-layer {
   position: fixed;
   inset: 0;

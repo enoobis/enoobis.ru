@@ -71,7 +71,8 @@ function isEquipped(a: OwnedShopItem): boolean {
 }
 
 async function load() {
-  loading.value = true;
+  const showLoading = !items.value.length;
+  if (showLoading) loading.value = true;
   try {
     await session.ensureMe();
     items.value = await listMyShopItems(auth.token!);
@@ -138,12 +139,12 @@ onMounted(load);
         <span>{{ profileCoins }}</span>
       </div>
     </header>
-    <div v-if="loading" class="page-empty muted">загрузка</div>
-    <div v-else-if="!items.length" class="page-empty muted">
+    <div v-if="loading && !items.length" class="page-empty muted">загрузка</div>
+    <div v-else-if="!loading && !items.length" class="page-empty muted">
       <p>пусто</p>
       <RouterLink to="/shop" class="to-shop">магазин →</RouterLink>
     </div>
-    <ul v-else class="grid">
+    <ul v-if="items.length" class="grid">
       <li v-for="a in sortedItems" :key="a.id" class="card item-card">
         <span class="kind muted small">{{ kindLabel(a.kind) }}</span>
         <div class="preview">
