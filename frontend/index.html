@@ -12,22 +12,32 @@
     <meta property="og:url" content="https://enoobis.ru/" />
     <meta property="og:image" content="https://enoobis.ru/favicon-round.png" />
     <title>enoobis.ru</title>
+    <script>
+      (function () {
+        try {
+          var raw = localStorage.getItem("enoobis_viewer_prefs");
+          if (!raw) return;
+          var p = JSON.parse(raw);
+          var t = p.theme_preference || "black";
+          if (t !== "white" && t !== "contrast" && t !== "contrast-white") t = "black";
+          document.documentElement.setAttribute("data-theme", t);
+          document.documentElement.style.colorScheme =
+            t === "white" || t === "contrast-white" ? "light" : "dark";
+          var scale =
+            p.font_preference === "compact" ? "0.94" : p.font_preference === "large" ? "1.08" : "1";
+          document.documentElement.style.setProperty("--app-font-scale", scale);
+          if (p.language_preference) document.documentElement.lang = p.language_preference;
+        } catch (e) {}
+      })();
+    </script>
     <link rel="icon" type="image/png" sizes="256x256" href="/favicon-round.png" />
     <link rel="apple-touch-icon" href="/favicon-round.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      rel="preload"
-      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600&family=JetBrains+Mono:wght@400;600&family=Outfit:wght@400;600;700&display=swap"
-      as="style"
-      onload="this.onload=null;this.rel='stylesheet'"
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600&family=JetBrains+Mono:wght@400;600&family=Outfit:wght@400;600;700&display=optional"
     />
-    <noscript>
-      <link
-        rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600&family=JetBrains+Mono:wght@400;600&family=Outfit:wght@400;600;700&display=swap"
-      />
-    </noscript>
   </head>
   <body>
     <div id="app"></div>

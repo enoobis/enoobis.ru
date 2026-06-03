@@ -103,7 +103,8 @@ async function load() {
     return;
   }
 
-  loading.value = true;
+  const showLoading = !items.value.length;
+  if (showLoading) loading.value = true;
   try {
     await loadCoins();
     if (seq !== shopLoadSeq) return;
@@ -264,9 +265,9 @@ watch(
       </div>
     </div>
 
-    <div v-if="loading" class="page-empty muted">загрузка</div>
-    <div v-else-if="!items.length" class="page-empty muted">пусто</div>
-    <ul v-else class="grid">
+    <div v-if="loading && !items.length" class="page-empty muted">загрузка</div>
+    <div v-else-if="!loading && !items.length" class="page-empty muted">пусто</div>
+    <ul v-if="items.length" class="grid">
       <li v-for="item in items" :key="item.id" class="card item-card">
         <div class="preview">
           <template v-if="item.kind === 'avatar'">

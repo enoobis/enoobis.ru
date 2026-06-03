@@ -128,10 +128,13 @@ async function load() {
   wallpaperBroken.value = false;
   coverBroken.value = false;
   avatarHealTried.value = false;
-  profile.value = null;
-  posts.value = [];
-  micro.value = [];
-  following.value = false;
+  const sameProfile = profile.value?.nickname === nick.value;
+  if (!sameProfile) {
+    profile.value = null;
+    posts.value = [];
+    micro.value = [];
+    following.value = false;
+  }
   try {
     profile.value = await api<Profile>(`/api/profile/${nick.value}`);
     const [pBlog, pMicro] = await Promise.all([

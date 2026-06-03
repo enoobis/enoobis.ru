@@ -320,8 +320,10 @@ header {
 }
 
 .image {
-  max-width: 100%;
+  width: 100%;
   max-height: 320px;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
   border-radius: var(--radius);
   border: 1px solid var(--border);
   margin: 0.4rem 0 0.5rem;

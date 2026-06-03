@@ -6,8 +6,31 @@ export type UserPreferences = {
   font_preference?: string;
 };
 
+const LS_VIEWER_PREFS = "enoobis_viewer_prefs";
+
 let viewerPrefs: UserPreferences = {};
 let profileThemeActive = false;
+
+function persistViewerPrefs() {
+  try {
+    localStorage.setItem(LS_VIEWER_PREFS, JSON.stringify(viewerPrefs));
+  } catch {
+    /* ignore */
+  }
+}
+
+/** до vue: тема/шрифт из localStorage, без скачка при /api/me */
+export function bootstrapStoredViewerPreferences() {
+  try {
+    const raw = localStorage.getItem(LS_VIEWER_PREFS);
+    if (!raw) return;
+    const stored = JSON.parse(raw) as UserPreferences;
+    viewerPrefs = { ...viewerPrefs, ...stored };
+    applyUserPreferences(viewerPrefs);
+  } catch {
+    /* ignore */
+  }
+}
 
 export function isProfileThemeRoute(path: string): boolean {
   return /^\/u\/[^/]+(\/follows)?$/.test(path);
@@ -41,6 +64,7 @@ export function applyUserPreferences(prefs: UserPreferences) {
 /** сохраняет настройки зрителя; на странице чужого профиля dom не трогает */
 export function rememberViewerPreferences(prefs: UserPreferences) {
   viewerPrefs = { ...viewerPrefs, ...prefs };
+  persistViewerPrefs();
   if (!profileThemeActive) {
     applyUserPreferences(viewerPrefs);
   }
@@ -50,6 +74,7 @@ export function rememberViewerPreferences(prefs: UserPreferences) {
 export function setViewerPreferences(prefs: UserPreferences) {
   viewerPrefs = { ...viewerPrefs, ...prefs };
   profileThemeActive = false;
+  persistViewerPrefs();
   applyUserPreferences(viewerPrefs);
 }
 

@@ -7,7 +7,6 @@ import { useSessionStore } from "./stores/session";
 import AppIcon from "./components/AppIcon.vue";
 import AppToast from "./components/AppToast.vue";
 import SearchPanel from "./components/SearchPanel.vue";
-import { routeNavPending } from "./sync/routeNavPending";
 
 const router = useRouter();
 const route = useRoute();
@@ -27,29 +26,12 @@ const sheetMobile = ref(
 const sheetGeom = ref({ top: 0, left: 0, width: 0 });
 const SHEET_MOBILE_MAX = 640;
 const profileCoins = computed(() => session.coins);
-const navLoadingVisible = ref(false);
-let navLoadingTimer: ReturnType<typeof setTimeout> | null = null;
 const headerSheetOpen = computed(
   () => navDrawerOpen.value || profileMenuOpen.value || searchOpen.value,
 );
 const navFullSheetOpen = computed(() => headerSheetOpen.value && !sheetMobile.value);
 const initials = computed(() => (auth.nickname || "U").slice(0, 2).toUpperCase());
 const chatBadge = computed(() => (chatStore.unread > 9 ? "9+" : String(chatStore.unread)));
-
-watch(routeNavPending, (pending) => {
-  if (pending) {
-    if (navLoadingTimer) clearTimeout(navLoadingTimer);
-    navLoadingTimer = setTimeout(() => {
-      if (routeNavPending.value) navLoadingVisible.value = true;
-    }, 180);
-  } else {
-    if (navLoadingTimer) {
-      clearTimeout(navLoadingTimer);
-      navLoadingTimer = null;
-    }
-    navLoadingVisible.value = false;
-  }
-});
 
 function syncOnlineStatus() {
   isOnline.value = navigator.onLine;
@@ -300,7 +282,6 @@ watch(
   <div class="layout">
     <header ref="navEl" class="nav" :class="{ 'nav--sheet-open': navFullSheetOpen }">
       <div class="nav-bar">
-      <span v-if="navLoadingVisible" class="nav-route-loading muted" aria-live="polite">загрузка…</span>
       <div v-if="auth.token" class="nav-menu-anchor">
         <button
           type="button"
@@ -608,12 +589,7 @@ watch(
         </div>
       </Transition>
     </Teleport>
-    <RouterView v-slot="{ Component, route: viewRoute }">
-      <component v-if="viewRoute.path === '/'" :is="Component" :key="viewRoute.path" />
-      <Transition v-else name="page" mode="out-in">
-        <component :is="Component" :key="viewRoute.path" />
-      </Transition>
-    </RouterView>
+    <RouterView />
     <AppToast />
     <div v-if="!isOnline" class="offline-overlay" role="status" aria-live="polite">
       <div class="offline-card">

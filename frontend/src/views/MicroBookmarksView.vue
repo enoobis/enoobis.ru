@@ -12,7 +12,8 @@ const err = ref("");
 
 async function load() {
   if (!auth.token) return;
-  loading.value = true;
+  const showLoading = !posts.value.length;
+  if (showLoading) loading.value = true;
   err.value = "";
   try {
     const data = await listMyMicroBookmarks(auth.token, { page: 1, page_size: 50 });
@@ -46,11 +47,10 @@ onMounted(load);
       <h1>закладки</h1>
     </header>
     <p v-if="err" class="error">{{ err }}</p>
-    <p v-else-if="loading" class="muted">загрузка</p>
-    <p v-else-if="!posts.length" class="muted empty">пусто</p>
+    <p v-else-if="loading && !posts.length" class="muted">загрузка</p>
+    <p v-else-if="!loading && !posts.length" class="muted empty">пусто</p>
     <MicroItem
       v-for="p in posts"
-      v-else
       :key="p.id"
       :post="p"
       clickable

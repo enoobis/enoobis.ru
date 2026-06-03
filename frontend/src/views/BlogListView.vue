@@ -70,7 +70,8 @@ async function loadTaxonomy() {
 
 async function load() {
   err.value = "";
-  loading.value = true;
+  const showLoading = !posts.value.length;
+  if (showLoading) loading.value = true;
   try {
     const query = {
       page: page.value,
@@ -194,7 +195,7 @@ onMounted(async () => {
     </div>
 
     <p v-if="err" class="error">{{ err }}</p>
-    <p v-else-if="loading" class="muted">загрузка</p>
+    <p v-else-if="loading && !sortedPosts.length" class="muted">загрузка</p>
     <template v-else>
       <ul v-if="sortedPosts.length" class="post-list">
         <li v-for="p in sortedPosts" :key="p.id">

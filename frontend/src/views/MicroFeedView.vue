@@ -22,7 +22,8 @@ let loadSeq = 0;
 async function load() {
   const seq = ++loadSeq;
   err.value = "";
-  loading.value = true;
+  const showLoading = !posts.value.length;
+  if (showLoading) loading.value = true;
   try {
     const data = await listMicro(
       {
@@ -104,8 +105,8 @@ onMounted(load);
     </div>
 
     <p v-if="err" class="error">{{ err }}</p>
-    <p v-else-if="loading" class="muted">загрузка</p>
-    <p v-else-if="!posts.length" class="muted empty">пусто</p>
+    <p v-else-if="loading && !posts.length" class="muted">загрузка</p>
+    <p v-else-if="!loading && !posts.length" class="muted empty">пусто</p>
 
     <MicroItem
       v-for="p in posts"

@@ -1,6 +1,5 @@
 import { createRouter, createWebHistory } from "vue-router";
 import { useAuthStore } from "../stores/auth";
-import { routeNavPending } from "../sync/routeNavPending";
 import { applyDocumentSeo } from "../utils/seo";
 import { clearProfileOwnerTheme, isProfileThemeRoute } from "../utils/preferences";
 
@@ -150,7 +149,6 @@ const router = createRouter({
 });
 
 router.beforeEach((to) => {
-  routeNavPending.value = true;
   const auth = useAuthStore();
   if (to.name === "home" && auth.token) {
     return { name: "micro", replace: true };
@@ -161,15 +159,10 @@ router.beforeEach((to) => {
 });
 
 router.afterEach((to) => {
-  routeNavPending.value = false;
   applyDocumentSeo();
   if (!isProfileThemeRoute(to.path)) {
     clearProfileOwnerTheme();
   }
-});
-
-router.onError(() => {
-  routeNavPending.value = false;
 });
 
 export default router;

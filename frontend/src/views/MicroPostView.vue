@@ -20,9 +20,12 @@ const isReply = computed(() => !!post.value?.parent_id);
 
 async function load() {
   err.value = "";
-  loading.value = true;
-  post.value = null;
-  replies.value = [];
+  const keepContent = post.value?.id === id.value;
+  if (!keepContent) {
+    loading.value = true;
+    post.value = null;
+    replies.value = [];
+  }
   try {
     const data = await getMicro(id.value, auth.token);
     post.value = data.post;
@@ -72,7 +75,7 @@ watch(id, load);
     <RouterLink v-else to="/microblogs" class="back muted small">← лента</RouterLink>
 
     <p v-if="err" class="error">{{ err }}</p>
-    <p v-else-if="loading" class="muted">загрузка</p>
+    <p v-else-if="loading && !post" class="muted">загрузка</p>
 
     <template v-else-if="post">
       <MicroItem :post="post" @deleted="onPostDeleted" @updated="onPostUpdated" />
