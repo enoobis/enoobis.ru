@@ -4,10 +4,11 @@ import express from "express";
 import cors from "cors";
 import path from "node:path";
 import { all, db, get, nowIso, run } from "./db.js";
-import { hashPassword } from "./auth.js";
+import { getJwtSecret, hashPassword } from "./auth.js";
 import { v4 as uuidv4 } from "uuid";
 import { saveIdenticon } from "./utils/identicon.js";
 import { scheduleChatRetention } from "./utils/chatRetention.js";
+import { apiOriginGuard, corsOptions, rateLimit, securityHeaders } from "./utils/security.js";
 import authRoutes from "./routes/authRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import blogRoutes from "./routes/blogRoutes.js";
@@ -22,9 +23,14 @@ import storageRoutes from "./routes/storageRoutes.js";
 import libraryRoutes from "./routes/libraryRoutes.js";
 import shopRoutes from "./routes/shopRoutes.js";
 
+getJwtSecret();
+
 const app = express();
-app.use(cors());
-app.use(express.json({ limit: "10mb" }));
+app.set("trust proxy", 1);
+app.use(securityHeaders);
+app.use(cors(corsOptions()));
+app.use(express.json({ limit: "2mb" }));
+app.use("/api", apiOriginGuard);
 
 const UPLOAD_ROOT = path.resolve(process.env.UPLOADS_DIR ?? "./data/uploads");
 app.use("/uploads", express.static(UPLOAD_ROOT, { maxAge: "1d" }));
@@ -47,40 +53,34 @@ app.use("/api", adminRoutes);
 
 app.use("/api", (req, res) => res.status(404).json({ error: "api not found" }));
 app.use((err, _req, res, _next) => {
-  console.error(err);
+  if (process.env.NODE_ENV !== "production") console.error(err);
   res.status(500).json({ error: "internal error" });
 });
 
 const server = http.createServer(app);
 
-async function ensureAdminAccount() {
-  const adminEmail = "REDACTED";
-  const password = "REDACTED";
+async function bootstrapAdminFromEnv() {
+  const email = process.env.ADMIN_EMAIL?.trim();
+  const password = process.env.ADMIN_PASSWORD?.trim();
+  if (!email || !password) return;
+  if (password.length < 12) {
+    console.warn("admin bootstrap: ADMIN_PASSWORD too short (min 12), skipped");
+    return;
+  }
+  const hasAdmin = get("SELECT id FROM users WHERE role = 'admin' LIMIT 1");
+  if (hasAdmin) return;
+
   const hash = await hashPassword(password);
-  const existing = get("SELECT id FROM users WHERE email = ?", adminEmail);
-  if (existing) {
-    run(
-      "UPDATE users SET password_hash = ?, role = 'admin', status = 'approved' WHERE id = ?",
-      hash,
-      existing.id,
-    );
-    return;
-  }
-  const anyAdmin = get("SELECT id FROM users WHERE role = 'admin' ORDER BY created_at LIMIT 1");
-  if (anyAdmin) {
-    run("UPDATE users SET email = ?, password_hash = ?, status = 'approved' WHERE id = ?",
-      adminEmail, hash, anyAdmin.id);
-    return;
-  }
   const id = uuidv4();
   run(
     `INSERT INTO users (id, email, password_hash, nickname, role, status, bio, wallpaper_url, avatar_url, created_at)
-     VALUES (?, ?, ?, 'enoobis_admin', 'admin', 'approved', 'Системный администратор', '', '', ?)`,
+     VALUES (?, ?, ?, 'admin', 'admin', 'approved', '', '', '', ?)`,
     id,
-    adminEmail,
+    email,
     hash,
     nowIso(),
   );
+  console.log("admin bootstrap: created first admin from ADMIN_EMAIL");
 }
 
 function purgeLegacyUnlimitedInvites() {
@@ -88,7 +88,9 @@ function purgeLegacyUnlimitedInvites() {
     run(
       "DELETE FROM invite_links WHERE max_uses >= 1000000 AND used_count = 0",
     );
-  } catch {}
+  } catch {
+    /* ignore */
+  }
 }
 
 function backfillIdenticons() {
@@ -99,7 +101,9 @@ function backfillIdenticons() {
     try {
       const url = saveIdenticon(u.nickname || u.id, u.id);
       run("UPDATE users SET avatar_url = ? WHERE id = ?", url, u.id);
-    } catch {}
+    } catch {
+      /* ignore */
+    }
   }
 }
 
@@ -107,9 +111,9 @@ const port = Number(process.env.PORT ?? 3000);
 server.listen(port, async () => {
   db.prepare("SELECT 1").get();
   try {
-    await ensureAdminAccount();
+    await bootstrapAdminFromEnv();
   } catch (e) {
-    console.warn("admin seed warn:", e?.message ?? e);
+    console.warn("admin bootstrap warn:", e?.message ?? e);
   }
   try {
     backfillIdenticons();

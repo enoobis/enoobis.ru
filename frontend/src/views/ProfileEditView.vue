@@ -260,7 +260,8 @@ async function onChangePassword() {
   err.value = "";
   changingPassword.value = true;
   try {
-    await changeMyPassword(auth.token, currentPassword.value, newPassword.value);
+    const r = await changeMyPassword(auth.token, currentPassword.value, newPassword.value);
+    if (r.token && auth.user) auth.applySession(r.token, auth.user);
     currentPassword.value = "";
     newPassword.value = "";
     avatarMsg.value = "пароль обновлён";

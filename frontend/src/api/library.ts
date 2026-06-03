@@ -103,9 +103,13 @@ function parseFilenameFromContentDisposition(header: string | null): string | nu
   return null;
 }
 
-/** url для iframe/embed (на телефоне blob-url часто не открывает pdf) */
-export function libraryReadUrl(id: string, token: string) {
-  const qs = new URLSearchParams({ token });
+/** короткий access-токен для iframe (без jwt сессии в url) */
+export async function libraryReadUrl(id: string, token: string): Promise<string> {
+  const r = await api<{ access: string }>(`/api/library/${encodeURIComponent(id)}/read-access`, {
+    method: "POST",
+    token,
+  });
+  const qs = new URLSearchParams({ access: r.access });
   return `/api/library/${encodeURIComponent(id)}/read?${qs}`;
 }
 

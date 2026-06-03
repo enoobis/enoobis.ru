@@ -62,7 +62,7 @@ export function patchMyNotifications(token: string, payload: Partial<Notificatio
 }
 
 export function changeMyPassword(token: string, current_password: string, new_password: string) {
-  return api<{ ok: boolean }>("/api/me/password", {
+  return api<{ ok: boolean; token?: string }>("/api/me/password", {
     method: "POST",
     token,
     body: JSON.stringify({ current_password, new_password }),

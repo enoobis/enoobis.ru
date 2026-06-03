@@ -17,10 +17,12 @@ import {
   updateShopCategory,
 } from "../utils/shopCategories.js";
 import { detachShopItemFromUsers } from "../utils/profileCosmetics.js";
+import { verifyLectureFile, verifyRasterImage } from "../utils/mimeVerify.js";
+import { assertSafeUploadExtension } from "../utils/security.js";
+import { unlinkUploadUrl, UPLOAD_ROOT } from "../utils/uploadSafe.js";
 
 const router = express.Router();
 
-const UPLOAD_ROOT = path.resolve(process.env.UPLOADS_DIR ?? "./data/uploads");
 const SUBDIRS = [
   "avatars",
   "blog",
@@ -68,9 +70,29 @@ const blogUpload = multer({
   limits: { fileSize: 8 * 1024 * 1024 },
   fileFilter: imageFileFilter,
 });
+const LECTURE_MIMES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "application/pdf",
+  "video/mp4",
+  "video/webm",
+]);
+
+function lectureFileFilter(_req, file, cb) {
+  if (LECTURE_MIMES.has(file.mimetype)) cb(null, true);
+  else cb(new Error("only images, pdf, mp4, webm"));
+}
+
+function canManageCourse(user, courseId) {
+  return canEditCourseIcon(user, courseId);
+}
+
 const lectureUpload = multer({
   storage: makeStorage("course-lectures"),
   limits: { fileSize: 32 * 1024 * 1024 },
+  fileFilter: lectureFileFilter,
 });
 const courseIconUpload = multer({
   storage: makeStorage("course-icons"),
@@ -92,15 +114,20 @@ function canEditCourseIcon(user, courseId) {
 
 function unlinkCourseIconUrl(url) {
   if (!url || !url.startsWith("/uploads/course-icons/")) return;
-  try {
-    fs.unlinkSync(path.join(UPLOAD_ROOT, url.replace(/^\/uploads\//, "")));
-  } catch {
-    /* ignore */
-  }
+  unlinkUploadUrl(url, ["course-icons"]);
 }
 
 router.post("/me/avatar", authRequired, uploadSingle(avatarUpload, "file"), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: "no file" });
+  const probe = await verifyRasterImage(req.file.path);
+  if (!probe.ok) {
+    try {
+      fs.unlinkSync(req.file.path);
+    } catch {
+      /* ignore */
+    }
+    return res.status(400).json({ error: "invalid image" });
+  }
   if (isRasterImageMimetype(req.file.mimetype)) {
     const r = await optimizeUploadedFile(req.file.path, "avatar");
     if (r.ok) req.file.filename = r.filename;
@@ -112,6 +139,15 @@ router.post("/me/avatar", authRequired, uploadSingle(avatarUpload, "file"), asyn
 
 router.post("/blog/upload-image", authRequired, uploadSingle(blogUpload, "file"), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: "no file" });
+  const probe = await verifyRasterImage(req.file.path);
+  if (!probe.ok) {
+    try {
+      fs.unlinkSync(req.file.path);
+    } catch {
+      /* ignore */
+    }
+    return res.status(400).json({ error: "invalid image" });
+  }
   if (isRasterImageMimetype(req.file.mimetype)) {
     const r = await optimizeUploadedFile(req.file.path, "blog");
     if (r.ok) req.file.filename = r.filename;
@@ -140,14 +176,29 @@ router.post("/blog/upload-image", authRequired, uploadSingle(blogUpload, "file")
 router.post(
   "/courses/:id/icon",
   authRequired,
-  uploadSingle(courseIconUpload, "file"),
-  async (req, res) => {
+  (req, res, next) => {
     const courseId = String(req.params.id ?? "").trim();
     if (!courseId) return res.status(400).json({ error: "invalid course" });
     if (!canEditCourseIcon(req.user, courseId)) {
       return res.status(403).json({ error: "forbidden" });
     }
+    courseIconUpload.single("file")(req, res, (err) => {
+      if (err) return res.status(400).json({ error: err.message ?? "upload error" });
+      next();
+    });
+  },
+  async (req, res) => {
+    const courseId = String(req.params.id ?? "").trim();
     if (!req.file) return res.status(400).json({ error: "no file" });
+    const probe = await verifyRasterImage(req.file.path);
+    if (!probe.ok) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch {
+        /* ignore */
+      }
+      return res.status(400).json({ error: "invalid image" });
+    }
     if (isRasterImageMimetype(req.file.mimetype)) {
       const r = await optimizeUploadedFile(req.file.path, "course_icon");
       if (r.ok) req.file.filename = r.filename;
@@ -177,9 +228,38 @@ router.delete("/courses/:id/icon", authRequired, (req, res) => {
 router.post(
   "/courses/:id/lectures/upload",
   authRequired,
-  lectureUpload.single("file"),
+  (req, res, next) => {
+    const courseId = String(req.params.id ?? "").trim();
+    if (!courseId) return res.status(400).json({ error: "invalid course" });
+    if (!canManageCourse(req.user, courseId)) {
+      return res.status(403).json({ error: "forbidden" });
+    }
+    lectureUpload.single("file")(req, res, (err) => {
+      if (err) return res.status(400).json({ error: err.message ?? "upload error" });
+      next();
+    });
+  },
   async (req, res) => {
     if (!req.file) return res.status(400).json({ error: "no file" });
+    try {
+      assertSafeUploadExtension(req.file.originalname);
+    } catch {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch {
+        /* ignore */
+      }
+      return res.status(400).json({ error: "blocked file type" });
+    }
+    const valid = await verifyLectureFile(req.file.path, req.file.mimetype || "");
+    if (!valid) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch {
+        /* ignore */
+      }
+      return res.status(400).json({ error: "invalid file" });
+    }
     if (isRasterImageMimetype(req.file.mimetype)) {
       const r = await optimizeUploadedFile(req.file.path, "lecture");
       if (r.ok) req.file.filename = r.filename;
@@ -201,9 +281,23 @@ const shopItemUpload = multer({
   fileFilter: imageFileFilter,
 });
 
-router.post("/admin/shop/items", authRequired, uploadSingle(shopItemUpload, "file"), async (req, res) => {
+router.post("/admin/shop/items", authRequired, (req, res, next) => {
   if (req.user.role !== "admin") return res.status(403).json({ error: "forbidden" });
+  shopItemUpload.single("file")(req, res, (err) => {
+    if (err) return res.status(400).json({ error: err.message ?? "upload error" });
+    next();
+  });
+}, async (req, res) => {
   if (!req.file) return res.status(400).json({ error: "no file" });
+  const probe = await verifyRasterImage(req.file.path);
+  if (!probe.ok) {
+    try {
+      fs.unlinkSync(req.file.path);
+    } catch {
+      /* ignore */
+    }
+    return res.status(400).json({ error: "invalid image" });
+  }
   const kind = String(req.body?.kind ?? "avatar").trim();
   if (!SHOP_KINDS.has(kind)) return res.status(400).json({ error: "bad kind" });
   const name = String(req.body?.name ?? "").trim() || req.file.originalname;
@@ -364,7 +458,7 @@ router.delete("/admin/shop/items/:id", authRequired, (req, res) => {
   run("DELETE FROM shop_item_categories WHERE item_id = ?", req.params.id);
   if (row.url?.startsWith("/uploads/shop-items/") || row.url?.startsWith("/uploads/shop-avatars/")) {
     try {
-      fs.unlinkSync(path.join(UPLOAD_ROOT, row.url.replace(/^\/uploads\//, "")));
+      unlinkUploadUrl(row.url, ["shop-items"]);
     } catch {
       /* ignore */
     }

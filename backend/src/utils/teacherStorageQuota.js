@@ -1,16 +1,20 @@
 import path from "node:path";
 import fs from "node:fs";
 import { all, get, run } from "../db.js";
+import { safePathUnder } from "./security.js";
 
 export const TEACHER_QUOTA_BYTES = 30 * 1024 * 1024;
 
 const FILES_ROOT = path.resolve(process.env.PRIVATE_FILES_DIR ?? "./data/private-files");
 
 function deleteStoredFile(row) {
-  try {
-    fs.unlinkSync(path.join(FILES_ROOT, row.storage_path));
-  } catch {
-    /* ignore */
+  const abs = safePathUnder(FILES_ROOT, row.storage_path);
+  if (abs) {
+    try {
+      fs.unlinkSync(abs);
+    } catch {
+      /* ignore */
+    }
   }
   run("DELETE FROM share_links WHERE target_type = 'file' AND target_id = ?", row.id);
   run("DELETE FROM user_files WHERE id = ?", row.id);

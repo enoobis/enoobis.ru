@@ -880,3 +880,26 @@ try {
 } catch {
   // ignore
 }
+
+try {
+  db.prepare("SELECT token_version FROM users LIMIT 1").get();
+} catch {
+  try {
+    db.exec("ALTER TABLE users ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0");
+  } catch {
+    // ignore
+  }
+}
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS admin_audit_log (
+    id TEXT PRIMARY KEY,
+    admin_id TEXT NOT NULL,
+    action TEXT NOT NULL,
+    target_id TEXT NOT NULL DEFAULT '',
+    detail_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (admin_id) REFERENCES users(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_admin_audit_created ON admin_audit_log(created_at DESC);
+`);

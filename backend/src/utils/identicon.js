@@ -9,7 +9,7 @@ const CELL = SIZE / GRID;
 const HALF = GRID / 2;
 
 export function buildIdenticonSvg(seed) {
-  const src = String(seed) + ":" + Math.random() + ":" + Date.now();
+  const src = String(seed);
   const hash = crypto.createHash("sha256").update(src).digest();
 
   const quad = [];

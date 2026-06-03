@@ -7,7 +7,9 @@ import { all, get, nowIso, run } from "../db.js";
 import { authRequired } from "../auth.js";
 import { assertChatOutgoing } from "../utils/contentLimits.js";
 import { optimizeUploadedFile } from "../utils/imageOptimize.js";
+import { verifyRasterImage } from "../utils/mimeVerify.js";
 import { onlinePayload } from "../utils/onlineStatus.js";
+import { unlinkUploadUrl } from "../utils/uploadSafe.js";
 
 const router = express.Router();
 const MAX_BODY = 4000;
@@ -263,12 +265,7 @@ router.delete("/chats/:id/messages", authRequired, (req, res) => {
   for (const m of msgs) {
     const url = m.image_url && String(m.image_url);
     if (url && url.startsWith("/uploads/chat/")) {
-      const file = path.join(UPLOAD_ROOT, url.replace(/^\/uploads\//, ""));
-      try {
-        fs.unlinkSync(file);
-      } catch {
-        // ignore missing file
-      }
+      unlinkUploadUrl(url, ["chat"]);
     }
   }
   run("DELETE FROM chat_messages WHERE thread_id = ?", thread.id);
@@ -413,6 +410,15 @@ router.post(
       return;
     }
     if (!req.file) return res.status(400).json({ error: "no file" });
+    const probe = await verifyRasterImage(req.file.path);
+    if (!probe.ok) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch {
+        /* ignore */
+      }
+      return res.status(400).json({ error: "invalid image" });
+    }
     const r = await optimizeUploadedFile(req.file.path, "chat");
     if (r.ok) req.file.filename = r.filename;
     const url = `/uploads/chat/${req.file.filename}`;
@@ -465,12 +471,7 @@ router.delete("/chats/messages/:id", authRequired, (req, res) => {
     return res.status(403).json({ error: "forbidden" });
   }
   if (msg.image_url && msg.image_url.startsWith("/uploads/chat/")) {
-    const file = path.join(UPLOAD_ROOT, msg.image_url.replace(/^\/uploads\//, ""));
-    try {
-      fs.unlinkSync(file);
-    } catch {
-      // ignore missing file
-    }
+    unlinkUploadUrl(msg.image_url, ["chat"]);
   }
   run("UPDATE chat_messages SET reply_to_id = NULL WHERE reply_to_id = ?", msg.id);
   run("DELETE FROM chat_messages WHERE id = ?", msg.id);

@@ -4,7 +4,13 @@ import path from "node:path";
 import fs from "node:fs";
 import { v4 as uuidv4 } from "uuid";
 import { all, get, nowIso, run } from "../db.js";
-import { authFromBearerOrQuery, authRequired } from "../auth.js";
+import {
+  authRequired,
+  mintScopedAccessToken,
+  verifyScopedAccessToken,
+} from "../auth.js";
+import { rateLimit, safePathUnder } from "../utils/security.js";
+import { LIBRARY_ALLOWED_MIMES, verifyLibraryBook } from "../utils/mimeVerify.js";
 import { contentDispositionAttachment, contentDispositionInline } from "../utils/contentDisposition.js";
 
 const router = express.Router();
@@ -30,6 +36,14 @@ const upload = multer({
     },
   }),
   limits: { fileSize: BOOK_MAX_BYTES },
+  fileFilter: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (![".pdf", ".epub"].includes(ext)) return cb(new Error("only pdf or epub"));
+    if (!LIBRARY_ALLOWED_MIMES.has(file.mimetype)) {
+      return cb(new Error("only pdf or epub"));
+    }
+    cb(null, true);
+  },
 });
 
 router.get("/library", authRequired, (req, res) => {
@@ -78,14 +92,23 @@ router.get("/library/categories", authRequired, (_req, res) => {
 });
 
 router.post("/library", authRequired, staffOnly, (req, res, next) => {
-  upload.single("file")(req, res, (err) => {
+  upload.single("file")(req, res, async (err) => {
     if (err) {
       if (err.code === "LIMIT_FILE_SIZE") {
         return res.status(413).json({ error: "file_too_large" });
       }
-      return next(err);
+      return res.status(400).json({ error: err.message ?? "upload_error" });
     }
     if (!req.file) return res.status(400).json({ error: "no_file" });
+    const valid = await verifyLibraryBook(req.file.path, req.file.mimetype || "");
+    if (!valid) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch {
+        /* ignore */
+      }
+      return res.status(400).json({ error: "invalid_file" });
+    }
     const title = String(req.body?.title ?? "").trim().slice(0, 200);
     const author = String(req.body?.author ?? "").trim().slice(0, 200);
     const description = String(req.body?.description ?? "").trim().slice(0, 4000);
@@ -177,7 +200,29 @@ router.patch("/library/:id", authRequired, staffOnly, (req, res) => {
   res.json(updated);
 });
 
-router.get("/library/:id/read", authFromBearerOrQuery, (req, res) => {
+const shareReadLimit = rateLimit({ windowMs: 60_000, max: 120, keyPrefix: "lib-read" });
+
+router.post("/library/:id/read-access", authRequired, (req, res) => {
+  const book = get(
+    "SELECT id, original_name, mime_type FROM library_books WHERE id = ?",
+    req.params.id,
+  );
+  if (!book) return res.status(404).json({ error: "not_found" });
+  if (!isPdfMime(book.mime_type, book.original_name)) {
+    return res.status(415).json({ error: "read_only_pdf" });
+  }
+  const access = mintScopedAccessToken(req.user.id, "library_read", book.id, 900);
+  return res.json({ access, expires_in: 900 });
+});
+
+router.get("/library/:id/read", shareReadLimit, (req, res) => {
+  const access = typeof req.query?.access === "string" ? req.query.access.trim() : "";
+  if (!access) return res.status(401).json({ error: "unauthorized" });
+  try {
+    verifyScopedAccessToken(access, "library_read", req.params.id);
+  } catch {
+    return res.status(401).json({ error: "unauthorized" });
+  }
   const book = get(
     "SELECT storage_path, original_name, mime_type FROM library_books WHERE id = ?",
     req.params.id,
@@ -186,8 +231,8 @@ router.get("/library/:id/read", authFromBearerOrQuery, (req, res) => {
   if (!isPdfMime(book.mime_type, book.original_name)) {
     return res.status(415).json({ error: "read_only_pdf" });
   }
-  const abs = path.join(LIBRARY_ROOT, book.storage_path);
-  if (!fs.existsSync(abs)) return res.status(404).json({ error: "not_found" });
+  const abs = safePathUnder(LIBRARY_ROOT, book.storage_path);
+  if (!abs || !fs.existsSync(abs)) return res.status(404).json({ error: "not_found" });
   const mime = resolveMime(book.mime_type, book.original_name);
   res.setHeader("Content-Type", mime);
   res.setHeader("Content-Disposition", contentDispositionInline(book.original_name));
@@ -204,8 +249,8 @@ router.get("/library/:id/download", authRequired, (req, res) => {
     req.params.id,
   );
   if (!book) return res.status(404).json({ error: "not_found" });
-  const abs = path.join(LIBRARY_ROOT, book.storage_path);
-  if (!fs.existsSync(abs)) return res.status(404).json({ error: "not_found" });
+  const abs = safePathUnder(LIBRARY_ROOT, book.storage_path);
+  if (!abs || !fs.existsSync(abs)) return res.status(404).json({ error: "not_found" });
   const mime = resolveMime(book.mime_type, book.original_name);
   res.setHeader("Content-Type", mime);
   res.setHeader("Content-Disposition", contentDispositionAttachment(book.original_name));
@@ -225,10 +270,13 @@ router.delete("/library/:id", authRequired, staffOnly, (req, res) => {
   if (book.uploaded_by !== req.user.id && req.user.role !== "admin") {
     return res.status(403).json({ error: "forbidden" });
   }
-  try {
-    fs.unlinkSync(path.join(LIBRARY_ROOT, book.storage_path));
-  } catch {
-    /* ignore */
+  const abs = safePathUnder(LIBRARY_ROOT, book.storage_path);
+  if (abs) {
+    try {
+      fs.unlinkSync(abs);
+    } catch {
+      /* ignore */
+    }
   }
   run("DELETE FROM library_books WHERE id = ?", book.id);
   res.json({ ok: true });

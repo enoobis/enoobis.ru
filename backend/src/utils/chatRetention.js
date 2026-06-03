@@ -1,8 +1,5 @@
-import fs from "node:fs";
-import path from "node:path";
 import { all, db, get, run } from "../db.js";
-
-const UPLOAD_ROOT = path.resolve(process.env.UPLOADS_DIR ?? "./data/uploads");
+import { unlinkUploadUrl } from "./uploadSafe.js";
 const RETENTION_DAYS = Math.max(1, Number(process.env.CHAT_RETENTION_DAYS ?? 7));
 const PURGE_INTERVAL_MS = Math.max(
   60_000,
@@ -16,12 +13,7 @@ function cutoffIso() {
 function unlinkChatImage(imageUrl) {
   const url = imageUrl && String(imageUrl);
   if (!url || !url.startsWith("/uploads/chat/")) return;
-  const file = path.join(UPLOAD_ROOT, url.replace(/^\/uploads\//, ""));
-  try {
-    fs.unlinkSync(file);
-  } catch {
-    /* ignore missing file */
-  }
+  unlinkUploadUrl(url, ["chat"]);
 }
 
 export function purgeExpiredChatMessages() {

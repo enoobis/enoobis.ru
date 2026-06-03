@@ -5,6 +5,7 @@ import fs from "node:fs";
 import { v4 as uuidv4 } from "uuid";
 import { all, get, nowIso, run } from "../db.js";
 import { authRequired } from "../auth.js";
+import { assertSafeUploadExtension, safePathUnder } from "../utils/security.js";
 import { TEACHER_QUOTA_BYTES, enforceTeacherStorageQuota } from "../utils/teacherStorageQuota.js";
 
 const router = express.Router();
@@ -13,6 +14,7 @@ const FILES_ROOT = path.resolve(process.env.PRIVATE_FILES_DIR ?? "./data/private
 fs.mkdirSync(FILES_ROOT, { recursive: true });
 
 const ADMIN_QUOTA_BYTES = 3 * 1024 * 1024 * 1024;
+const STAFF_FILE_MAX_BYTES = 200 * 1024 * 1024;
 
 function quotaBytesForRole(role) {
   return role === "admin" ? ADMIN_QUOTA_BYTES : TEACHER_QUOTA_BYTES;
@@ -59,9 +61,10 @@ router.get("/files", authRequired, staffOnly, (req, res) => {
 
 router.post("/files", authRequired, staffOnly, (req, res, next) => {
   const cap = quotaBytesForRole(req.user.role);
+  const perFileMax = Math.min(cap, STAFF_FILE_MAX_BYTES);
   multer({
     storage: diskStorage,
-    limits: { fileSize: cap },
+    limits: { fileSize: perFileMax },
   }).single("file")(req, res, (err) => {
     if (err) {
       if (err.code === "LIMIT_FILE_SIZE") {
@@ -70,6 +73,16 @@ router.post("/files", authRequired, staffOnly, (req, res, next) => {
       return next(err);
     }
     if (!req.file) return res.status(400).json({ error: "no_file" });
+    try {
+      assertSafeUploadExtension(req.file.originalname);
+    } catch {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch {
+        /* ignore */
+      }
+      return res.status(400).json({ error: "blocked_file_type" });
+    }
     const used = totalUsed(req.user.id);
     if (used + req.file.size > cap) {
       try {
@@ -110,7 +123,8 @@ router.get("/files/:id/download", authRequired, (req, res) => {
   if (row.owner_id !== req.user.id && req.user.role !== "admin") {
     return res.status(403).json({ error: "forbidden" });
   }
-  const abs = path.join(FILES_ROOT, row.storage_path);
+  const abs = safePathUnder(FILES_ROOT, row.storage_path);
+  if (!abs || !fs.existsSync(abs)) return res.status(404).json({ error: "not_found" });
   return res.download(abs, row.original_name);
 });
 
@@ -123,10 +137,13 @@ router.delete("/files/:id", authRequired, staffOnly, (req, res) => {
   if (row.owner_id !== req.user.id && req.user.role !== "admin") {
     return res.status(403).json({ error: "forbidden" });
   }
-  try {
-    fs.unlinkSync(path.join(FILES_ROOT, row.storage_path));
-  } catch {
-    /* ignore */
+  const abs = safePathUnder(FILES_ROOT, row.storage_path);
+  if (abs) {
+    try {
+      fs.unlinkSync(abs);
+    } catch {
+      /* ignore */
+    }
   }
   run("DELETE FROM user_files WHERE id = ?", row.id);
   return res.json({ ok: true });

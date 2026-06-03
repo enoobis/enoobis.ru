@@ -2,7 +2,15 @@ import express from "express";
 import jwt from "jsonwebtoken";
 import { v4 as uuidv4 } from "uuid";
 import { all, get, nowIso, run } from "../db.js";
-import { authRequired, hashPassword, verifyPassword } from "../auth.js";
+import {
+  authRequired,
+  bumpTokenVersion,
+  getJwtSecret,
+  hashPassword,
+  mintToken,
+  verifyPassword,
+} from "../auth.js";
+import { passwordPolicyError } from "../utils/passwordPolicy.js";
 import {
   listAchievementsForUser,
   checkFollowerMilestones,
@@ -10,13 +18,11 @@ import {
 import { buildModerationNotices, parseContentLimits } from "../utils/contentLimits.js";
 import { onlinePayload } from "../utils/onlineStatus.js";
 import { regenerateUserAvatar, sanitizeUserCosmetics } from "../utils/profileCosmetics.js";
-const JWT_SECRET = process.env.JWT_SECRET ?? "dev-secret-change-me";
-
 function viewerId(req) {
   const auth = req.headers.authorization ?? "";
   if (!auth.startsWith("Bearer ")) return null;
   try {
-    const claims = jwt.verify(auth.slice(7), JWT_SECRET);
+    const claims = jwt.verify(auth.slice(7), getJwtSecret());
     return claims?.sub ?? null;
   } catch {
     return null;
@@ -384,6 +390,41 @@ function userShowsOnlineStatus(userId) {
   return !!row?.show_online_status;
 }
 
+function privacySettingsFor(userId) {
+  ensurePrivacyRow(userId);
+  const row = get(
+    `SELECT profile_visibility, activity_visibility, media_visibility, show_birthday, show_country, show_online_status
+     FROM user_privacy_settings WHERE user_id = ?`,
+    userId,
+  );
+  return {
+    profile_visibility: row?.profile_visibility ?? "public",
+    activity_visibility: row?.activity_visibility ?? "public",
+    media_visibility: row?.media_visibility ?? "public",
+    show_birthday: !!row?.show_birthday,
+    show_country: !!row?.show_country,
+    show_online_status: !!row?.show_online_status,
+  };
+}
+
+function isFollower(viewerId, targetUserId) {
+  if (!viewerId || !targetUserId || viewerId === targetUserId) return false;
+  return !!get(
+    "SELECT 1 as v FROM user_follows WHERE follower_user_id = ? AND following_user_id = ?",
+    viewerId,
+    targetUserId,
+  );
+}
+
+function visibilityAllows(viewerId, targetUserId, visibility) {
+  if (!targetUserId) return false;
+  if (viewerId === targetUserId) return true;
+  if (visibility === "public") return true;
+  if (visibility === "private") return false;
+  if (visibility === "followers") return isFollower(viewerId, targetUserId);
+  return false;
+}
+
 router.get("/me/privacy", authRequired, (req, res) => {
   ensurePrivacyRow(req.user.id);
   const row = get(
@@ -507,14 +548,17 @@ router.patch("/me/notifications", authRequired, (req, res) => {
 
 router.post("/me/password", authRequired, async (req, res) => {
   const { current_password = "", new_password = "" } = req.body ?? {};
-  if (new_password.length < 8) return res.status(400).json({ error: "new password too short" });
+  const policyErr = passwordPolicyError(new_password);
+  if (policyErr) return res.status(400).json({ error: policyErr });
   const row = get("SELECT password_hash FROM users WHERE id = ?", req.user.id);
   if (!row) return res.status(404).json({ error: "not found" });
   const ok = await verifyPassword(current_password, row.password_hash);
-  if (!ok) return res.status(400).json({ error: "wrong current password" });
+  if (!ok) return res.status(400).json({ error: "wrong_current_password" });
   const hash = await hashPassword(new_password);
   run("UPDATE users SET password_hash = ? WHERE id = ?", hash, req.user.id);
-  return res.json({ ok: true });
+  bumpTokenVersion(req.user.id);
+  const token = mintToken(req.user.id, req.user.role, 30);
+  return res.json({ ok: true, token });
 });
 
 function gradeOverviewFor(userId) {
@@ -619,6 +663,7 @@ router.get("/leaderboard", authRequired, (req, res) => {
 });
 
 router.get("/profile/:nickname", (req, res) => {
+  const viewer = viewerId(req);
   const p = get(
     `SELECT id, nickname, role, bio, wallpaper_url, avatar_url, avatar_frame_url, profile_cover_url, theme_preference,
             language_preference, font_preference, full_name, website_url, social_links_json,
@@ -627,6 +672,11 @@ router.get("/profile/:nickname", (req, res) => {
     req.params.nickname,
   );
   if (!p) return res.status(404).json({ error: "not found" });
+  const privacy = privacySettingsFor(p.id);
+  const isSelf = viewer === p.id;
+  if (!isSelf && !visibilityAllows(viewer, p.id, privacy.profile_visibility)) {
+    return res.status(404).json({ error: "not found" });
+  }
   const cosmetics = sanitizeUserCosmetics(p);
   let socialLinks = [];
   try {
@@ -664,11 +714,11 @@ router.get("/profile/:nickname", (req, res) => {
     full_name: p.full_name ?? "",
     website_url: p.website_url ?? "",
     social_links: socialLinks,
-    birthday: p.birthday ?? "",
-    country: p.country ?? "",
+    birthday: isSelf || privacy.show_birthday ? (p.birthday ?? "") : "",
+    country: isSelf || privacy.show_country ? (p.country ?? "") : "",
     readme_md: p.readme_md ?? "",
     created_at: p.created_at ?? "",
-    online: onlinePayload(p.last_seen_at, userShowsOnlineStatus(p.id)),
+    online: onlinePayload(p.last_seen_at, isSelf || userShowsOnlineStatus(p.id)),
     favorite_courses,
     achievements,
     followers_count,
@@ -723,8 +773,13 @@ router.get("/me/achievements", authRequired, (req, res) => {
 });
 
 router.get("/profile/:nickname/activity", (req, res) => {
+  const viewer = viewerId(req);
   const p = get("SELECT id, created_at FROM users WHERE nickname = ?", req.params.nickname);
   if (!p) return res.status(404).json({ error: "not found" });
+  const privacy = privacySettingsFor(p.id);
+  if (!visibilityAllows(viewer, p.id, privacy.activity_visibility)) {
+    return res.status(403).json({ error: "forbidden" });
+  }
   const year = Number(req.query.year) || new Date().getFullYear();
   const days = all(
     `SELECT day, seconds_spent FROM user_daily_activity

@@ -2,11 +2,12 @@ import express from "express";
 import { v4 as uuidv4 } from "uuid";
 import jwtLib from "jsonwebtoken";
 import { all, get, nowIso, run } from "../db.js";
-import { authRequired } from "../auth.js";
+import { authRequired, getJwtSecret } from "../auth.js";
 import {
   checkBlogLikeMilestone,
 } from "../utils/achievements.js";
 import { applyVote, voteSummary } from "../utils/votes.js";
+import { assertBlogPatchField } from "../utils/sqlAllowlist.js";
 import { assertBlogComment, assertBlogPublish } from "../utils/contentLimits.js";
 import { finalizeBlogPublish } from "../utils/blogPublish.js";
 
@@ -239,7 +240,7 @@ function optionalViewer(req) {
   if (!auth.startsWith("Bearer ")) return null;
   try {
     const token = auth.slice(7);
-    const claims = jwtLib.verify(token, process.env.JWT_SECRET ?? "dev-secret-change-me");
+    const claims = jwtLib.verify(token, getJwtSecret());
     if (!claims?.sub) return null;
     const row = get("SELECT id, role FROM users WHERE id = ?", claims.sub);
     return row ?? null;
@@ -406,7 +407,9 @@ router.patch("/blog/:id", authRequired, (req, res) => {
     cover_image_url: body.cover_image_url,
   };
   for (const [k, v] of Object.entries(fields)) {
-    if (v !== undefined) run(`UPDATE blog_posts SET ${k} = ? WHERE id = ?`, v ?? "", req.params.id);
+    if (v === undefined) continue;
+    assertBlogPatchField(k);
+    run(`UPDATE blog_posts SET ${k} = ? WHERE id = ?`, v ?? "", req.params.id);
   }
   if (typeof body.slug === "string" && body.slug.trim()) {
     run("UPDATE blog_posts SET slug = ? WHERE id = ?", slugify(body.slug), req.params.id);

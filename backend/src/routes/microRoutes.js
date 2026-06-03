@@ -5,7 +5,7 @@ import fs from "node:fs";
 import { v4 as uuidv4 } from "uuid";
 import jwtLib from "jsonwebtoken";
 import { all, get, nowIso, run } from "../db.js";
-import { authRequired } from "../auth.js";
+import { authRequired, getJwtSecret } from "../auth.js";
 import {
   awardAchievement,
   checkMicroLikeMilestone,
@@ -13,6 +13,7 @@ import {
 import { applyVote, voteSummary } from "../utils/votes.js";
 import { assertMicroPublish } from "../utils/contentLimits.js";
 import { optimizeUploadedFile } from "../utils/imageOptimize.js";
+import { verifyRasterImage } from "../utils/mimeVerify.js";
 
 const router = express.Router();
 const MAX_BODY = 480;
@@ -40,7 +41,7 @@ function authorizeBearer(req) {
   if (!auth.startsWith("Bearer ")) return null;
   try {
     const token = auth.slice(7);
-    const claims = jwtLib.verify(token, process.env.JWT_SECRET ?? "dev-secret-change-me");
+    const claims = jwtLib.verify(token, getJwtSecret());
     return claims?.sub ?? null;
   } catch {
     return null;
@@ -274,6 +275,15 @@ router.post(
   },
   async (req, res) => {
     if (!req.file) return res.status(400).json({ error: "no file" });
+    const probe = await verifyRasterImage(req.file.path);
+    if (!probe.ok) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch {
+        /* ignore */
+      }
+      return res.status(400).json({ error: "invalid image" });
+    }
     const r = await optimizeUploadedFile(req.file.path, "micro");
     if (r.ok) req.file.filename = r.filename;
     return res.json({ url: `/uploads/micro/${req.file.filename}` });

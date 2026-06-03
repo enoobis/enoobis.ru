@@ -48,7 +48,7 @@ async function submit() {
     <form @submit.prevent="submit">
       <input v-model="nickname" placeholder="ник" required pattern="[A-Za-z0-9_]{3,32}" />
       <input v-model="email" type="email" placeholder="email" required />
-      <input v-model="password" type="password" placeholder="пароль" minlength="8" required />
+      <input v-model="password" type="password" placeholder="пароль" minlength="10" required />
       <button type="submit">создать</button>
     </form>
     <p v-if="err" class="error">{{ err }}</p>

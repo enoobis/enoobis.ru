@@ -7,6 +7,11 @@ import { all, get, nowIso, run } from "../db.js";
 import { authRequired } from "../auth.js";
 import { awardAchievement } from "../utils/achievements.js";
 import { isRasterImageMimetype, optimizeUploadedFile } from "../utils/imageOptimize.js";
+import { assertAssignmentPatchField, assertLecturePatchField } from "../utils/sqlAllowlist.js";
+import { unlinkUploadUrl } from "../utils/uploadSafe.js";
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const router = express.Router();
 
@@ -231,10 +236,7 @@ router.delete("/courses/:id", authRequired, (req, res) => {
     const files = attachmentsForSubmission(s.id);
     for (const f of files) {
       if (f.url.startsWith("/uploads/submissions/")) {
-        const fp = path.join(UPLOAD_ROOT, f.url.replace(/^\/uploads\//, ""));
-        try {
-          fs.unlinkSync(fp);
-        } catch {}
+        unlinkUploadUrl(f.url, ["submissions"]);
       }
     }
     run("DELETE FROM course_submission_attachments WHERE submission_id = ?", s.id);
@@ -255,12 +257,7 @@ router.delete("/courses/:id", authRequired, (req, res) => {
   run("DELETE FROM user_favorite_courses WHERE course_id = ?", c.id);
   const iconRow = get("SELECT icon_url FROM courses WHERE id = ?", c.id);
   if (iconRow?.icon_url?.startsWith("/uploads/course-icons/")) {
-    const fp = path.join(UPLOAD_ROOT, iconRow.icon_url.replace(/^\/uploads\//, ""));
-    try {
-      fs.unlinkSync(fp);
-    } catch {
-      /* ignore */
-    }
+    unlinkUploadUrl(iconRow.icon_url, ["course-icons"]);
   }
   run("DELETE FROM courses WHERE id = ?", c.id);
   return res.json({ ok: true });
@@ -287,11 +284,18 @@ router.post("/courses/:id/students", authRequired, (req, res) => {
   }
   const ids = Array.isArray(req.body?.student_ids) ? req.body.student_ids : [];
   run("DELETE FROM course_students WHERE course_id = ?", c.id);
-  for (const sid of ids) {
+  for (const sid of ids.slice(0, 500)) {
+    const studentId = String(sid);
+    if (!UUID_RE.test(studentId)) continue;
+    const u = get(
+      "SELECT id FROM users WHERE id = ? AND status = 'approved' AND role = 'student'",
+      studentId,
+    );
+    if (!u) continue;
     run(
       "INSERT OR IGNORE INTO course_students (course_id, student_id) VALUES (?, ?)",
       c.id,
-      String(sid),
+      studentId,
     );
   }
   return res.json({ ok: true });
@@ -448,6 +452,30 @@ function streamFor(course) {
   }));
 }
 
+function assignmentInCourse(courseId, assignmentId) {
+  return get(
+    "SELECT id FROM course_assignments WHERE id = ? AND course_id = ?",
+    assignmentId,
+    courseId,
+  );
+}
+
+function lectureInCourse(courseId, lectureId) {
+  return get(
+    "SELECT id FROM course_lectures WHERE id = ? AND course_id = ?",
+    lectureId,
+    courseId,
+  );
+}
+
+function streamPostInCourse(courseId, postId) {
+  return get(
+    "SELECT id FROM course_stream_posts WHERE id = ? AND course_id = ?",
+    postId,
+    courseId,
+  );
+}
+
 function ensureCourseAccess(courseId, user) {
   const course = get("SELECT * FROM courses WHERE id = ?", courseId);
   if (!course) return { error: 404 };
@@ -564,6 +592,9 @@ router.post("/courses/:id/stream", authRequired, (req, res) => {
 router.post("/courses/:id/stream/:postId/comments", authRequired, (req, res) => {
   const access = ensureCourseAccess(req.params.id, req.user);
   if (access.error) return res.status(access.error).json({ error: "no access" });
+  if (!streamPostInCourse(access.course.id, req.params.postId)) {
+    return res.status(404).json({ error: "not found" });
+  }
   const body = String(req.body?.body ?? "").trim();
   if (!body) return res.status(400).json({ error: "empty comment" });
   const id = uuidv4();
@@ -591,6 +622,10 @@ router.post("/courses/:id/assignments", authRequired, (req, res) => {
   if (access.error) return res.status(access.error).json({ error: "no access" });
   if (!access.isTeacher && req.user.role !== "admin")
     return res.status(403).json({ error: "forbidden" });
+  const lectureId = req.body?.lecture_id ? String(req.body.lecture_id) : null;
+  if (lectureId && !lectureInCourse(access.course.id, lectureId)) {
+    return res.status(400).json({ error: "invalid lecture" });
+  }
   const id = uuidv4();
   const now = nowIso();
   run(
@@ -603,7 +638,7 @@ router.post("/courses/:id/assignments", authRequired, (req, res) => {
     String(req.body?.description ?? ""),
     Number(req.body?.max_points ?? 100) || 100,
     now,
-    req.body?.lecture_id ?? null,
+    lectureId,
   );
   const row = get(
     `SELECT a.id, a.course_id, a.author_id, u.nickname as author_nickname,
@@ -619,10 +654,19 @@ router.patch("/courses/:id/assignments/:aid", authRequired, (req, res) => {
   if (access.error) return res.status(access.error).json({ error: "no access" });
   if (!access.isTeacher && req.user.role !== "admin")
     return res.status(403).json({ error: "forbidden" });
+  if (!assignmentInCourse(req.params.id, req.params.aid)) {
+    return res.status(404).json({ error: "not found" });
+  }
   const fields = ["title", "description", "max_points"];
   for (const f of fields) {
     if (req.body[f] !== undefined) {
-      run(`UPDATE course_assignments SET ${f} = ? WHERE id = ?`, req.body[f], req.params.aid);
+      assertAssignmentPatchField(f);
+      run(
+        `UPDATE course_assignments SET ${f} = ? WHERE id = ? AND course_id = ?`,
+        req.body[f],
+        req.params.aid,
+        req.params.id,
+      );
     }
   }
   const row = get(
@@ -643,6 +687,9 @@ router.patch("/courses/:id/assignments/:aid", authRequired, (req, res) => {
 router.post("/courses/:id/assignments/:aid/submit", authRequired, (req, res) => {
   const access = ensureCourseAccess(req.params.id, req.user);
   if (access.error) return res.status(access.error).json({ error: "no access" });
+  if (!assignmentInCourse(req.params.id, req.params.aid)) {
+    return res.status(404).json({ error: "not found" });
+  }
   const content = String(req.body?.content ?? "");
   const incomingAttachments = (
     Array.isArray(req.body?.attachments)
@@ -655,6 +702,7 @@ router.post("/courses/:id/assignments/:aid/submit", authRequired, (req, res) => 
     req.params.aid,
     req.user.id,
   );
+  const isFirstSubmit = !existing;
   let submissionId;
   if (existing) {
     submissionId = existing.id;
@@ -684,12 +732,7 @@ router.post("/courses/:id/assignments/:aid/submit", authRequired, (req, res) => 
   for (const f of existingFiles) {
     if (!keepUrls.has(f.url)) {
       if (f.url.startsWith("/uploads/submissions/")) {
-        const filePath = path.join(UPLOAD_ROOT, f.url.replace(/^\/uploads\//, ""));
-        try {
-          fs.unlinkSync(filePath);
-        } catch {
-          // ignore
-        }
+        unlinkUploadUrl(f.url, ["submissions"]);
       }
       run("DELETE FROM course_submission_attachments WHERE id = ?", f.id);
     }
@@ -731,10 +774,13 @@ router.post("/courses/:id/assignments/:aid/submit", authRequired, (req, res) => 
       req.params.id,
       req.user.id,
     )?.v ?? 0;
-  run("UPDATE users SET coins = coins + 5 WHERE id = ?", req.user.id);
+  if (isFirstSubmit) {
+    run("UPDATE users SET coins = coins + 5 WHERE id = ?", req.user.id);
+  }
   if (totalAssignments > 0 && submitted >= totalAssignments) {
-    awardAchievement(req.user.id, "course_complete");
-    run("UPDATE users SET coins = coins + 50 WHERE id = ?", req.user.id);
+    if (awardAchievement(req.user.id, "course_complete")) {
+      run("UPDATE users SET coins = coins + 50 WHERE id = ?", req.user.id);
+    }
   }
 
   return res.json({ ...my, attachments: attachmentsForSubmission(my.id) });
@@ -762,6 +808,14 @@ router.post(
       }
       return res.status(access.error).json({ error: "no access" });
     }
+    if (!assignmentInCourse(req.params.id, req.params.aid)) {
+      if (req.file?.path) {
+        try {
+          fs.unlinkSync(req.file.path);
+        } catch {}
+      }
+      return res.status(404).json({ error: "not found" });
+    }
     if (!req.file) return res.status(400).json({ error: "no file" });
     let mime = req.file.mimetype;
     if (isRasterImageMimetype(req.file.mimetype)) {
@@ -787,6 +841,9 @@ router.get("/courses/:id/assignments/:aid/submissions", authRequired, (req, res)
   if (access.error) return res.status(access.error).json({ error: "no access" });
   if (!access.isTeacher && req.user.role !== "admin")
     return res.status(403).json({ error: "forbidden" });
+  if (!assignmentInCourse(req.params.id, req.params.aid)) {
+    return res.status(404).json({ error: "not found" });
+  }
   const subs = all(
     `SELECT s.id, s.assignment_id, s.student_id, u.nickname as student_nickname,
             s.content, s.status, s.grade_points, s.teacher_comment, s.created_at, s.updated_at
@@ -901,10 +958,19 @@ router.patch("/courses/:id/lectures/:lid", authRequired, (req, res) => {
   if (access.error) return res.status(access.error).json({ error: "no access" });
   if (!access.isTeacher && req.user.role !== "admin")
     return res.status(403).json({ error: "forbidden" });
+  if (!lectureInCourse(req.params.id, req.params.lid)) {
+    return res.status(404).json({ error: "not found" });
+  }
   const fields = ["title", "body_text", "video_url"];
   for (const f of fields) {
     if (req.body[f] !== undefined) {
-      run(`UPDATE course_lectures SET ${f} = ? WHERE id = ?`, req.body[f], req.params.lid);
+      assertLecturePatchField(f);
+      run(
+        `UPDATE course_lectures SET ${f} = ? WHERE id = ? AND course_id = ?`,
+        req.body[f],
+        req.params.lid,
+        req.params.id,
+      );
     }
   }
   if (Array.isArray(req.body?.attachments)) {

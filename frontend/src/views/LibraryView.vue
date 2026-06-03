@@ -183,12 +183,17 @@ async function onDownload(b: LibraryBook) {
   }
 }
 
-function openReader(b: LibraryBook) {
+async function openReader(b: LibraryBook) {
   if (!auth.token || !isPdfBook(b)) return;
   err.value = "";
-  readerTitle.value = b.title;
-  readerUrl.value = libraryReadUrl(b.id, auth.token);
-  readerOpen.value = true;
+  try {
+    readerTitle.value = b.title;
+    readerUrl.value = await libraryReadUrl(b.id, auth.token);
+    readerOpen.value = true;
+  } catch (e) {
+    toastError(e);
+    err.value = describe(e instanceof Error ? e.message : "ошибка");
+  }
 }
 
 function closeReader() {

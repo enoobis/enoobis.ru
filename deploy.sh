@@ -42,13 +42,19 @@ chown -R "$SITE_OWNER:$SITE_OWNER" "$BACKEND/data" 2>/dev/null || true
 if [[ ! -f "$BACKEND/.env" ]]; then
   j="$(openssl rand -hex 32)"
   u="$SITE_OWNER"
+  cors_line=""
+  if [[ -n "${1:-}" && "$DOMAIN" != "_" ]]; then
+    cors_line="CORS_ORIGIN=https://${DOMAIN}"
+  fi
   cat >"$BACKEND/.env" <<EOF
 PORT=3000
+NODE_ENV=production
 JWT_SECRET=$j
 DATABASE_FILE=$BACKEND/data/edu.db
 UPLOADS_DIR=$BACKEND/data/uploads
 LIBRARY_DIR=$BACKEND/data/library
 PRIVATE_FILES_DIR=$BACKEND/data/private-files
+$cors_line
 EOF
   chown "$u:$u" "$BACKEND/.env"
   chmod 600 "$BACKEND/.env"

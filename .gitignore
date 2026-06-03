@@ -1,5 +1,7 @@
 # Rust
 backend/target/
+**/target/
+**/*.exe
 **/*.rs.bk
 
 # Node
@@ -12,6 +14,8 @@ node_modules/
 # SQLite (локальная БД)
 backend/*.db
 backend/*.db-*
+backend/edu.db
+backend/data/edu.db
 
 # Загруженные аватары
 backend/data/
@@ -30,3 +34,6 @@ AGENTS.md
 
 # Cursor IDE — только локально, не в репозитории
 .cursor/
+
+# локальные скрипты очистки истории (могут содержать шаблоны секретов)
+.git-filter-replacements.txt

@@ -1,16 +1,13 @@
 import fs from "node:fs";
-import path from "node:path";
 import { all, run } from "../db.js";
 import { saveIdenticon } from "./identicon.js";
-
-const UPLOAD_ROOT = path.resolve(process.env.UPLOADS_DIR ?? "./data/uploads");
+import { safeResolveUploadUrl, UPLOAD_SUBDIRS } from "./uploadSafe.js";
 
 function uploadExists(url) {
   if (!url || typeof url !== "string") return false;
   if (!url.startsWith("/uploads/")) return true;
-  const rel = url.replace(/^\/uploads\//, "").replace(/\.\./g, "");
-  const abs = path.join(UPLOAD_ROOT, rel);
-  if (!abs.startsWith(UPLOAD_ROOT)) return false;
+  const abs = safeResolveUploadUrl(url, UPLOAD_SUBDIRS);
+  if (!abs) return false;
   try {
     return fs.existsSync(abs);
   } catch {

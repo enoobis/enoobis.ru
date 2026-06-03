@@ -1,20 +1,26 @@
 import express from "express";
 import { v4 as uuidv4 } from "uuid";
-import { get, nowIso, run } from "../db.js";
+import { db, get, nowIso, run } from "../db.js";
 import { hashPassword, mintToken, verifyPassword } from "../auth.js";
 import { saveIdenticon } from "../utils/identicon.js";
 import { ensureUserFollowsAdmins } from "../utils/adminFollow.js";
+import { passwordPolicyError } from "../utils/passwordPolicy.js";
+import { rateLimit } from "../utils/security.js";
 
 const router = express.Router();
+const loginLimit = rateLimit({ windowMs: 60_000, max: 20, keyPrefix: "login" });
+const registerLimit = rateLimit({ windowMs: 60_000, max: 10, keyPrefix: "register" });
 
 function validNickname(n) {
   return /^[A-Za-z0-9_]{3,32}$/.test(n ?? "");
 }
 
-router.post("/register", async (req, res) => {
+router.post("/register", registerLimit, async (req, res) => {
   const { email = "", password = "", nickname = "", invite_code } = req.body ?? {};
-  if (!email || password.length < 8) {
-    return res.status(400).json({ error: "нужен email, пароль минимум 8 символов" });
+  const normEmail = String(email).trim().toLowerCase();
+  const policyErr = passwordPolicyError(password);
+  if (!normEmail || policyErr) {
+    return res.status(400).json({ error: policyErr ?? "invalid_email" });
   }
   if (!validNickname(nickname)) {
     return res.status(400).json({ error: "nickname: 3-32 chars, letters, digits, underscore" });
@@ -22,62 +28,84 @@ router.post("/register", async (req, res) => {
 
   let role = "student";
   let status = "pending";
+  let inviteId = null;
   if (invite_code && String(invite_code).trim()) {
     const invite = get(
       "SELECT id, max_uses, used_count, target_role FROM invite_links WHERE code = ?",
       String(invite_code).trim(),
     );
     if (!invite) return res.status(400).json({ error: "invalid invite code" });
-    if (invite.used_count >= invite.max_uses) return res.status(400).json({ error: "invite exhausted" });
-    run("UPDATE invite_links SET used_count = used_count + 1 WHERE id = ?", invite.id);
+    inviteId = invite.id;
     role = invite.target_role === "teacher" ? "teacher" : "student";
     status = "approved";
   }
 
   try {
-    const id = uuidv4();
     const hash = await hashPassword(password);
-    let avatarUrl = "";
-    try {
-      avatarUrl = saveIdenticon(nickname, id);
-    } catch {
-      avatarUrl = "";
-    }
-    run(
-      `INSERT INTO users
-      (id, email, password_hash, nickname, role, status, bio, wallpaper_url, avatar_url, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, '', '', ?, ?)`,
-      id,
-      email,
-      hash,
-      nickname,
-      role,
-      status,
-      avatarUrl,
-      nowIso(),
-    );
-    ensureUserFollowsAdmins(id);
+    const created = db.transaction(() => {
+      if (inviteId) {
+        const bumped = run(
+          "UPDATE invite_links SET used_count = used_count + 1 WHERE id = ? AND used_count < max_uses",
+          inviteId,
+        );
+        if (!bumped.changes) throw new Error("invite_exhausted");
+      }
+      const id = uuidv4();
+      let avatarUrl = "";
+      try {
+        avatarUrl = saveIdenticon(nickname, id);
+      } catch {
+        avatarUrl = "";
+      }
+      run(
+        `INSERT INTO users
+        (id, email, password_hash, nickname, role, status, bio, wallpaper_url, avatar_url, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, '', '', ?, ?)`,
+        id,
+        normEmail,
+        hash,
+        nickname,
+        role,
+        status,
+        avatarUrl,
+        nowIso(),
+      );
+      return { id, role, status, normEmail, nickname, avatarUrl };
+    })();
 
-    if (status === "pending") {
+    ensureUserFollowsAdmins(created.id);
+
+    if (created.status === "pending") {
       return res.json({ pending: true, message: "Ожидайте одобрения администратора" });
     }
-    const token = mintToken(id, role, 30);
+    const token = mintToken(created.id, created.role, 30);
     return res.json({
       pending: false,
       token,
-      user: { id, email, nickname, role, status: "approved", coins: 0 },
+      user: {
+        id: created.id,
+        email: created.normEmail,
+        nickname: created.nickname,
+        role: created.role,
+        status: "approved",
+        coins: 0,
+      },
       message: null,
     });
-  } catch {
-    return res.status(409).json({ error: "email or nickname taken" });
+  } catch (e) {
+    if (e instanceof Error && e.message === "invite_exhausted") {
+      return res.status(400).json({ error: "invite exhausted" });
+    }
+    return res.status(409).json({ error: "registration_failed" });
   }
 });
 
-router.post("/login", async (req, res) => {
+router.post("/login", loginLimit, async (req, res) => {
   const { email = "", password = "" } = req.body ?? {};
+  const normEmail = String(email).trim().toLowerCase();
   const row = get(
     "SELECT id, email, nickname, role, status, password_hash, coins FROM users WHERE email = ?",
-    email,
+    normEmail,
   );
   if (!row) return res.status(401).json({ error: "unauthorized" });
   const ok = await verifyPassword(password, row.password_hash);

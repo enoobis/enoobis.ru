@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from "uuid";
 import { all, get, nowIso, run } from "../db.js";
 import { authRequired } from "../auth.js";
 import { contentDispositionInline } from "../utils/contentDisposition.js";
+import { rateLimit, safePathUnder } from "../utils/security.js";
 
 const router = express.Router();
 
@@ -22,13 +23,13 @@ function staffOnly(req, res, next) {
 }
 
 const SHARE_ALPHABET = "23456789abcdefghjkmnpqrstuvwxyz";
-const SHARE_TOKEN_LEN = 6;
+const SHARE_TOKEN_LEN = 24;
 
 function genToken() {
-  const buf = crypto.randomBytes(SHARE_TOKEN_LEN);
+  const bytes = crypto.randomBytes(SHARE_TOKEN_LEN);
   let out = "";
   for (let i = 0; i < SHARE_TOKEN_LEN; i++) {
-    out += SHARE_ALPHABET[buf[i] % SHARE_ALPHABET.length];
+    out += SHARE_ALPHABET[bytes[i] % SHARE_ALPHABET.length];
   }
   return out;
 }
@@ -193,7 +194,9 @@ router.delete("/shares/:id", authRequired, staffOnly, (req, res) => {
   res.json({ ok: true });
 });
 
-router.get("/share/:token", (req, res) => {
+const publicShareLimit = rateLimit({ windowMs: 60_000, max: 60, keyPrefix: "share" });
+
+router.get("/share/:token", publicShareLimit, (req, res) => {
   const link = get("SELECT * FROM share_links WHERE token = ?", req.params.token);
   if (!link) return res.status(404).json({ error: "not_found" });
   if (isExpired(link.expires_at)) {
@@ -236,7 +239,7 @@ function isPdfFile(mime, originalName) {
   return path.extname(String(originalName ?? "")).toLowerCase() === ".pdf";
 }
 
-router.get("/share/:token/read", (req, res) => {
+router.get("/share/:token/read", publicShareLimit, (req, res) => {
   const link = get("SELECT * FROM share_links WHERE token = ?", req.params.token);
   if (!link || link.target_type !== "file") return res.status(404).json({ error: "not_found" });
   if (isExpired(link.expires_at)) {
@@ -251,8 +254,8 @@ router.get("/share/:token/read", (req, res) => {
   if (!isPdfFile(f.mime_type, f.original_name)) {
     return res.status(415).json({ error: "read_only_pdf" });
   }
-  const abs = path.join(FILES_ROOT, f.storage_path);
-  if (!fs.existsSync(abs)) return res.status(404).json({ error: "not_found" });
+  const abs = safePathUnder(FILES_ROOT, f.storage_path);
+  if (!abs || !fs.existsSync(abs)) return res.status(404).json({ error: "not_found" });
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader("Content-Disposition", contentDispositionInline(f.original_name));
   fs.createReadStream(abs)
@@ -262,7 +265,7 @@ router.get("/share/:token/read", (req, res) => {
     .pipe(res);
 });
 
-router.get("/share/:token/download", (req, res) => {
+router.get("/share/:token/download", publicShareLimit, (req, res) => {
   const link = get("SELECT * FROM share_links WHERE token = ?", req.params.token);
   if (!link || link.target_type !== "file") return res.status(404).json({ error: "not_found" });
   if (isExpired(link.expires_at)) {
@@ -274,8 +277,8 @@ router.get("/share/:token/download", (req, res) => {
     link.target_id,
   );
   if (!f) return res.status(404).json({ error: "not_found" });
-  const abs = path.join(FILES_ROOT, f.storage_path);
-  if (!fs.existsSync(abs)) return res.status(404).json({ error: "not_found" });
+  const abs = safePathUnder(FILES_ROOT, f.storage_path);
+  if (!abs || !fs.existsSync(abs)) return res.status(404).json({ error: "not_found" });
   return res.download(abs, f.original_name);
 });
 

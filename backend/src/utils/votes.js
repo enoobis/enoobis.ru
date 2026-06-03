@@ -1,6 +1,8 @@
 import { get, nowIso, run } from "../db.js";
+import { assertVoteTarget } from "./sqlAllowlist.js";
 
 export function voteSummary(table, idColumn, id, viewerId) {
+  assertVoteTarget(table, idColumn);
   const up =
     get(`SELECT COUNT(*) as v FROM ${table} WHERE ${idColumn} = ? AND vote = 1`, id)?.v ?? 0;
   const down =
@@ -18,6 +20,7 @@ export function voteSummary(table, idColumn, id, viewerId) {
 }
 
 export function applyVote({ table, idColumn, userIdColumn, id, userId, vote }) {
+  assertVoteTarget(table, idColumn);
   const existing = get(
     `SELECT vote FROM ${table} WHERE ${idColumn} = ? AND ${userIdColumn} = ?`,
     id,

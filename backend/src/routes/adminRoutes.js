@@ -4,7 +4,10 @@ import path from "node:path";
 import fs from "node:fs";
 import { v4 as uuidv4 } from "uuid";
 import { all, db, get, nowIso, run } from "../db.js";
-import { authRequired, hashPassword } from "../auth.js";
+import { authRequired, bumpTokenVersion, hashPassword } from "../auth.js";
+import { logAdminAction } from "../utils/adminAudit.js";
+import { passwordPolicyError } from "../utils/passwordPolicy.js";
+import { unlinkUploadUrl, UPLOAD_ROOT } from "../utils/uploadSafe.js";
 import { awardAchievement } from "../utils/achievements.js";
 import { saveIdenticon } from "../utils/identicon.js";
 import { limitsFromAdminBody, limitsToJson, parseContentLimits } from "../utils/contentLimits.js";
@@ -21,7 +24,6 @@ function adminOnly(req, res, next) {
 
 router.use(authRequired, adminOnly);
 
-const UPLOAD_ROOT = path.resolve(process.env.UPLOADS_DIR ?? "./data/uploads");
 const PRIVATE_FILES_ROOT = path.resolve(process.env.PRIVATE_FILES_DIR ?? "./data/private-files");
 const LIBRARY_ROOT = path.resolve(process.env.LIBRARY_DIR ?? "./data/library");
 const IMAGE_MIMES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
@@ -119,6 +121,7 @@ router.post("/admin/users/:id/coins", (req, res) => {
   run("UPDATE users SET coins = coins + ? WHERE id = ?", n, id);
   const after = get("SELECT coins FROM users WHERE id = ?", id);
   const coins = Math.max(0, Math.floor(Number(after?.coins ?? 0)));
+  logAdminAction(req.user.id, "user_coins", id, { amount: n });
   return res.json({ ok: true, coins });
 });
 
@@ -207,10 +210,12 @@ router.patch("/admin/users/:id/profile", async (req, res) => {
     }
     if (body.new_password !== undefined && String(body.new_password).length > 0) {
       const pw = String(body.new_password);
-      if (pw.length < 8) return res.status(400).json({ error: "password too short" });
-      if (pw.length > 256) return res.status(400).json({ error: "password too long" });
+      const policyErr = passwordPolicyError(pw);
+      if (policyErr) return res.status(400).json({ error: policyErr });
       const hash = await hashPassword(pw);
       run("UPDATE users SET password_hash = ? WHERE id = ?", hash, id);
+      bumpTokenVersion(id);
+      logAdminAction(req.user.id, "user_password", id);
     }
     return res.json({ ok: true });
   } catch (e) {
@@ -258,25 +263,12 @@ router.post("/admin/users/:id/role", (req, res) => {
   const role = String(req.body?.role ?? "");
   if (!["student", "teacher", "admin"].includes(role)) return res.status(400).json({ error: "bad role" });
   run("UPDATE users SET role = ? WHERE id = ?", role, req.params.id);
+  logAdminAction(req.user.id, "user_role", req.params.id, { role });
   if (role === "teacher" || role === "admin") {
     awardAchievement(req.params.id, "mentor");
   }
   return res.json({ ok: true });
 });
-
-function unlinkIfUploadsUrl(url) {
-  if (!url || typeof url !== "string") return;
-  const m = url.trim().match(/^\/uploads\/(.+)$/);
-  if (!m) return;
-  const rel = m[1].replace(/\.\./g, "");
-  const abs = path.join(UPLOAD_ROOT, rel);
-  if (!abs.startsWith(UPLOAD_ROOT)) return;
-  try {
-    fs.unlinkSync(abs);
-  } catch {
-    /* ignore */
-  }
-}
 
 function purgeUserCourses(userId) {
   const owned = all("SELECT id FROM courses WHERE teacher_id = ?", userId);
@@ -286,7 +278,7 @@ function purgeUserCourses(userId) {
        (SELECT id FROM course_lectures WHERE course_id = ?)`,
       c.id,
     );
-    for (const row of lecAttachUrls) unlinkIfUploadsUrl(row.url);
+    for (const row of lecAttachUrls) unlinkUploadUrl(row.url);
 
     const subAttachUrls = all(
       `SELECT sa.url FROM course_submission_attachments sa
@@ -295,7 +287,7 @@ function purgeUserCourses(userId) {
        WHERE a.course_id = ?`,
       c.id,
     );
-    for (const row of subAttachUrls) unlinkIfUploadsUrl(row.url);
+    for (const row of subAttachUrls) unlinkUploadUrl(row.url);
 
     const lectures = all("SELECT id FROM course_lectures WHERE course_id = ?", c.id);
     for (const l of lectures) {
@@ -320,7 +312,7 @@ function purgeUserCourses(userId) {
     run("DELETE FROM course_co_teachers WHERE course_id = ?", c.id);
     run("DELETE FROM user_favorite_courses WHERE course_id = ?", c.id);
     const iconRow = get("SELECT icon_url FROM courses WHERE id = ?", c.id);
-    unlinkIfUploadsUrl(iconRow?.icon_url ?? "");
+    unlinkUploadUrl(iconRow?.icon_url ?? "");
     run("DELETE FROM courses WHERE id = ?", c.id);
   }
 }
@@ -332,12 +324,12 @@ function purgeUserBlogAndMicro(userId) {
     "SELECT cover_image_url FROM blog_posts WHERE author_id = ? AND COALESCE(cover_image_url, '') <> ''",
     userId,
   );
-  for (const row of covers) unlinkIfUploadsUrl(row.cover_image_url);
+  for (const row of covers) unlinkUploadUrl(row.cover_image_url);
 
   if (postIds.length) {
     const ph = postIds.map(() => "?").join(",");
     const blogImgUrls = all(`SELECT url FROM blog_post_images WHERE post_id IN (${ph})`, ...postIds);
-    for (const row of blogImgUrls) unlinkIfUploadsUrl(row.url);
+    for (const row of blogImgUrls) unlinkUploadUrl(row.url);
 
     run(`DELETE FROM blog_reports WHERE target_post_id IN (${ph})`, ...postIds);
     run(`DELETE FROM blog_comments WHERE post_id IN (${ph})`, ...postIds);
@@ -370,7 +362,7 @@ function purgeUserMicroposts(userId) {
     "SELECT image_url FROM microposts WHERE author_id = ? AND COALESCE(image_url, '') <> ''",
     userId,
   );
-  for (const row of microImages) unlinkIfUploadsUrl(row.image_url);
+  for (const row of microImages) unlinkUploadUrl(row.image_url);
 
   run(
     "UPDATE users SET pinned_post_id = NULL, pinned_post_type = '' WHERE pinned_post_id IN (SELECT id FROM microposts WHERE author_id = ?)",
@@ -419,7 +411,7 @@ function _deleteUserFullyBody(userId) {
      WHERE s.student_id = ?`,
     userId,
   );
-  for (const row of studentSubAttach) unlinkIfUploadsUrl(row.url);
+  for (const row of studentSubAttach) unlinkUploadUrl(row.url);
   run(
     "DELETE FROM course_submission_attachments WHERE submission_id IN (SELECT id FROM course_assignment_submissions WHERE student_id = ?)",
     userId,
@@ -474,7 +466,7 @@ function _deleteUserFullyBody(userId) {
 }
 
 function removeDeletedUserFiles(fileRows, bookRows, avatarUrl) {
-  if (avatarUrl) unlinkIfUploadsUrl(String(avatarUrl));
+  if (avatarUrl) unlinkUploadUrl(String(avatarUrl));
   for (const f of fileRows) {
     try {
       const abs = path.join(PRIVATE_FILES_ROOT, f.storage_path);
@@ -506,9 +498,10 @@ router.delete("/admin/users/:id", (req, res) => {
   try {
     const { fileRows, bookRows, avatarUrl } = deleteUserFully(id);
     removeDeletedUserFiles(fileRows, bookRows, avatarUrl);
+    logAdminAction(req.user.id, "user_delete", id);
     return res.json({ ok: true });
   } catch (e) {
-    console.error("admin delete user", e);
+    if (process.env.NODE_ENV !== "production") console.error("admin delete user", e);
     return res.status(500).json({ error: "internal error" });
   }
 });

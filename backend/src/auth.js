@@ -1,8 +1,17 @@
 import jwt from "jsonwebtoken";
 import argon2 from "argon2";
-import { get } from "./db.js";
+import { get, run } from "./db.js";
 
-const JWT_SECRET = process.env.JWT_SECRET ?? "dev-secret-change-me";
+export function getJwtSecret() {
+  const secret = process.env.JWT_SECRET?.trim();
+  if (process.env.NODE_ENV === "production") {
+    if (!secret || secret.length < 32) {
+      throw new Error("JWT_SECRET must be set in production (min 32 chars)");
+    }
+    return secret;
+  }
+  return secret || "dev-secret-change-me";
+}
 
 export async function hashPassword(password) {
   return argon2.hash(password);
@@ -16,16 +25,51 @@ export async function verifyPassword(password, hash) {
   }
 }
 
-export function mintToken(userId, role, days = 30) {
-  const expSec = Math.floor(Date.now() / 1000) + days * 24 * 60 * 60;
-  return jwt.sign({ sub: userId, role, exp: expSec }, JWT_SECRET);
+function tokenVersionFor(userId) {
+  return Number(get("SELECT token_version FROM users WHERE id = ?", userId)?.token_version ?? 0);
 }
 
-function bearerTokenFromRequest(req) {
+export function bumpTokenVersion(userId) {
+  run(
+    "UPDATE users SET token_version = COALESCE(token_version, 0) + 1 WHERE id = ?",
+    userId,
+  );
+}
+
+export function mintToken(userId, role, days = 30) {
+  const tv = tokenVersionFor(userId);
+  const expSec = Math.floor(Date.now() / 1000) + days * 24 * 60 * 60;
+  return jwt.sign({ sub: userId, role, tv, exp: expSec }, getJwtSecret());
+}
+
+/**
+ * @param {string} userId
+ * @param {string} scope
+ * @param {string} resourceId
+ * @param {number} [ttlSec]
+ */
+export function mintScopedAccessToken(userId, scope, resourceId, ttlSec = 900) {
+  return jwt.sign({ sub: userId, scope, rid: resourceId }, getJwtSecret(), {
+    expiresIn: ttlSec,
+  });
+}
+
+/**
+ * @param {string} token
+ * @param {string} scope
+ * @param {string} resourceId
+ */
+export function verifyScopedAccessToken(token, scope, resourceId) {
+  const claims = jwt.verify(token, getJwtSecret());
+  if (typeof claims !== "object" || claims === null) throw new Error("invalid");
+  const c = /** @type {{ sub?: string; scope?: string; rid?: string }} */ (claims);
+  if (c.scope !== scope || c.rid !== resourceId || !c.sub) throw new Error("invalid scope");
+  return c.sub;
+}
+
+function bearerFromHeader(req) {
   const auth = req.headers.authorization ?? "";
   if (auth.startsWith("Bearer ")) return auth.slice(7);
-  const q = req.query?.token;
-  if (typeof q === "string" && q.trim()) return q.trim();
   return "";
 }
 
@@ -34,22 +78,26 @@ function attachUserFromToken(req, res, next, token) {
 
   let claims;
   try {
-    claims = jwt.verify(token, JWT_SECRET);
+    claims = jwt.verify(token, getJwtSecret());
   } catch {
     return res.status(401).json({ error: "unauthorized" });
   }
 
-  const row = get("SELECT id, role, status FROM users WHERE id = ?", claims.sub);
+  const c = typeof claims === "object" && claims ? claims : {};
+  const sub = "sub" in c ? String(c.sub) : "";
+  const tvClaim = "tv" in c ? Number(c.tv) : 0;
+  const row = get("SELECT id, role, status, token_version FROM users WHERE id = ?", sub);
   if (!row) return res.status(401).json({ error: "unauthorized" });
-  req.user = row;
+  if (Number(row.token_version ?? 0) !== tvClaim) {
+    return res.status(401).json({ error: "unauthorized" });
+  }
+  if (row.status !== "approved" && row.role !== "admin") {
+    return res.status(403).json({ error: "not approved" });
+  }
+  req.user = { id: row.id, role: row.role, status: row.status };
   next();
 }
 
 export function authRequired(req, res, next) {
-  attachUserFromToken(req, res, next, bearerTokenFromRequest(req));
-}
-
-/** для встроенного просмотра pdf (iframe/embed не шлёт Authorization) */
-export function authFromBearerOrQuery(req, res, next) {
-  attachUserFromToken(req, res, next, bearerTokenFromRequest(req));
+  attachUserFromToken(req, res, next, bearerFromHeader(req));
 }
