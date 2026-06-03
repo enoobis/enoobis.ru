@@ -94,3 +94,7 @@ export function getShare(token: string) {
 export function shareDownloadUrl(token: string) {
   return `/api/share/${token}/download`;
 }
+
+export function shareReadUrl(token: string) {
+  return `/api/share/${encodeURIComponent(token)}/read`;
+}

@@ -103,6 +103,12 @@ function parseFilenameFromContentDisposition(header: string | null): string | nu
   return null;
 }
 
+/** url для iframe/embed (на телефоне blob-url часто не открывает pdf) */
+export function libraryReadUrl(id: string, token: string) {
+  const qs = new URLSearchParams({ token });
+  return `/api/library/${encodeURIComponent(id)}/read?${qs}`;
+}
+
 export async function fetchBookReadBlob(token: string, id: string): Promise<Blob> {
   const res = await fetch(`/api/library/${id}/read`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -117,7 +123,9 @@ export async function fetchBookReadBlob(token: string, id: string): Promise<Blob
     }
     throw new Error(errCode || res.statusText);
   }
-  return res.blob();
+  const raw = await res.blob();
+  if (raw.type && raw.type !== "application/octet-stream") return raw;
+  return new Blob([await raw.arrayBuffer()], { type: "application/pdf" });
 }
 
 export async function downloadBook(token: string, id: string, fallbackName: string) {

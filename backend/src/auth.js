@@ -21,9 +21,15 @@ export function mintToken(userId, role, days = 30) {
   return jwt.sign({ sub: userId, role, exp: expSec }, JWT_SECRET);
 }
 
-export function authRequired(req, res, next) {
+function bearerTokenFromRequest(req) {
   const auth = req.headers.authorization ?? "";
-  const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+  if (auth.startsWith("Bearer ")) return auth.slice(7);
+  const q = req.query?.token;
+  if (typeof q === "string" && q.trim()) return q.trim();
+  return "";
+}
+
+function attachUserFromToken(req, res, next, token) {
   if (!token) return res.status(401).json({ error: "unauthorized" });
 
   let claims;
@@ -37,4 +43,13 @@ export function authRequired(req, res, next) {
   if (!row) return res.status(401).json({ error: "unauthorized" });
   req.user = row;
   next();
+}
+
+export function authRequired(req, res, next) {
+  attachUserFromToken(req, res, next, bearerTokenFromRequest(req));
+}
+
+/** для встроенного просмотра pdf (iframe/embed не шлёт Authorization) */
+export function authFromBearerOrQuery(req, res, next) {
+  attachUserFromToken(req, res, next, bearerTokenFromRequest(req));
 }

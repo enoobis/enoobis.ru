@@ -5,6 +5,7 @@ import crypto from "node:crypto";
 import { v4 as uuidv4 } from "uuid";
 import { all, get, nowIso, run } from "../db.js";
 import { authRequired } from "../auth.js";
+import { contentDispositionInline } from "../utils/contentDisposition.js";
 
 const router = express.Router();
 
@@ -227,6 +228,38 @@ router.get("/share/:token", (req, res) => {
     });
   }
   return res.status(404).json({ error: "not_found" });
+});
+
+function isPdfFile(mime, originalName) {
+  const m = String(mime ?? "").toLowerCase();
+  if (m.includes("pdf")) return true;
+  return path.extname(String(originalName ?? "")).toLowerCase() === ".pdf";
+}
+
+router.get("/share/:token/read", (req, res) => {
+  const link = get("SELECT * FROM share_links WHERE token = ?", req.params.token);
+  if (!link || link.target_type !== "file") return res.status(404).json({ error: "not_found" });
+  if (isExpired(link.expires_at)) {
+    run("DELETE FROM share_links WHERE id = ?", link.id);
+    return res.status(410).json({ error: "expired" });
+  }
+  const f = get(
+    "SELECT storage_path, original_name, mime_type FROM user_files WHERE id = ?",
+    link.target_id,
+  );
+  if (!f) return res.status(404).json({ error: "not_found" });
+  if (!isPdfFile(f.mime_type, f.original_name)) {
+    return res.status(415).json({ error: "read_only_pdf" });
+  }
+  const abs = path.join(FILES_ROOT, f.storage_path);
+  if (!fs.existsSync(abs)) return res.status(404).json({ error: "not_found" });
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", contentDispositionInline(f.original_name));
+  fs.createReadStream(abs)
+    .on("error", () => {
+      if (!res.headersSent) res.sendStatus(500);
+    })
+    .pipe(res);
 });
 
 router.get("/share/:token/download", (req, res) => {

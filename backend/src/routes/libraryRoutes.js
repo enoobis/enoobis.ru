@@ -4,7 +4,7 @@ import path from "node:path";
 import fs from "node:fs";
 import { v4 as uuidv4 } from "uuid";
 import { all, get, nowIso, run } from "../db.js";
-import { authRequired } from "../auth.js";
+import { authFromBearerOrQuery, authRequired } from "../auth.js";
 import { contentDispositionAttachment, contentDispositionInline } from "../utils/contentDisposition.js";
 
 const router = express.Router();
@@ -177,7 +177,7 @@ router.patch("/library/:id", authRequired, staffOnly, (req, res) => {
   res.json(updated);
 });
 
-router.get("/library/:id/read", authRequired, (req, res) => {
+router.get("/library/:id/read", authFromBearerOrQuery, (req, res) => {
   const book = get(
     "SELECT storage_path, original_name, mime_type FROM library_books WHERE id = ?",
     req.params.id,

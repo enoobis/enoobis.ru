@@ -3,7 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import {
   deleteBook,
   downloadBook,
-  fetchBookReadBlob,
+  libraryReadUrl,
   listBooks,
   listCategories,
   updateBookMetadata,
@@ -183,26 +183,17 @@ async function onDownload(b: LibraryBook) {
   }
 }
 
-async function openReader(b: LibraryBook) {
+function openReader(b: LibraryBook) {
   if (!auth.token || !isPdfBook(b)) return;
   err.value = "";
-  try {
-    const blob = await fetchBookReadBlob(auth.token, b.id);
-    readerTitle.value = b.title;
-    readerUrl.value = URL.createObjectURL(blob);
-    readerOpen.value = true;
-  } catch (e) {
-    toastError(e);
-    err.value = describe(e instanceof Error ? e.message : "ошибка");
-  }
+  readerTitle.value = b.title;
+  readerUrl.value = libraryReadUrl(b.id, auth.token);
+  readerOpen.value = true;
 }
 
 function closeReader() {
   readerOpen.value = false;
-  if (readerUrl.value) {
-    URL.revokeObjectURL(readerUrl.value);
-    readerUrl.value = null;
-  }
+  readerUrl.value = null;
   readerTitle.value = "";
 }
 
@@ -282,8 +273,13 @@ watch([activeCategory, sort], () => {
   void load();
 });
 
+watch(readerOpen, (open) => {
+  document.documentElement.style.overflow = open ? "hidden" : "";
+});
+
 onBeforeUnmount(() => {
   document.removeEventListener("click", onDocumentClick);
+  document.documentElement.style.overflow = "";
   closeReader();
   closeEdit();
 });
@@ -421,7 +417,14 @@ onBeforeUnmount(() => {
               <AppIcon name="close" :size="18" />
             </button>
           </header>
-          <iframe v-if="readerUrl" class="reader-frame" title="документ" :src="readerUrl" />
+          <object
+            v-if="readerUrl"
+            class="reader-frame"
+            :data="readerUrl"
+            type="application/pdf"
+          >
+            <iframe class="reader-frame" :src="readerUrl" title="документ" />
+          </object>
         </div>
       </div>
 
@@ -666,5 +669,7 @@ onBeforeUnmount(() => {
   min-height: 0;
   border: none;
   margin-top: 0.5rem;
+  background: var(--surface);
+  -webkit-overflow-scrolling: touch;
 }
 </style>
