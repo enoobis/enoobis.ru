@@ -287,11 +287,11 @@ onMounted(async () => {
         <div class="quota-bar"><span :style="{ width: usedPercent + '%' }" /></div>
       </div>
 
-      <nav class="filter-tabs">
-        <button class="filter-tab" :class="{ on: section === 'files' }" type="button" @click="section = 'files'">
+      <nav class="content-tabs">
+        <button class="content-tab" :class="{ on: section === 'files' }" type="button" @click="section = 'files'">
           файлы
         </button>
-        <button class="filter-tab" :class="{ on: section === 'notes' }" type="button" @click="section = 'notes'">
+        <button class="content-tab" :class="{ on: section === 'notes' }" type="button" @click="section = 'notes'">
           заметки
         </button>
       </nav>

@@ -342,11 +342,11 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
       </ul>
     </section>
 
-    <div class="profile-tabs">
-      <button class="profile-tab" :class="{ on: tab === 'blog' }" type="button" @click="tab = 'blog'">
+    <div class="content-tabs">
+      <button class="content-tab" :class="{ on: tab === 'blog' }" type="button" @click="tab = 'blog'">
         блоги
       </button>
-      <button class="profile-tab" :class="{ on: tab === 'micro' }" type="button" @click="tab = 'micro'">
+      <button class="content-tab" :class="{ on: tab === 'micro' }" type="button" @click="tab = 'micro'">
         микроблоги
       </button>
     </div>
@@ -411,8 +411,8 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   inset: 0;
   background: linear-gradient(
     to bottom,
-    color-mix(in srgb, var(--bg) 30%, transparent),
-    color-mix(in srgb, var(--bg) 55%, transparent) 45%,
+    color-mix(in srgb, var(--bg) 50%, transparent),
+    color-mix(in srgb, var(--bg) 72%, transparent) 45%,
     var(--bg) 100%
   );
 }
@@ -428,8 +428,8 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   background: linear-gradient(
     to right,
     transparent,
-    color-mix(in srgb, var(--bg) 62%, transparent) 10%,
-    color-mix(in srgb, var(--bg) 62%, transparent) 90%,
+    color-mix(in srgb, var(--bg) 82%, transparent) 8%,
+    color-mix(in srgb, var(--bg) 82%, transparent) 92%,
     transparent
   );
 }
@@ -693,49 +693,6 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   font-size: 0.78rem;
   color: var(--muted);
   cursor: help;
-}
-
-.profile-tabs {
-  display: flex;
-  margin: 0 0 1rem;
-  border-bottom: 1px solid var(--border);
-}
-
-.profile-tab {
-  position: relative;
-  flex: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 0;
-  padding: 0.55rem 0;
-  border: none;
-  border-radius: 0;
-  background: transparent;
-  color: var(--muted);
-  font-size: 0.95rem;
-  font-weight: 600;
-  text-transform: lowercase;
-}
-
-.profile-tab:hover {
-  color: var(--text);
-  background: transparent;
-  transform: none;
-}
-
-.profile-tab.on {
-  color: var(--text);
-}
-
-.profile-tab.on::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: -1px;
-  height: 2px;
-  background: var(--text);
 }
 
 .post-list {
