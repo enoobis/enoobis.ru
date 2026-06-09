@@ -722,14 +722,17 @@ onBeforeUnmount(() => {
 .mode-split .pane {
   border-left: 1px solid var(--border);
   padding-left: 1rem;
+  align-items: stretch;
 }
 .mode-split .pane:first-child {
   border-left: none;
   padding-left: 0;
+  padding-right: 1rem;
 }
 
 .editor-pane {
   position: relative;
+  padding-top: 0.5rem;
 }
 
 .editor-pane.drag-over {
@@ -744,7 +747,7 @@ onBeforeUnmount(() => {
   border: none;
   background: transparent;
   resize: vertical;
-  padding: 0.5rem 0;
+  padding: 0;
   font-family: var(--mono);
   font-size: 0.92rem;
   line-height: 1.7;
@@ -757,7 +760,7 @@ onBeforeUnmount(() => {
 
 .preview-pane {
   overflow: auto;
-  padding: 0.5rem 0;
+  padding: 0.5rem 0 0;
 }
 
 .preview-title {
@@ -767,20 +770,37 @@ onBeforeUnmount(() => {
   line-height: 1.25;
 }
 
+.mode-split .markdown-preview {
+  font-family: var(--mono);
+  font-size: 0.92rem;
+  line-height: 1.7;
+}
+
 .markdown-preview :deep(h1) {
   font-size: 1.5rem;
-  margin-top: 1.1rem;
+  margin: 0 0 0.5rem;
 }
 .markdown-preview :deep(h2) {
   font-size: 1.25rem;
-  margin-top: 1rem;
+  margin: 0.85rem 0 0;
 }
 .markdown-preview :deep(h3) {
   font-size: 1.1rem;
-  margin-top: 0.9rem;
+  margin: 0.75rem 0 0;
 }
 .markdown-preview :deep(p) {
-  line-height: 1.65;
+  margin: 0;
+  line-height: 1.7;
+}
+.markdown-preview :deep(p + p),
+.markdown-preview :deep(p + ul),
+.markdown-preview :deep(p + ol),
+.markdown-preview :deep(p + pre),
+.markdown-preview :deep(p + blockquote) {
+  margin-top: 0.85em;
+}
+.markdown-preview :deep(> *:first-child) {
+  margin-top: 0;
 }
 .markdown-preview :deep(blockquote) {
   border-left: 3px solid var(--border);
