@@ -172,6 +172,10 @@ textarea {
   padding: 0;
   font-size: 1rem;
   line-height: 1.5;
+  min-height: 2.75rem;
+}
+textarea::placeholder {
+  color: var(--muted);
 }
 textarea:focus {
   outline: none;
@@ -234,5 +238,10 @@ button[type="button"]:not(.ghost):not(.remove) {
   min-height: 40px;
   border-radius: 999px;
   font-size: 0.85rem;
+}
+@media (max-width: 640px) {
+  textarea {
+    font-size: 16px;
+  }
 }
 </style>

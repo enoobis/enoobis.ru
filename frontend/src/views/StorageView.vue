@@ -311,8 +311,8 @@ onMounted(async () => {
           <p>{{ uploading ? "загрузка…" : "перетащите файл или нажмите" }}</p>
         </div>
 
-        <p v-if="filesLoading" class="page-empty muted">загрузка</p>
-        <p v-else-if="!files.length" class="page-empty muted">пусто</p>
+        <p v-if="filesLoading" class="page-empty page-empty--tight muted">загрузка</p>
+        <p v-else-if="!files.length" class="page-empty page-empty--tight muted">пусто</p>
         <ul v-else class="list">
           <li v-for="f in files" :key="f.id" class="list-row">
             <div class="info">
@@ -331,7 +331,7 @@ onMounted(async () => {
       </template>
 
       <template v-else-if="section === 'notes'">
-        <div class="composer card">
+        <div class="composer">
           <input v-model="noteTitle" placeholder="название" maxlength="200" />
           <textarea v-model="noteBody" rows="6" placeholder="текст… markdown поддерживается" />
           <div class="actions">
@@ -342,8 +342,8 @@ onMounted(async () => {
           </div>
         </div>
 
-        <p v-if="notesLoading" class="page-empty muted">загрузка</p>
-        <p v-else-if="!notes.length" class="page-empty muted">пусто</p>
+        <p v-if="notesLoading" class="page-empty page-empty--tight muted">загрузка</p>
+        <p v-else-if="!notes.length" class="page-empty page-empty--tight muted">пусто</p>
         <ul v-else class="list">
           <li v-for="n in notes" :key="n.id" class="list-row">
             <div class="info">
@@ -488,6 +488,8 @@ onMounted(async () => {
 .composer {
   display: grid;
   gap: 0.5rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border);
 }
 
 .composer .actions {

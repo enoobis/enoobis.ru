@@ -249,6 +249,7 @@ select {
   appearance: none;
   -webkit-appearance: none;
   cursor: pointer;
+  text-transform: lowercase;
   padding-right: 2.3rem;
   background-image:
     linear-gradient(45deg, transparent 50%, var(--muted) 50%),
@@ -398,14 +399,15 @@ a.card:hover {
 /* shared toolbar: micro, blogs, library */
 .filter-bar {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
   align-items: stretch;
-  flex-wrap: wrap;
   margin: 0.6rem 0 0.75rem;
 }
 
 .filter-search {
-  flex: 1 1 10rem;
+  flex: 1 1 100%;
+  width: 100%;
   min-width: 0;
   display: flex;
   align-items: center;
@@ -671,14 +673,6 @@ input[type="search"]::-webkit-search-cancel-button:hover {
 }
 
 @media (max-width: 760px) {
-  .filter-bar {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  .filter-search {
-    flex: none;
-    width: 100%;
-  }
   .filter-menu-wrap,
   .filter-select,
   .filter-tabs {
@@ -743,6 +737,9 @@ input[type="search"]::-webkit-search-cancel-button:hover {
   text-align: center;
   padding: 2rem 0;
   margin: 0;
+}
+.page-empty--tight {
+  padding: 0.75rem 0;
 }
 
 /* мини-pill для действий в карточках списков (купить/применить) */
@@ -1041,6 +1038,11 @@ h3 {
   }
   .filter-search input {
     padding: 0.45rem 0;
+    min-height: 0;
+  }
+  .composer textarea {
+    font-size: 16px;
+    padding: 0;
     min-height: 0;
   }
 }

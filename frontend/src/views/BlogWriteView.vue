@@ -495,15 +495,14 @@ onBeforeUnmount(() => {
           ref="bodyInput"
           v-model="body"
           spellcheck="false"
-          placeholder="markdown"
+          placeholder="текст…"
           @keydown="onKeydown"
           @paste="onPaste"
         />
       </div>
       <div v-if="viewMode !== 'edit'" class="pane preview-pane">
         <h1 v-if="title" class="preview-title">{{ title }}</h1>
-        <div class="markdown-preview" v-html="previewHtml" />
-        <p v-if="!body" class="muted small">превью</p>
+        <div v-if="body" class="markdown-preview" v-html="previewHtml" />
       </div>
     </div>
 
@@ -699,6 +698,14 @@ onBeforeUnmount(() => {
 @media (max-width: 900px) {
   .editor-body.mode-split {
     grid-template-columns: 1fr;
+  }
+  .editor-body.mode-split .preview-pane {
+    display: none;
+  }
+  .editor-body,
+  .pane,
+  .editor-pane textarea {
+    min-height: 42vh;
   }
   .form-grid {
     grid-template-columns: 1fr;

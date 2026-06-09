@@ -404,19 +404,27 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   background-position: center top;
   pointer-events: none;
 }
-/* затемнение по всему фону + растворение к низу страницы */
+/* затемнение: боковые поля + растворение к низу */
 .profile-bg-layer::before {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    to bottom,
-    color-mix(in srgb, var(--bg) 50%, transparent),
-    color-mix(in srgb, var(--bg) 72%, transparent) 45%,
-    var(--bg) 100%
-  );
+  background:
+    linear-gradient(
+      to right,
+      var(--bg) 0%,
+      color-mix(in srgb, var(--bg) 40%, transparent) 12%,
+      color-mix(in srgb, var(--bg) 40%, transparent) 88%,
+      var(--bg) 100%
+    ),
+    linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--bg) 55%, transparent),
+      color-mix(in srgb, var(--bg) 78%, transparent) 45%,
+      var(--bg) 100%
+    );
 }
-/* steam-подобная колонка под контентом, чтобы текст читался на любом фоне */
+/* колонка под контентом — без просветов по краям */
 .profile-bg-layer::after {
   content: "";
   position: absolute;
@@ -424,14 +432,8 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   bottom: 0;
   left: 50%;
   transform: translateX(-50%);
-  width: min(100%, 820px);
-  background: linear-gradient(
-    to right,
-    transparent,
-    color-mix(in srgb, var(--bg) 82%, transparent) 8%,
-    color-mix(in srgb, var(--bg) 82%, transparent) 92%,
-    transparent
-  );
+  width: min(100%, 640px);
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
 }
 .profile {
   position: relative;
