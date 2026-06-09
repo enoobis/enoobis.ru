@@ -9,6 +9,7 @@ const nickname = ref("");
 const invite = ref("");
 const err = ref("");
 const ok = ref("");
+const loading = ref(false);
 const router = useRouter();
 const route = useRoute();
 const auth = useAuthStore();
@@ -21,6 +22,7 @@ onMounted(() => {
 async function submit() {
   err.value = "";
   ok.value = "";
+  loading.value = true;
   try {
     const r = await auth.register({
       email: email.value,
@@ -38,22 +40,27 @@ async function submit() {
     }
   } catch (e) {
     err.value = e instanceof Error ? e.message : "ошибка";
+  } finally {
+    loading.value = false;
   }
 }
 </script>
 
 <template>
-  <section class="auth">
+  <section class="auth" data-reveal>
     <h1>регистрация</h1>
     <form @submit.prevent="submit">
       <input v-model="nickname" placeholder="ник" required pattern="[A-Za-z0-9_]{3,32}" />
       <input v-model="email" type="email" placeholder="email" required />
       <input v-model="password" type="password" placeholder="пароль" minlength="10" required />
-      <button type="submit">создать</button>
+      <button type="submit" class="primary" :disabled="loading">
+        <span v-if="!loading">создать</span>
+        <span v-else class="spinner" aria-hidden="true" />
+      </button>
     </form>
     <p v-if="err" class="error">{{ err }}</p>
-    <p v-if="ok" class="muted">{{ ok }}</p>
-    <p class="muted alt">
+    <p v-if="ok" class="muted ok">{{ ok }}</p>
+    <p class="alt">
       уже есть аккаунт? <RouterLink to="/login">войти</RouterLink>
     </p>
   </section>
@@ -61,22 +68,45 @@ async function submit() {
 
 <style scoped>
 .auth {
-  max-width: 320px;
-  margin: 12vh auto 0;
+  max-width: 360px;
+  margin: 14vh auto 0;
+  padding: 0 1rem;
 }
 .auth h1 {
-  font-size: 1.4rem;
-  margin-bottom: 1.2rem;
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  margin-bottom: 1.5rem;
   text-transform: lowercase;
 }
 form {
   display: grid;
   gap: 0.6rem;
 }
-button {
-  margin-top: 0.4rem;
+form button {
+  margin-top: 0.6rem;
+  width: 100%;
 }
 .alt {
-  margin-top: 1.2rem;
+  margin-top: 1.5rem;
+  text-align: center;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+.alt a {
+  color: var(--text);
+}
+.ok,
+.error {
+  margin-top: 0.8rem;
+  text-align: center;
+}
+@media (max-width: 640px) {
+  .auth {
+    margin-top: 10vh;
+  }
+  .auth h1 {
+    font-size: 1.7rem;
+  }
 }
 </style>

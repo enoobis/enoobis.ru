@@ -183,7 +183,7 @@ const FILLED = new Set<AppIconName>([
   "pinned",
 ]);
 
-const DEFAULT_SIZE = 18;
+const DEFAULT_SIZE = 20;
 const STROKE_WIDTH = 2.5;
 const SIZE_SCALE = 1.125;
 

@@ -89,7 +89,7 @@ onUnmounted(() => {
 <template>
   <div class="search-panel" :class="{ 'search-panel--embedded': embedded }">
     <div class="filter-search">
-      <AppIcon name="search" :size="16" />
+      <AppIcon name="search" :size="20" />
       <input
         ref="inputEl"
         v-model="q"
@@ -101,7 +101,9 @@ onUnmounted(() => {
     </div>
 
     <p v-if="err" class="error">{{ err }}</p>
-    <p v-else-if="loading" class="muted search-status">загрузка</p>
+    <p v-else-if="loading" class="muted search-status">
+      <span class="spinner" aria-hidden="true" /> загрузка
+    </p>
     <p
       v-else-if="q && !data.blog.length && !data.micro.length && !data.users.length"
       class="muted search-status"
@@ -110,7 +112,7 @@ onUnmounted(() => {
     </p>
 
     <template v-else-if="q">
-      <ul v-if="data.blog.length" class="results">
+      <ul v-if="data.blog.length" class="results stagger-list">
         <li v-for="p in data.blog" :key="`b-${p.id}`">
           <RouterLink :to="`/blogs/${p.id}`" class="result-row" @click="emit('close')">
             <span class="result-title">{{ p.title }}</span>
@@ -121,7 +123,7 @@ onUnmounted(() => {
         </li>
       </ul>
 
-      <ul v-if="data.micro.length" class="results">
+      <ul v-if="data.micro.length" class="results stagger-list">
         <li v-for="m in data.micro" :key="`m-${m.id}`">
           <RouterLink :to="`/microblogs/${m.id}`" class="result-row" @click="emit('close')">
             <span class="result-title">{{ m.body }}</span>
@@ -132,7 +134,7 @@ onUnmounted(() => {
         </li>
       </ul>
 
-      <ul v-if="data.users.length" class="results">
+      <ul v-if="data.users.length" class="results stagger-list">
         <li v-for="u in data.users" :key="`u-${u.nickname}`">
           <RouterLink :to="`/u/${u.nickname}`" class="result-row result-row--user" @click="emit('close')">
             <span class="avatar">
@@ -167,6 +169,9 @@ onUnmounted(() => {
 .search-status {
   margin: 0;
   padding: 0.15rem 0.1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .results {
@@ -180,15 +185,15 @@ onUnmounted(() => {
 .result-row {
   display: grid;
   gap: 0.12rem;
-  padding: 0.45rem 0.1rem;
+  padding: 0.6rem 0.7rem;
   color: var(--text);
-  border-radius: 6px;
+  border-radius: var(--radius);
 }
 
 .result-row--user {
-  grid-template-columns: 32px 1fr;
+  grid-template-columns: 36px 1fr;
   align-items: center;
-  gap: 0.55rem;
+  gap: 0.6rem;
 }
 
 .result-row:hover {
@@ -197,8 +202,8 @@ onUnmounted(() => {
 }
 
 .result-title {
-  font-weight: 500;
-  font-size: 0.95rem;
+  font-weight: 600;
+  font-size: 1.05rem;
   line-height: 1.35;
   white-space: pre-wrap;
 }
@@ -210,8 +215,8 @@ onUnmounted(() => {
 }
 
 .avatar {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   border-radius: var(--avatar-radius);
   border: 1px solid var(--border);
   background: var(--surface);
@@ -220,8 +225,8 @@ onUnmounted(() => {
   justify-content: center;
   overflow: hidden;
   color: var(--muted);
-  font-weight: 500;
-  font-size: 0.72rem;
+  font-weight: 600;
+  font-size: 0.78rem;
 }
 
 .avatar img {

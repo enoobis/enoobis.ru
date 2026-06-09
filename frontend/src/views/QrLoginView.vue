@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import QRCode from "qrcode";
 import { claimQrCode, extractQrCode, issueQrCode, qrLoginUrl } from "../api/qrAuth";
+import { useQrScanDevice } from "../composables/useQrScanDevice";
 import { useAuthStore } from "../stores/auth";
 
 type Tab = "show" | "scan";
@@ -10,6 +11,7 @@ type Tab = "show" | "scan";
 const auth = useAuthStore();
 const route = useRoute();
 const router = useRouter();
+const { canScanQr } = useQrScanDevice();
 
 const tab = ref<Tab>("show");
 const err = ref("");
@@ -20,6 +22,12 @@ const issuing = ref(false);
 const claiming = ref(false);
 const scanRaw = ref("");
 const videoEl = ref<HTMLVideoElement | null>(null);
+
+const leadText = computed(() =>
+  canScanQr.value
+    ? "покажите qr на одном устройстве — отсканируйте на другом. работает в обе стороны."
+    : "покажите qr и отсканируйте с телефона.",
+);
 
 let expireTimer: ReturnType<typeof setInterval> | null = null;
 let refreshTimer: ReturnType<typeof setTimeout> | null = null;
@@ -89,6 +97,10 @@ async function refreshQr() {
 }
 
 async function claim(codeInput: string) {
+  if (!canScanQr.value) {
+    err.value = "откройте ссылку с телефона";
+    return;
+  }
   const code = extractQrCode(codeInput);
   if (!code) {
     err.value = "вставьте ссылку или код из qr";
@@ -111,6 +123,7 @@ async function claim(codeInput: string) {
 }
 
 async function startCamera() {
+  if (!canScanQr.value) return;
   stopCamera();
   err.value = "";
   const Detector = (window as unknown as { BarcodeDetector?: typeof BarcodeDetector })
@@ -143,13 +156,20 @@ async function startCamera() {
   }
 }
 
+watch(canScanQr, (can) => {
+  if (!can) {
+    tab.value = "show";
+    stopCamera();
+  }
+});
+
 watch(tab, (t) => {
   err.value = "";
   ok.value = "";
   if (t === "show") {
     stopCamera();
     void refreshQr();
-  } else {
+  } else if (canScanQr.value) {
     clearTimers();
     qrDataUrl.value = "";
     void startCamera();
@@ -159,6 +179,11 @@ watch(tab, (t) => {
 onMounted(() => {
   const fromUrl = String(route.query.code ?? "");
   if (fromUrl) {
+    if (!canScanQr.value) {
+      err.value = "откройте ссылку с телефона";
+      tab.value = "show";
+      return;
+    }
     tab.value = "scan";
     scanRaw.value = fromUrl;
     void claim(fromUrl);
@@ -167,9 +192,11 @@ onMounted(() => {
   if (auth.token) {
     tab.value = "show";
     void refreshQr();
-  } else {
+  } else if (canScanQr.value) {
     tab.value = "scan";
     void startCamera();
+  } else {
+    tab.value = "show";
   }
 });
 
@@ -182,11 +209,9 @@ onBeforeUnmount(() => {
 <template>
   <section class="qr-page card">
     <h1>вход по qr</h1>
-    <p class="muted lead">
-      покажите qr на одном устройстве — отсканируйте на другом. работает в обе стороны.
-    </p>
+    <p class="muted lead">{{ leadText }}</p>
 
-    <div class="tabs" role="tablist">
+    <div v-if="canScanQr" class="tabs" role="tablist">
       <button
         type="button"
         class="tab"
@@ -201,7 +226,11 @@ onBeforeUnmount(() => {
       </button>
     </div>
 
-    <p v-if="!auth.token && tab === 'show'" class="muted hint">
+    <p v-if="!canScanQr && !auth.token" class="muted hint">
+      сканирование только с телефона. <RouterLink to="/login">войти</RouterLink>
+    </p>
+
+    <p v-else-if="!auth.token && tab === 'show'" class="muted hint">
       чтобы показать qr, сначала <RouterLink to="/login">войдите</RouterLink> на этом устройстве.
     </p>
 
@@ -211,18 +240,18 @@ onBeforeUnmount(() => {
         <p class="muted timer">{{ expiresIn }} сек</p>
       </div>
       <p v-else-if="issuing" class="muted">создаём код…</p>
-      <button type="button" class="ghost" :disabled="issuing || !auth.token" @click="refreshQr">
+      <button type="button" class="secondary ghost" :disabled="issuing || !auth.token" @click="refreshQr">
         обновить
       </button>
     </div>
 
-    <div v-else class="scan-pane">
+    <div v-else-if="canScanQr" class="scan-pane">
       <video ref="videoEl" class="scan-video" playsinline muted />
       <label class="scan-label">
         или вставьте ссылку / код
         <textarea v-model="scanRaw" rows="3" placeholder="https://…/auth/qr?code=…" />
       </label>
-      <button type="button" :disabled="claiming" @click="claim(scanRaw)">
+      <button type="button" class="primary" :disabled="claiming" @click="claim(scanRaw)">
         {{ claiming ? "вход…" : "войти на этом устройстве" }}
       </button>
     </div>
@@ -260,8 +289,8 @@ h1 {
 
 .tab {
   padding: 0.55rem 0.65rem;
-  border: 1px solid var(--line, #333);
-  border-radius: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
   background: transparent;
   color: inherit;
   font-size: 0.875rem;
@@ -269,8 +298,9 @@ h1 {
 }
 
 .tab.on {
-  border-color: var(--accent, #a78bfa);
-  color: var(--accent, #a78bfa);
+  border-color: var(--text);
+  color: var(--text);
+  background: var(--surface2);
 }
 
 .tab:disabled {
@@ -291,8 +321,8 @@ h1 {
 }
 
 .qr-wrap img {
-  border-radius: 8px;
-  background: #141414;
+  border-radius: var(--radius);
+  background: var(--surface2);
 }
 
 .timer {
@@ -302,8 +332,8 @@ h1 {
 .scan-video {
   width: 100%;
   max-height: 220px;
-  border-radius: 8px;
-  background: #111;
+  border-radius: var(--radius);
+  background: var(--surface2);
   object-fit: cover;
 }
 
@@ -311,29 +341,11 @@ h1 {
   display: grid;
   gap: 0.35rem;
   font-size: 0.8125rem;
-  color: var(--muted, #737373);
+  color: var(--muted);
 }
 
-textarea {
+.scan-pane button {
   width: 100%;
-  resize: vertical;
-  min-height: 4.5rem;
-  padding: 0.55rem 0.65rem;
-  border: 1px solid var(--line, #333);
-  border-radius: 8px;
-  background: #111;
-  color: inherit;
-  font: inherit;
-}
-
-button:not(.tab):not(.ghost) {
-  width: 100%;
-  padding: 0.65rem 1rem;
-  border: 1px solid var(--line, #404040);
-  border-radius: 8px;
-  background: #1a1a1a;
-  color: inherit;
-  cursor: pointer;
 }
 
 .ghost {
@@ -341,9 +353,11 @@ button:not(.tab):not(.ghost) {
   padding: 0.4rem 0;
   border: none;
   background: transparent;
-  color: var(--muted, #737373);
-  cursor: pointer;
-  font-size: 0.8125rem;
+  min-height: 0;
+}
+
+.ghost:hover {
+  transform: none;
 }
 
 .hint {
@@ -352,13 +366,11 @@ button:not(.tab):not(.ghost) {
 }
 
 .error {
-  color: #f87171;
-  font-size: 0.875rem;
   margin: 0.75rem 0 0;
 }
 
 .ok {
-  color: #86efac;
+  color: var(--muted);
   font-size: 0.875rem;
   margin: 0.75rem 0 0;
 }

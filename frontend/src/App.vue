@@ -20,6 +20,43 @@ const profileMenuOpen = ref(false);
 const navDrawerOpen = ref(false);
 const searchOpen = ref(false);
 const navEl = ref<HTMLElement | null>(null);
+
+const navProgress = ref(0);
+const navProgressOn = ref(false);
+const navProgressDone = ref(false);
+let navTrickleTimer: ReturnType<typeof setInterval> | null = null;
+let navDoneTimer: ReturnType<typeof setTimeout> | null = null;
+
+function startNavProgress() {
+  if (navDoneTimer) {
+    clearTimeout(navDoneTimer);
+    navDoneTimer = null;
+  }
+  navProgressDone.value = false;
+  navProgressOn.value = true;
+  navProgress.value = 12;
+  if (navTrickleTimer) clearInterval(navTrickleTimer);
+  navTrickleTimer = setInterval(() => {
+    const remaining = 90 - navProgress.value;
+    if (remaining <= 0.5) return;
+    navProgress.value += Math.max(0.5, remaining * 0.08);
+  }, 180);
+}
+
+function finishNavProgress() {
+  if (navTrickleTimer) {
+    clearInterval(navTrickleTimer);
+    navTrickleTimer = null;
+  }
+  if (!navProgressOn.value) return;
+  navProgress.value = 100;
+  navProgressDone.value = true;
+  navDoneTimer = setTimeout(() => {
+    navProgressOn.value = false;
+    navProgressDone.value = false;
+    navProgress.value = 0;
+  }, 360);
+}
 const sheetMobile = ref(
   typeof window !== "undefined" ? window.innerWidth <= 640 : false,
 );
@@ -227,6 +264,8 @@ function syncShell() {
 onMounted(() => {
   window.addEventListener("enoobis:profile-cosmetics-updated", onProfileCosmeticsUpdated);
   window.addEventListener("enoobis:online-preference-updated", onOnlinePreferenceUpdated);
+  window.addEventListener("enoobis:nav-start", startNavProgress);
+  window.addEventListener("enoobis:nav-done", finishNavProgress);
   window.addEventListener("online", syncOnlineStatus);
   window.addEventListener("offline", syncOnlineStatus);
   window.addEventListener("keydown", onEscape);
@@ -242,6 +281,8 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener("enoobis:profile-cosmetics-updated", onProfileCosmeticsUpdated);
   window.removeEventListener("enoobis:online-preference-updated", onOnlinePreferenceUpdated);
+  window.removeEventListener("enoobis:nav-start", startNavProgress);
+  window.removeEventListener("enoobis:nav-done", finishNavProgress);
   window.removeEventListener("online", syncOnlineStatus);
   window.removeEventListener("offline", syncOnlineStatus);
   window.removeEventListener("keydown", onEscape);
@@ -251,6 +292,8 @@ onUnmounted(() => {
   document.removeEventListener("click", onDocumentClick);
   window.removeEventListener("resize", onSheetLayoutChange);
   window.removeEventListener("scroll", onSheetLayoutChange, true);
+  if (navTrickleTimer) clearInterval(navTrickleTimer);
+  if (navDoneTimer) clearTimeout(navDoneTimer);
   session.stopShell();
 });
 
@@ -291,7 +334,7 @@ watch(
           aria-label="меню"
           @click.stop="toggleNavDrawer"
         >
-          <AppIcon name="menu" :size="18" />
+          <AppIcon name="menu" :size="20" />
         </button>
       </div>
       <RouterLink v-if="onHome" to="/" class="nav-link brand-link">
@@ -313,7 +356,7 @@ watch(
             :aria-expanded="searchOpen"
             @click.stop="toggleSearch"
           >
-            <AppIcon name="search" :size="18" />
+            <AppIcon name="search" :size="20" />
           </button>
           <RouterLink
             v-else
@@ -322,7 +365,7 @@ watch(
             aria-label="поиск"
             title="поиск"
           >
-            <AppIcon name="search" :size="18" />
+            <AppIcon name="search" :size="20" />
           </RouterLink>
           <RouterLink
             to="/leaderboard"
@@ -330,10 +373,10 @@ watch(
             aria-label="лидерборд"
             title="лидерборд"
           >
-            <AppIcon name="leaderboard" :size="18" />
+            <AppIcon name="leaderboard" :size="20" />
           </RouterLink>
           <RouterLink to="/chats" class="icon-btn chat-btn" aria-label="чаты" title="чаты">
-            <AppIcon name="chat" :size="18" />
+            <AppIcon name="chat" :size="20" />
             <span v-if="chatStore.unread > 0" class="chat-badge">{{ chatBadge }}</span>
           </RouterLink>
           <RouterLink
@@ -343,7 +386,7 @@ watch(
             aria-label="хранилище"
             title="хранилище"
           >
-            <AppIcon name="folder" :size="18" />
+            <AppIcon name="folder" :size="20" />
           </RouterLink>
           <RouterLink
             v-if="auth.role === 'teacher' || auth.role === 'admin'"
@@ -352,7 +395,7 @@ watch(
             aria-label="написать"
             title="написать"
           >
-            <AppIcon name="write" :size="18" />
+            <AppIcon name="write" :size="20" />
           </RouterLink>
         </div>
         <div class="profile-menu-wrap">
@@ -441,13 +484,13 @@ watch(
             </div>
           </div>
           <RouterLink :to="`/u/${auth.nickname}`" class="profile-menu-item" @click="closeProfileMenu">
-            <AppIcon name="profile" :size="20" /><span>профиль</span>
+            <AppIcon name="profile" :size="22" /><span>профиль</span>
           </RouterLink>
           <RouterLink to="/inventory" class="profile-menu-item" @click="closeProfileMenu">
-            <AppIcon name="inventory" :size="20" /><span>инвентарь</span>
+            <AppIcon name="inventory" :size="22" /><span>инвентарь</span>
           </RouterLink>
           <RouterLink to="/saved" class="profile-menu-item" @click="closeProfileMenu">
-            <AppIcon name="bookmark" :size="20" /><span>закладки</span>
+            <AppIcon name="bookmark" :size="22" /><span>закладки</span>
           </RouterLink>
           <RouterLink
             v-if="auth.role === 'teacher' || auth.role === 'admin'"
@@ -455,17 +498,17 @@ watch(
             class="profile-menu-item"
             @click="closeProfileMenu"
           >
-            <AppIcon name="invites" :size="20" /><span>инвайты</span>
+            <AppIcon name="invites" :size="22" /><span>инвайты</span>
           </RouterLink>
           <RouterLink to="/me/edit" class="profile-menu-item" @click="closeProfileMenu">
-            <AppIcon name="settings" :size="20" /><span>настройки</span>
+            <AppIcon name="settings" :size="22" /><span>настройки</span>
           </RouterLink>
           <RouterLink to="/auth/qr" class="profile-menu-item" @click="closeProfileMenu">
-            <AppIcon name="qr" :size="20" /><span>вход по qr</span>
+            <AppIcon name="qr" :size="22" /><span>вход по qr</span>
           </RouterLink>
           <span class="profile-menu-sep" />
           <button class="profile-menu-item profile-menu-btn" type="button" @click="logoutFromMenu">
-            <AppIcon name="logout" :size="20" /><span>выход</span>
+            <AppIcon name="logout" :size="22" /><span>выход</span>
           </button>
         </div>
       </Transition>
@@ -567,13 +610,13 @@ watch(
                 </div>
               </div>
               <RouterLink :to="`/u/${auth.nickname}`" class="profile-menu-item" @click="closeProfileMenu">
-                <AppIcon name="profile" :size="20" /><span>профиль</span>
+                <AppIcon name="profile" :size="22" /><span>профиль</span>
               </RouterLink>
               <RouterLink to="/inventory" class="profile-menu-item" @click="closeProfileMenu">
-                <AppIcon name="inventory" :size="20" /><span>инвентарь</span>
+                <AppIcon name="inventory" :size="22" /><span>инвентарь</span>
               </RouterLink>
               <RouterLink to="/saved" class="profile-menu-item" @click="closeProfileMenu">
-                <AppIcon name="bookmark" :size="20" /><span>закладки</span>
+                <AppIcon name="bookmark" :size="22" /><span>закладки</span>
               </RouterLink>
               <RouterLink
                 v-if="auth.role === 'teacher' || auth.role === 'admin'"
@@ -581,25 +624,37 @@ watch(
                 class="profile-menu-item"
                 @click="closeProfileMenu"
               >
-                <AppIcon name="invites" :size="20" /><span>инвайты</span>
+                <AppIcon name="invites" :size="22" /><span>инвайты</span>
               </RouterLink>
               <RouterLink to="/me/edit" class="profile-menu-item" @click="closeProfileMenu">
-                <AppIcon name="settings" :size="20" /><span>настройки</span>
+                <AppIcon name="settings" :size="22" /><span>настройки</span>
               </RouterLink>
               <RouterLink to="/auth/qr" class="profile-menu-item" @click="closeProfileMenu">
-                <AppIcon name="qr" :size="20" /><span>вход по qr</span>
+                <AppIcon name="qr" :size="22" /><span>вход по qr</span>
               </RouterLink>
               <span class="profile-menu-sep" />
               <button class="profile-menu-item profile-menu-btn" type="button" @click="logoutFromMenu">
-                <AppIcon name="logout" :size="20" /><span>выход</span>
+                <AppIcon name="logout" :size="22" /><span>выход</span>
               </button>
             </div>
           </div>
         </div>
       </Transition>
     </Teleport>
-    <RouterView />
+    <RouterView v-slot="{ Component, route: rv }">
+      <Transition name="page" mode="out-in">
+        <component :is="Component" :key="rv.fullPath" />
+      </Transition>
+    </RouterView>
     <AppToast />
+    <Teleport to="body">
+      <div
+        class="nprog"
+        :class="{ on: navProgressOn, done: navProgressDone }"
+        :style="{ width: navProgress + '%' }"
+        aria-hidden="true"
+      />
+    </Teleport>
     <div v-if="!isOnline" class="offline-overlay" role="status" aria-live="polite">
       <div class="offline-card">
         <h2>нет связи</h2>
@@ -615,7 +670,9 @@ watch(
   position: fixed;
   inset: 0;
   z-index: 1000;
-  background: rgba(0, 0, 0, 0.95);
+  background: var(--glass-bg, rgba(0, 0, 0, 0.95));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
   display: grid;
   place-items: center;
   padding: 1rem;
@@ -664,7 +721,9 @@ watch(
   border-radius: 0 0 var(--radius) var(--radius);
   padding: 0.5rem 0.6rem 0.75rem;
   overflow: hidden;
-  background: var(--bg);
+  background: var(--glass-bg, var(--bg));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
   transform-origin: top center;
   will-change: transform, opacity;
 }
@@ -706,6 +765,8 @@ watch(
 
 .nav-menu-root--backdrop {
   background: rgba(0, 0, 0, 0.45);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
   pointer-events: auto;
 }
 
@@ -734,7 +795,9 @@ watch(
   border-top: none;
   border-radius: 0 0 var(--radius) var(--radius);
   max-height: min(72vh, 28rem);
-  background: var(--surface);
+  background: var(--glass-bg, var(--surface));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
   border: 1px solid var(--border);
   overflow-y: auto;
   transform-origin: top center;
@@ -750,7 +813,9 @@ watch(
   border-right: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
   border-radius: 0 0 var(--radius) var(--radius);
-  background: var(--bg);
+  background: var(--glass-bg, var(--bg));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
   z-index: 91;
   overflow: hidden;
   display: flex;
@@ -911,7 +976,7 @@ watch(
 }
 
 .profile-trigger {
-  border-radius: var(--avatar-radius);
+  border-radius: 999px;
   min-height: 44px;
   width: 44px;
   height: 44px;
@@ -920,7 +985,13 @@ watch(
   background: var(--surface);
   border: 1px solid var(--border);
   color: var(--text);
-  transition: background 0.18s ease, border-color 0.18s ease;
+  transition:
+    background var(--dur-2) var(--ease-out),
+    border-color var(--dur-2) var(--ease-out),
+    transform var(--dur-2) var(--ease-spring);
+}
+.profile-trigger:active {
+  transform: scale(0.94);
 }
 
 @media (max-width: 640px) {
@@ -939,12 +1010,12 @@ watch(
 .profile-trigger-avatar {
   width: 100%;
   height: 100%;
-  border-radius: 0;
+  border-radius: 999px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.68rem;
-  font-weight: 600;
+  font-size: 0.72rem;
+  font-weight: 700;
   background: transparent;
   color: var(--muted);
   overflow: hidden;
@@ -1067,8 +1138,11 @@ watch(
 }
 
 .brand-link {
-  font-weight: 600;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-size: 1rem;
   color: var(--text);
+  padding: 0.35rem 0.6rem;
 }
 .brand-link:hover {
   color: var(--text);
@@ -1076,5 +1150,29 @@ watch(
 
 .offline-card h2 {
   text-transform: lowercase;
+}
+
+html[data-theme="contrast"] .nav-dropdown,
+html[data-theme="contrast-white"] .nav-dropdown,
+html[data-theme="contrast"] .nav-menu-sheet,
+html[data-theme="contrast-white"] .nav-menu-sheet,
+html[data-theme="contrast"] .nav-menu-sheet--full,
+html[data-theme="contrast-white"] .nav-menu-sheet--full,
+html[data-theme="contrast"] .offline-overlay,
+html[data-theme="contrast-white"] .offline-overlay {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: var(--surface);
+}
+
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .nav-dropdown,
+  .nav-menu-sheet,
+  .nav-menu-sheet--full {
+    background: var(--surface);
+  }
+  .offline-overlay {
+    background: rgba(0, 0, 0, 0.95);
+  }
 }
 </style>
