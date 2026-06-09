@@ -38,6 +38,9 @@ async function submit() {
     </form>
     <p v-if="err" class="error">{{ err }}</p>
     <p class="muted alt">
+      <RouterLink to="/auth/qr">вход по qr</RouterLink>
+    </p>
+    <p class="muted alt">
       нет аккаунта? <RouterLink to="/register">создать</RouterLink>
     </p>
   </section>
