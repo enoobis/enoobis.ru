@@ -515,16 +515,27 @@ watch(
             <div class="profile-menu-head-main">
               <span class="profile-menu-name">@{{ auth.nickname }}</span>
             </div>
-            <div class="profile-menu-coins" title="монеты">
-              <img
-                src="/coin-gem.png"
-                alt=""
-                width="18"
-                height="18"
-                class="profile-coin-img"
-                loading="lazy"
-              />
-              <span>{{ profileCoins }}</span>
+            <div class="profile-menu-head-actions">
+              <RouterLink
+                to="/auth/qr"
+                class="profile-menu-qr icon-btn"
+                aria-label="вход по qr"
+                title="вход по qr"
+                @click="closeProfileMenu"
+              >
+                <AppIcon name="qr" :size="18" />
+              </RouterLink>
+              <div class="profile-menu-coins" title="монеты">
+                <img
+                  src="/coin-gem.png"
+                  alt=""
+                  width="18"
+                  height="18"
+                  class="profile-coin-img"
+                  loading="lazy"
+                />
+                <span>{{ profileCoins }}</span>
+              </div>
             </div>
           </div>
           <RouterLink :to="`/u/${auth.nickname}`" class="profile-menu-item" @click="closeProfileMenu">
@@ -546,9 +557,6 @@ watch(
           </RouterLink>
           <RouterLink to="/me/edit" class="profile-menu-item" @click="closeProfileMenu">
             <AppIcon name="settings" :size="22" /><span>настройки</span>
-          </RouterLink>
-          <RouterLink to="/auth/qr" class="profile-menu-item" @click="closeProfileMenu">
-            <AppIcon name="qr" :size="22" /><span>вход по qr</span>
           </RouterLink>
           <span class="profile-menu-sep" />
           <button class="profile-menu-item profile-menu-btn" type="button" @click="logoutFromMenu">
@@ -641,16 +649,27 @@ watch(
                 <div class="profile-menu-head-main">
                   <span class="profile-menu-name">@{{ auth.nickname }}</span>
                 </div>
-                <div class="profile-menu-coins" title="монеты">
-                  <img
-                    src="/coin-gem.png"
-                    alt=""
-                    width="18"
-                    height="18"
-                    class="profile-coin-img"
-                    loading="lazy"
-                  />
-                  <span>{{ profileCoins }}</span>
+                <div class="profile-menu-head-actions">
+                  <RouterLink
+                    to="/auth/qr"
+                    class="profile-menu-qr icon-btn"
+                    aria-label="вход по qr"
+                    title="вход по qr"
+                    @click="closeProfileMenu"
+                  >
+                    <AppIcon name="qr" :size="18" />
+                  </RouterLink>
+                  <div class="profile-menu-coins" title="монеты">
+                    <img
+                      src="/coin-gem.png"
+                      alt=""
+                      width="18"
+                      height="18"
+                      class="profile-coin-img"
+                      loading="lazy"
+                    />
+                    <span>{{ profileCoins }}</span>
+                  </div>
                 </div>
               </div>
               <RouterLink :to="`/u/${auth.nickname}`" class="profile-menu-item" @click="closeProfileMenu">
@@ -672,9 +691,6 @@ watch(
               </RouterLink>
               <RouterLink to="/me/edit" class="profile-menu-item" @click="closeProfileMenu">
                 <AppIcon name="settings" :size="22" /><span>настройки</span>
-              </RouterLink>
-              <RouterLink to="/auth/qr" class="profile-menu-item" @click="closeProfileMenu">
-                <AppIcon name="qr" :size="22" /><span>вход по qr</span>
               </RouterLink>
               <span class="profile-menu-sep" />
               <button class="profile-menu-item profile-menu-btn" type="button" @click="logoutFromMenu">
@@ -1130,6 +1146,15 @@ watch(
   flex-direction: column;
   gap: 0.12rem;
   min-width: 0;
+}
+.profile-menu-head-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+.profile-menu-qr {
+  color: var(--muted);
 }
 .profile-menu-coins {
   display: inline-flex;
