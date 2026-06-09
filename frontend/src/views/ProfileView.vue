@@ -400,7 +400,9 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   margin: 0 auto;
 }
 .profile-bg {
-  --profile-col: min(640px, calc(100vw - 2 * var(--layout-pad, 1rem)));
+  /* ширина колонки = ширина шапки (.layout 880px минус её padding) */
+  --profile-col: min(calc(880px - 2rem), calc(100vw - 2 * var(--layout-pad, 1rem)));
+  --profile-fade: 110px;
   position: fixed;
   inset: 0;
   z-index: 0;
@@ -412,32 +414,28 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   background-size: cover;
   background-position: center top;
 }
+/* узкая полоса перехода: blur + чёрный, гаснет наружу */
 .profile-bg-side {
   position: absolute;
   top: 0;
   bottom: 0;
-  width: max(0px, calc((100vw - var(--profile-col)) / 2));
-  -webkit-backdrop-filter: blur(16px);
-  backdrop-filter: blur(16px);
+  width: var(--profile-fade);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
 }
 .profile-bg-side--left {
-  left: 0;
-  background: linear-gradient(
-    to right,
-    var(--bg) 0%,
-    color-mix(in srgb, var(--bg) 62%, transparent) 52%,
-    transparent 100%
-  );
+  left: calc(50% - var(--profile-col) / 2 - var(--profile-fade));
+  background: linear-gradient(to right, transparent, rgba(0, 0, 0, 0.85));
+  -webkit-mask-image: linear-gradient(to right, transparent, #000);
+  mask-image: linear-gradient(to right, transparent, #000);
 }
 .profile-bg-side--right {
-  right: 0;
-  background: linear-gradient(
-    to left,
-    var(--bg) 0%,
-    color-mix(in srgb, var(--bg) 62%, transparent) 52%,
-    transparent 100%
-  );
+  right: calc(50% - var(--profile-col) / 2 - var(--profile-fade));
+  background: linear-gradient(to left, transparent, rgba(0, 0, 0, 0.85));
+  -webkit-mask-image: linear-gradient(to left, transparent, #000);
+  mask-image: linear-gradient(to left, transparent, #000);
 }
+/* чёрная колонка строго по ширине шапки */
 .profile-bg-center {
   position: absolute;
   top: 0;
@@ -447,8 +445,8 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   width: var(--profile-col);
   background: linear-gradient(
     to bottom,
-    rgba(0, 0, 0, 0.82),
-    rgba(0, 0, 0, 0.88) 44%,
+    rgba(0, 0, 0, 0.85),
+    rgba(0, 0, 0, 0.9) 44%,
     var(--bg) 100%
   );
 }
