@@ -82,12 +82,12 @@ onMounted(load);
 
     <div class="filter-bar">
       <FilterSearch v-model="q" @enter="search" @input="() => { if (!q.trim()) search(); }" />
-      <div v-if="auth.token" class="filter-tabs">
-        <button class="filter-tab" :class="{ on: feed === 'all' }" type="button" @click="feed = 'all'">все</button>
-        <button class="filter-tab" :class="{ on: feed === 'following' }" type="button" @click="feed = 'following'">
-          подписки
-        </button>
-      </div>
+    </div>
+    <div v-if="auth.token" class="content-tabs">
+      <button class="content-tab" :class="{ on: feed === 'all' }" type="button" @click="feed = 'all'">все</button>
+      <button class="content-tab" :class="{ on: feed === 'following' }" type="button" @click="feed = 'following'">
+        подписки
+      </button>
     </div>
 
     <MicroComposer v-if="auth.token" @posted="onPosted" />
@@ -114,6 +114,9 @@ onMounted(load);
 .feed {
   display: grid;
   gap: 0;
+}
+.feed .content-tabs {
+  margin-top: -0.15rem;
 }
 .login-hint {
   padding: 1rem 0;
