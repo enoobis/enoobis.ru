@@ -402,7 +402,7 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
 .profile-bg {
   /* ширина колонки = ширина шапки (.layout 880px минус её padding) */
   --profile-col: min(calc(880px - 2rem), calc(100vw - 2 * var(--layout-pad, 1rem)));
-  --profile-fade: 110px;
+  --profile-fade: 120px;
   position: fixed;
   inset: 0;
   z-index: 0;
@@ -420,20 +420,20 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   top: 0;
   bottom: 0;
   width: var(--profile-fade);
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(22px);
+  backdrop-filter: blur(22px);
 }
 .profile-bg-side--left {
   left: calc(50% - var(--profile-col) / 2 - var(--profile-fade));
-  background: linear-gradient(to right, transparent, rgba(0, 0, 0, 0.85));
-  -webkit-mask-image: linear-gradient(to right, transparent, #000);
-  mask-image: linear-gradient(to right, transparent, #000);
+  background: linear-gradient(to right, transparent, rgba(0, 0, 0, 0.96));
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 55%);
+  mask-image: linear-gradient(to right, transparent 0%, #000 55%);
 }
 .profile-bg-side--right {
   right: calc(50% - var(--profile-col) / 2 - var(--profile-fade));
-  background: linear-gradient(to left, transparent, rgba(0, 0, 0, 0.85));
-  -webkit-mask-image: linear-gradient(to left, transparent, #000);
-  mask-image: linear-gradient(to left, transparent, #000);
+  background: linear-gradient(to left, transparent, rgba(0, 0, 0, 0.96));
+  -webkit-mask-image: linear-gradient(to left, transparent 0%, #000 55%);
+  mask-image: linear-gradient(to left, transparent 0%, #000 55%);
 }
 /* чёрная колонка строго по ширине шапки */
 .profile-bg-center {
@@ -445,8 +445,8 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   width: var(--profile-col);
   background: linear-gradient(
     to bottom,
-    rgba(0, 0, 0, 0.85),
-    rgba(0, 0, 0, 0.9) 44%,
+    rgba(0, 0, 0, 0.96),
+    rgba(0, 0, 0, 0.98) 44%,
     var(--bg) 100%
   );
 }
