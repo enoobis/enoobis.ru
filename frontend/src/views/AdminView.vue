@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, type Ref } from "vue";
 import { RouterLink } from "vue-router";
 import FilterSearch from "../components/FilterSearch.vue";
+import PageHeader from "../components/PageHeader.vue";
 import { api } from "../api/http";
 import {
   approveBlogPost,
@@ -836,6 +837,7 @@ async function approveBlog(id: string) {
 
 <template>
   <section class="admin page-shell">
+    <PageHeader title="админ" />
     <nav class="filter-tabs admin-tabs">
       <button class="filter-tab" :class="{ on: tab === 'pending' }" type="button" @click="tab = 'pending'">
         заявки <span v-if="pending.length" class="muted small">{{ pending.length }}</span>
@@ -1384,6 +1386,9 @@ async function approveBlog(id: string) {
 </template>
 
 <style scoped>
+.admin :deep(.page-head) {
+  margin-bottom: 0.8rem;
+}
 .admin-tabs {
   margin-bottom: 1rem;
 }
@@ -1823,7 +1828,7 @@ strong {
 .shop-edit-root {
   position: fixed;
   inset: 0;
-  z-index: 4000;
+  z-index: 1000;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1835,7 +1840,7 @@ strong {
   margin: 0;
   padding: 0;
   border: none;
-  background: rgba(0, 0, 0, 0.55);
+  background: rgba(0, 0, 0, 0.6);
   cursor: pointer;
 }
 .shop-edit-dialog {
@@ -1865,5 +1870,18 @@ strong {
 .ok-msg {
   color: var(--text);
   margin-bottom: 0.4rem;
+}
+
+@media (max-width: 640px) {
+  .mod-grid,
+  .shop-modal-row {
+    grid-template-columns: 1fr;
+  }
+  .mod-social-row {
+    grid-template-columns: 1fr;
+  }
+  .mod-social-row > button {
+    justify-self: end;
+  }
 }
 </style>

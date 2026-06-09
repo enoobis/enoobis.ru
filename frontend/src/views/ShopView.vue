@@ -303,7 +303,7 @@ watch(
           </span>
           <button
             type="button"
-            class="btn-buy"
+            class="btn-pill-sm"
             :disabled="busy === item.id || profileCoins < item.price || shopSoldOut(item)"
             @click="onBuy(item)"
           >
@@ -356,6 +356,11 @@ watch(
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.35rem;
+}
+@media (max-width: 480px) {
+  .shop-kind {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 .shop-cat-picker {
   width: 100%;
@@ -421,7 +426,7 @@ watch(
   font-size: 0.62rem;
   padding: 1px 4px;
   color: var(--muted);
-  text-transform: uppercase;
+  text-transform: lowercase;
   letter-spacing: 0.04em;
 }
 .frame-demo {
@@ -481,20 +486,6 @@ watch(
   gap: 0.25rem;
   font-size: 0.85rem;
   color: var(--muted);
-}
-.btn-buy {
-  padding: 0.25rem 0.65rem;
-  border-radius: 999px;
-  font-size: 0.8rem;
-  border: 1px solid var(--border);
-  background: var(--surface2);
-  color: var(--text);
-  cursor: pointer;
-  min-height: 0;
-}
-.btn-buy:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
 }
 .shop-pages {
   display: flex;

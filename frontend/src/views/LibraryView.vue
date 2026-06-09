@@ -421,7 +421,7 @@ onBeforeUnmount(() => {
         <div class="edit-panel card" @click.stop>
           <header class="edit-head">
             <span class="muted">изменить</span>
-            <button class="edit-close" type="button" aria-label="закрыть" @click="closeEdit">
+            <button class="icon-btn" type="button" aria-label="закрыть" @click="closeEdit">
               <AppIcon name="close" :size="18" />
             </button>
           </header>
@@ -525,6 +525,7 @@ onBeforeUnmount(() => {
 .row-actions {
   display: flex;
   gap: 0.4rem;
+  flex-wrap: wrap;
   flex-shrink: 0;
 }
 
@@ -537,8 +538,8 @@ onBeforeUnmount(() => {
 .edit-overlay {
   position: fixed;
   inset: 0;
-  z-index: 85;
-  background: rgba(0, 0, 0, 0.72);
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.6);
   display: grid;
   place-items: center;
   padding: 1rem;
@@ -549,6 +550,9 @@ onBeforeUnmount(() => {
   padding: 1rem;
   display: grid;
   gap: 0.75rem;
+  max-height: 90vh;
+  max-height: 90dvh;
+  overflow-y: auto;
 }
 
 .edit-head {
@@ -560,25 +564,6 @@ onBeforeUnmount(() => {
 
 .edit-head .muted {
   font-size: 0.88rem;
-}
-
-.edit-close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  min-height: 40px;
-  padding: 0;
-  border: none;
-  border-radius: var(--radius-pill);
-  background: transparent;
-  color: var(--muted);
-}
-.edit-close:hover {
-  background: var(--surface2);
-  color: var(--text);
-  transform: none;
 }
 
 .edit-form {

@@ -20,6 +20,7 @@ import {
   type ShareTtl,
 } from "../api/storage";
 import AppIcon from "../components/AppIcon.vue";
+import PageHeader from "../components/PageHeader.vue";
 import { useAuthStore } from "../stores/auth";
 import { toastError, toastSuccess } from "../utils/toast";
 
@@ -274,14 +275,10 @@ onMounted(async () => {
 
 <template>
   <section class="page page-shell">
-    <header class="page-head">
-      <div class="page-head-main">
-        <h1>хранилище</h1>
-        <p v-if="isStaff" class="page-head-meta">
-          {{ fmt(used) }} из {{ fmt(quota) }} · {{ usedPercent }}%
-        </p>
-      </div>
-    </header>
+    <PageHeader
+      title="хранилище"
+      :meta="isStaff ? `${fmt(used)} из ${fmt(quota)} · ${usedPercent}%` : undefined"
+    />
 
     <p v-if="!isStaff" class="muted">доступно только менторам и админам</p>
 
@@ -523,32 +520,13 @@ onMounted(async () => {
 }
 
 .token:hover {
-  border-color: #2a2a2a;
-}
-
-.icon-btn-sm {
-  width: 30px;
-  height: 30px;
-  min-height: 30px;
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 8px;
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--muted);
-}
-
-.icon-btn-sm:hover {
-  color: var(--text);
-  background: var(--surface2);
+  border-color: var(--hover-border);
 }
 
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.6);
   display: grid;
   place-items: center;
   z-index: 100;

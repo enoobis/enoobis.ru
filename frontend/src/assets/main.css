@@ -8,6 +8,7 @@
   --icon-size: 18px;
   --app-font-scale: 1;
   --danger: #e07b8a;
+  --gold: #fbbf24;
   --glass-blur: 16px;
   --control-h: 44px;
 
@@ -685,6 +686,27 @@ input[type="search"]::-webkit-search-cancel-button:hover {
   font-size: 0.88rem;
   line-height: 1.4;
 }
+.page-empty {
+  text-align: center;
+  padding: 2rem 0;
+  margin: 0;
+}
+
+/* мини-pill для действий в карточках списков (купить/применить) */
+.btn-pill-sm {
+  padding: 0.25rem 0.65rem;
+  border-radius: var(--radius-pill);
+  font-size: 0.8rem;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text);
+  cursor: pointer;
+  min-height: 0;
+}
+.btn-pill-sm:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 
 .coins-badge {
   display: inline-flex;
@@ -847,6 +869,25 @@ html[data-theme="contrast-white"] .nav {
   color: var(--text);
 }
 
+.icon-btn-sm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0;
+  border-radius: var(--radius-pill);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.icon-btn-sm:hover {
+  background: var(--surface2);
+  color: var(--text);
+}
+
 label {
   display: block;
   font-size: 0.82rem;
@@ -938,10 +979,11 @@ h3 {
     min-height: var(--control-h);
     padding: 0.6rem 1rem;
   }
+  /* 16px минимум — иначе ios safari зумит страницу при фокусе */
   input,
   textarea,
   select {
-    font-size: 0.95rem;
+    font-size: 16px;
     padding: 0.6rem 0.7rem;
   }
 }

@@ -231,7 +231,7 @@ textarea:focus {
 }
 button[type="button"]:not(.ghost):not(.remove) {
   padding: 0.35rem 0.85rem;
-  min-height: 32px;
+  min-height: 40px;
   border-radius: 999px;
   font-size: 0.85rem;
 }

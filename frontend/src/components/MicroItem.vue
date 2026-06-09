@@ -374,7 +374,7 @@ header {
 }
 .edit-row button {
   padding: 0.3rem 0.7rem;
-  min-height: 28px;
+  min-height: 40px;
   border-radius: 999px;
   font-size: 0.82rem;
 }

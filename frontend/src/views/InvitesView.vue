@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { api } from "../api/http";
 import { useAuthStore } from "../stores/auth";
 import AppIcon from "../components/AppIcon.vue";
+import PageHeader from "../components/PageHeader.vue";
 
 type Link = {
   id: string;
@@ -84,8 +85,8 @@ async function copy(text: string) {
 </script>
 
 <template>
-  <section class="invites">
-    <h1>инвайты</h1>
+  <section class="invites page-shell">
+    <PageHeader title="инвайты" />
 
     <p v-if="err" class="error">{{ err }}</p>
 
@@ -128,7 +129,7 @@ async function copy(text: string) {
             title="копировать"
             @click="copy(fullUrl(l.code))"
           >
-            <AppIcon name="copy" :size="14" />
+            <AppIcon name="copy" :size="16" />
           </button>
           <button
             type="button"
@@ -137,7 +138,7 @@ async function copy(text: string) {
             title="удалить"
             @click="remove(l.id)"
           >
-            <AppIcon name="delete" :size="14" />
+            <AppIcon name="delete" :size="16" />
           </button>
         </div>
       </li>
@@ -150,10 +151,8 @@ async function copy(text: string) {
   max-width: 640px;
   margin: 0 auto;
 }
-h1 {
-  font-size: 1.2rem;
-  font-weight: 500;
-  margin: 0 0 1rem;
+.invites :deep(.page-head) {
+  margin-bottom: 1rem;
 }
 .creator {
   display: grid;
@@ -212,23 +211,8 @@ h1 {
   font-size: 0.78rem;
   background: transparent;
 }
-.icon-btn {
-  width: 28px;
-  height: 28px;
-  min-height: 0;
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--text);
-  cursor: pointer;
+.link-row .icon-btn {
   flex-shrink: 0;
-}
-.icon-btn:hover {
-  background: var(--surface2);
 }
 .small {
   font-size: 0.8rem;

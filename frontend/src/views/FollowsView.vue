@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import AppIcon from "../components/AppIcon.vue";
+import PageHeader from "../components/PageHeader.vue";
 import { api } from "../api/http";
 import { useAuthStore } from "../stores/auth";
 import { useProfileOwnerThemeFromApi } from "../composables/useProfileOwnerTheme";
@@ -86,13 +87,14 @@ useProfileOwnerThemeFromApi(nick);
 </script>
 
 <template>
-  <section class="follows">
-    <header class="head">
-      <button type="button" class="back" aria-label="назад" @click="back">
-        <AppIcon name="back" :size="18" />
-      </button>
-      <RouterLink :to="`/u/${nick}`" class="who muted">@{{ nick }}</RouterLink>
-    </header>
+  <section class="follows page-shell">
+    <PageHeader :title="`@${nick}`">
+      <template #back>
+        <button type="button" class="filter-icon-btn" aria-label="назад" @click="back">
+          <AppIcon name="back" :size="18" />
+        </button>
+      </template>
+    </PageHeader>
 
     <nav class="filter-tabs tabs">
       <button
@@ -116,8 +118,8 @@ useProfileOwnerThemeFromApi(nick);
     </nav>
 
     <p v-if="err" class="error">{{ err }}</p>
-    <p v-else-if="loading" class="muted center">загрузка</p>
-    <p v-else-if="!list.length" class="muted center">пусто</p>
+    <p v-else-if="loading" class="page-empty muted">загрузка</p>
+    <p v-else-if="!list.length" class="page-empty muted">пусто</p>
     <ul v-else class="list">
       <li v-for="u in list" :key="u.id" class="row">
         <RouterLink :to="`/u/${u.nickname}`" class="user">
@@ -148,31 +150,8 @@ useProfileOwnerThemeFromApi(nick);
   max-width: 640px;
   margin: 0 auto;
 }
-.head {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.2rem 0 0.8rem;
-}
-.back {
-  width: 32px;
-  height: 32px;
-  min-height: 0;
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--text);
-  cursor: pointer;
-}
-.back:hover {
-  background: var(--surface2);
-}
-.who {
-  font-size: 0.9rem;
+.follows :deep(.page-head) {
+  margin-bottom: 0.8rem;
 }
 .tabs {
   margin-bottom: 0.8rem;
@@ -186,11 +165,6 @@ useProfileOwnerThemeFromApi(nick);
 }
 .filter-tab.on .count {
   color: var(--text);
-}
-
-.center {
-  text-align: center;
-  margin-top: 1.2rem;
 }
 
 .list {

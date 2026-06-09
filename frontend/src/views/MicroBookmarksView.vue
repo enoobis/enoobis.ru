@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { RouterLink } from "vue-router";
+import { useRouter } from "vue-router";
+import AppIcon from "../components/AppIcon.vue";
 import MicroItem from "../components/MicroItem.vue";
+import PageHeader from "../components/PageHeader.vue";
 import { listMyMicroBookmarks, type MicroPost } from "../api/micro";
 import { useAuthStore } from "../stores/auth";
 
 const auth = useAuthStore();
+const router = useRouter();
 const posts = ref<MicroPost[]>([]);
 const loading = ref(false);
 const err = ref("");
@@ -41,14 +44,17 @@ onMounted(load);
 </script>
 
 <template>
-  <section class="saved">
-    <header class="head">
-      <RouterLink to="/saved" class="back muted">← закладки</RouterLink>
-      <h1>закладки</h1>
-    </header>
+  <section class="saved page-shell">
+    <PageHeader title="закладки">
+      <template #back>
+        <button type="button" class="filter-icon-btn" aria-label="назад" @click="router.push('/saved')">
+          <AppIcon name="back" :size="18" />
+        </button>
+      </template>
+    </PageHeader>
     <p v-if="err" class="error">{{ err }}</p>
-    <p v-else-if="loading && !posts.length" class="muted">загрузка</p>
-    <p v-else-if="!loading && !posts.length" class="muted empty">пусто</p>
+    <p v-else-if="loading && !posts.length" class="page-empty muted">загрузка</p>
+    <p v-else-if="!loading && !posts.length" class="page-empty muted">пусто</p>
     <MicroItem
       v-for="p in posts"
       :key="p.id"
@@ -65,25 +71,10 @@ onMounted(load);
 .saved {
   max-width: 640px;
   margin: 0 auto;
+  display: grid;
+  gap: 0;
 }
-.head {
+.saved :deep(.page-head) {
   margin-bottom: 0.6rem;
-}
-.back {
-  display: inline-block;
-  font-size: 0.85rem;
-  margin-bottom: 0.4rem;
-}
-.back:hover {
-  color: var(--text);
-}
-h1 {
-  font-size: 1.1rem;
-  font-weight: 500;
-  margin: 0;
-}
-.empty {
-  text-align: center;
-  margin-top: 4vh;
 }
 </style>

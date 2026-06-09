@@ -96,8 +96,8 @@ onMounted(load);
     </p>
 
     <p v-if="err" class="error">{{ err }}</p>
-    <p v-else-if="loading && !posts.length" class="muted">загрузка</p>
-    <p v-else-if="!loading && !posts.length" class="muted empty">пусто</p>
+    <p v-else-if="loading && !posts.length" class="page-empty muted">загрузка</p>
+    <p v-else-if="!loading && !posts.length" class="page-empty muted">пусто</p>
 
     <MicroItem
       v-for="p in posts"
@@ -118,9 +118,5 @@ onMounted(load);
 .login-hint {
   padding: 1rem 0;
   border-bottom: 1px solid var(--border);
-}
-.empty {
-  text-align: center;
-  margin-top: 4vh;
 }
 </style>

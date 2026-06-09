@@ -539,8 +539,8 @@ onUnmounted(() => {
       <div class="list-head">
         <h2>чаты</h2>
       </div>
-      <p v-if="loadingChats && !chats.length" class="muted small pad">загрузка</p>
-      <p v-else-if="!chats.length" class="muted small pad">пусто</p>
+      <p v-if="loadingChats && !chats.length" class="page-empty muted">загрузка</p>
+      <p v-else-if="!chats.length" class="page-empty muted">пусто</p>
       <div
         v-for="c in chats"
         :key="c.id"
@@ -627,8 +627,8 @@ onUnmounted(() => {
         </header>
 
         <div class="messages">
-          <p v-if="loadingMessages && !messages.length" class="muted small pad">загрузка</p>
-          <p v-else-if="!messages.length" class="muted small pad">напишите первое сообщение</p>
+          <p v-if="loadingMessages && !messages.length" class="page-empty muted">загрузка</p>
+          <p v-else-if="!messages.length" class="page-empty muted">напишите первое сообщение</p>
           <template v-for="row in messageRows" :key="row.id">
             <div v-if="row.kind === 'day'" class="day-mark muted small">
               {{ row.line }}
@@ -788,7 +788,7 @@ onUnmounted(() => {
           </div>
         </div>
       </template>
-      <p v-else class="muted small pad center">выберите чат слева</p>
+      <p v-else class="page-empty muted center">выберите чат слева</p>
     </main>
 
     <div v-if="lightboxUrl" class="lightbox" @click="lightboxUrl = ''">
@@ -837,11 +837,7 @@ onUnmounted(() => {
   text-transform: lowercase;
   color: var(--text);
 }
-.pad {
-  padding: 1rem;
-}
 .center {
-  text-align: center;
   margin: auto;
 }
 
@@ -916,7 +912,7 @@ onUnmounted(() => {
   right: -2px;
   bottom: -2px;
   display: inline-flex;
-  color: #fbbf24;
+  color: var(--gold);
   z-index: 1;
 }
 .who-text {
@@ -931,7 +927,7 @@ onUnmounted(() => {
   line-height: 1.2;
 }
 .presence-label.online {
-  color: #fbbf24;
+  color: var(--gold);
 }
 .chat-last-seen {
   opacity: 0.85;
@@ -979,9 +975,9 @@ onUnmounted(() => {
   padding: 0 0.4rem 0 0;
 }
 .chat-row-del {
-  width: 28px;
-  height: 28px;
-  min-height: 28px;
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
   padding: 0;
   border: none;
   border-radius: 999px;
@@ -1200,9 +1196,9 @@ onUnmounted(() => {
   opacity: 1;
 }
 .msg-act {
-  width: 24px;
-  height: 24px;
-  min-height: 24px;
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
   padding: 0;
   border-radius: 999px;
   border: none;
@@ -1232,7 +1228,7 @@ onUnmounted(() => {
 }
 .edit-area:focus {
   outline: none;
-  border-color: #3a3a3a;
+  border-color: var(--focus-border);
 }
 .edit-actions {
   display: inline-flex;
@@ -1278,9 +1274,9 @@ onUnmounted(() => {
   overflow-wrap: anywhere;
 }
 .reply-bar-x {
-  width: 26px;
-  height: 26px;
-  min-height: 26px;
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
   padding: 0;
   flex-shrink: 0;
   border: none;
@@ -1322,6 +1318,12 @@ onUnmounted(() => {
   font-size: 0.95rem;
   line-height: 1;
   cursor: pointer;
+}
+/* зона клика ≥36px без увеличения глифа */
+.pending-x::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
 }
 .composer {
   display: grid;
@@ -1365,7 +1367,7 @@ onUnmounted(() => {
 }
 .composer .composer-ta:focus {
   outline: none;
-  border-color: #3a3a3a;
+  border-color: var(--focus-border);
 }
 .composer button:not(.attach) {
   padding: 0.4rem 1rem;

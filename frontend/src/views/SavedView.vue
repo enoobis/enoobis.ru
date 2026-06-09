@@ -1,6 +1,10 @@
+<script setup lang="ts">
+import PageHeader from "../components/PageHeader.vue";
+</script>
+
 <template>
-  <section class="saved-hub">
-    <h1>закладки</h1>
+  <section class="saved-hub page-shell">
+    <PageHeader title="закладки" />
     <nav class="pick">
       <RouterLink to="/blogs?mode=bookmarks" class="pick-link">блоги</RouterLink>
       <RouterLink to="/microblogs/saved" class="pick-link">микроблоги</RouterLink>
@@ -10,24 +14,16 @@
 
 <style scoped>
 .saved-hub {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  max-width: 20rem;
+  max-width: 640px;
   width: 100%;
   margin: 0 auto;
-  padding-top: 2.5rem;
-  text-align: center;
-}
-.saved-hub h1 {
-  margin: 0 0 1rem;
-  font-size: 1.25rem;
-  font-weight: 500;
+  display: grid;
+  gap: 1rem;
 }
 .pick {
   display: flex;
   gap: 0.5rem;
-  width: 100%;
+  max-width: 20rem;
 }
 .pick-link {
   flex: 1;

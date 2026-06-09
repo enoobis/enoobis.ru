@@ -81,6 +81,20 @@
   margin-left: 0.1rem;
 }
 
+/* тач-устройства: зона нажатия ≥36px */
+@media (pointer: coarse) {
+  .post-actions {
+    min-height: 2.25rem;
+  }
+  .post-actions .act {
+    min-width: 2.25rem;
+    height: 2.25rem;
+  }
+  .post-actions .votes {
+    height: 2.25rem;
+  }
+}
+
 @media (max-width: 768px) {
   .post-actions--lg {
     gap: 0.65rem;

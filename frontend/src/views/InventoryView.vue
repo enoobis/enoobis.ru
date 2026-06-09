@@ -174,13 +174,13 @@ onMounted(load);
           <button
             v-if="isEquipped(a)"
             type="button"
-            class="btn-cancel"
+            class="btn-pill-sm btn-cancel"
             :disabled="busy === a.id"
             @click="onCancel(a)"
           >
             отменить
           </button>
-          <button v-else type="button" class="btn-equip" :disabled="busy === a.id" @click="onApply(a)">
+          <button v-else type="button" class="btn-pill-sm btn-equip" :disabled="busy === a.id" @click="onApply(a)">
             применить
           </button>
         </div>
@@ -241,7 +241,7 @@ onMounted(load);
   font-size: 0.62rem;
   padding: 1px 4px;
   color: var(--muted);
-  text-transform: uppercase;
+  text-transform: lowercase;
   letter-spacing: 0.04em;
 }
 .frame-demo {
@@ -287,22 +287,6 @@ onMounted(load);
   display: flex;
   justify-content: center;
   margin-top: auto;
-}
-.btn-equip,
-.btn-cancel {
-  padding: 0.25rem 0.65rem;
-  border-radius: 999px;
-  font-size: 0.8rem;
-  border: 1px solid var(--border);
-  background: var(--surface2);
-  color: var(--text);
-  cursor: pointer;
-  min-height: 0;
-}
-.btn-equip:disabled,
-.btn-cancel:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
 }
 .btn-equip {
   border-color: var(--text);

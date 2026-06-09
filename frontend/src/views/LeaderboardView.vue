@@ -44,8 +44,8 @@ onMounted(load);
     </PageHeader>
 
     <p v-if="err" class="error">{{ err }}</p>
-    <p v-else-if="loading" class="muted">загрузка</p>
-    <p v-else-if="!list.length" class="muted">пусто</p>
+    <p v-else-if="loading" class="page-empty muted">загрузка</p>
+    <p v-else-if="!list.length" class="page-empty muted">пусто</p>
     <ol v-else class="list">
       <li v-for="u in list" :key="u.id" class="row" :class="{ top: u.rank <= 3 }">
         <span class="rank">{{ u.rank }}</span>

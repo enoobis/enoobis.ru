@@ -216,7 +216,7 @@ onMounted(async () => {
           </div>
         </li>
       </ul>
-      <p v-else class="muted empty">пусто</p>
+      <p v-else class="page-empty muted">пусто</p>
 
       <div v-if="total > pageSize" class="pager muted">
         <button class="link" type="button" :disabled="page === 1" @click="prev">←</button>
@@ -232,10 +232,6 @@ onMounted(async () => {
   margin: 0 0 0.6rem;
 }
 .filter-bar :deep(.filter-icon-btn) {
-  width: 28px;
-  min-width: 28px;
-  height: 28px;
-  min-height: 28px;
   margin-right: -0.35rem;
 }
 
@@ -305,11 +301,6 @@ onMounted(async () => {
   gap: 0.35rem;
   font-size: 0.82rem;
 }
-.empty {
-  margin-top: 4vh;
-  text-align: center;
-}
-
 .pager {
   display: flex;
   align-items: center;

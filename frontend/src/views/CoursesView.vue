@@ -1454,7 +1454,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
           </div>
         </article>
       </div>
-      <p v-if="!filteredCourses.length" class="muted center">
+      <p v-if="!filteredCourses.length" class="page-empty muted">
         {{ courseQuery ? "ничего не найдено" : "пусто" }}
       </p>
     </template>
@@ -1906,10 +1906,10 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
             </button>
           </li>
         </ul>
-        <p v-if="!classroom.lectures.length" class="muted center empty">
+        <p v-if="!classroom.lectures.length" class="page-empty muted">
           {{ isTeacherInCurrent ? "опубликуйте первую лекцию" : "лекций пока нет" }}
         </p>
-        <p v-else-if="!filteredLectures.length" class="muted center empty">ничего не найдено</p>
+        <p v-else-if="!filteredLectures.length" class="page-empty muted">ничего не найдено</p>
       </template>
 
       <!-- задания -->
@@ -2125,16 +2125,16 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
         </ul>
 
 
-        <p v-if="!classroom.assignments.length" class="muted center empty">
+        <p v-if="!classroom.assignments.length" class="page-empty muted">
           {{ isTeacherInCurrent ? "создайте первое задание" : "заданий пока нет" }}
         </p>
         <p
           v-else-if="!visibleCourseAssignments.length"
-          class="muted center empty"
+          class="page-empty muted"
         >
           нет заданий по фильтру
         </p>
-        <p v-else-if="!filteredListAssignments.length" class="muted center empty">ничего не найдено</p>
+        <p v-else-if="!filteredListAssignments.length" class="page-empty muted">ничего не найдено</p>
       </template>
 
       <!-- лента -->
@@ -2184,7 +2184,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
             />
           </div>
         </article>
-        <p v-if="!classroom.stream.length" class="muted center empty">пусто</p>
+        <p v-if="!classroom.stream.length" class="page-empty muted">пусто</p>
       </template>
 
       <!-- участники -->
@@ -2274,14 +2274,14 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
               </tbody>
             </table>
           </div>
-          <p v-else class="muted center empty">нет данных</p>
+          <p v-else class="page-empty muted">нет данных</p>
         </template>
         <template v-else>
           <div v-for="row in studentGradeRows" :key="row.student.id" class="grade-summary">
             <h3>{{ row.pointsEarned }} / {{ row.pointsTotal }} баллов</h3>
             <p class="muted small">{{ row.progress }}</p>
           </div>
-          <p v-if="!studentGradeRows.length" class="muted center empty">пока без оценок</p>
+          <p v-if="!studentGradeRows.length" class="page-empty muted">пока без оценок</p>
         </template>
       </template>
     </template>
@@ -2330,17 +2330,11 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
         · сдало {{ gradingStats.submitted }} из {{ gradingStats.total }}
       </p>
 
-      <p v-if="!gradingStudents.length" class="muted center empty">студентов нет</p>
+      <p v-if="!gradingStudents.length" class="page-empty muted">студентов нет</p>
 
       <div v-else class="grade-modal-split">
         <div class="grade-picker-wrap">
-          <input
-            v-model="gradingSearch"
-            class="grade-search"
-            type="search"
-            autocomplete="off"
-            placeholder="ник…"
-          />
+          <FilterSearch v-model="gradingSearch" class="grade-search" placeholder="ник…" />
           <ul class="grade-picker-list">
             <li v-for="row in gradingStudentsFiltered" :key="row.student.id">
               <button
@@ -2444,15 +2438,6 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 .courses {
   display: grid;
   gap: 0.9rem;
-}
-.center {
-  text-align: center;
-  padding: 1.5rem 0;
-}
-.empty {
-  border: 1px dashed var(--border);
-  border-radius: var(--radius);
-  padding: 1.2rem;
 }
 .small {
   font-size: 0.8rem;
@@ -2584,12 +2569,10 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   .course-card-thumb--head .course-card-thumb-letter {
     font-size: 1.1rem;
   }
-  .grid-2 {
-    grid-template-columns: 1fr;
-  }
   .grade-modal {
     width: 100%;
     max-height: min(94vh, 44rem);
+    max-height: min(94dvh, 44rem);
   }
 }
 
@@ -2684,7 +2667,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   transition: border-color 0.15s ease, background 0.15s ease;
 }
 .course-card:hover {
-  border-color: #3a3a3a;
+  border-color: var(--focus-border);
   background: var(--surface2);
 }
 .course-card-layout {
@@ -2844,11 +2827,11 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   background: var(--surface2);
 }
 .course-menu-item--danger {
-  color: #ff8b8b;
+  color: var(--danger);
 }
 .course-menu-item--danger:hover {
-  background: #2a1414;
-  color: #ff8b8b;
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--danger);
 }
 .dot {
   color: var(--muted);
@@ -2918,30 +2901,10 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   text-align: center;
 }
 
-.assignments-toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 0.65rem;
-  flex-wrap: wrap;
-  margin-bottom: 0.35rem;
-}
 .submission-filter {
   display: flex;
   gap: 0.35rem;
   flex-wrap: wrap;
-}
-.add-bar {
-  display: flex;
-  justify-content: flex-end;
-  margin-left: auto;
-}
-.assignments-toolbar .add-bar {
-  margin-left: auto;
-}
-.add-bar button.active {
-  background: var(--surface2);
-  color: var(--text);
 }
 .submission-filter button.active {
   background: var(--surface2);
@@ -2970,7 +2933,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 .attach-label:hover {
   background: var(--surface2);
   color: var(--text);
-  border-color: #2a2a2a;
+  border-color: var(--hover-border);
 }
 
 .files {
@@ -3171,27 +3134,9 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   font-size: 1.05rem;
   font-weight: 500;
 }
-.icon-btn-sm {
-  width: 28px;
-  height: 28px;
-  min-height: 28px;
-  padding: 0;
-  border-radius: var(--radius);
-  border: none;
-  background: transparent;
-  color: var(--muted);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-.icon-btn-sm:hover {
-  background: var(--surface2);
-  color: var(--text);
-}
 .icon-btn-sm.danger:hover {
-  background: #2a1414;
-  color: #ff8b8b;
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--danger);
 }
 
 .lecture-video {
@@ -3235,10 +3180,6 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 }
 .attach-list a:hover {
   border-color: var(--hover-border);
-}
-
-.empty {
-  padding: 1.5rem 0;
 }
 
 .lecture-tasks {
@@ -3315,6 +3256,11 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   display: grid;
   gap: 0.4rem;
   grid-template-columns: 1fr 1fr;
+}
+@media (max-width: 640px) {
+  .grid-2 {
+    grid-template-columns: 1fr;
+  }
 }
 
 .stream-post {
@@ -3401,7 +3347,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 .gradebook-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 600px;
+  min-width: 480px;
 }
 .gradebook-table th,
 .gradebook-table td {
@@ -3464,7 +3410,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 .grade-modal-root {
   position: fixed;
   inset: 0;
-  z-index: 4000;
+  z-index: 1000;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3476,7 +3422,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   position: absolute;
   inset: 0;
   margin: 0;
-  background: color-mix(in srgb, var(--bg) 78%, transparent);
+  background: rgba(0, 0, 0, 0.6);
   cursor: pointer;
 }
 .grade-modal {
@@ -3492,6 +3438,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   border-radius: var(--radius);
   background: var(--surface);
   max-height: min(92vh, 44rem);
+  max-height: min(92dvh, 44rem);
   min-height: 0;
   overflow: hidden;
 }
@@ -3531,6 +3478,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   min-height: 0;
   flex: 0 0 auto;
   max-height: min(36vh, 14rem);
+  max-height: min(36dvh, 14rem);
   border-radius: var(--radius);
   overflow: hidden;
   background: var(--surface2);
@@ -3543,16 +3491,10 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   }
 }
 .grade-search {
-  flex-shrink: 0;
-  width: 100%;
-  margin: 0;
-  padding: 0.45rem 0.55rem;
-  font-size: 0.9rem;
-  border: 0;
-  border-bottom: 1px solid var(--border);
-  border-radius: 0;
-  background: var(--surface);
-  color: var(--text);
+  flex: 0 0 auto;
+  margin: 0.4rem 0.4rem 0.1rem;
+  min-height: 36px;
+  padding: 0 0.7rem;
 }
 .grade-picker-list {
   list-style: none;
@@ -3632,6 +3574,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 @media (max-width: 639px) {
   .grade-detail-panel {
     max-height: 48vh;
+    max-height: 48dvh;
   }
 }
 @media (min-width: 640px) {
@@ -3653,9 +3596,5 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 .grade-detail-placeholder {
   margin: 0;
   padding: 0.5rem 0;
-}
-.empty.center {
-  text-align: center;
-  padding: 0.8rem 0;
 }
 </style>

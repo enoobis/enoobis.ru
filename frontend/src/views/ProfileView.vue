@@ -368,7 +368,7 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
           </p>
         </li>
       </ul>
-      <p v-else class="muted empty">записей нет</p>
+      <p v-else class="page-empty muted">записей нет</p>
     </template>
 
     <template v-else>
@@ -382,7 +382,7 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
           @updated="onMicroUpdated"
         />
       </div>
-      <p v-else class="muted empty">записей нет</p>
+      <p v-else class="page-empty muted">записей нет</p>
     </template>
     </section>
   </div>
@@ -495,7 +495,7 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   right: 0;
   bottom: 0;
   display: inline-flex;
-  color: #fbbf24;
+  color: var(--gold);
   z-index: 2;
 }
 .presence-label {
@@ -503,7 +503,7 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   font-size: 0.82rem;
 }
 .presence-label.online {
-  color: #fbbf24;
+  color: var(--gold);
 }
 .nick-line {
   margin: 0;
@@ -673,7 +673,7 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  text-transform: uppercase;
+  text-transform: lowercase;
   letter-spacing: 0.06em;
   font-size: 0.7rem;
   margin-bottom: 0.4rem;
@@ -766,11 +766,6 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
 .small {
   font-size: 0.82rem;
 }
-.empty {
-  text-align: center;
-  margin-top: 4vh;
-}
-
 @media (max-width: 760px) {
   .profile-bg-layer {
     display: none;
