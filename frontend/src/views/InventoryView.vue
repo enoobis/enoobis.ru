@@ -145,7 +145,7 @@ onMounted(load);
       <RouterLink to="/shop" class="to-shop">магазин →</RouterLink>
     </div>
     <ul v-if="items.length" class="grid">
-      <li v-for="a in sortedItems" :key="a.id" class="card item-card">
+      <li v-for="a in sortedItems" :key="a.id" class="item-card">
         <span class="kind muted small">{{ kindLabel(a.kind) }}</span>
         <div class="preview">
           <template v-if="a.kind === 'avatar'">
@@ -310,10 +310,6 @@ onMounted(load);
 .btn-cancel {
   border-color: var(--muted);
   color: var(--muted);
-}
-.empty {
-  text-align: center;
-  margin-top: 4vh;
 }
 .to-shop {
   display: inline-block;

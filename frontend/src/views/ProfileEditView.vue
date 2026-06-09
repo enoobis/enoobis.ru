@@ -923,8 +923,8 @@ function closeSettings() {
 }
 
 .invite-card {
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  background: var(--surface2);
+  border-radius: var(--radius);
   padding: 0.7rem;
 }
 

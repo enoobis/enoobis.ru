@@ -420,7 +420,7 @@ onBeforeUnmount(() => {
         <div class="edit-panel card" @click.stop>
           <header class="edit-head">
             <span class="muted">изменить</span>
-            <button class="reader-close" type="button" aria-label="закрыть" @click="closeEdit">
+            <button class="edit-close" type="button" aria-label="закрыть" @click="closeEdit">
               <AppIcon name="close" :size="18" />
             </button>
           </header>
@@ -559,6 +559,25 @@ onBeforeUnmount(() => {
 
 .edit-head .muted {
   font-size: 0.88rem;
+}
+
+.edit-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--muted);
+}
+.edit-close:hover {
+  background: var(--surface2);
+  color: var(--text);
+  transform: none;
 }
 
 .edit-form {

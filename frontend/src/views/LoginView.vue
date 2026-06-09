@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
-import { useQrScanDevice } from "../composables/useQrScanDevice";
 import { useAuthStore } from "../stores/auth";
 
 const email = ref("");
@@ -11,7 +10,6 @@ const loading = ref(false);
 const router = useRouter();
 const route = useRoute();
 const auth = useAuthStore();
-const { canScanQr } = useQrScanDevice();
 
 async function submit() {
   err.value = "";
@@ -47,10 +45,8 @@ async function submit() {
     </form>
     <p v-if="err" class="error">{{ err }}</p>
     <div class="alt">
-      <template v-if="canScanQr">
-        <RouterLink to="/auth/qr">вход по qr</RouterLink>
-        <span class="dot" aria-hidden="true">·</span>
-      </template>
+      <RouterLink to="/auth/qr">вход по qr</RouterLink>
+      <span class="dot" aria-hidden="true">·</span>
       <RouterLink to="/register">создать аккаунт</RouterLink>
     </div>
   </section>

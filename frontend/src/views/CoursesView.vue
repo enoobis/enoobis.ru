@@ -3526,7 +3526,6 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   min-height: 0;
   flex: 0 0 auto;
   max-height: min(36vh, 14rem);
-  border: 1px solid var(--border);
   border-radius: var(--radius);
   overflow: hidden;
   background: var(--surface2);
@@ -3653,22 +3652,5 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 .empty.center {
   text-align: center;
   padding: 0.8rem 0;
-}
-.icon-btn-sm {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  min-height: 0;
-  padding: 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: transparent;
-  color: var(--text);
-  cursor: pointer;
-}
-.icon-btn-sm:hover {
-  background: var(--surface2);
 }
 </style>

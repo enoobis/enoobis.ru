@@ -265,9 +265,8 @@ onMounted(async () => {
   margin-bottom: 1.5rem;
 }
 .active-chip {
-  padding: 0.35rem 0.65rem;
-  min-height: 38px;
-  border-radius: var(--radius);
+  padding: 0.3rem 0.75rem;
+  border-radius: var(--radius-pill);
   background: var(--surface);
   border: 1px solid var(--border);
   color: var(--muted);

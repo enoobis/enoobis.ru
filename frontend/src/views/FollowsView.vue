@@ -94,10 +94,10 @@ useProfileOwnerThemeFromApi(nick);
       <RouterLink :to="`/u/${nick}`" class="who muted">@{{ nick }}</RouterLink>
     </header>
 
-    <nav class="tabs">
+    <nav class="filter-tabs tabs">
       <button
         type="button"
-        class="tab"
+        class="filter-tab"
         :class="{ on: tab === 'followers' }"
         @click="setTab('followers')"
       >
@@ -106,7 +106,7 @@ useProfileOwnerThemeFromApi(nick);
       </button>
       <button
         type="button"
-        class="tab"
+        class="filter-tab"
         :class="{ on: tab === 'following' }"
         @click="setTab('following')"
       >
@@ -175,38 +175,16 @@ useProfileOwnerThemeFromApi(nick);
   font-size: 0.9rem;
 }
 .tabs {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 0.6rem;
+  margin-bottom: 0.8rem;
 }
-.tab {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.15rem;
-  background: transparent;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  border-radius: 0;
-  padding: 0.55rem 0.5rem;
-  min-height: 0;
-  color: var(--muted);
-  cursor: pointer;
-}
-.tab:hover {
-  background: transparent;
-  color: var(--text);
-}
-.tab.on {
-  color: var(--text);
-  border-bottom-color: var(--text);
+.tabs .filter-tab {
+  gap: 0.35rem;
 }
 .count {
   font-size: 0.85rem;
   color: var(--muted);
 }
-.tab.on .count {
+.filter-tab.on .count {
   color: var(--text);
 }
 

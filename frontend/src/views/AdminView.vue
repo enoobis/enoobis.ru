@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, type Ref } from "vue";
 import { RouterLink } from "vue-router";
+import FilterSearch from "../components/FilterSearch.vue";
 import { api } from "../api/http";
 import {
   approveBlogPost,
@@ -895,9 +896,7 @@ async function approveBlog(id: string) {
     </template>
 
     <template v-else-if="tab === 'users'">
-      <div class="filter-search admin-users-search">
-        <input v-model="usersQuery" placeholder="поиск" />
-      </div>
+      <FilterSearch v-model="usersQuery" class="admin-users-search" />
       <div v-if="moderateUserId" class="mod-panel">
         <template v-if="moderateDetail">
           <p class="mod-title">
