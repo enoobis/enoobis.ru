@@ -3,7 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { getShare, shareDownloadUrl, shareReadUrl, type SharePayload } from "../api/storage";
 import { renderMarkdown } from "../utils/markdown";
-import AppIcon from "../components/AppIcon.vue";
+import PdfReader from "../components/PdfReader.vue";
 
 const route = useRoute();
 
@@ -103,24 +103,12 @@ onBeforeUnmount(() => {
       <pre v-else class="plain">{{ data.note.body }}</pre>
     </template>
 
-    <div v-if="readerOpen" class="reader-overlay" role="dialog" aria-modal="true">
-      <div class="reader-shell">
-        <header class="reader-top">
-          <span class="reader-label muted">{{ data?.kind === 'file' ? data.file.original_name : '' }}</span>
-          <button class="reader-close" type="button" aria-label="закрыть" @click="closeReader">
-            <AppIcon name="close" :size="18" />
-          </button>
-        </header>
-        <object
-          v-if="readerUrl"
-          class="reader-frame"
-          :data="readerUrl"
-          type="application/pdf"
-        >
-          <iframe class="reader-frame" :src="readerUrl" title="документ" />
-        </object>
-      </div>
-    </div>
+    <PdfReader
+      v-if="readerOpen && readerUrl"
+      :url="readerUrl"
+      :title="data?.kind === 'file' ? data.file.original_name : ''"
+      @close="closeReader"
+    />
   </section>
 </template>
 
@@ -165,70 +153,5 @@ onBeforeUnmount(() => {
   margin: 0;
   border-top: 1px solid var(--border);
   padding-top: 0.85rem;
-}
-
-.reader-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 80;
-  background: var(--bg);
-  display: flex;
-  flex-direction: column;
-  padding: 0.5rem;
-}
-
-.reader-shell {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  max-width: 960px;
-  width: 100%;
-  margin: 0 auto;
-}
-
-.reader-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  padding: 0.35rem 0 0.5rem;
-  border-bottom: 1px solid var(--border);
-}
-
-.reader-label {
-  font-size: 0.88rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.reader-close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  padding: 0;
-  background: transparent;
-  border: none;
-  border-radius: var(--radius);
-  color: var(--muted);
-  cursor: pointer;
-}
-
-.reader-close:hover {
-  background: var(--surface);
-  color: var(--text);
-}
-
-.reader-frame {
-  flex: 1;
-  width: 100%;
-  min-height: 0;
-  border: none;
-  margin-top: 0.5rem;
-  background: var(--surface);
-  -webkit-overflow-scrolling: touch;
 }
 </style>
