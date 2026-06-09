@@ -902,4 +902,14 @@ db.exec(`
     FOREIGN KEY (admin_id) REFERENCES users(id)
   );
   CREATE INDEX IF NOT EXISTS idx_admin_audit_created ON admin_audit_log(created_at DESC);
+
+  CREATE TABLE IF NOT EXISTS qr_login_codes (
+    code TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    used_at TEXT,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_qr_login_expires ON qr_login_codes(expires_at);
 `);

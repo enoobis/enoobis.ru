@@ -460,6 +460,9 @@ watch(
           <RouterLink to="/me/edit" class="profile-menu-item" @click="closeProfileMenu">
             <AppIcon name="settings" :size="20" /><span>настройки</span>
           </RouterLink>
+          <RouterLink to="/auth/qr" class="profile-menu-item" @click="closeProfileMenu">
+            <AppIcon name="qr" :size="20" /><span>вход по qr</span>
+          </RouterLink>
           <span class="profile-menu-sep" />
           <button class="profile-menu-item profile-menu-btn" type="button" @click="logoutFromMenu">
             <AppIcon name="logout" :size="20" /><span>выход</span>
@@ -582,6 +585,9 @@ watch(
               </RouterLink>
               <RouterLink to="/me/edit" class="profile-menu-item" @click="closeProfileMenu">
                 <AppIcon name="settings" :size="20" /><span>настройки</span>
+              </RouterLink>
+              <RouterLink to="/auth/qr" class="profile-menu-item" @click="closeProfileMenu">
+                <AppIcon name="qr" :size="20" /><span>вход по qr</span>
               </RouterLink>
               <span class="profile-menu-sep" />
               <button class="profile-menu-item profile-menu-btn" type="button" @click="logoutFromMenu">

@@ -34,6 +34,7 @@ import {
   Pencil,
   Pin,
   Play,
+  QrCode,
   Quote,
   Reply,
   Search,
@@ -111,7 +112,8 @@ export type AppIconName =
   | "link"
   | "seen"
   | "reply"
-  | "clear";
+  | "clear"
+  | "qr";
 
 const icons: Record<AppIconName, Component> = {
   home: House,
@@ -170,6 +172,7 @@ const icons: Record<AppIconName, Component> = {
   seen: Eye,
   reply: Reply,
   clear: Eraser,
+  qr: QrCode,
 };
 
 const FILLED = new Set<AppIconName>([

@@ -87,6 +87,11 @@ const router = createRouter({
     { path: "/login", name: "login", component: LoginView },
     { path: "/register", name: "register", component: () => import("../views/RegisterView.vue") },
     {
+      path: "/auth/qr",
+      name: "qr-login",
+      component: () => import("../views/QrLoginView.vue"),
+    },
+    {
       path: "/courses",
       name: "courses",
       component: () => import("../views/CoursesView.vue"),
