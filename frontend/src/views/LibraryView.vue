@@ -67,6 +67,8 @@ function describe(code: string) {
   if (code === "title_required") return "нужно название";
   if (code === "no_file") return "нужен файл";
   if (code === "read_only_pdf") return "чтение в браузере только для pdf";
+  if (code === "invalid_file") return "файл не похож на pdf или epub";
+  if (code === "only pdf or epub") return "только pdf или epub";
   return code || "ошибка";
 }
 
@@ -321,7 +323,7 @@ onBeforeUnmount(() => {
         <textarea v-model="newDescription" rows="3" placeholder="описание" maxlength="4000" />
         <input
           type="file"
-          accept=".pdf,.epub,.txt,.djvu,.fb2,.doc,.docx,application/pdf,application/epub+zip,text/plain"
+          accept=".pdf,.epub,application/pdf,application/epub+zip"
           @change="onPickFile"
         />
         <div class="actions">

@@ -39,10 +39,23 @@ const upload = multer({
   fileFilter: (_req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
     if (![".pdf", ".epub"].includes(ext)) return cb(new Error("only pdf or epub"));
-    if (!LIBRARY_ALLOWED_MIMES.has(file.mimetype)) {
-      return cb(new Error("only pdf or epub"));
+    const mime = String(file.mimetype ?? "").toLowerCase();
+    if (LIBRARY_ALLOWED_MIMES.has(mime)) return cb(null, true);
+    // Browsers on Windows often send octet-stream for real PDF/EPUB files.
+    if (ext === ".pdf" && (!mime || mime === "application/octet-stream" || mime === "binary/octet-stream")) {
+      return cb(null, true);
     }
-    cb(null, true);
+    if (
+      ext === ".epub" &&
+      (!mime ||
+        mime === "application/octet-stream" ||
+        mime === "binary/octet-stream" ||
+        mime === "application/zip" ||
+        mime === "application/x-zip-compressed")
+    ) {
+      return cb(null, true);
+    }
+    return cb(new Error("only pdf or epub"));
   },
 });
 

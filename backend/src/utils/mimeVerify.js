@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 import sharp from "sharp";
 
@@ -50,18 +51,54 @@ export async function verifyLectureFile(absPath, declaredMime) {
   return probe.mime ? mime.startsWith("image/") : false;
 }
 
+function readFileHead(absPath, bytes = 8) {
+  const fd = fs.openSync(absPath, "r");
+  try {
+    const buf = Buffer.alloc(bytes);
+    fs.readSync(fd, buf, 0, bytes, 0);
+    return buf;
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+/** Real PDF files start with %PDF (sharp often fails on valid PDFs). */
+function hasPdfMagic(absPath) {
+  try {
+    return readFileHead(absPath, 5).toString("utf8").startsWith("%PDF");
+  } catch {
+    return false;
+  }
+}
+
+/** EPUB is a zip archive (PK). */
+function hasEpubMagic(absPath) {
+  try {
+    const head = readFileHead(absPath, 2);
+    return head[0] === 0x50 && head[1] === 0x4b;
+  } catch {
+    return false;
+  }
+}
+
 export async function verifyLibraryBook(absPath, declaredMime) {
-  if (declaredMime.includes("pdf")) {
+  const ext = path.extname(absPath).toLowerCase();
+  const mime = String(declaredMime ?? "").toLowerCase();
+  if (ext === ".pdf" || mime.includes("pdf")) {
+    if (hasPdfMagic(absPath)) return true;
     const p = await probeFileFormats(absPath, new Set(["pdf"]));
     return p.ok;
   }
-  if (declaredMime.includes("epub") || absPath.toLowerCase().endsWith(".epub")) {
-    return absPath.toLowerCase().endsWith(".epub");
+  if (ext === ".epub" || mime.includes("epub")) {
+    return hasEpubMagic(absPath);
   }
   return false;
 }
 
 export const LIBRARY_ALLOWED_MIMES = new Set([
   "application/pdf",
+  "application/x-pdf",
   "application/epub+zip",
+  "application/octet-stream",
+  "binary/octet-stream",
 ]);
