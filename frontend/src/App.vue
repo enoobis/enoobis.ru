@@ -516,15 +516,6 @@ watch(
               <span class="profile-menu-name">@{{ auth.nickname }}</span>
             </div>
             <div class="profile-menu-head-actions">
-              <RouterLink
-                to="/auth/qr"
-                class="profile-menu-qr icon-btn"
-                aria-label="вход по qr"
-                title="вход по qr"
-                @click="closeProfileMenu"
-              >
-                <AppIcon name="qr" :size="18" />
-              </RouterLink>
               <div class="profile-menu-coins" title="монеты">
                 <img
                   src="/coin-gem.png"
@@ -559,9 +550,14 @@ watch(
             <AppIcon name="settings" :size="22" /><span>настройки</span>
           </RouterLink>
           <span class="profile-menu-sep" />
-          <button class="profile-menu-item profile-menu-btn" type="button" @click="logoutFromMenu">
-            <AppIcon name="logout" :size="22" /><span>выход</span>
-          </button>
+          <div class="profile-menu-footer">
+            <button class="profile-menu-footer-btn" type="button" @click="logoutFromMenu">
+              <AppIcon name="logout" :size="22" /><span>выход</span>
+            </button>
+            <RouterLink to="/auth/qr" class="profile-menu-footer-btn" @click="closeProfileMenu">
+              <AppIcon name="qr" :size="22" /><span>вход по qr</span>
+            </RouterLink>
+          </div>
         </div>
       </Transition>
       <Transition name="nav-sheet">
@@ -650,15 +646,6 @@ watch(
                   <span class="profile-menu-name">@{{ auth.nickname }}</span>
                 </div>
                 <div class="profile-menu-head-actions">
-                  <RouterLink
-                    to="/auth/qr"
-                    class="profile-menu-qr icon-btn"
-                    aria-label="вход по qr"
-                    title="вход по qr"
-                    @click="closeProfileMenu"
-                  >
-                    <AppIcon name="qr" :size="18" />
-                  </RouterLink>
                   <div class="profile-menu-coins" title="монеты">
                     <img
                       src="/coin-gem.png"
@@ -693,9 +680,14 @@ watch(
                 <AppIcon name="settings" :size="22" /><span>настройки</span>
               </RouterLink>
               <span class="profile-menu-sep" />
-              <button class="profile-menu-item profile-menu-btn" type="button" @click="logoutFromMenu">
-                <AppIcon name="logout" :size="22" /><span>выход</span>
-              </button>
+              <div class="profile-menu-footer">
+                <button class="profile-menu-footer-btn" type="button" @click="logoutFromMenu">
+                  <AppIcon name="logout" :size="22" /><span>выход</span>
+                </button>
+                <RouterLink to="/auth/qr" class="profile-menu-footer-btn" @click="closeProfileMenu">
+                  <AppIcon name="qr" :size="22" /><span>вход по qr</span>
+                </RouterLink>
+              </div>
             </div>
           </div>
         </div>
@@ -1153,8 +1145,54 @@ watch(
   gap: 0.35rem;
   flex-shrink: 0;
 }
-.profile-menu-qr {
-  color: var(--muted);
+.profile-menu-footer {
+  display: flex;
+  align-items: stretch;
+}
+.profile-menu-footer-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-width: 0;
+  min-height: 40px;
+  padding: 0.45rem 0.35rem;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  text-transform: lowercase;
+  font: inherit;
+  font-size: 0.95rem;
+  line-height: 1.35;
+  cursor: pointer;
+  text-decoration: none;
+}
+.profile-menu-footer-btn + .profile-menu-footer-btn {
+  border-left: 1px solid var(--border);
+}
+.nav-menu-root--mobile .profile-menu-footer-btn {
+  min-height: 48px;
+  padding: 0.65rem 0.35rem;
+}
+.profile-menu-footer-btn:hover {
+  background: var(--surface2);
+  color: var(--text);
+  text-decoration: none;
+}
+.profile-menu-footer-btn :deep(.app-icon) {
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+.profile-menu-footer-btn > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.profile-menu-footer-btn:hover :deep(.app-icon) {
+  opacity: 1;
 }
 .profile-menu-coins {
   display: inline-flex;

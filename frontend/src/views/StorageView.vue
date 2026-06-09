@@ -300,7 +300,7 @@ onMounted(async () => {
 
       <template v-if="section === 'files'">
         <div
-          class="dropzone"
+          class="storage-zone dropzone"
           :class="{ over: dragOver, busy: uploading }"
           @dragover.prevent="dragOver = true"
           @dragleave.prevent="dragOver = false"
@@ -331,15 +331,17 @@ onMounted(async () => {
       </template>
 
       <template v-else-if="section === 'notes'">
-        <div class="composer">
-          <input v-model="noteTitle" placeholder="название" maxlength="200" />
-          <textarea v-model="noteBody" rows="6" placeholder="текст… markdown поддерживается" />
-          <div class="actions">
-            <button v-if="editingNote" class="secondary" type="button" @click="openNew">отмена</button>
-            <button type="button" :disabled="!noteBody.trim() && !noteTitle.trim()" @click="saveNote">
-              {{ editingNote ? "сохранить" : "создать" }}
-            </button>
+        <div class="storage-zone composer">
+          <div class="composer-head">
+            <input v-model="noteTitle" placeholder="название" maxlength="200" />
+            <div class="composer-head-actions">
+              <button v-if="editingNote" class="secondary" type="button" @click="openNew">отмена</button>
+              <button type="button" :disabled="!noteBody.trim() && !noteTitle.trim()" @click="saveNote">
+                {{ editingNote ? "сохранить" : "создать" }}
+              </button>
+            </div>
           </div>
+          <textarea v-model="noteBody" rows="3" placeholder="текст… markdown поддерживается" />
         </div>
 
         <p v-if="notesLoading" class="page-empty page-empty--tight muted">загрузка</p>
@@ -422,13 +424,16 @@ onMounted(async () => {
   transition: width 0.2s ease;
 }
 
-.dropzone {
+.storage-zone {
   border: 1px dashed var(--border);
   border-radius: var(--radius);
   padding: 1.1rem 1rem;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.dropzone {
   text-align: center;
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease;
 }
 
 .dropzone p {
@@ -445,6 +450,72 @@ onMounted(async () => {
 .dropzone.busy {
   pointer-events: none;
   opacity: 0.7;
+}
+
+.composer {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.composer:focus-within {
+  border-color: var(--text);
+  background: var(--surface2);
+}
+
+.composer-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.composer-head-actions {
+  display: flex;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.composer-head-actions button {
+  min-height: 0;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.82rem;
+}
+
+.composer input,
+.composer textarea {
+  border: none;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  padding: 0.35rem 0;
+  min-height: 0;
+  width: 100%;
+}
+
+.composer-head input {
+  flex: 1;
+  min-width: 0;
+  border-bottom: none;
+  padding: 0;
+}
+
+.composer textarea {
+  resize: vertical;
+  min-height: 3.25rem;
+  max-height: 12rem;
+  line-height: 1.5;
+  font-size: 0.88rem;
+}
+
+.composer input:focus,
+.composer textarea:focus {
+  outline: none;
+  border-bottom-color: var(--focus-border);
+  background: transparent;
+}
+
+.composer-head input:focus {
+  border-bottom: none;
 }
 
 .list {
@@ -483,40 +554,6 @@ onMounted(async () => {
   min-height: 0;
   padding: 0.35rem 0.7rem;
   font-size: 0.82rem;
-}
-
-.composer {
-  display: grid;
-  gap: 0.65rem;
-  padding-bottom: 0.75rem;
-  border-bottom: 1px solid var(--border);
-}
-
-.composer input,
-.composer textarea {
-  border: none;
-  border-bottom: 1px solid var(--border);
-  border-radius: 0;
-  background: transparent;
-  padding: 0.55rem 0;
-  min-height: 0;
-}
-
-.composer textarea {
-  resize: vertical;
-  min-height: 5.5rem;
-  line-height: 1.55;
-}
-
-.composer input:focus,
-.composer textarea:focus {
-  outline: none;
-  border-bottom-color: var(--focus-border);
-  background: transparent;
-}
-
-.composer .actions {
-  justify-content: flex-end;
 }
 
 .shares {
