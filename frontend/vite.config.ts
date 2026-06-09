@@ -7,6 +7,9 @@ export default defineConfig(({ mode }) => {
   const apiPort = env.VITE_API_PORT || "3000";
   return {
     plugins: [vue()],
+    worker: {
+      format: "es",
+    },
     build: {
       target: "es2022",
       rollupOptions: {

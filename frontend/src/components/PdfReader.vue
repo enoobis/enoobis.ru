@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { getDocument, GlobalWorkerOptions, type PDFDocumentProxy } from "pdfjs-dist";
-import pdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+import PdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?worker";
 import AppIcon from "./AppIcon.vue";
 
-GlobalWorkerOptions.workerSrc = pdfWorker;
+GlobalWorkerOptions.workerPort = new PdfWorker();
 
 const props = defineProps<{
   url: string;
