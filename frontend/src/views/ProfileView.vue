@@ -403,28 +403,35 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   background-size: cover;
   background-position: center top;
   pointer-events: none;
+  --profile-band: min(640px, calc(100vw - 2 * var(--layout-pad)));
+  --profile-band-half: min(320px, calc(50vw - var(--layout-pad)));
 }
-/* затемнение: боковые поля + растворение к низу */
+/* боковые поля — сплошной фон, совпадает с шириной контента */
 .profile-bg-layer::before {
   content: "";
   position: absolute;
   inset: 0;
-  background:
-    linear-gradient(
-      to right,
-      var(--bg) 0%,
-      color-mix(in srgb, var(--bg) 40%, transparent) 12%,
-      color-mix(in srgb, var(--bg) 40%, transparent) 88%,
-      var(--bg) 100%
-    ),
-    linear-gradient(
-      to bottom,
-      color-mix(in srgb, var(--bg) 55%, transparent),
-      color-mix(in srgb, var(--bg) 78%, transparent) 45%,
-      var(--bg) 100%
-    );
+  background: var(--bg);
+  -webkit-mask-image: linear-gradient(
+    to right,
+    #000 0,
+    #000 calc(50% - var(--profile-band-half)),
+    transparent calc(50% - var(--profile-band-half)),
+    transparent calc(50% + var(--profile-band-half)),
+    #000 calc(50% + var(--profile-band-half)),
+    #000 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    #000 0,
+    #000 calc(50% - var(--profile-band-half)),
+    transparent calc(50% - var(--profile-band-half)),
+    transparent calc(50% + var(--profile-band-half)),
+    #000 calc(50% + var(--profile-band-half)),
+    #000 100%
+  );
 }
-/* колонка под контентом — без просветов по краям */
+/* центральная колонка — blur + затемнение, ширина = контент */
 .profile-bg-layer::after {
   content: "";
   position: absolute;
@@ -432,8 +439,15 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   bottom: 0;
   left: 50%;
   transform: translateX(-50%);
-  width: min(100%, 640px);
-  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  width: var(--profile-band);
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--bg) 45%, transparent),
+    color-mix(in srgb, var(--bg) 68%, transparent) 50%,
+    var(--bg) 100%
+  );
+  -webkit-backdrop-filter: blur(calc(var(--glass-blur) * 1.5));
+  backdrop-filter: blur(calc(var(--glass-blur) * 1.5));
 }
 .profile {
   position: relative;
