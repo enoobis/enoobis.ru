@@ -21,7 +21,9 @@ const isOnline = ref(typeof navigator !== "undefined" ? navigator.onLine : true)
 const profileMenuOpen = ref(false);
 const navDrawerOpen = ref(false);
 const searchOpen = ref(false);
+const searchQuery = ref("");
 const navEl = ref<HTMLElement | null>(null);
+const navSearchEl = ref<HTMLInputElement | null>(null);
 
 const navProgress = ref(0);
 const navProgressOn = ref(false);
@@ -78,7 +80,20 @@ const mobileSearchTo = computed(() => {
   if (route.path.startsWith("/microblogs")) {
     return { path: "/search", query: { ...route.query, scope: "micro" } };
   }
+  if (route.path.startsWith("/library")) {
+    return { path: "/search", query: { ...route.query, scope: "library" } };
+  }
+  if (route.path.startsWith("/courses")) {
+    return { path: "/search", query: { ...route.query, scope: "courses" } };
+  }
   return { path: "/search" };
+});
+const searchPlaceholder = computed(() => {
+  if (route.path.startsWith("/blogs")) return "поиск в блогах";
+  if (route.path.startsWith("/microblogs")) return "поиск в микроблогах";
+  if (route.path.startsWith("/library")) return "поиск книги";
+  if (route.path.startsWith("/courses")) return "поиск курса";
+  return "поиск";
 });
 
 function syncOnlineStatus() {
@@ -100,6 +115,7 @@ function onDocumentClick(event: MouseEvent) {
   }
   if (searchOpen.value) {
     if (target?.closest?.(".search-menu-sheet")) return;
+    if (target?.closest?.(".nav-inline-search")) return;
     searchOpen.value = false;
   }
 }
@@ -213,7 +229,9 @@ function toggleSearch() {
   closeNavDrawer();
   closeProfileMenu();
   prepareSheetOpen();
+  searchQuery.value = typeof route.query.q === "string" ? route.query.q : "";
   searchOpen.value = true;
+  void nextTick().then(() => navSearchEl.value?.focus());
 }
 
 function overlayStyle() {
@@ -386,7 +404,20 @@ watch(
       <div v-if="reader.active" class="nav-reader-center">
         <span class="nav-reader-title">{{ reader.title }}</span>
       </div>
-      <span v-else class="nav-spacer" />
+      <div v-else class="nav-spacer">
+        <Transition name="nav-inline">
+          <div v-if="searchOpen && auth.token && !sheetMobile" class="nav-inline-search">
+            <AppIcon name="search" :size="18" />
+            <input
+              ref="navSearchEl"
+              v-model="searchQuery"
+              type="search"
+              :placeholder="searchPlaceholder"
+              @keydown.esc.stop
+            />
+          </div>
+        </Transition>
+      </div>
       <template v-if="auth.token">
         <div v-if="reader.active" class="nav-reader-controls">
           <span v-if="reader.pageCount > 0" class="nav-reader-page">
@@ -577,7 +608,12 @@ watch(
           aria-modal="true"
           aria-label="поиск"
         >
-          <SearchPanel embedded autofocus @close="closeSearch" />
+          <SearchPanel
+            embedded
+            :query="searchQuery"
+            @update:query="searchQuery = $event"
+            @close="closeSearch"
+          />
         </div>
       </Transition>
     </header>
@@ -832,6 +868,7 @@ watch(
   padding: 0.35rem 0.6rem 0.65rem;
   max-height: min(75vh, 36rem);
   overflow-y: auto;
+  background: color-mix(in srgb, var(--bg) 94%, transparent);
 }
 
 .nav-dropdown.profile-menu-sheet {
@@ -1045,6 +1082,53 @@ watch(
 
 .profile-menu-wrap {
   position: relative;
+}
+
+.nav-spacer {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  padding: 0 0.5rem;
+}
+
+.nav-inline-search {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  min-width: 0;
+  padding: 0.3rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--muted);
+}
+
+.nav-inline-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  padding: 0.15rem 0;
+  min-height: 0;
+  color: var(--text);
+  font-size: 0.92rem;
+}
+
+.nav-inline-search input:focus {
+  outline: none;
+}
+
+.nav-inline-enter-active {
+  transition: opacity 0.18s var(--ease-out), transform 0.18s var(--ease-out);
+}
+.nav-inline-leave-active {
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+.nav-inline-enter-from,
+.nav-inline-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
 }
 
 .nav-actions {

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useRoute } from "vue-router";
 import {
   deleteBook,
   downloadBook,
@@ -17,10 +18,10 @@ import { useAuthStore } from "../stores/auth";
 import { toastError, toastSuccess } from "../utils/toast";
 import AppIcon from "../components/AppIcon.vue";
 import PageHeader from "../components/PageHeader.vue";
-import FilterSearch from "../components/FilterSearch.vue";
 import PdfReader from "../components/PdfReader.vue";
 
 const auth = useAuthStore();
+const route = useRoute();
 
 const books = ref<LibraryBook[]>([]);
 const categories = ref<LibraryCategory[]>([]);
@@ -29,12 +30,11 @@ const err = ref("");
 
 const isStaff = computed(() => auth.role === "teacher" || auth.role === "admin");
 
-const search = ref("");
+const search = ref(typeof route.query.q === "string" ? route.query.q : "");
 const activeCategory = ref("");
 const sort = ref<"new" | "title">("new");
 const categoryOpen = ref(false);
 const categoryMenuRoot = ref<HTMLElement | null>(null);
-let searchTimer: ReturnType<typeof setTimeout> | null = null;
 
 const showForm = ref(false);
 const newTitle = ref("");
@@ -135,11 +135,6 @@ function onDocumentClick(event: MouseEvent) {
   const root = categoryMenuRoot.value;
   if (root && target && root.contains(target)) return;
   categoryOpen.value = false;
-}
-
-function onSearchInput() {
-  if (searchTimer) clearTimeout(searchTimer);
-  searchTimer = setTimeout(() => void load(), 250);
 }
 
 function onPickFile(ev: Event) {
@@ -283,6 +278,14 @@ watch([activeCategory, sort], () => {
   void load();
 });
 
+watch(
+  () => route.query.q,
+  (v) => {
+    search.value = typeof v === "string" ? v : "";
+    void load();
+  },
+);
+
 watch(readerOpen, (open) => {
   document.documentElement.style.overflow = open ? "hidden" : "";
 });
@@ -290,7 +293,6 @@ watch(readerOpen, (open) => {
 onBeforeUnmount(() => {
   document.removeEventListener("click", onDocumentClick);
   document.documentElement.style.overflow = "";
-  if (searchTimer) clearTimeout(searchTimer);
   closeReader();
   closeEdit();
 });
@@ -336,7 +338,6 @@ onBeforeUnmount(() => {
       </form>
 
       <div class="filter-bar">
-        <FilterSearch v-model="search" @input="onSearchInput" />
         <div ref="categoryMenuRoot" class="filter-menu-wrap">
           <button
             type="button"

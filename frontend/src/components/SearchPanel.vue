@@ -6,7 +6,7 @@ import { listTags, type TaxonomyItem } from "../api/blog";
 import { search, type SearchResponse } from "../api/search";
 import { useAuthStore } from "../stores/auth";
 
-type SearchScope = "global" | "blog" | "micro";
+type SearchScope = "global" | "blog" | "micro" | "library" | "courses";
 type BlogSort = "new" | "popular" | "discussed";
 type BlogMode = "all" | "bookmarks";
 type MicroFeed = "all" | "following";
@@ -14,10 +14,13 @@ type MicroFeed = "all" | "following";
 const props = defineProps<{
   autofocus?: boolean;
   embedded?: boolean;
+  /* controlled-режим: ввод живёт снаружи (инлайн-поиск в шапке) */
+  query?: string;
 }>();
 
 const emit = defineEmits<{
   close: [];
+  "update:query": [value: string];
 }>();
 
 const route = useRoute();
@@ -27,10 +30,20 @@ const auth = useAuthStore();
 const scope = computed<SearchScope>(() => {
   if (route.query.scope === "blog" || route.path.startsWith("/blogs")) return "blog";
   if (route.query.scope === "micro" || route.path.startsWith("/microblogs")) return "micro";
+  if (route.query.scope === "library" || route.path.startsWith("/library")) return "library";
+  if (route.query.scope === "courses" || route.path.startsWith("/courses")) return "courses";
   return "global";
 });
 
-const q = ref("");
+const controlled = computed(() => props.query !== undefined);
+const placeholder = computed(() => {
+  if (scope.value === "blog") return "поиск в блогах";
+  if (scope.value === "micro") return "поиск в микроблогах";
+  if (scope.value === "library") return "поиск книги";
+  if (scope.value === "courses") return "поиск курса";
+  return "поиск";
+});
+const q = ref(props.query ?? "");
 const data = ref<SearchResponse>({ blog: [], micro: [], users: [] });
 const loading = ref(false);
 const err = ref("");
@@ -46,7 +59,9 @@ let timer: ReturnType<typeof setTimeout> | null = null;
 let runSeq = 0;
 
 function readQuery() {
-  q.value = typeof route.query.q === "string" ? route.query.q : "";
+  if (!controlled.value) {
+    q.value = typeof route.query.q === "string" ? route.query.q : "";
+  }
   blogSort.value =
     route.query.sort === "popular" || route.query.sort === "discussed"
       ? route.query.sort
@@ -73,11 +88,22 @@ function microQuery() {
 }
 
 function feedPath() {
-  return scope.value === "blog" ? "/blogs" : "/microblogs";
+  if (scope.value === "blog") return "/blogs";
+  if (scope.value === "micro") return "/microblogs";
+  if (scope.value === "library") return "/library";
+  return "/courses";
+}
+
+function feedQuery() {
+  if (scope.value === "blog") return blogQuery();
+  if (scope.value === "micro") return microQuery();
+  const query: Record<string, string> = {};
+  if (q.value.trim()) query.q = q.value.trim();
+  return query;
 }
 
 function applyFeedSearch() {
-  const query = scope.value === "blog" ? blogQuery() : microQuery();
+  const query = feedQuery();
   if (props.embedded && route.path === feedPath()) {
     router.replace({ path: feedPath(), query });
     return;
@@ -95,6 +121,7 @@ function onEsc(e: KeyboardEvent) {
   if (e.key !== "Escape") return;
   if (q.value) {
     q.value = "";
+    emit("update:query", "");
     if (scope.value === "global") onGlobalInput();
     else applyFeedSearch();
     return;
@@ -154,6 +181,15 @@ async function loadBlogTags() {
 }
 
 watch(
+  () => props.query,
+  (v) => {
+    if (v === undefined || v === q.value) return;
+    q.value = v;
+    onInput();
+  },
+);
+
+watch(
   () => route.query,
   () => {
     readQuery();
@@ -184,8 +220,10 @@ onUnmounted(() => {
 <template>
   <div class="search-panel" :class="{ 'search-panel--embedded': embedded }">
     <FilterSearch
+      v-if="!controlled"
       v-model="q"
       :autofocus="autofocus"
+      :placeholder="placeholder"
       @input="onInput"
       @enter="onEnter"
     />

@@ -80,7 +80,7 @@ const err = ref("");
 const creatingCourse = ref(false);
 const addingLecture = ref(false);
 const addingAssignment = ref(false);
-const courseQuery = ref("");
+const courseQuery = ref(typeof route.query.q === "string" ? route.query.q : "");
 
 const title = ref("");
 const description = ref("");
@@ -706,6 +706,13 @@ watch(
 );
 
 watch(
+  () => route.query.q,
+  (v) => {
+    courseQuery.value = typeof v === "string" ? v : "";
+  },
+);
+
+watch(
   () => route.params.courseId,
   async (next) => {
     const nextCourse = typeof next === "string" ? next : "";
@@ -1277,7 +1284,6 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
       <PageHeader title="курсы" />
 
       <div class="board-tools filter-bar">
-        <FilterSearch v-model="courseQuery" placeholder="поиск курса" class="board-search-wrap" />
         <input
           v-model="joinCode"
           class="board-code"
