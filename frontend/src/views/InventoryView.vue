@@ -12,6 +12,7 @@ import {
 import { useAuthStore } from "../stores/auth";
 import { useSessionStore } from "../stores/session";
 import { toastError, toastSuccess } from "../utils/toast";
+import PageHeader from "../components/PageHeader.vue";
 
 const auth = useAuthStore();
 const session = useSessionStore();
@@ -130,15 +131,14 @@ onMounted(load);
 
 <template>
   <section class="inv page-shell">
-    <header class="page-head">
-      <div class="page-head-main">
-        <h1>инвентарь</h1>
-      </div>
-      <div class="coins-badge" title="монеты">
-        <img src="/coin-gem.png" alt="" width="18" height="18" loading="lazy" />
-        <span>{{ profileCoins }}</span>
-      </div>
-    </header>
+    <PageHeader title="инвентарь">
+      <template #actions>
+        <div class="coins-badge" title="монеты">
+          <img src="/coin-gem.png" alt="" width="18" height="18" loading="lazy" />
+          <span>{{ profileCoins }}</span>
+        </div>
+      </template>
+    </PageHeader>
     <div v-if="loading && !items.length" class="page-empty muted">загрузка</div>
     <div v-else-if="!loading && !items.length" class="page-empty muted">
       <p>пусто</p>

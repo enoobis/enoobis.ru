@@ -12,6 +12,7 @@ import {
 import { useAuthStore } from "../stores/auth";
 import { useSessionStore } from "../stores/session";
 import { toastError, toastSuccess } from "../utils/toast";
+import PageHeader from "../components/PageHeader.vue";
 
 const auth = useAuthStore();
 const session = useSessionStore();
@@ -200,24 +201,23 @@ watch(
 
 <template>
   <section class="shop page-shell">
-    <header class="page-head">
-      <div class="page-head-main">
-        <h1>магазин</h1>
-      </div>
-      <div class="coins-badge" title="монеты">
-        <img src="/coin-gem.png" alt="" width="18" height="18" loading="lazy" />
-        <span>{{ profileCoins }}</span>
-      </div>
-    </header>
+    <PageHeader title="магазин">
+      <template #actions>
+        <div class="coins-badge" title="монеты">
+          <img src="/coin-gem.png" alt="" width="18" height="18" loading="lazy" />
+          <span>{{ profileCoins }}</span>
+        </div>
+      </template>
+    </PageHeader>
 
     <div class="shop-filters">
-      <div class="shop-kind" role="tablist" aria-label="разделы">
+      <div class="filter-tabs shop-kind" role="tablist" aria-label="разделы">
         <button
           v-for="t in tabs"
           :key="t.key"
           type="button"
           role="tab"
-          class="shop-pill shop-pill-kind"
+          class="filter-tab"
           :class="{ on: tab === t.key }"
           :aria-selected="tab === t.key"
           @click="tab = t.key"
@@ -232,7 +232,7 @@ watch(
       >
         <button
           type="button"
-          class="shop-cat-btn"
+          class="filter-tab shop-cat-btn"
           :class="{ on: categoryOpen || categoryFilter }"
           aria-haspopup="listbox"
           :aria-expanded="categoryOpen"
@@ -362,30 +362,8 @@ watch(
 }
 .shop-cat-btn {
   width: 100%;
-  min-height: 38px;
-  padding: 0.4rem 0.7rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: transparent;
-  color: var(--muted);
-  font: inherit;
-  font-size: 0.82rem;
+  justify-content: flex-start;
   text-align: left;
-  cursor: pointer;
-  transition:
-    background 0.15s ease,
-    color 0.15s ease,
-    border-color 0.15s ease;
-}
-.shop-cat-btn:hover {
-  color: var(--text);
-  border-color: var(--hover-border);
-  background: var(--surface2);
-}
-.shop-cat-btn.on {
-  color: var(--text);
-  border-color: var(--text);
-  background: var(--surface2);
 }
 .shop-cat-menu {
   left: 0;
@@ -394,37 +372,6 @@ watch(
   max-width: none;
   max-height: min(14rem, 45vh);
   overflow-y: auto;
-}
-.shop-pill {
-  font: inherit;
-  font-size: 0.8rem;
-  line-height: 1.2;
-  padding: 0.38rem 0.65rem;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-  white-space: nowrap;
-  transition:
-    background 0.15s ease,
-    color 0.15s ease,
-    border-color 0.15s ease;
-}
-.shop-pill-kind {
-  border-radius: var(--radius);
-  padding: 0.45rem 0.35rem;
-  text-align: center;
-}
-.shop-pill:hover {
-  color: var(--text);
-  border-color: var(--hover-border);
-}
-.shop-pill.on,
-.shop-pill[aria-selected="true"] {
-  background: var(--text);
-  color: var(--bg);
-  border-color: var(--text);
 }
 .item-category {
   margin: -0.15rem 0 0;

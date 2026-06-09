@@ -333,12 +333,12 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
       </ul>
     </section>
 
-    <div class="tabs">
-      <button class="tab" :class="{ on: tab === 'blog' }" type="button" @click="tab = 'blog'">
+    <div class="filter-tabs tabs">
+      <button class="filter-tab" :class="{ on: tab === 'blog' }" type="button" @click="tab = 'blog'">
         блоги
         <span v-if="posts.length" class="count muted">{{ posts.length }}</span>
       </button>
-      <button class="tab" :class="{ on: tab === 'micro' }" type="button" @click="tab = 'micro'">
+      <button class="filter-tab" :class="{ on: tab === 'micro' }" type="button" @click="tab = 'micro'">
         микроблоги
         <span v-if="micro.length" class="count muted">{{ micro.length }}</span>
       </button>
@@ -391,11 +391,17 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
 }
 .profile-bg-layer {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(100vw, 1280px);
+  height: 100%;
   z-index: 0;
   background-size: cover;
-  background-position: center;
+  background-position: center top;
   pointer-events: none;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
 }
 .profile {
   position: relative;
@@ -538,10 +544,12 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.4rem 0.85rem;
+  min-height: var(--control-h);
+  padding: 0.5rem 1.1rem;
   border: 1px solid var(--border);
-  border-radius: 999px;
-  font-size: 0.85rem;
+  border-radius: var(--radius-pill);
+  font-size: 0.9rem;
+  font-weight: 600;
   text-transform: lowercase;
   color: var(--text);
   text-align: center;
@@ -658,31 +666,8 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
 }
 
 .tabs {
-  display: flex;
-  gap: 0.3rem;
   margin: 0 0 1rem;
-  border-bottom: 1px solid var(--border);
-}
-.tab {
-  background: transparent;
-  border: none;
-  border-bottom: 2px solid transparent;
-  color: var(--muted);
-  padding: 0.5rem 0.8rem;
-  min-height: 0;
-  font-size: 0.9rem;
-  border-radius: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-.tab:hover {
-  color: var(--text);
-  background: transparent;
-}
-.tab.on {
-  color: var(--text);
-  border-bottom-color: var(--text);
+  flex-wrap: wrap;
 }
 .count {
   font-size: 0.78rem;
@@ -719,6 +704,15 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
 .empty {
   text-align: center;
   margin-top: 4vh;
+}
+
+@media (max-width: 760px) {
+  .profile-bg-layer {
+    display: none;
+  }
+  .profile.on-wallpaper {
+    padding: 0;
+  }
 }
 
 @media (max-width: 600px) {

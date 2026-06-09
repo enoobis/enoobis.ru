@@ -16,6 +16,8 @@ const LIBRARY_QUOTA_BYTES = 5 * 1024 * 1024 * 1024;
 import { useAuthStore } from "../stores/auth";
 import { toastError, toastSuccess } from "../utils/toast";
 import AppIcon from "../components/AppIcon.vue";
+import PageHeader from "../components/PageHeader.vue";
+import FilterSearch from "../components/FilterSearch.vue";
 import PdfReader from "../components/PdfReader.vue";
 
 const auth = useAuthStore();
@@ -298,17 +300,14 @@ onBeforeUnmount(() => {
     <div v-if="!auth.token" class="muted">войдите, чтобы видеть библиотеку</div>
 
     <template v-else>
-      <header class="page-head">
-        <div class="page-head-main">
-          <h1>библиотека</h1>
-          <p class="page-head-meta">
-            {{ totalCount }} {{ totalCount === 1 ? "книга" : "книг" }} · {{ fmtUsed(storageBytesUsed) }} / {{ libraryQuotaLabel }}
-          </p>
-        </div>
-        <button v-if="isStaff && !showForm" type="button" @click="showForm = true">
-          добавить
-        </button>
-      </header>
+      <PageHeader
+        title="библиотека"
+        :meta="`${totalCount} ${totalCount === 1 ? 'книга' : 'книг'} · ${fmtUsed(storageBytesUsed)} / ${libraryQuotaLabel}`"
+      >
+        <template v-if="isStaff && !showForm" #actions>
+          <button type="button" @click="showForm = true">добавить</button>
+        </template>
+      </PageHeader>
 
       <p v-if="err" class="error">{{ err }}</p>
 
@@ -336,14 +335,7 @@ onBeforeUnmount(() => {
       </form>
 
       <div class="filter-bar">
-        <div class="filter-search">
-          <input
-            v-model="search"
-            type="search"
-            placeholder="поиск"
-            @input="onSearchInput"
-          />
-        </div>
+        <FilterSearch v-model="search" @input="onSearchInput" />
         <div ref="categoryMenuRoot" class="filter-menu-wrap">
           <button
             type="button"

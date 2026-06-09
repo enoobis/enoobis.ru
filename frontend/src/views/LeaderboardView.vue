@@ -2,6 +2,7 @@
 import { onMounted, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import AppIcon from "../components/AppIcon.vue";
+import PageHeader from "../components/PageHeader.vue";
 import { listLeaderboard, type LeaderboardEntry } from "../api/leaderboard";
 import { useAuthStore } from "../stores/auth";
 
@@ -34,12 +35,13 @@ onMounted(load);
 
 <template>
   <section class="board page-shell">
-    <header class="head">
-      <button type="button" class="back" aria-label="назад" @click="back">
-        <AppIcon name="back" :size="18" />
-      </button>
-      <h1>лидерборд</h1>
-    </header>
+    <PageHeader title="лидерборд">
+      <template #back>
+        <button type="button" class="filter-icon-btn" aria-label="назад" @click="back">
+          <AppIcon name="back" :size="18" />
+        </button>
+      </template>
+    </PageHeader>
 
     <p v-if="err" class="error">{{ err }}</p>
     <p v-else-if="loading" class="muted">загрузка</p>
@@ -62,32 +64,8 @@ onMounted(load);
 </template>
 
 <style scoped>
-.board {
-  max-width: 640px;
-  margin: 0 auto;
-}
-.head {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
+.board :deep(.page-head) {
   margin-bottom: 1rem;
-}
-.back {
-  width: 32px;
-  height: 32px;
-  min-height: 0;
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: transparent;
-}
-h1 {
-  font-size: 1.1rem;
-  font-weight: 600;
-  text-transform: lowercase;
 }
 .list {
   list-style: none;

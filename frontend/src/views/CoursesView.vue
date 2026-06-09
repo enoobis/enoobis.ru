@@ -34,6 +34,8 @@ import {
   type SubmissionAttachment,
 } from "../api/courses";
 import AppIcon from "../components/AppIcon.vue";
+import PageHeader from "../components/PageHeader.vue";
+import FilterSearch from "../components/FilterSearch.vue";
 import { useAuthStore } from "../stores/auth";
 
 type Tab = "lectures" | "assignments" | "stream" | "people" | "grades";
@@ -1267,10 +1269,10 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 
     <!-- список курсов -->
     <template v-if="!classroom">
+      <PageHeader title="курсы" />
+
       <div class="board-tools filter-bar">
-        <div class="filter-search board-search-wrap">
-          <input v-model="courseQuery" placeholder="поиск курса" />
-        </div>
+        <FilterSearch v-model="courseQuery" placeholder="поиск курса" class="board-search-wrap" />
         <input
           v-model="joinCode"
           class="board-code"
@@ -1599,13 +1601,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
       <!-- лекции -->
       <template v-if="tab === 'lectures'">
         <div v-if="!selectedLecture" class="panel-toolbar">
-          <input
-            v-model="lectureQuery"
-            type="search"
-            class="panel-search"
-            placeholder="поиск лекции"
-            autocomplete="off"
-          />
+          <FilterSearch v-model="lectureQuery" placeholder="поиск лекции" class="panel-search" />
           <button
             v-if="isTeacherInCurrent"
             type="button"
@@ -1914,13 +1910,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
       <!-- задания -->
       <template v-else-if="tab === 'assignments'">
         <div v-if="!selectedAssignment" class="panel-toolbar">
-          <input
-            v-model="assignmentQuery"
-            type="search"
-            class="panel-search"
-            placeholder="поиск задания"
-            autocomplete="off"
-          />
+          <FilterSearch v-model="assignmentQuery" placeholder="поиск задания" class="panel-search" />
           <div class="panel-toolbar-actions">
             <div
               v-if="!isTeacherInCurrent && classroom.assignments.length"

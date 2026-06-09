@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
-import AppIcon from "../components/AppIcon.vue";
+import PageHeader from "../components/PageHeader.vue";
+import FilterSearch from "../components/FilterSearch.vue";
 import MicroComposer from "../components/MicroComposer.vue";
 import MicroItem from "../components/MicroItem.vue";
 import { listMicro, type MicroPost } from "../api/micro";
@@ -77,25 +78,10 @@ onMounted(load);
 
 <template>
   <section class="feed page-shell">
-    <MicroComposer v-if="auth.token" @posted="onPosted" />
-    <p v-else class="muted login-hint">
-      <RouterLink to="/login">войдите</RouterLink>, чтобы публиковать
-    </p>
+    <PageHeader title="лента" />
 
     <div class="filter-bar">
-      <div class="filter-search">
-        <AppIcon name="search" :size="14" />
-        <input
-          v-model="q"
-          placeholder="поиск"
-          @keydown.enter.prevent="search"
-          @input="
-            () => {
-              if (!q.trim()) search();
-            }
-          "
-        />
-      </div>
+      <FilterSearch v-model="q" @enter="search" @input="() => { if (!q.trim()) search(); }" />
       <div v-if="auth.token" class="filter-tabs">
         <button class="filter-tab" :class="{ on: feed === 'all' }" type="button" @click="feed = 'all'">все</button>
         <button class="filter-tab" :class="{ on: feed === 'following' }" type="button" @click="feed = 'following'">
@@ -103,6 +89,11 @@ onMounted(load);
         </button>
       </div>
     </div>
+
+    <MicroComposer v-if="auth.token" @posted="onPosted" />
+    <p v-else class="muted login-hint">
+      <RouterLink to="/login">войдите</RouterLink>, чтобы публиковать
+    </p>
 
     <p v-if="err" class="error">{{ err }}</p>
     <p v-else-if="loading && !posts.length" class="muted">загрузка</p>

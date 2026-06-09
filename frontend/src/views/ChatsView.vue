@@ -821,11 +821,12 @@ onUnmounted(() => {
   z-index: 1;
 }
 .list-head h2 {
-  font-size: 0.95rem;
-  font-weight: 500;
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
   margin: 0;
   text-transform: lowercase;
-  color: var(--muted);
+  color: var(--text);
 }
 .pad {
   padding: 1rem;
@@ -1037,12 +1038,12 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 .thread-act {
-  width: 36px;
-  height: 36px;
-  min-height: 36px;
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
   padding: 0;
   border: none;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: transparent;
   color: var(--muted);
   display: inline-flex;
@@ -1057,13 +1058,23 @@ onUnmounted(() => {
 }
 .back {
   display: none;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
   background: transparent;
   border: none;
+  border-radius: var(--radius-pill);
   color: var(--muted);
-  font-size: 1rem;
+  font-size: 1.1rem;
   padding: 0;
-  min-height: 0;
-  margin-right: 0.2rem;
+  margin-right: 0.1rem;
+  flex-shrink: 0;
+}
+.back:hover {
+  color: var(--text);
+  background: var(--surface2);
 }
 .who {
   display: flex;
@@ -1402,7 +1413,7 @@ onUnmounted(() => {
     display: none;
   }
   .back {
-    display: inline;
+    display: inline-flex;
   }
   .list {
     border-right: none;

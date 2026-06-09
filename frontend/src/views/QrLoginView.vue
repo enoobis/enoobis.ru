@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import QRCode from "qrcode";
+import jsQR from "jsqr";
 import { claimQrCode, extractQrCode, issueQrCode, qrLoginUrl } from "../api/qrAuth";
 import { useQrScanDevice } from "../composables/useQrScanDevice";
 import { useAuthStore } from "../stores/auth";
@@ -33,6 +34,7 @@ let expireTimer: ReturnType<typeof setInterval> | null = null;
 let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 let scanLoop: ReturnType<typeof setInterval> | null = null;
 let mediaStream: MediaStream | null = null;
+let scanCanvas: HTMLCanvasElement | null = null;
 
 function clearTimers() {
   if (expireTimer) {
@@ -122,15 +124,32 @@ async function claim(codeInput: string) {
   }
 }
 
+function decodeWithJsQr(): string | null {
+  const video = videoEl.value;
+  if (!video || !video.videoWidth || !video.videoHeight) return null;
+  if (!scanCanvas) scanCanvas = document.createElement("canvas");
+  const ctx = scanCanvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return null;
+  scanCanvas.width = video.videoWidth;
+  scanCanvas.height = video.videoHeight;
+  ctx.drawImage(video, 0, 0, scanCanvas.width, scanCanvas.height);
+  const image = ctx.getImageData(0, 0, scanCanvas.width, scanCanvas.height);
+  const hit = jsQR(image.data, image.width, image.height, {
+    inversionAttempts: "dontInvert",
+  });
+  return hit?.data ?? null;
+}
+
 async function startCamera() {
   if (!canScanQr.value) return;
   stopCamera();
   err.value = "";
-  const Detector = (window as unknown as { BarcodeDetector?: typeof BarcodeDetector })
-    .BarcodeDetector;
-  if (!Detector || !navigator.mediaDevices?.getUserMedia) {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    err.value = "камера недоступна — вставьте ссылку вручную";
     return;
   }
+  const Detector = (window as unknown as { BarcodeDetector?: typeof BarcodeDetector })
+    .BarcodeDetector;
   try {
     mediaStream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: "environment" },
@@ -138,21 +157,27 @@ async function startCamera() {
     });
     if (videoEl.value) {
       videoEl.value.srcObject = mediaStream;
+      videoEl.value.setAttribute("playsinline", "true");
       await videoEl.value.play();
     }
-    const detector = new Detector({ formats: ["qr_code"] });
+    const detector = Detector ? new Detector({ formats: ["qr_code"] }) : null;
     scanLoop = setInterval(async () => {
       if (!videoEl.value || claiming.value) return;
       try {
-        const hits = await detector.detect(videoEl.value);
-        const raw = hits[0]?.rawValue;
+        let raw: string | null = null;
+        if (detector) {
+          const hits = await detector.detect(videoEl.value);
+          raw = hits[0]?.rawValue ?? null;
+        } else {
+          raw = decodeWithJsQr();
+        }
         if (raw) await claim(raw);
       } catch {
         /* ignore frame errors */
       }
-    }, 700);
+    }, 400);
   } catch {
-    err.value = "камера недоступна — вставьте ссылку вручную";
+    err.value = "нет доступа к камере — разрешите камеру или вставьте ссылку вручную";
   }
 }
 
@@ -211,17 +236,17 @@ onBeforeUnmount(() => {
     <h1>вход по qr</h1>
     <p class="muted lead">{{ leadText }}</p>
 
-    <div v-if="canScanQr" class="tabs" role="tablist">
+    <div v-if="canScanQr" class="filter-tabs tabs" role="tablist">
       <button
         type="button"
-        class="tab"
+        class="filter-tab"
         :class="{ on: tab === 'show' }"
         :disabled="!auth.token"
         @click="tab = 'show'"
       >
         показать qr
       </button>
-      <button type="button" class="tab" :class="{ on: tab === 'scan' }" @click="tab = 'scan'">
+      <button type="button" class="filter-tab" :class="{ on: tab === 'scan' }" @click="tab = 'scan'">
         сканировать
       </button>
     </div>
@@ -285,27 +310,6 @@ h1 {
   grid-template-columns: 1fr 1fr;
   gap: 0.35rem;
   margin-bottom: 1rem;
-}
-
-.tab {
-  padding: 0.55rem 0.65rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  background: transparent;
-  color: inherit;
-  font-size: 0.875rem;
-  cursor: pointer;
-}
-
-.tab.on {
-  border-color: var(--text);
-  color: var(--text);
-  background: var(--surface2);
-}
-
-.tab:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
 }
 
 .show-pane,

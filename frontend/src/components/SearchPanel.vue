@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { onMounted, onUnmounted, ref, watch } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
-import AppIcon from "./AppIcon.vue";
+import FilterSearch from "./FilterSearch.vue";
 import { search, type SearchResponse } from "../api/search";
 
 const props = defineProps<{
@@ -15,7 +15,6 @@ const emit = defineEmits<{
 
 const route = useRoute();
 const router = useRouter();
-const inputEl = ref<HTMLInputElement | null>(null);
 const q = ref(typeof route.query.q === "string" ? route.query.q : "");
 const data = ref<SearchResponse>({ blog: [], micro: [], users: [] });
 const loading = ref(false);
@@ -71,12 +70,8 @@ watch(
   },
 );
 
-onMounted(async () => {
+onMounted(() => {
   window.addEventListener("keydown", onEsc);
-  if (props.autofocus) {
-    await nextTick();
-    inputEl.value?.focus();
-  }
   void run();
 });
 
@@ -88,17 +83,12 @@ onUnmounted(() => {
 
 <template>
   <div class="search-panel" :class="{ 'search-panel--embedded': embedded }">
-    <div class="filter-search">
-      <AppIcon name="search" :size="20" />
-      <input
-        ref="inputEl"
-        v-model="q"
-        type="search"
-        placeholder="поиск"
-        @input="onInput"
-        @keydown.enter.prevent="run"
-      />
-    </div>
+    <FilterSearch
+      v-model="q"
+      :autofocus="autofocus"
+      @input="onInput"
+      @enter="run"
+    />
 
     <p v-if="err" class="error">{{ err }}</p>
     <p v-else-if="loading" class="muted search-status">

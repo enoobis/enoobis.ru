@@ -2,6 +2,8 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import AppIcon from "../components/AppIcon.vue";
+import PageHeader from "../components/PageHeader.vue";
+import FilterSearch from "../components/FilterSearch.vue";
 import PostMetaStats from "../components/PostMetaStats.vue";
 import {
   listMyBookmarks,
@@ -139,27 +141,25 @@ onMounted(async () => {
 
 <template>
   <section class="blog page-shell">
-    <div class="filter-search" :class="{ active: filtersOpen }">
-      <AppIcon name="search" :size="16" />
-      <input
+    <PageHeader title="блоги" />
+
+    <div class="filter-bar">
+      <FilterSearch
         v-model="q"
-        placeholder="поиск"
-        @keydown.enter.prevent="search"
-        @input="
-          () => {
-            if (!q.trim()) search();
-          }
-        "
-      />
-      <button
-        class="filter-icon-btn"
-        type="button"
-        :class="{ on: filtersOpen || activeChips.length }"
-        :title="filtersOpen ? 'свернуть' : 'фильтры'"
-        @click="filtersOpen = !filtersOpen"
+        :active="filtersOpen"
+        @enter="search"
+        @input="() => { if (!q.trim()) search(); }"
       >
-        <AppIcon name="filter" :size="16" />
-      </button>
+        <button
+          class="filter-icon-btn"
+          type="button"
+          :class="{ on: filtersOpen || activeChips.length }"
+          :title="filtersOpen ? 'свернуть' : 'фильтры'"
+          @click="filtersOpen = !filtersOpen"
+        >
+          <AppIcon name="filter" :size="18" />
+        </button>
+      </FilterSearch>
     </div>
 
     <div v-if="filtersOpen" class="filters">
@@ -228,8 +228,15 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.blog > .filter-search {
-  margin-bottom: 0.6rem;
+.filter-bar {
+  margin: 0 0 0.6rem;
+}
+.filter-bar :deep(.filter-icon-btn) {
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  min-height: 28px;
+  margin-right: -0.35rem;
 }
 
 .filters {
