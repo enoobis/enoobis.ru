@@ -44,15 +44,6 @@ const editId = computed(() => (typeof route.params.id === "string" ? route.param
 const isEdit = computed(() => !!editId.value);
 const draftKey = computed(() => `blog-draft:${editId.value || "new"}`);
 
-const charCount = computed(() => body.value.length);
-const wordCount = computed(
-  () =>
-    body.value
-      .replace(/[#_*`\-\[\]()!>]/g, " ")
-      .split(/\s+/)
-      .filter(Boolean).length,
-);
-const readMinutes = computed(() => Math.max(1, Math.ceil(wordCount.value / 220)));
 const previewHtml = computed(() => renderMarkdown(body.value));
 const submitLabel = computed(() => (auth.role === "admin" ? "опубликовать" : "на модерацию"));
 
@@ -367,7 +358,6 @@ onBeforeUnmount(() => {
   <div ref="editorRoot" class="editor-shell">
     <header class="editor-top">
       <div class="editor-top-left">
-        <span class="muted small">{{ wordCount }} слов · ~{{ readMinutes }} мин</span>
         <span v-if="autosaveStatus === 'saving'" class="muted small">сохраняем…</span>
         <span v-else-if="autosaveStatus === 'saved'" class="muted small">сохранено</span>
       </div>
