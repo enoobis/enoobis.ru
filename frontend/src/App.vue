@@ -71,6 +71,15 @@ const headerSheetOpen = computed(
 const navFullSheetOpen = computed(() => headerSheetOpen.value && !sheetMobile.value);
 const initials = computed(() => (auth.nickname || "U").slice(0, 2).toUpperCase());
 const chatBadge = computed(() => (chatStore.unread > 9 ? "9+" : String(chatStore.unread)));
+const mobileSearchTo = computed(() => {
+  if (route.path.startsWith("/blogs")) {
+    return { path: "/search", query: { ...route.query, scope: "blog" } };
+  }
+  if (route.path.startsWith("/microblogs")) {
+    return { path: "/search", query: { ...route.query, scope: "micro" } };
+  }
+  return { path: "/search" };
+});
 
 function syncOnlineStatus() {
   isOnline.value = navigator.onLine;
@@ -119,7 +128,7 @@ function onGlobalKey(event: KeyboardEvent) {
   if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
     event.preventDefault();
     if (isSheetMobile()) {
-      router.push("/search");
+      router.push(mobileSearchTo.value);
     } else {
       toggleSearch();
     }
@@ -128,7 +137,7 @@ function onGlobalKey(event: KeyboardEvent) {
   if (event.key === "/" && !isTypingTarget(event.target)) {
     event.preventDefault();
     if (isSheetMobile()) {
-      router.push("/search");
+      router.push(mobileSearchTo.value);
     } else {
       toggleSearch();
     }
@@ -404,7 +413,7 @@ watch(
           </button>
           <RouterLink
             v-else
-            to="/search"
+            :to="mobileSearchTo"
             class="icon-btn nav-search-trigger"
             aria-label="поиск"
             title="поиск"

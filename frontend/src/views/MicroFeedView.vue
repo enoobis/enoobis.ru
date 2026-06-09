@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import PageHeader from "../components/PageHeader.vue";
-import FilterSearch from "../components/FilterSearch.vue";
 import MicroComposer from "../components/MicroComposer.vue";
 import MicroItem from "../components/MicroItem.vue";
 import { listMicro, type MicroPost } from "../api/micro";
@@ -16,9 +15,50 @@ const router = useRouter();
 const posts = ref<MicroPost[]>([]);
 const err = ref("");
 const loading = ref(false);
-const q = ref(typeof route.query.q === "string" ? route.query.q : "");
+const q = ref("");
 const feed = ref<Feed>("all");
 let loadSeq = 0;
+
+const activeChips = computed(() => {
+  const chips: { key: string; label: string; clear: () => void }[] = [];
+  if (q.value.trim()) {
+    chips.push({
+      key: "q",
+      label: q.value.trim(),
+      clear: () => {
+        q.value = "";
+        pushQuery();
+      },
+    });
+  }
+  if (feed.value === "following") {
+    chips.push({
+      key: "feed",
+      label: "подписки",
+      clear: () => {
+        feed.value = "all";
+        pushQuery();
+      },
+    });
+  }
+  return chips;
+});
+
+function syncFromRoute() {
+  q.value = typeof route.query.q === "string" ? route.query.q : "";
+  feed.value = route.query.feed === "following" ? "following" : "all";
+}
+
+function buildQuery() {
+  const query: Record<string, string> = {};
+  if (q.value.trim()) query.q = q.value.trim();
+  if (feed.value === "following") query.feed = "following";
+  return query;
+}
+
+function pushQuery() {
+  router.replace({ path: "/microblogs", query: buildQuery() });
+}
 
 async function load() {
   const seq = ++loadSeq;
@@ -57,37 +97,36 @@ function onUpdated(updated: MicroPost) {
   posts.value = posts.value.map((p) => (p.id === updated.id ? updated : p));
 }
 
-function search() {
-  router.replace({ query: q.value.trim() ? { q: q.value.trim() } : {} });
-  void load();
+function resetAll() {
+  q.value = "";
+  feed.value = "all";
+  pushQuery();
 }
 
-watch(feed, load);
 watch(
-  () => route.query.q,
-  (v) => {
-    const next = typeof v === "string" ? v : "";
-    if (next !== q.value) {
-      q.value = next;
-      void load();
-    }
+  () => route.query,
+  () => {
+    syncFromRoute();
+    void load();
   },
+  { deep: true },
 );
-onMounted(load);
+
+onMounted(() => {
+  syncFromRoute();
+  void load();
+});
 </script>
 
 <template>
   <section class="feed page-shell">
     <PageHeader title="лента" />
 
-    <div class="filter-bar">
-      <FilterSearch v-model="q" @enter="search" @input="() => { if (!q.trim()) search(); }" />
-    </div>
-    <div v-if="auth.token" class="content-tabs">
-      <button class="content-tab" :class="{ on: feed === 'all' }" type="button" @click="feed = 'all'">все</button>
-      <button class="content-tab" :class="{ on: feed === 'following' }" type="button" @click="feed = 'following'">
-        подписки
+    <div v-if="activeChips.length" class="active-chips">
+      <button v-for="c in activeChips" :key="c.key" class="active-chip" type="button" @click="c.clear">
+        {{ c.label }} ×
       </button>
+      <button class="active-chip clear" type="button" @click="resetAll">сбросить</button>
     </div>
 
     <MicroComposer v-if="auth.token" @posted="onPosted" />
@@ -115,8 +154,25 @@ onMounted(load);
   display: grid;
   gap: 0;
 }
-.feed .content-tabs {
-  margin-top: -0.15rem;
+.active-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-bottom: 0.75rem;
+}
+.active-chip {
+  padding: 0.3rem 0.75rem;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+.active-chip:hover {
+  color: var(--text);
+}
+.active-chip.clear {
+  border-style: dashed;
 }
 .login-hint {
   padding: 1rem 0;

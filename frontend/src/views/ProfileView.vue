@@ -231,12 +231,15 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
 
 <template>
   <div v-if="profile" class="profile-wrap">
-    <div
-      v-if="showWallpaper"
-      class="profile-bg-layer"
-      aria-hidden="true"
-      :style="{ backgroundImage: `url(${profile.wallpaper_url})` }"
-    />
+    <div v-if="showWallpaper" class="profile-bg" aria-hidden="true">
+      <div
+        class="profile-bg-sharp"
+        :style="{ backgroundImage: `url(${profile.wallpaper_url})` }"
+      />
+      <div class="profile-bg-side profile-bg-side--left" />
+      <div class="profile-bg-side profile-bg-side--right" />
+      <div class="profile-bg-center" />
+    </div>
     <section class="profile" :class="{ 'on-wallpaper': showWallpaper }">
     <div
       v-if="showCover"
@@ -396,51 +399,57 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   max-width: 640px;
   margin: 0 auto;
 }
-.profile-bg-layer {
+.profile-bg {
+  --profile-col: min(640px, calc(100vw - 2 * var(--layout-pad, 1rem)));
   position: fixed;
-  inset: -48px;
+  inset: 0;
   z-index: 0;
-  background-size: cover;
-  background-position: center top;
-  filter: blur(8px);
   pointer-events: none;
 }
-/* затемнение всех обоев + плавный уход в фон по бокам и снизу */
-.profile-bg-layer::before {
-  content: "";
+.profile-bg-sharp {
   position: absolute;
   inset: 0;
-  background:
-    linear-gradient(
-      to right,
-      var(--bg) 0%,
-      color-mix(in srgb, var(--bg) 35%, transparent) 16%,
-      transparent 30%,
-      transparent 70%,
-      color-mix(in srgb, var(--bg) 35%, transparent) 84%,
-      var(--bg) 100%
-    ),
-    linear-gradient(
-      to bottom,
-      color-mix(in srgb, #000 42%, transparent),
-      color-mix(in srgb, #000 52%, transparent) 50%,
-      var(--bg) 94%
-    );
+  background-size: cover;
+  background-position: center top;
 }
-/* центральная колонка по ширине контента — тёмный scrim во всю высоту */
-.profile-bg-layer::after {
-  content: "";
+.profile-bg-side {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: max(0px, calc((100vw - var(--profile-col)) / 2));
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+}
+.profile-bg-side--left {
+  left: 0;
+  background: linear-gradient(
+    to right,
+    var(--bg) 0%,
+    color-mix(in srgb, var(--bg) 62%, transparent) 52%,
+    transparent 100%
+  );
+}
+.profile-bg-side--right {
+  right: 0;
+  background: linear-gradient(
+    to left,
+    var(--bg) 0%,
+    color-mix(in srgb, var(--bg) 62%, transparent) 52%,
+    transparent 100%
+  );
+}
+.profile-bg-center {
   position: absolute;
   top: 0;
   bottom: 0;
   left: 50%;
   transform: translateX(-50%);
-  width: min(660px, calc(100vw - 2 * var(--layout-pad, 1rem)));
+  width: var(--profile-col);
   background: linear-gradient(
     to bottom,
-    color-mix(in srgb, #000 55%, transparent),
-    color-mix(in srgb, #000 62%, transparent) 48%,
-    var(--bg) 94%
+    rgba(0, 0, 0, 0.82),
+    rgba(0, 0, 0, 0.88) 44%,
+    var(--bg) 100%
   );
 }
 .profile {
@@ -734,7 +743,7 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   font-size: 0.82rem;
 }
 @media (max-width: 760px) {
-  .profile-bg-layer {
+  .profile-bg {
     display: none;
   }
   .profile.on-wallpaper {

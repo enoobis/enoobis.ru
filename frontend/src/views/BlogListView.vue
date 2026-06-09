@@ -1,16 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { RouterLink, useRoute } from "vue-router";
-import AppIcon from "../components/AppIcon.vue";
+import { RouterLink, useRoute, useRouter } from "vue-router";
 import PageHeader from "../components/PageHeader.vue";
-import FilterSearch from "../components/FilterSearch.vue";
 import PostMetaStats from "../components/PostMetaStats.vue";
 import {
   listMyBookmarks,
   listPosts,
-  listTags,
   type BlogListItem,
-  type TaxonomyItem,
 } from "../api/blog";
 import { useAuthStore } from "../stores/auth";
 
@@ -19,8 +15,8 @@ type Mode = "all" | "bookmarks";
 
 const auth = useAuthStore();
 const route = useRoute();
+const router = useRouter();
 const posts = ref<BlogListItem[]>([]);
-const tags = ref<TaxonomyItem[]>([]);
 const err = ref("");
 const loading = ref(false);
 const total = ref(0);
@@ -31,7 +27,6 @@ const q = ref("");
 const tag = ref("");
 const sort = ref<SortKey>("new");
 const mode = ref<Mode>("all");
-const filtersOpen = ref(false);
 
 const sortedPosts = computed(() => {
   const items = posts.value.slice();
@@ -42,32 +37,70 @@ const sortedPosts = computed(() => {
 
 const activeChips = computed(() => {
   const chips: { key: string; label: string; clear: () => void }[] = [];
+  if (q.value.trim()) {
+    chips.push({
+      key: "q",
+      label: q.value.trim(),
+      clear: () => {
+        q.value = "";
+        pushQuery();
+      },
+    });
+  }
   if (sort.value !== "new") {
     chips.push({
       key: "sort",
       label: sort.value === "popular" ? "по лайкам" : "по обсуждениям",
-      clear: () => (sort.value = "new"),
+      clear: () => {
+        sort.value = "new";
+        pushQuery();
+      },
     });
   }
   if (tag.value) {
-    chips.push({ key: "tag", label: `#${tag.value}`, clear: () => { tag.value = ""; reload(); } });
+    chips.push({
+      key: "tag",
+      label: `#${tag.value}`,
+      clear: () => {
+        tag.value = "";
+        pushQuery();
+      },
+    });
   }
   if (mode.value === "bookmarks") {
-    chips.push({ key: "bm", label: "закладки", clear: () => { mode.value = "all"; reload(); } });
+    chips.push({
+      key: "bm",
+      label: "закладки",
+      clear: () => {
+        mode.value = "all";
+        pushQuery();
+      },
+    });
   }
   return chips;
 });
 
-function syncModeFromRoute() {
+function syncFromRoute() {
+  q.value = typeof route.query.q === "string" ? route.query.q : "";
+  tag.value = typeof route.query.tag === "string" ? route.query.tag : "";
+  sort.value =
+    route.query.sort === "popular" || route.query.sort === "discussed"
+      ? route.query.sort
+      : "new";
   mode.value = route.query.mode === "bookmarks" ? "bookmarks" : "all";
 }
 
-async function loadTaxonomy() {
-  try {
-    tags.value = await listTags();
-  } catch {
-    tags.value = [];
-  }
+function buildQuery() {
+  const query: Record<string, string> = {};
+  if (q.value.trim()) query.q = q.value.trim();
+  if (tag.value) query.tag = tag.value;
+  if (sort.value !== "new") query.sort = sort.value;
+  if (mode.value === "bookmarks") query.mode = "bookmarks";
+  return query;
+}
+
+function pushQuery() {
+  router.replace({ path: "/blogs", query: buildQuery() });
 }
 
 async function load() {
@@ -96,11 +129,7 @@ async function load() {
 
 function reload() {
   page.value = 1;
-  load();
-}
-
-function search() {
-  reload();
+  void load();
 }
 
 function resetAll() {
@@ -108,84 +137,39 @@ function resetAll() {
   tag.value = "";
   sort.value = "new";
   mode.value = "all";
-  reload();
+  pushQuery();
 }
 
 function prev() {
   if (page.value === 1) return;
   page.value -= 1;
-  load();
+  void load();
 }
 
 function next() {
   if (page.value * pageSize >= total.value) return;
   page.value += 1;
-  load();
+  void load();
 }
 
-watch([tag, mode], reload);
-
 watch(
-  () => route.query.mode,
+  () => route.query,
   () => {
-    syncModeFromRoute();
+    syncFromRoute();
     reload();
   },
+  { deep: true },
 );
 
-onMounted(async () => {
-  syncModeFromRoute();
-  await Promise.all([loadTaxonomy(), load()]);
+onMounted(() => {
+  syncFromRoute();
+  void load();
 });
 </script>
 
 <template>
   <section class="blog page-shell">
     <PageHeader title="блоги" />
-
-    <div class="filter-bar">
-      <FilterSearch
-        v-model="q"
-        :active="filtersOpen"
-        @enter="search"
-        @input="() => { if (!q.trim()) search(); }"
-      >
-        <button
-          class="filter-icon-btn"
-          type="button"
-          :class="{ on: filtersOpen || activeChips.length }"
-          :title="filtersOpen ? 'свернуть' : 'фильтры'"
-          @click="filtersOpen = !filtersOpen"
-        >
-          <AppIcon name="filter" :size="18" />
-        </button>
-      </FilterSearch>
-    </div>
-
-    <div v-if="filtersOpen" class="filters">
-      <div class="row">
-        <span class="muted small">сортировка</span>
-        <div class="chips">
-          <button class="filter-chip" :class="{ on: sort === 'new' }" type="button" @click="sort = 'new'">новые</button>
-          <button class="filter-chip" :class="{ on: sort === 'popular' }" type="button" @click="sort = 'popular'">популярные</button>
-          <button class="filter-chip" :class="{ on: sort === 'discussed' }" type="button" @click="sort = 'discussed'">обсуждаемые</button>
-        </div>
-      </div>
-      <div v-if="tags.length" class="row">
-        <span class="muted small">тег</span>
-        <select v-model="tag">
-          <option value="">все</option>
-          <option v-for="t in tags" :key="t.slug" :value="t.slug">{{ t.name }} · {{ t.post_count }}</option>
-        </select>
-      </div>
-      <div v-if="auth.token" class="row">
-        <span class="muted small">показать</span>
-        <div class="chips">
-          <button class="filter-chip" :class="{ on: mode === 'all' }" type="button" @click="mode = 'all'">все</button>
-          <button class="filter-chip" :class="{ on: mode === 'bookmarks' }" type="button" @click="mode = 'bookmarks'">закладки</button>
-        </div>
-      </div>
-    </div>
 
     <div v-if="activeChips.length" class="active-chips">
       <button v-for="c in activeChips" :key="c.key" class="active-chip" type="button" @click="c.clear">
@@ -228,37 +212,11 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.filter-bar {
-  margin: 0 0 0.6rem;
-}
-.filter-bar :deep(.filter-icon-btn) {
-  margin-right: -0.35rem;
-}
-
-.filters {
-  display: grid;
-  gap: 0.6rem;
-  padding: 0.8rem 0.9rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  margin-bottom: 0.6rem;
-}
-.row {
-  display: grid;
-  grid-template-columns: 100px 1fr;
-  align-items: center;
-  gap: 0.6rem;
-}
-.chips {
-  display: flex;
-  gap: 0.3rem;
-  flex-wrap: wrap;
-}
 .active-chips {
   display: flex;
   flex-wrap: wrap;
   gap: 0.3rem;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
 }
 .active-chip {
   padding: 0.3rem 0.75rem;
@@ -320,14 +278,5 @@ onMounted(async () => {
 .link:hover:not(:disabled) {
   color: var(--text);
   background: transparent;
-}
-.small {
-  font-size: 0.78rem;
-}
-
-@media (max-width: 500px) {
-  .row {
-    grid-template-columns: 1fr;
-  }
 }
 </style>
