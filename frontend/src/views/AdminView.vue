@@ -1629,10 +1629,10 @@ strong {
 }
 .lim-select {
   font: inherit;
-  padding: 0.25rem 0.35rem;
+  padding: 0.25rem 1.6rem 0.25rem 0.35rem;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--bg);
+  background-color: var(--bg);
   color: var(--text);
 }
 .shop-upload-btn {

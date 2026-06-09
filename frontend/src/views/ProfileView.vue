@@ -398,17 +398,40 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
 }
 .profile-bg-layer {
   position: fixed;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(100vw, 1280px);
-  height: 100%;
+  inset: 0;
   z-index: 0;
   background-size: cover;
   background-position: center top;
   pointer-events: none;
-  -webkit-mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
-  mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
+}
+/* затемнение по всему фону + растворение к низу страницы */
+.profile-bg-layer::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--bg) 30%, transparent),
+    color-mix(in srgb, var(--bg) 55%, transparent) 45%,
+    var(--bg) 100%
+  );
+}
+/* steam-подобная колонка под контентом, чтобы текст читался на любом фоне */
+.profile-bg-layer::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(100%, 820px);
+  background: linear-gradient(
+    to right,
+    transparent,
+    color-mix(in srgb, var(--bg) 62%, transparent) 10%,
+    color-mix(in srgb, var(--bg) 62%, transparent) 90%,
+    transparent
+  );
 }
 .profile {
   position: relative;
@@ -674,13 +697,16 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
 
 .profile-tabs {
   display: flex;
-  gap: 1.5rem;
   margin: 0 0 1rem;
   border-bottom: 1px solid var(--border);
 }
 
 .profile-tab {
   position: relative;
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-height: 0;
   padding: 0.55rem 0;
   border: none;
