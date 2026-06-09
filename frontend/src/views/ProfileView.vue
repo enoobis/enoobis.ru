@@ -398,51 +398,50 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
 }
 .profile-bg-layer {
   position: fixed;
-  inset: 0;
+  inset: -48px;
   z-index: 0;
   background-size: cover;
   background-position: center top;
+  filter: blur(8px);
   pointer-events: none;
 }
-/* затемнение + боковые поля + fade к низу */
+/* затемнение всех обоев + плавный уход в фон по бокам и снизу */
 .profile-bg-layer::before {
   content: "";
   position: absolute;
   inset: 0;
   background:
     linear-gradient(
-      to bottom,
-      color-mix(in srgb, var(--bg) 32%, transparent),
-      color-mix(in srgb, var(--bg) 58%, transparent) 38%,
-      var(--bg) 78%
-    ),
-    linear-gradient(
       to right,
       var(--bg) 0%,
-      transparent 16%,
-      transparent 84%,
+      color-mix(in srgb, var(--bg) 35%, transparent) 16%,
+      transparent 30%,
+      transparent 70%,
+      color-mix(in srgb, var(--bg) 35%, transparent) 84%,
       var(--bg) 100%
+    ),
+    linear-gradient(
+      to bottom,
+      color-mix(in srgb, #000 42%, transparent),
+      color-mix(in srgb, #000 52%, transparent) 50%,
+      var(--bg) 94%
     );
 }
-/* blur только в верхней зоне под шапкой профиля */
+/* центральная колонка по ширине контента — тёмный scrim во всю высоту */
 .profile-bg-layer::after {
   content: "";
   position: absolute;
   top: 0;
+  bottom: 0;
   left: 50%;
   transform: translateX(-50%);
-  width: min(640px, calc(100vw - 2 * var(--layout-pad, 1rem)));
-  height: min(440px, 52vh);
+  width: min(660px, calc(100vw - 2 * var(--layout-pad, 1rem)));
   background: linear-gradient(
-    to right,
-    transparent,
-    color-mix(in srgb, var(--bg) 50%, transparent) 14%,
-    color-mix(in srgb, var(--bg) 50%, transparent) 86%,
-    transparent
+    to bottom,
+    color-mix(in srgb, #000 55%, transparent),
+    color-mix(in srgb, #000 62%, transparent) 48%,
+    var(--bg) 94%
   );
-  -webkit-backdrop-filter: blur(var(--glass-blur));
-  backdrop-filter: blur(var(--glass-blur));
-  pointer-events: none;
 }
 .profile {
   position: relative;
