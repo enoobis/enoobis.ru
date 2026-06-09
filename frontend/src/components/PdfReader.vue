@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { getDocument, GlobalWorkerOptions, type PDFDocumentProxy } from "pdfjs-dist";
 import PdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?worker";
 import AppIcon from "./AppIcon.vue";
@@ -15,19 +15,102 @@ const emit = defineEmits<{ close: [] }>();
 
 const loading = ref(true);
 const err = ref("");
-const pageNum = ref(1);
 const pageCount = ref(0);
-const scale = ref(1.15);
-const canvasEl = ref<HTMLCanvasElement | null>(null);
+const currentPage = ref(1);
+const zoom = ref(1);
 const scrollEl = ref<HTMLElement | null>(null);
+const pageEls = ref<(HTMLElement | null)[]>([]);
 
 let pdfDoc: PDFDocumentProxy | null = null;
+let baseRatio = 1.414;
+let observer: IntersectionObserver | null = null;
+let reflowTimer: ReturnType<typeof setTimeout> | null = null;
+const rendered = new Set<number>();
+
+function containerWidth(): number {
+  const el = scrollEl.value;
+  const pad = window.innerWidth <= 640 ? 16 : 48;
+  const w = el ? el.clientWidth - pad : 800;
+  return Math.max(280, Math.min(w, 1000));
+}
+
+function setPlaceholders() {
+  const cssWidth = containerWidth() * zoom.value;
+  for (const el of pageEls.value) {
+    if (!el) continue;
+    el.style.width = `${cssWidth}px`;
+    el.style.height = `${cssWidth * baseRatio}px`;
+  }
+}
+
+async function renderPageInto(num: number) {
+  if (!pdfDoc || rendered.has(num)) return;
+  const wrap = pageEls.value[num - 1];
+  if (!wrap) return;
+  const canvas = wrap.querySelector("canvas") as HTMLCanvasElement | null;
+  if (!canvas) return;
+  const page = await pdfDoc.getPage(num);
+  const base = page.getViewport({ scale: 1 });
+  const cssWidth = containerWidth() * zoom.value;
+  const cssHeight = (cssWidth * base.height) / base.width;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const viewport = page.getViewport({ scale: (cssWidth / base.width) * dpr });
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+  canvas.style.width = `${cssWidth}px`;
+  canvas.style.height = `${cssHeight}px`;
+  wrap.style.height = `${cssHeight}px`;
+  await page.render({ canvas, canvasContext: ctx, viewport }).promise;
+  rendered.add(num);
+}
+
+function setupObserver() {
+  observer?.disconnect();
+  observer = new IntersectionObserver(
+    (entries) => {
+      for (const e of entries) {
+        const num = Number((e.target as HTMLElement).dataset.page);
+        if (e.isIntersecting) {
+          void renderPageInto(num);
+          currentPage.value = num;
+        }
+      }
+    },
+    { root: scrollEl.value, rootMargin: "800px 0px" },
+  );
+  for (const el of pageEls.value) if (el) observer.observe(el);
+}
+
+function reflow() {
+  rendered.clear();
+  setPlaceholders();
+  setupObserver();
+}
+
+function scheduleReflow() {
+  if (reflowTimer) clearTimeout(reflowTimer);
+  reflowTimer = setTimeout(reflow, 150);
+}
+
+function zoomIn() {
+  zoom.value = Math.min(zoom.value + 0.2, 3);
+  scheduleReflow();
+}
+
+function zoomOut() {
+  zoom.value = Math.max(zoom.value - 0.2, 0.6);
+  scheduleReflow();
+}
 
 async function loadPdf() {
   loading.value = true;
   err.value = "";
-  pageNum.value = 1;
+  rendered.clear();
+  currentPage.value = 1;
   pageCount.value = 0;
+  pageEls.value = [];
   pdfDoc?.cleanup();
   pdfDoc = null;
   try {
@@ -44,57 +127,26 @@ async function loadPdf() {
     }
     const buf = await res.arrayBuffer();
     pdfDoc = await getDocument({ data: buf }).promise;
+    const first = await pdfDoc.getPage(1);
+    const v = first.getViewport({ scale: 1 });
+    baseRatio = v.height / v.width;
     pageCount.value = pdfDoc.numPages;
-    await renderPage();
+    loading.value = false;
+    await nextTick();
+    setPlaceholders();
+    setupObserver();
   } catch (e) {
     err.value = e instanceof Error ? e.message : "ошибка";
-  } finally {
     loading.value = false;
   }
 }
 
-async function renderPage() {
-  if (!pdfDoc || !canvasEl.value) return;
-  const page = await pdfDoc.getPage(pageNum.value);
-  const viewport = page.getViewport({ scale: scale.value });
-  const canvas = canvasEl.value;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
-  canvas.height = viewport.height;
-  canvas.width = viewport.width;
-  await page.render({ canvas, canvasContext: ctx, viewport }).promise;
-  scrollEl.value?.scrollTo({ top: 0, behavior: "smooth" });
-}
-
-function prevPage() {
-  if (pageNum.value <= 1) return;
-  pageNum.value -= 1;
-  void renderPage();
-}
-
-function nextPage() {
-  if (pageNum.value >= pageCount.value) return;
-  pageNum.value += 1;
-  void renderPage();
-}
-
-function zoomIn() {
-  scale.value = Math.min(scale.value + 0.15, 2.5);
-  void renderPage();
-}
-
-function zoomOut() {
-  scale.value = Math.max(scale.value - 0.15, 0.75);
-  void renderPage();
-}
-
 function onKey(event: KeyboardEvent) {
-  if (event.key === "Escape") {
-    emit("close");
-    return;
-  }
-  if (event.key === "ArrowLeft") prevPage();
-  if (event.key === "ArrowRight") nextPage();
+  if (event.key === "Escape") emit("close");
+}
+
+function onResize() {
+  scheduleReflow();
 }
 
 watch(
@@ -104,11 +156,15 @@ watch(
 
 onMounted(() => {
   window.addEventListener("keydown", onKey);
+  window.addEventListener("resize", onResize);
   void loadPdf();
 });
 
 onBeforeUnmount(() => {
   window.removeEventListener("keydown", onKey);
+  window.removeEventListener("resize", onResize);
+  if (reflowTimer) clearTimeout(reflowTimer);
+  observer?.disconnect();
   pdfDoc?.cleanup();
   pdfDoc = null;
 });
@@ -116,33 +172,20 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="pdf-reader" role="dialog" aria-modal="true" :aria-label="title">
-    <header class="pdf-head glass">
+    <header class="pdf-head">
+      <button type="button" class="pdf-icon" aria-label="закрыть" @click="emit('close')">
+        <AppIcon name="back" :size="20" />
+      </button>
       <span class="pdf-title">{{ title }}</span>
-      <div v-if="pageCount > 0" class="pdf-controls">
-        <button type="button" class="secondary icon-only" :disabled="pageNum <= 1" aria-label="назад" @click="prevPage">
-          <AppIcon name="back" :size="20" />
+      <span v-if="pageCount > 0" class="pdf-page">{{ currentPage }} / {{ pageCount }}</span>
+      <div class="pdf-zoom">
+        <button type="button" class="pdf-icon" aria-label="уменьшить" @click="zoomOut">
+          <span class="glyph">−</span>
         </button>
-        <span class="pdf-page">{{ pageNum }} / {{ pageCount }}</span>
-        <button
-          type="button"
-          class="secondary icon-only"
-          :disabled="pageNum >= pageCount"
-          aria-label="вперёд"
-          @click="nextPage"
-        >
-          <span class="flip"><AppIcon name="back" :size="20" /></span>
-        </button>
-        <span class="pdf-sep" aria-hidden="true" />
-        <button type="button" class="secondary icon-only" aria-label="уменьшить" @click="zoomOut">
-          <span class="zoom-glyph">−</span>
-        </button>
-        <button type="button" class="secondary icon-only" aria-label="увеличить" @click="zoomIn">
-          <span class="zoom-glyph">+</span>
+        <button type="button" class="pdf-icon" aria-label="увеличить" @click="zoomIn">
+          <span class="glyph">+</span>
         </button>
       </div>
-      <button type="button" class="secondary icon-only pdf-close" aria-label="закрыть" @click="emit('close')">
-        <AppIcon name="close" :size="20" />
-      </button>
     </header>
 
     <div ref="scrollEl" class="pdf-body">
@@ -150,9 +193,17 @@ onBeforeUnmount(() => {
         <span class="spinner" aria-hidden="true" /> загрузка
       </p>
       <p v-else-if="err" class="pdf-state error">{{ err }}</p>
-      <div v-else class="pdf-page-wrap">
-        <canvas ref="canvasEl" class="pdf-canvas" />
-      </div>
+      <template v-else>
+        <div
+          v-for="n in pageCount"
+          :key="n"
+          :ref="(el) => (pageEls[n - 1] = el as HTMLElement | null)"
+          class="pdf-page-wrap"
+          :data-page="n"
+        >
+          <canvas class="pdf-canvas" />
+        </div>
+      </template>
     </div>
   </div>
 </template>
@@ -170,8 +221,8 @@ onBeforeUnmount(() => {
 .pdf-head {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.55rem 0.85rem;
+  gap: 0.6rem;
+  padding: 0.5rem 0.75rem;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
@@ -187,52 +238,37 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
-.pdf-controls {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
+.pdf-page {
+  font-size: 0.85rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
   flex-shrink: 0;
 }
 
-.pdf-page {
-  min-width: 4.5rem;
-  text-align: center;
-  font-size: 0.88rem;
-  font-weight: 600;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
+.pdf-zoom {
+  display: inline-flex;
+  gap: 0.25rem;
+  flex-shrink: 0;
 }
 
-.pdf-sep {
-  width: 1px;
-  height: 1.25rem;
-  background: var(--border);
-  margin: 0 0.15rem;
-}
-
-.icon-only {
-  min-height: 36px;
-  width: 36px;
+.pdf-icon {
+  min-height: 40px;
+  width: 40px;
   padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text);
 }
-
-.icon-only:hover {
+.pdf-icon:hover {
+  background: var(--surface2);
   transform: none;
 }
-
-.pdf-close {
-  flex-shrink: 0;
-}
-
-.flip {
-  transform: rotate(180deg);
-}
-
-.zoom-glyph {
-  font-size: 1.1rem;
+.glyph {
+  font-size: 1.2rem;
   font-weight: 600;
   line-height: 1;
 }
@@ -240,11 +276,14 @@ onBeforeUnmount(() => {
 .pdf-body {
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   display: flex;
-  justify-content: center;
-  padding: 1rem;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
 }
 
 .pdf-state {
@@ -256,33 +295,23 @@ onBeforeUnmount(() => {
 }
 
 .pdf-page-wrap {
-  margin: auto;
+  flex-shrink: 0;
+  background: #fff;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px var(--border);
+  overflow: hidden;
 }
 
 .pdf-canvas {
   display: block;
-  max-width: 100%;
-  height: auto;
-  background: #fff;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  width: 100%;
+  height: 100%;
 }
 
 @media (max-width: 640px) {
-  .pdf-head {
-    flex-wrap: wrap;
-    gap: 0.5rem;
-  }
-  .pdf-title {
-    flex: 1 1 100%;
-    order: -1;
-  }
-  .pdf-controls {
-    flex: 1;
-    justify-content: center;
-  }
   .pdf-body {
-    padding: 0.5rem;
+    padding: 0.4rem;
+    gap: 0.4rem;
   }
 }
 </style>

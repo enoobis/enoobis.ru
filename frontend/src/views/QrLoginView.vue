@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import QRCode from "qrcode";
 import jsQR from "jsqr";
 import { claimQrCode, extractQrCode, issueQrCode, qrLoginUrl } from "../api/qrAuth";
-import { useQrScanDevice } from "../composables/useQrScanDevice";
 import { useAuthStore } from "../stores/auth";
 
 type Tab = "show" | "scan";
@@ -12,7 +11,6 @@ type Tab = "show" | "scan";
 const auth = useAuthStore();
 const route = useRoute();
 const router = useRouter();
-const { canScanQr } = useQrScanDevice();
 
 const tab = ref<Tab>("show");
 const err = ref("");
@@ -21,14 +19,12 @@ const qrDataUrl = ref("");
 const expiresIn = ref(0);
 const issuing = ref(false);
 const claiming = ref(false);
+const scanning = ref(false);
 const scanRaw = ref("");
+const showManual = ref(false);
 const videoEl = ref<HTMLVideoElement | null>(null);
 
-const leadText = computed(() =>
-  canScanQr.value
-    ? "покажите qr на одном устройстве — отсканируйте на другом. работает в обе стороны."
-    : "покажите qr и отсканируйте с телефона.",
-);
+const leadText = "покажите qr на одном устройстве — отсканируйте на другом. работает в обе стороны.";
 
 let expireTimer: ReturnType<typeof setInterval> | null = null;
 let refreshTimer: ReturnType<typeof setTimeout> | null = null;
@@ -56,6 +52,7 @@ function stopCamera() {
     for (const t of mediaStream.getTracks()) t.stop();
     mediaStream = null;
   }
+  scanning.value = false;
 }
 
 function describeErr(code: string) {
@@ -99,10 +96,6 @@ async function refreshQr() {
 }
 
 async function claim(codeInput: string) {
-  if (!canScanQr.value) {
-    err.value = "откройте ссылку с телефона";
-    return;
-  }
   const code = extractQrCode(codeInput);
   if (!code) {
     err.value = "вставьте ссылку или код из qr";
@@ -141,20 +134,26 @@ function decodeWithJsQr(): string | null {
 }
 
 async function startCamera() {
-  if (!canScanQr.value) return;
   stopCamera();
   err.value = "";
+  if (!window.isSecureContext) {
+    err.value = "камера работает только по https";
+    return;
+  }
   if (!navigator.mediaDevices?.getUserMedia) {
-    err.value = "камера недоступна — вставьте ссылку вручную";
+    err.value = "браузер не поддерживает камеру — вставьте ссылку вручную";
+    showManual.value = true;
     return;
   }
   const Detector = (window as unknown as { BarcodeDetector?: typeof BarcodeDetector })
     .BarcodeDetector;
   try {
     mediaStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "environment" },
+      video: { facingMode: { ideal: "environment" } },
       audio: false,
     });
+    scanning.value = true;
+    await nextTick();
     if (videoEl.value) {
       videoEl.value.srcObject = mediaStream;
       videoEl.value.setAttribute("playsinline", "true");
@@ -176,17 +175,14 @@ async function startCamera() {
         /* ignore frame errors */
       }
     }, 400);
-  } catch {
-    err.value = "нет доступа к камере — разрешите камеру или вставьте ссылку вручную";
+  } catch (e) {
+    const name = e instanceof DOMException ? e.name : "";
+    if (name === "NotAllowedError") err.value = "доступ к камере запрещён — разрешите в настройках браузера";
+    else if (name === "NotFoundError") err.value = "камера не найдена";
+    else err.value = "не удалось открыть камеру — вставьте ссылку вручную";
+    showManual.value = true;
   }
 }
-
-watch(canScanQr, (can) => {
-  if (!can) {
-    tab.value = "show";
-    stopCamera();
-  }
-});
 
 watch(tab, (t) => {
   err.value = "";
@@ -194,34 +190,26 @@ watch(tab, (t) => {
   if (t === "show") {
     stopCamera();
     void refreshQr();
-  } else if (canScanQr.value) {
+  } else {
     clearTimers();
     qrDataUrl.value = "";
-    void startCamera();
   }
 });
 
 onMounted(() => {
   const fromUrl = String(route.query.code ?? "");
   if (fromUrl) {
-    if (!canScanQr.value) {
-      err.value = "откройте ссылку с телефона";
-      tab.value = "show";
-      return;
-    }
     tab.value = "scan";
     scanRaw.value = fromUrl;
+    showManual.value = true;
     void claim(fromUrl);
     return;
   }
   if (auth.token) {
     tab.value = "show";
     void refreshQr();
-  } else if (canScanQr.value) {
-    tab.value = "scan";
-    void startCamera();
   } else {
-    tab.value = "show";
+    tab.value = "scan";
   }
 });
 
@@ -236,7 +224,7 @@ onBeforeUnmount(() => {
     <h1>вход по qr</h1>
     <p class="muted lead">{{ leadText }}</p>
 
-    <div v-if="canScanQr" class="filter-tabs tabs" role="tablist">
+    <div class="filter-tabs tabs" role="tablist">
       <button
         type="button"
         class="filter-tab"
@@ -251,11 +239,7 @@ onBeforeUnmount(() => {
       </button>
     </div>
 
-    <p v-if="!canScanQr && !auth.token" class="muted hint">
-      сканирование только с телефона. <RouterLink to="/login">войти</RouterLink>
-    </p>
-
-    <p v-else-if="!auth.token && tab === 'show'" class="muted hint">
+    <p v-if="!auth.token && tab === 'show'" class="muted hint">
       чтобы показать qr, сначала <RouterLink to="/login">войдите</RouterLink> на этом устройстве.
     </p>
 
@@ -270,15 +254,27 @@ onBeforeUnmount(() => {
       </button>
     </div>
 
-    <div v-else-if="canScanQr" class="scan-pane">
-      <video ref="videoEl" class="scan-video" playsinline muted />
-      <label class="scan-label">
-        или вставьте ссылку / код
-        <textarea v-model="scanRaw" rows="3" placeholder="https://…/auth/qr?code=…" />
-      </label>
-      <button type="button" class="primary" :disabled="claiming" @click="claim(scanRaw)">
-        {{ claiming ? "вход…" : "войти на этом устройстве" }}
+    <div v-else class="scan-pane">
+      <video v-show="scanning" ref="videoEl" class="scan-video" playsinline muted />
+      <button v-if="!scanning" type="button" class="primary" @click="startCamera">
+        включить камеру
       </button>
+      <button v-else type="button" class="secondary ghost" @click="stopCamera">
+        выключить камеру
+      </button>
+
+      <button type="button" class="link-toggle" @click="showManual = !showManual">
+        {{ showManual ? "скрыть ввод" : "ввести ссылку вручную" }}
+      </button>
+      <template v-if="showManual">
+        <label class="scan-label">
+          ссылка / код
+          <textarea v-model="scanRaw" rows="3" placeholder="https://…/auth/qr?code=…" />
+        </label>
+        <button type="button" class="primary" :disabled="claiming" @click="claim(scanRaw)">
+          {{ claiming ? "вход…" : "войти на этом устройстве" }}
+        </button>
+      </template>
     </div>
 
     <p v-if="err" class="error">{{ err }}</p>
@@ -361,6 +357,23 @@ h1 {
 }
 
 .ghost:hover {
+  transform: none;
+}
+
+.link-toggle {
+  justify-self: start;
+  padding: 0.25rem 0;
+  border: none;
+  background: transparent;
+  min-height: 0;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.link-toggle:hover {
+  color: var(--text);
+  background: transparent;
   transform: none;
 }
 
