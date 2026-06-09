@@ -9,6 +9,7 @@ import { applyVote, voteSummary } from "../utils/votes.js";
 import { assertBlogPatchField } from "../utils/sqlAllowlist.js";
 import { assertBlogComment, assertBlogPublish } from "../utils/contentLimits.js";
 import { finalizeBlogPublish } from "../utils/blogPublish.js";
+import { isStaffRole } from "../utils/roles.js";
 
 const router = express.Router();
 
@@ -334,7 +335,7 @@ function syncCategories(postId, list) {
 }
 
 router.post("/blog", authRequired, (req, res) => {
-  if (req.user.role !== "teacher" && req.user.role !== "admin") {
+  if (!isStaffRole(req.user.role)) {
     return res.status(403).json({ error: "forbidden" });
   }
   const body = req.body ?? {};

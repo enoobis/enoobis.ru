@@ -28,7 +28,7 @@ const categories = ref<LibraryCategory[]>([]);
 const loading = ref(false);
 const err = ref("");
 
-const isStaff = computed(() => auth.role === "teacher" || auth.role === "admin");
+const isStaff = computed(() => auth.isStaff);
 
 const search = ref(typeof route.query.q === "string" ? route.query.q : "");
 const activeCategory = ref("");
@@ -534,6 +534,27 @@ onBeforeUnmount(() => {
   min-height: 0;
   padding: 0.35rem 0.7rem;
   font-size: 0.82rem;
+}
+
+@media (max-width: 640px) {
+  .list .list-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.55rem;
+  }
+
+  .row-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .desc {
+    line-height: 1.45;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 4;
+    overflow: hidden;
+  }
 }
 
 .edit-overlay {

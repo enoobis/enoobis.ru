@@ -464,7 +464,7 @@ watch(
             <span v-if="chatStore.unread > 0" class="chat-badge">{{ chatBadge }}</span>
           </RouterLink>
           <RouterLink
-            v-if="auth.role === 'teacher' || auth.role === 'admin'"
+            v-if="auth.isStaff"
             to="/storage"
             class="icon-btn"
             aria-label="хранилище"
@@ -473,7 +473,7 @@ watch(
             <AppIcon name="folder" :size="20" />
           </RouterLink>
           <RouterLink
-            v-if="auth.role === 'teacher' || auth.role === 'admin'"
+            v-if="auth.isStaff"
             to="/blogs/write"
             class="icon-btn desktop-only"
             aria-label="написать"
@@ -579,7 +579,7 @@ watch(
             <AppIcon name="bookmark" :size="22" /><span>закладки</span>
           </RouterLink>
           <RouterLink
-            v-if="auth.role === 'teacher' || auth.role === 'admin'"
+            v-if="auth.isStaff"
             to="/invites"
             class="profile-menu-item"
             @click="closeProfileMenu"
@@ -588,6 +588,14 @@ watch(
           </RouterLink>
           <RouterLink to="/me/edit" class="profile-menu-item" @click="closeProfileMenu">
             <AppIcon name="settings" :size="22" /><span>настройки</span>
+          </RouterLink>
+          <RouterLink
+            v-if="auth.role === 'master' || auth.role === 'admin'"
+            to="/work"
+            class="profile-menu-item"
+            @click="closeProfileMenu"
+          >
+            <AppIcon name="briefcase" :size="22" /><span>работа</span>
           </RouterLink>
           <span class="profile-menu-sep" />
           <div class="profile-menu-footer">
@@ -714,7 +722,7 @@ watch(
                 <AppIcon name="bookmark" :size="22" /><span>закладки</span>
               </RouterLink>
               <RouterLink
-                v-if="auth.role === 'teacher' || auth.role === 'admin'"
+                v-if="auth.isStaff"
                 to="/invites"
                 class="profile-menu-item"
                 @click="closeProfileMenu"
@@ -723,6 +731,14 @@ watch(
               </RouterLink>
               <RouterLink to="/me/edit" class="profile-menu-item" @click="closeProfileMenu">
                 <AppIcon name="settings" :size="22" /><span>настройки</span>
+              </RouterLink>
+              <RouterLink
+                v-if="auth.role === 'master' || auth.role === 'admin'"
+                to="/work"
+                class="profile-menu-item"
+                @click="closeProfileMenu"
+              >
+                <AppIcon name="briefcase" :size="22" /><span>работа</span>
               </RouterLink>
               <span class="profile-menu-sep" />
               <div class="profile-menu-footer">

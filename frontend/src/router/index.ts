@@ -116,6 +116,12 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      path: "/work",
+      name: "work",
+      component: () => import("../views/WorkView.vue"),
+      meta: { requiresAuth: true, requiresWork: true },
+    },
+    {
       path: "/admin",
       name: "admin",
       component: () => import("../views/AdminView.vue"),
@@ -167,6 +173,9 @@ router.beforeEach((to, from) => {
   }
   if (to.meta.requiresAuth && !auth.token) return { name: "login", query: { next: to.fullPath } };
   if (to.meta.requiresAdmin && auth.role !== "admin") return { name: "home" };
+  if (to.meta.requiresWork && auth.role !== "master" && auth.role !== "admin") {
+    return { name: "home" };
+  }
   if (typeof window !== "undefined" && to.fullPath !== from.fullPath) {
     window.dispatchEvent(new CustomEvent("enoobis:nav-start"));
   }

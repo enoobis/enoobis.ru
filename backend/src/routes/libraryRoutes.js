@@ -12,6 +12,7 @@ import {
 import { rateLimit, safePathUnder } from "../utils/security.js";
 import { LIBRARY_ALLOWED_MIMES, verifyLibraryBook } from "../utils/mimeVerify.js";
 import { contentDispositionAttachment, contentDispositionInline } from "../utils/contentDisposition.js";
+import { isStaffRole } from "../utils/roles.js";
 
 const router = express.Router();
 
@@ -21,7 +22,7 @@ fs.mkdirSync(LIBRARY_ROOT, { recursive: true });
 const BOOK_MAX_BYTES = 150 * 1024 * 1024;
 
 function staffOnly(req, res, next) {
-  if (req.user?.role !== "admin" && req.user?.role !== "teacher") {
+  if (!isStaffRole(req.user?.role)) {
     return res.status(403).json({ error: "forbidden" });
   }
   next();

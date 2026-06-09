@@ -29,7 +29,7 @@ type Section = "files" | "notes";
 const auth = useAuthStore();
 
 const section = ref<Section>("files");
-const isStaff = computed(() => auth.role === "teacher" || auth.role === "admin");
+const isStaff = computed(() => auth.isStaff);
 
 const files = ref<StoredFile[]>([]);
 const used = ref(0);

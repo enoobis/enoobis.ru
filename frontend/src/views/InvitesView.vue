@@ -24,9 +24,7 @@ const newMaxUses = ref(1);
 const creating = ref(false);
 
 const isAdmin = computed(() => auth.user?.role === "admin");
-const canCreate = computed(
-  () => auth.user?.role === "admin" || auth.user?.role === "teacher",
-);
+const canCreate = computed(() => auth.isStaff);
 
 async function load() {
   err.value = "";

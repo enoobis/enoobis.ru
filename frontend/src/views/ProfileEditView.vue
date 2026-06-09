@@ -165,6 +165,7 @@ const roleLabel = computed(() => {
   const r = me.value?.role ?? auth.role ?? "student";
   if (r === "admin") return "админ";
   if (r === "teacher") return "ментор";
+  if (r === "master") return "мастер";
   return "ученик";
 });
 

@@ -18,6 +18,7 @@ import { buildModerationNotices, parseContentLimits } from "../utils/contentLimi
 import { onlinePayload } from "../utils/onlineStatus.js";
 import { regenerateUserAvatar, sanitizeUserCosmetics } from "../utils/profileCosmetics.js";
 import { isValidNickname } from "../utils/nickname.js";
+import { isStaffRole } from "../utils/roles.js";
 function viewerId(req) {
   return optionalUserId(req);
 }
@@ -378,7 +379,7 @@ router.get("/me/invites", authRequired, (req, res) => {
 
 router.post("/me/invites", authRequired, (req, res) => {
   const me = get("SELECT role FROM users WHERE id = ?", req.user.id);
-  if (!me || (me.role !== "admin" && me.role !== "teacher")) {
+  if (!me || !isStaffRole(me.role)) {
     return res.status(403).json({ error: "недостаточно прав" });
   }
   const targetRole = req.body?.target_role === "teacher" ? "teacher" : "student";

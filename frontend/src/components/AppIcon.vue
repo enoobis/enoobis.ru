@@ -4,6 +4,7 @@ import {
   Ban,
   Bold,
   Bookmark,
+  BriefcaseBusiness,
   ChevronLeft,
   Code,
   Contrast,
@@ -113,7 +114,8 @@ export type AppIconName =
   | "seen"
   | "reply"
   | "clear"
-  | "qr";
+  | "qr"
+  | "briefcase";
 
 const icons: Record<AppIconName, Component> = {
   home: House,
@@ -173,6 +175,7 @@ const icons: Record<AppIconName, Component> = {
   reply: Reply,
   clear: Eraser,
   qr: QrCode,
+  briefcase: BriefcaseBusiness,
 };
 
 const FILLED = new Set<AppIconName>([

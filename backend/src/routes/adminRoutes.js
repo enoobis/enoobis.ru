@@ -261,10 +261,10 @@ router.post("/admin/users/:id/reject", (req, res) => {
 
 router.post("/admin/users/:id/role", (req, res) => {
   const role = String(req.body?.role ?? "");
-  if (!["student", "teacher", "admin"].includes(role)) return res.status(400).json({ error: "bad role" });
+  if (!["student", "teacher", "master", "admin"].includes(role)) return res.status(400).json({ error: "bad role" });
   run("UPDATE users SET role = ? WHERE id = ?", role, req.params.id);
   logAdminAction(req.user.id, "user_role", req.params.id, { role });
-  if (role === "teacher" || role === "admin") {
+  if (role === "teacher" || role === "master" || role === "admin") {
     awardAchievement(req.params.id, "mentor");
   }
   return res.json({ ok: true });

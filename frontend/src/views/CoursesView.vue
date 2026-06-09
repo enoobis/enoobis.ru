@@ -185,7 +185,7 @@ const addTaskTitle = ref("");
 const addTaskDesc = ref("");
 const addTaskMaxPoints = ref(100);
 
-const canTeach = computed(() => auth.role === "teacher" || auth.role === "admin");
+const canTeach = computed(() => auth.isStaff);
 const isTeacherInCurrent = computed(() => classroom.value?.is_teacher ?? false);
 const isOwnerInCurrent = computed(
   () => classroom.value?.is_owner || auth.role === "admin",

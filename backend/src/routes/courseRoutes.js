@@ -10,6 +10,7 @@ import { isRasterImageMimetype, optimizeUploadedFile } from "../utils/imageOptim
 import { assertAssignmentPatchField, assertLecturePatchField } from "../utils/sqlAllowlist.js";
 import { unlinkUploadUrl } from "../utils/uploadSafe.js";
 import { assertSafeUploadExtension } from "../utils/security.js";
+import { isStaffRole } from "../utils/roles.js";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -179,7 +180,7 @@ router.get("/courses", authRequired, (req, res) => {
 });
 
 router.post("/courses", authRequired, (req, res) => {
-  if (req.user.role !== "teacher" && req.user.role !== "admin") {
+  if (!isStaffRole(req.user.role)) {
     return res.status(403).json({ error: "forbidden" });
   }
   const title = String(req.body?.title ?? "").trim();
@@ -329,7 +330,7 @@ router.post("/courses/:id/co-teachers", authRequired, (req, res) => {
     nickname,
   );
   if (!u) return res.status(404).json({ error: "пользователь не найден" });
-  if (u.role !== "teacher" && u.role !== "admin") {
+  if (!isStaffRole(u.role)) {
     return res.status(400).json({ error: "только ментор может быть соучителем" });
   }
   if (u.id === c.teacher_id) {

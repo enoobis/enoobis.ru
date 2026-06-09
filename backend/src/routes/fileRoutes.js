@@ -7,6 +7,7 @@ import { all, get, nowIso, run } from "../db.js";
 import { authRequired } from "../auth.js";
 import { assertSafeUploadExtension, safePathUnder } from "../utils/security.js";
 import { TEACHER_QUOTA_BYTES, enforceTeacherStorageQuota } from "../utils/teacherStorageQuota.js";
+import { isStaffRole } from "../utils/roles.js";
 
 const router = express.Router();
 
@@ -21,7 +22,7 @@ function quotaBytesForRole(role) {
 }
 
 function staffOnly(req, res, next) {
-  if (req.user?.role !== "admin" && req.user?.role !== "teacher") {
+  if (!isStaffRole(req.user?.role)) {
     return res.status(403).json({ error: "forbidden" });
   }
   next();
@@ -44,7 +45,7 @@ function totalUsed(userId) {
 }
 
 router.get("/files", authRequired, staffOnly, (req, res) => {
-  if (req.user.role === "teacher") {
+  if (req.user.role === "teacher" || req.user.role === "master") {
     enforceTeacherStorageQuota(req.user.id);
   }
   const items = all(

@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref, type Ref } from "vue";
 import { RouterLink } from "vue-router";
 import FilterSearch from "../components/FilterSearch.vue";
 import PageHeader from "../components/PageHeader.vue";
+import AdminWorkTab from "../components/AdminWorkTab.vue";
 import { api } from "../api/http";
 import {
   approveBlogPost,
@@ -62,7 +63,7 @@ type AdminUser = {
   avatar_url: string;
   coins?: number;
 };
-type Tab = "pending" | "users" | "reports" | "shop" | "blogs";
+type Tab = "pending" | "users" | "reports" | "shop" | "blogs" | "work";
 
 const auth = useAuthStore();
 const tab = ref<Tab>("pending");
@@ -603,7 +604,7 @@ async function reject(id: string) {
   await load();
 }
 
-async function setRole(id: string, role: "student" | "teacher") {
+async function setRole(id: string, role: "student" | "teacher" | "master") {
   if (!auth.token) return;
   await api(`/api/admin/users/${id}/role`, {
     method: "POST",
@@ -853,6 +854,9 @@ async function approveBlog(id: string) {
       </button>
       <button class="filter-tab" :class="{ on: tab === 'blogs' }" type="button" @click="tab = 'blogs'">
         блоги <span v-if="blogPending.length" class="muted small">{{ blogPending.length }}</span>
+      </button>
+      <button class="filter-tab" :class="{ on: tab === 'work' }" type="button" @click="tab = 'work'">
+        работа
       </button>
     </nav>
 
@@ -1141,6 +1145,9 @@ async function approveBlog(id: string) {
             <button class="secondary" type="button" :disabled="u.role === 'teacher' || u.role === 'admin'" @click="setRole(u.id, 'teacher')">
               ментор
             </button>
+            <button class="secondary" type="button" :disabled="u.role === 'master' || u.role === 'admin'" @click="setRole(u.id, 'master')">
+              мастер
+            </button>
             <button class="secondary" type="button" @click="addInvite(u.id, 'student')">+ инвайт</button>
             <button
               v-if="u.role !== 'admin'"
@@ -1382,6 +1389,8 @@ async function approveBlog(id: string) {
         </div>
       </Teleport>
     </template>
+
+    <AdminWorkTab v-else-if="tab === 'work'" />
   </section>
 </template>
 

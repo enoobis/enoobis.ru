@@ -912,4 +912,28 @@ db.exec(`
     FOREIGN KEY (user_id) REFERENCES users(id)
   );
   CREATE INDEX IF NOT EXISTS idx_qr_login_expires ON qr_login_codes(expires_at);
+
+  CREATE TABLE IF NOT EXISTS work_points (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    lat REAL NOT NULL,
+    lng REAL NOT NULL,
+    radius_m INTEGER NOT NULL DEFAULT 250,
+    qr_secret TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS work_checkins (
+    id TEXT PRIMARY KEY,
+    point_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    lat REAL NOT NULL,
+    lng REAL NOT NULL,
+    distance_m INTEGER NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (point_id) REFERENCES work_points(id),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_work_checkins_created ON work_checkins(created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_work_checkins_user ON work_checkins(user_id);
 `);
