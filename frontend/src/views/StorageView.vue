@@ -487,9 +487,32 @@ onMounted(async () => {
 
 .composer {
   display: grid;
-  gap: 0.5rem;
+  gap: 0.65rem;
   padding-bottom: 0.75rem;
   border-bottom: 1px solid var(--border);
+}
+
+.composer input,
+.composer textarea {
+  border: none;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  padding: 0.55rem 0;
+  min-height: 0;
+}
+
+.composer textarea {
+  resize: vertical;
+  min-height: 5.5rem;
+  line-height: 1.55;
+}
+
+.composer input:focus,
+.composer textarea:focus {
+  outline: none;
+  border-bottom-color: var(--focus-border);
+  background: transparent;
 }
 
 .composer .actions {
