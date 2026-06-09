@@ -1,9 +1,19 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { RouterLink, useRoute, useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import QRCode from "qrcode";
 import jsQR from "jsqr";
-import { claimQrCode, extractQrCode, issueQrCode, qrLoginUrl } from "../api/qrAuth";
+import {
+  approveQrLogin,
+  claimQrCode,
+  extractApproveCode,
+  extractQrCode,
+  issueQrCode,
+  pollQrLogin,
+  qrApproveUrl,
+  qrLoginUrl,
+  requestQrLogin,
+} from "../api/qrAuth";
 import { useAuthStore } from "../stores/auth";
 
 type Tab = "show" | "scan";
@@ -23,11 +33,14 @@ const scanning = ref(false);
 const scanRaw = ref("");
 const showManual = ref(false);
 const videoEl = ref<HTMLVideoElement | null>(null);
+const approveCode = ref("");
+const approving = ref(false);
 
 const leadText = "покажите qr на одном устройстве — отсканируйте на другом. работает в обе стороны.";
 
 let expireTimer: ReturnType<typeof setInterval> | null = null;
 let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+let pollTimer: ReturnType<typeof setInterval> | null = null;
 let scanLoop: ReturnType<typeof setInterval> | null = null;
 let mediaStream: MediaStream | null = null;
 let scanCanvas: HTMLCanvasElement | null = null;
@@ -40,6 +53,10 @@ function clearTimers() {
   if (refreshTimer) {
     clearTimeout(refreshTimer);
     refreshTimer = null;
+  }
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
   }
 }
 
@@ -64,16 +81,12 @@ function describeErr(code: string) {
 }
 
 async function refreshQr() {
-  if (!auth.token) {
-    err.value = "войдите, чтобы показать qr";
-    return;
-  }
   issuing.value = true;
   err.value = "";
   ok.value = "";
   try {
-    const r = await issueQrCode(auth.token);
-    const url = qrLoginUrl(r.code);
+    const r = auth.token ? await issueQrCode(auth.token) : await requestQrLogin();
+    const url = auth.token ? qrLoginUrl(r.code) : qrApproveUrl(r.code);
     qrDataUrl.value = await QRCode.toDataURL(url, {
       width: 220,
       margin: 1,
@@ -87,6 +100,21 @@ async function refreshQr() {
     refreshTimer = setTimeout(() => {
       if (tab.value === "show") void refreshQr();
     }, r.expires_in * 1000);
+    if (!auth.token) {
+      pollTimer = setInterval(async () => {
+        try {
+          const p = await pollQrLogin(r.code);
+          if (!p.pending && p.token && p.user) {
+            clearTimers();
+            auth.applySession(p.token, p.user);
+            ok.value = `вошли как @${p.user.nickname}`;
+            await router.push("/microblogs");
+          }
+        } catch {
+          /* истёк — обновится по таймеру */
+        }
+      }, 2000);
+    }
   } catch (e) {
     err.value = describeErr(e instanceof Error ? e.message : "ошибка");
     qrDataUrl.value = "";
@@ -95,7 +123,32 @@ async function refreshQr() {
   }
 }
 
+async function confirmApprove() {
+  if (!auth.token || !approveCode.value) return;
+  approving.value = true;
+  err.value = "";
+  try {
+    await approveQrLogin(auth.token, approveCode.value);
+    approveCode.value = "";
+    ok.value = "вход на другом устройстве подтверждён";
+  } catch (e) {
+    err.value = describeErr(e instanceof Error ? e.message : "ошибка");
+  } finally {
+    approving.value = false;
+  }
+}
+
 async function claim(codeInput: string) {
+  const approve = extractApproveCode(codeInput);
+  if (approve) {
+    if (!auth.token) {
+      err.value = "войдите, чтобы подтвердить вход на другом устройстве";
+      return;
+    }
+    approveCode.value = approve;
+    stopCamera();
+    return;
+  }
   const code = extractQrCode(codeInput);
   if (!code) {
     err.value = "вставьте ссылку или код из qr";
@@ -197,6 +250,16 @@ watch(tab, (t) => {
 });
 
 onMounted(() => {
+  const approveFromUrl = String(route.query.approve ?? "");
+  if (approveFromUrl) {
+    if (auth.token) {
+      approveCode.value = approveFromUrl;
+    } else {
+      tab.value = "scan";
+      err.value = "войдите, чтобы подтвердить вход на другом устройстве";
+    }
+    return;
+  }
   const fromUrl = String(route.query.code ?? "");
   if (fromUrl) {
     tab.value = "scan";
@@ -205,12 +268,8 @@ onMounted(() => {
     void claim(fromUrl);
     return;
   }
-  if (auth.token) {
-    tab.value = "show";
-    void refreshQr();
-  } else {
-    tab.value = "scan";
-  }
+  tab.value = "show";
+  void refreshQr();
 });
 
 onBeforeUnmount(() => {
@@ -224,12 +283,20 @@ onBeforeUnmount(() => {
     <h1>вход по qr</h1>
     <p class="muted lead">{{ leadText }}</p>
 
+    <div v-if="approveCode" class="approve-pane">
+      <p class="approve-text">подтвердить вход на другом устройстве?</p>
+      <button type="button" class="primary" :disabled="approving" @click="confirmApprove">
+        {{ approving ? "подтверждаем…" : "войти на том устройстве" }}
+      </button>
+      <button type="button" class="secondary ghost" @click="approveCode = ''">отмена</button>
+    </div>
+
+    <template v-else>
     <div class="filter-tabs tabs" role="tablist">
       <button
         type="button"
         class="filter-tab"
         :class="{ on: tab === 'show' }"
-        :disabled="!auth.token"
         @click="tab = 'show'"
       >
         показать qr
@@ -239,17 +306,14 @@ onBeforeUnmount(() => {
       </button>
     </div>
 
-    <p v-if="!auth.token && tab === 'show'" class="muted hint">
-      чтобы показать qr, сначала <RouterLink to="/login">войдите</RouterLink> на этом устройстве.
-    </p>
-
     <div v-if="tab === 'show'" class="show-pane">
+      <p v-if="!auth.token" class="muted hint">отсканируйте этот qr с устройства, где вы вошли</p>
       <div v-if="qrDataUrl" class="qr-wrap">
         <img :src="qrDataUrl" width="220" height="220" alt="qr для входа" />
         <p class="muted timer">{{ expiresIn }} сек</p>
       </div>
       <p v-else-if="issuing" class="muted">создаём код…</p>
-      <button type="button" class="secondary ghost" :disabled="issuing || !auth.token" @click="refreshQr">
+      <button type="button" class="secondary ghost" :disabled="issuing" @click="refreshQr">
         обновить
       </button>
     </div>
@@ -276,6 +340,7 @@ onBeforeUnmount(() => {
         </button>
       </template>
     </div>
+    </template>
 
     <p v-if="err" class="error">{{ err }}</p>
     <p v-if="ok" class="ok">{{ ok }}</p>
@@ -309,9 +374,19 @@ h1 {
 }
 
 .show-pane,
-.scan-pane {
+.scan-pane,
+.approve-pane {
   display: grid;
   gap: 0.75rem;
+}
+
+.approve-pane button {
+  width: 100%;
+}
+
+.approve-text {
+  margin: 0;
+  font-size: 0.9375rem;
 }
 
 .qr-wrap {

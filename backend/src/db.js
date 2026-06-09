@@ -913,6 +913,15 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_qr_login_expires ON qr_login_codes(expires_at);
 
+  CREATE TABLE IF NOT EXISTS qr_login_requests (
+    code TEXT PRIMARY KEY,
+    user_id TEXT,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    approved_at TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_qr_requests_expires ON qr_login_requests(expires_at);
+
   CREATE TABLE IF NOT EXISTS work_points (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,

@@ -14,11 +14,13 @@ const loginLimit = rateLimit({ windowMs: 60_000, max: 20, keyPrefix: "login" });
 const registerLimit = rateLimit({ windowMs: 60_000, max: 10, keyPrefix: "register" });
 const qrIssueLimit = rateLimit({ windowMs: 60_000, max: 12, keyPrefix: "qr_issue" });
 const qrClaimLimit = rateLimit({ windowMs: 60_000, max: 30, keyPrefix: "qr_claim" });
+const qrPollLimit = rateLimit({ windowMs: 60_000, max: 120, keyPrefix: "qr_poll" });
 
 const QR_TTL_MS = 120_000;
 
 function purgeExpiredQrCodes() {
   run("DELETE FROM qr_login_codes WHERE expires_at < ?", nowIso());
+  run("DELETE FROM qr_login_requests WHERE expires_at < ?", nowIso());
 }
 
 function userPayload(row) {
@@ -183,6 +185,72 @@ router.post("/qr/claim", qrClaimLimit, async (req, res) => {
   if (!claimed.changes) return res.status(410).json({ error: "code_used" });
   const token = mintToken(user.id, user.role, 30);
   return res.json({ token, user: userPayload(user) });
+});
+
+/* обратный поток: незалогиненное устройство показывает qr,
+   залогиненное сканирует и подтверждает */
+
+router.post("/qr/request", qrIssueLimit, (_req, res) => {
+  purgeExpiredQrCodes();
+  const code = crypto.randomBytes(24).toString("hex");
+  const expiresAt = new Date(Date.now() + QR_TTL_MS).toISOString();
+  run(
+    "INSERT INTO qr_login_requests (code, user_id, created_at, expires_at, approved_at) VALUES (?, NULL, ?, ?, NULL)",
+    code,
+    nowIso(),
+    expiresAt,
+  );
+  return res.json({ code, expires_at: expiresAt, expires_in: Math.floor(QR_TTL_MS / 1000) });
+});
+
+router.post("/qr/approve", authRequired, qrClaimLimit, (req, res) => {
+  const code = String(req.body?.code ?? "").trim();
+  if (!/^[a-f0-9]{32,64}$/i.test(code)) {
+    return res.status(400).json({ error: "invalid_code" });
+  }
+  purgeExpiredQrCodes();
+  const row = get(
+    "SELECT code, user_id, expires_at FROM qr_login_requests WHERE code = ?",
+    code,
+  );
+  if (!row) return res.status(404).json({ error: "invalid_code" });
+  if (row.user_id) return res.status(410).json({ error: "code_used" });
+  if (String(row.expires_at) < nowIso()) return res.status(410).json({ error: "code_expired" });
+  const updated = run(
+    "UPDATE qr_login_requests SET user_id = ?, approved_at = ? WHERE code = ? AND user_id IS NULL",
+    req.user.id,
+    nowIso(),
+    code,
+  );
+  if (!updated.changes) return res.status(410).json({ error: "code_used" });
+  return res.json({ ok: true });
+});
+
+router.post("/qr/poll", qrPollLimit, (req, res) => {
+  const code = String(req.body?.code ?? "").trim();
+  if (!/^[a-f0-9]{32,64}$/i.test(code)) {
+    return res.status(400).json({ error: "invalid_code" });
+  }
+  const row = get(
+    "SELECT code, user_id, expires_at FROM qr_login_requests WHERE code = ?",
+    code,
+  );
+  if (!row) return res.status(404).json({ error: "invalid_code" });
+  if (String(row.expires_at) < nowIso()) return res.status(410).json({ error: "code_expired" });
+  if (!row.user_id) return res.json({ pending: true });
+
+  const user = get(
+    "SELECT id, email, nickname, role, status, coins FROM users WHERE id = ?",
+    row.user_id,
+  );
+  if (!user) return res.status(404).json({ error: "invalid_code" });
+  if (user.status !== "approved" && user.role !== "admin") {
+    return res.status(403).json({ error: "forbidden" });
+  }
+
+  run("DELETE FROM qr_login_requests WHERE code = ?", code);
+  const token = mintToken(user.id, user.role, 30);
+  return res.json({ pending: false, token, user: userPayload(user) });
 });
 
 export default router;
