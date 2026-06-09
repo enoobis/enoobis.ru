@@ -14,7 +14,7 @@ router.get("/search", (req, res) => {
             u.nickname as author_nickname
      FROM blog_posts p
      JOIN users u ON u.id = p.author_id
-     WHERE p.status = 'published'
+     WHERE p.status = 'published' AND p.is_deleted = 0
        AND (p.title LIKE ? OR p.excerpt LIKE ? OR p.body LIKE ?)
      ORDER BY p.published_at DESC
      LIMIT ?`,
@@ -39,7 +39,7 @@ router.get("/search", (req, res) => {
   const users = all(
     `SELECT nickname, full_name, avatar_url
      FROM users
-     WHERE nickname LIKE ? OR full_name LIKE ?
+     WHERE status = 'approved' AND (nickname LIKE ? OR full_name LIKE ?)
      ORDER BY nickname
      LIMIT ?`,
     like,

@@ -162,6 +162,9 @@ router.beforeEach((to, from) => {
   if (to.name === "home" && auth.token) {
     return { name: "micro", replace: true };
   }
+  if ((to.name === "login" || to.name === "register") && auth.token) {
+    return { name: "micro", replace: true };
+  }
   if (to.meta.requiresAuth && !auth.token) return { name: "login", query: { next: to.fullPath } };
   if (to.meta.requiresAdmin && auth.role !== "admin") return { name: "home" };
   if (typeof window !== "undefined" && to.fullPath !== from.fullPath) {

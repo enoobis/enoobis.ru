@@ -20,6 +20,7 @@ const data = ref<SearchResponse>({ blog: [], micro: [], users: [] });
 const loading = ref(false);
 const err = ref("");
 let timer: ReturnType<typeof setTimeout> | null = null;
+let runSeq = 0;
 
 function onEsc(e: KeyboardEvent) {
   if (e.key !== "Escape") return;
@@ -38,16 +39,21 @@ function onEsc(e: KeyboardEvent) {
 async function run() {
   err.value = "";
   if (!q.value.trim()) {
+    runSeq++;
     data.value = { blog: [], micro: [], users: [] };
     return;
   }
+  const seq = ++runSeq;
   loading.value = true;
   try {
-    data.value = await search(q.value.trim());
+    const r = await search(q.value.trim());
+    if (seq !== runSeq) return;
+    data.value = r;
   } catch (e) {
+    if (seq !== runSeq) return;
     err.value = e instanceof Error ? e.message : "ошибка";
   } finally {
-    loading.value = false;
+    if (seq === runSeq) loading.value = false;
   }
 }
 

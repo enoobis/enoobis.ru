@@ -190,6 +190,7 @@ async function checkNick() {
       `/api/me/nickname/check?nickname=${encodeURIComponent(v)}`,
       { token: auth.token },
     );
+    if (newNick.value.trim() !== v) return;
     if (r.available) {
       nickStatus.value = "ok";
       nickMessage.value = "ник свободен";
@@ -306,6 +307,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   document.removeEventListener("visibilitychange", onMeVisibility);
+  if (nickTimer) clearTimeout(nickTimer);
 });
 
 function addSocialLink() {

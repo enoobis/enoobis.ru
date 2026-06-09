@@ -91,7 +91,16 @@ export const useSessionStore = defineStore("session", () => {
     }
     const run = async () => {
       try {
-        const row = await api<MePresentation & { coins?: number }>("/api/me", {
+        const row = await api<
+          MePresentation & {
+            coins?: number;
+            id?: string;
+            email?: string;
+            nickname?: string;
+            role?: string;
+            status?: string;
+          }
+        >("/api/me", {
           token: auth.token,
         });
         me.value = {
@@ -104,6 +113,13 @@ export const useSessionStore = defineStore("session", () => {
         writeMeCache(me.value);
         avatarBroken.value = false;
         rememberViewerPreferences(row);
+        auth.syncFromMe({
+          id: row.id,
+          email: row.email,
+          nickname: row.nickname,
+          role: row.role,
+          status: row.status,
+        });
       } catch {
         /* keep stale */
       } finally {

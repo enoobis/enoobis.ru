@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import AppIcon from "./AppIcon.vue";
 import RichText from "./RichText.vue";
@@ -35,6 +35,17 @@ const upCount = ref(props.post.up_count);
 const downCount = ref(props.post.down_count);
 const bookmarked = ref(!!props.post.bookmarked_by_me);
 const busy = ref(false);
+
+watch(
+  () => props.post,
+  (p) => {
+    if (busy.value) return;
+    myVote.value = p.my_vote;
+    upCount.value = p.up_count;
+    downCount.value = p.down_count;
+    bookmarked.value = !!p.bookmarked_by_me;
+  },
+);
 const editing = ref(false);
 const draft = ref("");
 const saving = ref(false);
@@ -100,10 +111,17 @@ async function toggleBookmark() {
 }
 
 async function remove() {
-  if (!auth.token || !canDelete.value) return;
+  if (!auth.token || !canDelete.value || busy.value) return;
   if (!confirm("удалить?")) return;
-  await deleteMicro(props.post.id, auth.token);
-  emit("deleted", props.post.id);
+  busy.value = true;
+  try {
+    await deleteMicro(props.post.id, auth.token);
+    emit("deleted", props.post.id);
+  } catch (e) {
+    toastError(e);
+  } finally {
+    busy.value = false;
+  }
 }
 
 function openDetail() {

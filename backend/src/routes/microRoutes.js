@@ -3,9 +3,8 @@ import multer from "multer";
 import path from "node:path";
 import fs from "node:fs";
 import { v4 as uuidv4 } from "uuid";
-import jwtLib from "jsonwebtoken";
 import { all, get, nowIso, run } from "../db.js";
-import { authRequired, getJwtSecret } from "../auth.js";
+import { authRequired, optionalUserId } from "../auth.js";
 import {
   awardAchievement,
   checkMicroLikeMilestone,
@@ -37,15 +36,7 @@ const microUpload = multer({
 });
 
 function authorizeBearer(req) {
-  const auth = req.headers.authorization ?? "";
-  if (!auth.startsWith("Bearer ")) return null;
-  try {
-    const token = auth.slice(7);
-    const claims = jwtLib.verify(token, getJwtSecret());
-    return claims?.sub ?? null;
-  } catch {
-    return null;
-  }
+  return optionalUserId(req);
 }
 
 function userLimitsJson(userId) {

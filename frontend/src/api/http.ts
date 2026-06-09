@@ -1,5 +1,11 @@
 const base = "";
 
+let unauthorizedHandler: (() => void) | null = null;
+
+export function setUnauthorizedHandler(fn: (() => void) | null) {
+  unauthorizedHandler = fn;
+}
+
 function looksLikeHtml(text: string) {
   const t = text.trimStart().toLowerCase();
   return t.startsWith("<!doctype html") || t.startsWith("<html");
@@ -45,6 +51,7 @@ export async function api<T>(
     }
   }
   if (!res.ok) {
+    if (res.status === 401 && opts.token) unauthorizedHandler?.();
     const err = (data as { error?: string })?.error ?? res.statusText;
     throw new Error(err);
   }

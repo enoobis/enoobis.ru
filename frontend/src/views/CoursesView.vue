@@ -68,6 +68,7 @@ const router = useRouter();
 const courses = ref<Course[]>([]);
 const classroom = ref<CourseClassroom | null>(null);
 const selectedCourseId = ref("");
+let classroomSeq = 0;
 const allowedTabs: readonly Tab[] = ["lectures", "assignments", "stream", "people", "grades"];
 function normalizeTab(value: unknown): Tab {
   if (typeof value === "string" && allowedTabs.includes(value as Tab)) return value as Tab;
@@ -681,12 +682,16 @@ async function loadCourses() {
 
 async function loadClassroom(courseId: string) {
   if (!auth.token) return;
+  const seq = ++classroomSeq;
   try {
-    classroom.value = await getClassroom(courseId, auth.token);
+    const loaded = await getClassroom(courseId, auth.token);
+    if (seq !== classroomSeq) return;
+    classroom.value = loaded;
     selectedCourseId.value = courseId;
     invalidateTeacherGradebook();
     if (tab.value === "grades") await loadTeacherGradebook(true);
   } catch (e) {
+    if (seq !== classroomSeq) return;
     err.value = e instanceof Error ? e.message : "ошибка";
   }
 }

@@ -1,8 +1,7 @@
 import express from "express";
 import { v4 as uuidv4 } from "uuid";
-import jwtLib from "jsonwebtoken";
 import { all, get, nowIso, run } from "../db.js";
-import { authRequired, getJwtSecret } from "../auth.js";
+import { authRequired, optionalUserId } from "../auth.js";
 import {
   checkBlogLikeMilestone,
 } from "../utils/achievements.js";
@@ -236,17 +235,9 @@ function fetchPostFull(id, viewer) {
 }
 
 function optionalViewer(req) {
-  const auth = req.headers.authorization ?? "";
-  if (!auth.startsWith("Bearer ")) return null;
-  try {
-    const token = auth.slice(7);
-    const claims = jwtLib.verify(token, getJwtSecret());
-    if (!claims?.sub) return null;
-    const row = get("SELECT id, role FROM users WHERE id = ?", claims.sub);
-    return row ?? null;
-  } catch {
-    return null;
-  }
+  const id = optionalUserId(req);
+  if (!id) return null;
+  return get("SELECT id, role FROM users WHERE id = ?", id) ?? null;
 }
 
 function canViewPost(post, viewer) {

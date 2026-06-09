@@ -72,6 +72,20 @@ export const useAuthStore = defineStore("auth", () => {
     persist(u, t);
   }
 
+  function syncFromMe(row: Partial<User>) {
+    if (!user.value || !token.value) return;
+    const next: User = {
+      ...user.value,
+      ...(row.id ? { id: row.id } : {}),
+      ...(row.email ? { email: row.email } : {}),
+      ...(row.nickname ? { nickname: row.nickname } : {}),
+      ...(row.role ? { role: row.role } : {}),
+      ...(row.status ? { status: row.status } : {}),
+    };
+    user.value = next;
+    persist(next, token.value);
+  }
+
   function logout() {
     useSessionStore().reset();
     token.value = null;
@@ -79,5 +93,5 @@ export const useAuthStore = defineStore("auth", () => {
     persist(null, null);
   }
 
-  return { token, user, nickname, role, login, register, applySession, logout };
+  return { token, user, nickname, role, login, register, applySession, syncFromMe, logout };
 });

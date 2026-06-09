@@ -7,6 +7,7 @@ import { saveIdenticon } from "../utils/identicon.js";
 import { ensureUserFollowsAdmins } from "../utils/adminFollow.js";
 import { passwordPolicyError } from "../utils/passwordPolicy.js";
 import { rateLimit } from "../utils/security.js";
+import { isValidNickname, NICKNAME_RULE_TEXT } from "../utils/nickname.js";
 
 const router = express.Router();
 const loginLimit = rateLimit({ windowMs: 60_000, max: 20, keyPrefix: "login" });
@@ -31,9 +32,7 @@ function userPayload(row) {
   };
 }
 
-function validNickname(n) {
-  return /^[A-Za-z0-9_]{3,32}$/.test(n ?? "");
-}
+const validNickname = isValidNickname;
 
 router.post("/register", registerLimit, async (req, res) => {
   const { email = "", password = "", nickname = "", invite_code } = req.body ?? {};
@@ -43,7 +42,7 @@ router.post("/register", registerLimit, async (req, res) => {
     return res.status(400).json({ error: policyErr ?? "invalid_email" });
   }
   if (!validNickname(nickname)) {
-    return res.status(400).json({ error: "nickname: 3-32 chars, letters, digits, underscore" });
+    return res.status(400).json({ error: `nickname: ${NICKNAME_RULE_TEXT}` });
   }
 
   let role = "student";
@@ -176,7 +175,12 @@ router.post("/qr/claim", qrClaimLimit, async (req, res) => {
     return res.status(403).json({ error: "forbidden" });
   }
 
-  run("UPDATE qr_login_codes SET used_at = ? WHERE code = ?", nowIso(), code);
+  const claimed = run(
+    "UPDATE qr_login_codes SET used_at = ? WHERE code = ? AND used_at IS NULL",
+    nowIso(),
+    code,
+  );
+  if (!claimed.changes) return res.status(410).json({ error: "code_used" });
   const token = mintToken(user.id, user.role, 30);
   return res.json({ token, user: userPayload(user) });
 });

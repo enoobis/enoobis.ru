@@ -4,7 +4,7 @@ import { RouterLink } from "vue-router";
 
 <template>
   <section class="home" data-reveal>
-    <p class="logo">enoobis</p>
+    <img src="/logo.png" alt="enoobis" class="logo" width="120" height="120" decoding="async" />
     <p class="tag">читай. пиши. учись.</p>
     <RouterLink to="/login" class="cta">зайти</RouterLink>
     <nav class="alt-nav">
@@ -29,13 +29,11 @@ import { RouterLink } from "vue-router";
   gap: 0;
 }
 .logo {
-  margin: 0 0 0.4rem;
-  font-size: clamp(3.5rem, 12vw, 6rem);
-  font-weight: 800;
-  letter-spacing: -0.05em;
-  text-transform: lowercase;
-  color: var(--text);
-  line-height: 0.95;
+  margin: 0 0 0.6rem;
+  width: clamp(88px, 22vw, 132px);
+  height: auto;
+  display: block;
+  border-radius: 16px;
 }
 .tag {
   margin: 0 0 2.2rem;

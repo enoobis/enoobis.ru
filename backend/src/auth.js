@@ -101,3 +101,28 @@ function attachUserFromToken(req, res, next, token) {
 export function authRequired(req, res, next) {
   attachUserFromToken(req, res, next, bearerFromHeader(req));
 }
+
+/**
+ * Resolve a viewer id from an optional Bearer token. Returns null when the
+ * token is missing, invalid, the user no longer exists, or the token was
+ * revoked via token_version bump. Never throws.
+ * @param {import("express").Request} req
+ * @returns {string | null}
+ */
+export function optionalUserId(req) {
+  const token = bearerFromHeader(req);
+  if (!token) return null;
+  try {
+    const claims = jwt.verify(token, getJwtSecret());
+    const c = typeof claims === "object" && claims ? claims : {};
+    const sub = "sub" in c ? String(c.sub) : "";
+    if (!sub) return null;
+    const tvClaim = "tv" in c ? Number(c.tv) : 0;
+    const row = get("SELECT token_version FROM users WHERE id = ?", sub);
+    if (!row) return null;
+    if (Number(row.token_version ?? 0) !== tvClaim) return null;
+    return sub;
+  } catch {
+    return null;
+  }
+}

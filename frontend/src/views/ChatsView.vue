@@ -220,9 +220,11 @@ async function loadChats() {
 
 async function loadMessages(scrollEnd = true) {
   if (!auth.token || !activeId.value) return;
+  const chatId = activeId.value;
   loadingMessages.value = true;
   try {
-    const data = await listMessages(activeId.value, auth.token);
+    const data = await listMessages(chatId, auth.token);
+    if (chatId !== activeId.value) return;
     messages.value = data.items;
     otherNickname.value = data.other?.nickname ?? "";
     otherAvatar.value = data.other?.avatar_url ?? "";
@@ -231,14 +233,15 @@ async function loadMessages(scrollEnd = true) {
       await nextTick();
       messagesEnd.value?.scrollIntoView({ block: "end" });
     }
-    await markChatRead(activeId.value, auth.token);
-    const c = chats.value.find((x) => x.id === activeId.value);
+    await markChatRead(chatId, auth.token);
+    const c = chats.value.find((x) => x.id === chatId);
     if (c) c.unread = 0;
     void chatStore.refresh();
   } catch (e) {
+    if (chatId !== activeId.value) return;
     err.value = e instanceof Error ? e.message : "ошибка";
   } finally {
-    loadingMessages.value = false;
+    if (chatId === activeId.value) loadingMessages.value = false;
   }
 }
 
@@ -257,15 +260,17 @@ async function syncOutgoingReads() {
 
 async function pollMessages() {
   if (!auth.token || !activeId.value) return;
+  const chatId = activeId.value;
   const last = messages.value.at(-1)?.created_at;
   try {
-    const data = await listMessages(activeId.value, auth.token, last);
+    const data = await listMessages(chatId, auth.token, last);
+    if (chatId !== activeId.value) return;
     if (data.other) applyOtherPresence(data.other.online);
     if (data.items.length) {
       messages.value = [...messages.value, ...data.items];
       await nextTick();
       messagesEnd.value?.scrollIntoView({ block: "end", behavior: "smooth" });
-      await markChatRead(activeId.value, auth.token);
+      await markChatRead(chatId, auth.token);
       void chatStore.refresh();
       void loadChats();
     }
@@ -521,6 +526,10 @@ onMounted(async () => {
 onUnmounted(() => {
   if (chatsTimer) clearInterval(chatsTimer);
   if (messagesTimer) clearInterval(messagesTimer);
+  if (pendingPreview.value) {
+    URL.revokeObjectURL(pendingPreview.value);
+    pendingPreview.value = "";
+  }
 });
 </script>
 

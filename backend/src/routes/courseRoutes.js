@@ -9,6 +9,7 @@ import { awardAchievement } from "../utils/achievements.js";
 import { isRasterImageMimetype, optimizeUploadedFile } from "../utils/imageOptimize.js";
 import { assertAssignmentPatchField, assertLecturePatchField } from "../utils/sqlAllowlist.js";
 import { unlinkUploadUrl } from "../utils/uploadSafe.js";
+import { assertSafeUploadExtension } from "../utils/security.js";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -28,6 +29,14 @@ const submissionUpload = multer({
     },
   }),
   limits: { fileSize: 2 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    try {
+      assertSafeUploadExtension(file.originalname);
+      cb(null, true);
+    } catch (e) {
+      cb(e instanceof Error ? e : new Error("blocked file type"));
+    }
+  },
 });
 
 function generateCourseCode() {
@@ -628,14 +637,16 @@ router.post("/courses/:id/assignments", authRequired, (req, res) => {
   }
   const id = uuidv4();
   const now = nowIso();
+  const dueAt = req.body?.due_at ? String(req.body.due_at).slice(0, 40) : "";
   run(
     `INSERT INTO course_assignments (id, course_id, author_id, title, description, due_at, max_points, created_at, lecture_id)
-     VALUES (?, ?, ?, ?, ?, '', ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     id,
     access.course.id,
     req.user.id,
     String(req.body?.title ?? ""),
     String(req.body?.description ?? ""),
+    dueAt,
     Number(req.body?.max_points ?? 100) || 100,
     now,
     lectureId,

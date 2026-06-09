@@ -290,6 +290,7 @@ watch(readerOpen, (open) => {
 onBeforeUnmount(() => {
   document.removeEventListener("click", onDocumentClick);
   document.documentElement.style.overflow = "";
+  if (searchTimer) clearTimeout(searchTimer);
   closeReader();
   closeEdit();
 });

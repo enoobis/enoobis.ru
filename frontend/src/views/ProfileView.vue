@@ -50,6 +50,7 @@ const coverBroken = ref(false);
 const avatarHealTried = ref(false);
 const following = ref(false);
 const followBusy = ref(false);
+let loadSeq = 0;
 
 const nick = computed(() => route.params.nickname as string);
 const isMe = computed(() => auth.token && auth.nickname === nick.value);
@@ -109,7 +110,8 @@ async function onAvatarError() {
   avatarHealTried.value = true;
   try {
     const p = await api<Profile>(`/api/profile/${nick.value}`);
-    profile.value = { ...profile.value!, ...p };
+    if (!profile.value) return;
+    profile.value = { ...profile.value, ...p };
     avatarBroken.value = false;
   } catch {
     avatarBroken.value = true;
@@ -122,13 +124,15 @@ function onFrameError() {
 }
 
 async function load() {
+  const seq = ++loadSeq;
+  const target = nick.value;
   err.value = "";
   avatarBroken.value = false;
   frameBroken.value = false;
   wallpaperBroken.value = false;
   coverBroken.value = false;
   avatarHealTried.value = false;
-  const sameProfile = profile.value?.nickname === nick.value;
+  const sameProfile = profile.value?.nickname === target;
   if (!sameProfile) {
     profile.value = null;
     posts.value = [];
@@ -136,20 +140,25 @@ async function load() {
     following.value = false;
   }
   try {
-    profile.value = await api<Profile>(`/api/profile/${nick.value}`);
+    const loaded = await api<Profile>(`/api/profile/${target}`);
+    if (seq !== loadSeq) return;
+    profile.value = loaded;
     const [pBlog, pMicro] = await Promise.all([
-      listAuthorPosts(nick.value, { page: 1, page_size: 20 }),
-      listMicroByAuthor(nick.value, auth.token),
+      listAuthorPosts(target, { page: 1, page_size: 20 }),
+      listMicroByAuthor(target, auth.token),
     ]);
+    if (seq !== loadSeq) return;
     posts.value = pBlog.items;
     micro.value = pMicro.items;
-    if (auth.token && auth.nickname !== nick.value) {
-      const state = await api<{ following: boolean }>(`/api/profile/${nick.value}/following/me`, {
+    if (auth.token && auth.nickname !== target) {
+      const state = await api<{ following: boolean }>(`/api/profile/${target}/following/me`, {
         token: auth.token,
       });
+      if (seq !== loadSeq) return;
       following.value = state.following;
     }
   } catch (e) {
+    if (seq !== loadSeq) return;
     const msg = e instanceof Error ? e.message : "ошибка";
     err.value = msg.toLowerCase().includes("forbidden") || msg.includes("403") ? "профиль скрыт" : msg;
   }
@@ -333,14 +342,12 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
       </ul>
     </section>
 
-    <div class="filter-tabs tabs">
-      <button class="filter-tab" :class="{ on: tab === 'blog' }" type="button" @click="tab = 'blog'">
+    <div class="profile-tabs">
+      <button class="profile-tab" :class="{ on: tab === 'blog' }" type="button" @click="tab = 'blog'">
         блоги
-        <span v-if="posts.length" class="count muted">{{ posts.length }}</span>
       </button>
-      <button class="filter-tab" :class="{ on: tab === 'micro' }" type="button" @click="tab = 'micro'">
+      <button class="profile-tab" :class="{ on: tab === 'micro' }" type="button" @click="tab = 'micro'">
         микроблоги
-        <span v-if="micro.length" class="count muted">{{ micro.length }}</span>
       </button>
     </div>
 
@@ -665,12 +672,44 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   cursor: help;
 }
 
-.tabs {
+.profile-tabs {
+  display: flex;
+  gap: 1.5rem;
   margin: 0 0 1rem;
-  flex-wrap: wrap;
+  border-bottom: 1px solid var(--border);
 }
-.count {
-  font-size: 0.78rem;
+
+.profile-tab {
+  position: relative;
+  min-height: 0;
+  padding: 0.55rem 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-transform: lowercase;
+}
+
+.profile-tab:hover {
+  color: var(--text);
+  background: transparent;
+  transform: none;
+}
+
+.profile-tab.on {
+  color: var(--text);
+}
+
+.profile-tab.on::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: var(--text);
 }
 
 .post-list {

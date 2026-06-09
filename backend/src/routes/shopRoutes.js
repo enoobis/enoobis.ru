@@ -62,14 +62,21 @@ function buyShopItemCore(userId, itemId, avatarOnly) {
   const coins = Math.max(0, Math.floor(Number(user?.coins ?? 0)));
   if (coins < item.price) throw shopBuyError(400, "not_enough");
 
-  run("UPDATE users SET coins = coins - ? WHERE id = ?", item.price, userId);
+  const paid = run(
+    "UPDATE users SET coins = coins - ? WHERE id = ? AND coins >= ?",
+    item.price,
+    userId,
+    item.price,
+  );
+  if (!paid.changes) throw shopBuyError(400, "not_enough");
   run(
     "INSERT INTO user_owned_shop_items (user_id, item_id, acquired_at) VALUES (?, ?, ?)",
     userId,
     item.id,
     nowIso(),
   );
-  return { ok: true, coins: Math.max(0, coins - item.price) };
+  const after = get("SELECT coins FROM users WHERE id = ?", userId);
+  return { ok: true, coins: Math.max(0, Math.floor(Number(after?.coins ?? 0))) };
 }
 
 function handleShopBuyError(res, err) {

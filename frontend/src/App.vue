@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "./stores/auth";
 import { useChatStore } from "./stores/chat";
+import { useReaderStore } from "./stores/reader";
 import { useSessionStore } from "./stores/session";
 import AppIcon from "./components/AppIcon.vue";
 import AppToast from "./components/AppToast.vue";
@@ -14,6 +15,7 @@ const onHome = computed(() => route.path === "/");
 
 const auth = useAuthStore();
 const chatStore = useChatStore();
+const reader = useReaderStore();
 const session = useSessionStore();
 const isOnline = ref(typeof navigator !== "undefined" ? navigator.onLine : true);
 const profileMenuOpen = ref(false);
@@ -145,10 +147,17 @@ function resolveNavEl() {
   return navEl.value ?? document.querySelector<HTMLElement>(".nav");
 }
 
+function syncReaderTop() {
+  const nav = resolveNavEl();
+  const h = nav ? Math.round(nav.getBoundingClientRect().height) : 52;
+  document.documentElement.style.setProperty("--reader-top", `${h}px`);
+}
+
 function syncSheetLayout() {
   sheetMobile.value = isSheetMobile();
   const nav = resolveNavEl();
   if (!nav) return;
+  syncReaderTop();
   const rect = nav.getBoundingClientRect();
   sheetGeom.value = {
     top: Math.round(rect.bottom),
@@ -179,6 +188,7 @@ function onSheetBeforeEnter() {
 }
 
 function onSheetLayoutChange() {
+  syncReaderTop();
   if (headerSheetOpen.value) syncSheetLayout();
 }
 
@@ -275,6 +285,7 @@ onMounted(() => {
   window.addEventListener("resize", onSheetLayoutChange);
   window.addEventListener("scroll", onSheetLayoutChange, true);
   syncSheetLayout();
+  syncReaderTop();
   syncShell();
 });
 
@@ -319,6 +330,15 @@ watch(
     syncShell();
   },
 );
+
+watch(
+  () => reader.active,
+  async (open) => {
+    if (open) closeHeaderSheets();
+    await nextTick();
+    syncReaderTop();
+  },
+);
 </script>
 
 <template>
@@ -327,6 +347,16 @@ watch(
       <div class="nav-bar">
       <div v-if="auth.token" class="nav-menu-anchor">
         <button
+          v-if="reader.active"
+          type="button"
+          class="icon-btn"
+          aria-label="закрыть книгу"
+          @click.stop="reader.close()"
+        >
+          <AppIcon name="back" :size="20" />
+        </button>
+        <button
+          v-else
           type="button"
           class="icon-btn nav-burger"
           :aria-expanded="navDrawerOpen"
@@ -337,16 +367,30 @@ watch(
           <AppIcon name="menu" :size="20" />
         </button>
       </div>
-      <RouterLink v-if="onHome" to="/" class="nav-link brand-link">
-        <span>enoobis</span>
+      <RouterLink v-if="onHome && !reader.active" to="/" class="nav-link brand-link" aria-label="enoobis">
+        <img src="/logo.png" alt="" class="brand-logo" width="28" height="28" decoding="async" />
       </RouterLink>
-      <template v-if="!auth.token">
+      <template v-if="!auth.token && !reader.active">
         <RouterLink to="/blogs" class="nav-link"><span>блоги</span></RouterLink>
         <RouterLink to="/microblogs" class="nav-link"><span>микроблоги</span></RouterLink>
       </template>
-      <span class="nav-spacer" />
+      <div v-if="reader.active" class="nav-reader-center">
+        <span class="nav-reader-title">{{ reader.title }}</span>
+      </div>
+      <span v-else class="nav-spacer" />
       <template v-if="auth.token">
-        <div class="nav-actions">
+        <div v-if="reader.active" class="nav-reader-controls">
+          <span v-if="reader.pageCount > 0" class="nav-reader-page">
+            {{ reader.page }} / {{ reader.pageCount }}
+          </span>
+          <button type="button" class="icon-btn" aria-label="уменьшить" @click.stop="reader.zoomOut()">
+            <span class="nav-zoom-glyph">−</span>
+          </button>
+          <button type="button" class="icon-btn" aria-label="увеличить" @click.stop="reader.zoomIn()">
+            <span class="nav-zoom-glyph">+</span>
+          </button>
+        </div>
+        <div v-else class="nav-actions">
           <button
             v-if="!sheetMobile"
             type="button"
@@ -700,9 +744,48 @@ watch(
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   padding: 0.4rem 0.6rem;
   position: relative;
+}
+
+.nav-reader-center {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  justify-content: center;
+  padding: 0 0.35rem;
+}
+
+.nav-reader-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  text-transform: lowercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: min(42vw, 360px);
+}
+
+.nav-reader-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  flex-shrink: 0;
+}
+
+.nav-reader-page {
+  font-size: 0.82rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  margin-right: 0.15rem;
+  white-space: nowrap;
+}
+
+.nav-zoom-glyph {
+  font-size: 1.15rem;
+  font-weight: 600;
+  line-height: 1;
 }
 
 .nav.nav--sheet-open {
@@ -1138,14 +1221,18 @@ watch(
 }
 
 .brand-link {
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  font-size: 1rem;
-  color: var(--text);
-  padding: 0.35rem 0.6rem;
+  padding: 0.2rem 0.35rem;
+  border-bottom: none;
 }
 .brand-link:hover {
-  color: var(--text);
+  opacity: 0.88;
+}
+.brand-logo {
+  display: block;
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  border-radius: 6px;
 }
 
 .offline-card h2 {

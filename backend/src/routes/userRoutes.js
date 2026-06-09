@@ -1,13 +1,12 @@
 import express from "express";
-import jwt from "jsonwebtoken";
 import { v4 as uuidv4 } from "uuid";
 import { all, get, nowIso, run } from "../db.js";
 import {
   authRequired,
   bumpTokenVersion,
-  getJwtSecret,
   hashPassword,
   mintToken,
+  optionalUserId,
   verifyPassword,
 } from "../auth.js";
 import { passwordPolicyError } from "../utils/passwordPolicy.js";
@@ -18,15 +17,9 @@ import {
 import { buildModerationNotices, parseContentLimits } from "../utils/contentLimits.js";
 import { onlinePayload } from "../utils/onlineStatus.js";
 import { regenerateUserAvatar, sanitizeUserCosmetics } from "../utils/profileCosmetics.js";
+import { isValidNickname } from "../utils/nickname.js";
 function viewerId(req) {
-  const auth = req.headers.authorization ?? "";
-  if (!auth.startsWith("Bearer ")) return null;
-  try {
-    const claims = jwt.verify(auth.slice(7), getJwtSecret());
-    return claims?.sub ?? null;
-  } catch {
-    return null;
-  }
+  return optionalUserId(req);
 }
 
 const router = express.Router();
@@ -113,8 +106,8 @@ router.get("/me", authRequired, (req, res) => {
 router.get("/me/nickname/check", authRequired, (req, res) => {
   const requested = String(req.query.nickname ?? "").trim().toLowerCase();
   if (!requested) return res.json({ available: false, reason: "пустой ник" });
-  if (!/^[a-z0-9_.]{2,24}$/i.test(requested)) {
-    return res.json({ available: false, reason: "от 2 до 24 символов: буквы, цифры, _ и ." });
+  if (!isValidNickname(requested)) {
+    return res.json({ available: false, reason: "от 3 до 24 символов: буквы, цифры, _ и ." });
   }
   const me = get("SELECT nickname FROM users WHERE id = ?", req.user.id);
   if (me?.nickname?.toLowerCase() === requested) {
@@ -128,8 +121,8 @@ router.get("/me/nickname/check", authRequired, (req, res) => {
 router.post("/me/nickname", authRequired, (req, res) => {
   const requested = String(req.body?.nickname ?? "").trim();
   if (!requested) return res.status(400).json({ error: "пустой ник" });
-  if (!/^[a-z0-9_.]{2,24}$/i.test(requested)) {
-    return res.status(400).json({ error: "от 2 до 24 символов: буквы, цифры, _ и ." });
+  if (!isValidNickname(requested)) {
+    return res.status(400).json({ error: "от 3 до 24 символов: буквы, цифры, _ и ." });
   }
   const me = get(
     "SELECT id, nickname, nickname_change_count FROM users WHERE id = ?",
@@ -170,6 +163,34 @@ function normalizeThemePreference(raw) {
   return null;
 }
 
+function ownsShopUrl(userId, url) {
+  return !!get(
+    `SELECT 1 FROM user_owned_shop_items uoi
+     JOIN shop_items si ON si.id = uoi.item_id
+     WHERE uoi.user_id = ? AND si.url = ?`,
+    userId,
+    url,
+  );
+}
+
+function isOwnUpload(userId, url, allowedSubdirs) {
+  const m = String(url).match(/^\/uploads\/([a-z0-9-]+)\/([^/]+)$/i);
+  if (!m || !allowedSubdirs.includes(m[1])) return false;
+  return m[2].startsWith(`${userId}-`);
+}
+
+const COSMETIC_UPLOAD_SUBDIRS = {
+  avatar_url: ["avatars"],
+  wallpaper_url: ["wallpapers"],
+  avatar_frame_url: [],
+  profile_cover_url: [],
+};
+
+function cosmeticUrlAllowed(userId, field, url) {
+  if (ownsShopUrl(userId, url)) return true;
+  return isOwnUpload(userId, url, COSMETIC_UPLOAD_SUBDIRS[field] ?? []);
+}
+
 router.patch("/me", authRequired, (req, res) => {
   const allowed = [
     "bio",
@@ -190,11 +211,29 @@ router.patch("/me", authRequired, (req, res) => {
   if (typeof body.readme_md === "string" && body.readme_md.length > 4000) {
     return res.status(400).json({ error: "readme_too_long" });
   }
+  const STRING_LIMITS = {
+    bio: 600,
+    full_name: 120,
+    website_url: 300,
+    country: 80,
+    birthday: 40,
+  };
+  for (const [field, max] of Object.entries(STRING_LIMITS)) {
+    if (typeof body[field] === "string" && body[field].length > max) {
+      return res.status(400).json({ error: `${field}_too_long` });
+    }
+  }
   if (body.theme_preference !== undefined) {
     const theme = normalizeThemePreference(body.theme_preference);
     if (!theme) return res.status(400).json({ error: "invalid_theme" });
     body.theme_preference = theme;
   }
+  const COSMETIC_FIELDS = new Set([
+    "avatar_url",
+    "wallpaper_url",
+    "avatar_frame_url",
+    "profile_cover_url",
+  ]);
   for (const field of allowed) {
     if (body[field] === undefined) continue;
     if (field === "avatar_url" && (body[field] === null || body[field] === "")) {
@@ -202,12 +241,20 @@ router.patch("/me", authRequired, (req, res) => {
       regenerateUserAvatar(req.user.id, nick ?? req.user.id);
       continue;
     }
+    if (COSMETIC_FIELDS.has(field) && body[field]) {
+      if (!cosmeticUrlAllowed(req.user.id, field, String(body[field]))) {
+        return res.status(403).json({ error: "cosmetic_not_owned" });
+      }
+    }
     run(`UPDATE users SET ${field} = ? WHERE id = ?`, body[field] ?? "", req.user.id);
   }
   if (Array.isArray(body.social_links)) {
+    const links = body.social_links
+      .slice(0, 12)
+      .map((l) => (typeof l === "string" ? l.slice(0, 300) : l));
     run(
       "UPDATE users SET social_links_json = ? WHERE id = ?",
-      JSON.stringify(body.social_links),
+      JSON.stringify(links),
       req.user.id,
     );
   }
