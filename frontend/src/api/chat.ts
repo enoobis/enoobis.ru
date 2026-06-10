@@ -104,6 +104,13 @@ export function addGroupMember(threadId: string, token: string, nickname: string
   });
 }
 
+export function removeGroupMember(threadId: string, token: string, userId: string) {
+  return api<{ ok: boolean; members: ChatGroupMember[]; removed?: boolean }>(
+    `/api/chats/${threadId}/members/${encodeURIComponent(userId)}`,
+    { method: "DELETE", token },
+  );
+}
+
 export function listMessages(threadId: string, token: string, after?: string) {
   const url = after
     ? `/api/chats/${threadId}/messages?after=${encodeURIComponent(after)}`

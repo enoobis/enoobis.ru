@@ -13,10 +13,12 @@ import {
   listOutgoingReadFlags,
   markChatRead,
   openChatWith,
+  removeGroupMember,
   sendMessage,
   uploadChatImage,
   uploadGroupAvatar,
   type ChatGroupInfo,
+  type ChatGroupMember,
   type ChatMessage,
   type ChatReplyRef,
   type ChatThread,
@@ -48,6 +50,7 @@ const composeSuggestions = ref<SearchUser[]>([]);
 const composePickIdx = ref(0);
 const composeSearching = ref(false);
 const addMemberOpen = ref(false);
+const membersOpen = ref(false);
 const groupTitle = ref("");
 const groupAvatarFile = ref<File | null>(null);
 const groupAvatarPreview = ref("");
@@ -279,7 +282,46 @@ async function createGroup() {
   }
 }
 
+function openMembers() {
+  if (!groupInfo.value) return;
+  membersOpen.value = true;
+}
+
+function closeMembers() {
+  membersOpen.value = false;
+}
+
+function canRemoveMember(m: ChatGroupMember): boolean {
+  if (!groupInfo.value || !auth.user?.id) return false;
+  if (m.id === auth.user.id) return true;
+  return groupInfo.value.owner_id === auth.user.id;
+}
+
+async function kickMember(m: ChatGroupMember) {
+  if (!auth.token || !activeId.value || !groupInfo.value || !auth.user?.id) return;
+  const self = m.id === auth.user.id;
+  const q = self ? "выйти из группы?" : `убрать ${m.nickname}?`;
+  if (!window.confirm(q)) return;
+  try {
+    const r = await removeGroupMember(activeId.value, auth.token, m.id);
+    if (r.removed || self) {
+      closeMembers();
+      activeId.value = "";
+      messages.value = [];
+      groupInfo.value = null;
+      router.replace({ name: "chats" });
+      await loadChats();
+      return;
+    }
+    groupInfo.value = { ...groupInfo.value, members: r.members };
+    await loadChats();
+  } catch (e) {
+    toastError(e);
+  }
+}
+
 function openAddMember() {
+  closeMembers();
   memberQuery.value = "";
   memberSuggestions.value = [];
   memberPickIdx.value = 0;
@@ -953,7 +995,7 @@ onUnmounted(() => {
       <template v-if="activeId">
         <header class="thread-head">
           <button class="back" type="button" @click="router.replace({ name: 'chats' })">←</button>
-          <div v-if="groupInfo" class="who">
+          <button v-if="groupInfo" type="button" class="who who--group" @click="openMembers">
             <span class="avatar small">
               <img v-if="groupInfo.avatar_url" :src="groupInfo.avatar_url" alt="" />
               <AppIcon v-else name="users" :size="13" />
@@ -962,7 +1004,7 @@ onUnmounted(() => {
               <span>{{ groupInfo.title }}</span>
               <span class="presence-label">{{ groupMembersLabel }}</span>
             </span>
-          </div>
+          </button>
           <RouterLink v-else-if="otherNickname" :to="`/u/${otherNickname}`" class="who">
             <span class="avatar small" :class="{ 'has-online': otherOnline === true }">
               <img v-if="otherAvatar" :src="otherAvatar" alt="" />
@@ -1236,24 +1278,26 @@ onUnmounted(() => {
             </button>
           </template>
 
-          <form v-else @submit.prevent="createGroup">
-            <button type="button" class="group-avatar-pick" aria-label="аватар группы" @click="pickGroupAvatar">
-              <img v-if="groupAvatarPreview" :src="groupAvatarPreview" alt="" />
-              <AppIcon v-else name="users" :size="28" />
-            </button>
+          <form v-else class="group-form" @submit.prevent="createGroup">
+            <div class="group-form-top">
+              <button type="button" class="group-avatar-pick" aria-label="аватар группы" @click="pickGroupAvatar">
+                <img v-if="groupAvatarPreview" :src="groupAvatarPreview" alt="" />
+                <AppIcon v-else name="users" :size="24" />
+              </button>
+              <input
+                v-model="groupTitle"
+                type="text"
+                class="group-title-in"
+                placeholder="название"
+                :maxlength="80"
+              />
+            </div>
             <input
               ref="groupAvatarInput"
               type="file"
               accept="image/*"
               hidden
               @change="onGroupAvatarChange"
-            />
-            <input
-              v-model="groupTitle"
-              type="text"
-              class="group-title-in"
-              placeholder="название"
-              :maxlength="80"
             />
             <div class="member-picker">
               <div class="member-combo" @click="focusMemberInput">
@@ -1263,6 +1307,14 @@ onUnmounted(() => {
                     <AppIcon v-else name="profile" :size="12" />
                   </span>
                   <span class="member-chip-nick">{{ u.nickname }}</span>
+                  <button
+                    type="button"
+                    class="member-chip-x"
+                    aria-label="убрать"
+                    @click.stop="removePickedMember(u.nickname)"
+                  >
+                    ×
+                  </button>
                 </span>
                 <input
                   ref="memberInput"
@@ -1297,6 +1349,45 @@ onUnmounted(() => {
               {{ creatingGroup ? "…" : "создать" }}
             </button>
           </form>
+        </div>
+      </div>
+    </Teleport>
+
+    <Teleport to="body">
+      <div v-if="membersOpen && groupInfo" class="group-modal" @click.self="closeMembers">
+        <div class="group-modal-card">
+          <div class="group-modal-head">
+            <span class="group-modal-spacer" aria-hidden="true" />
+            <span>участники</span>
+            <button type="button" class="group-modal-x" aria-label="закрыть" @click="closeMembers">×</button>
+          </div>
+          <button type="button" class="compose-switch" @click="openAddMember">
+            <AppIcon name="register" :size="16" />
+            <span>добавить</span>
+          </button>
+          <ul class="members-list">
+            <li v-for="m in groupInfo.members" :key="m.id" class="members-row">
+              <RouterLink :to="`/u/${m.nickname}`" class="members-who" @click="closeMembers">
+                <span class="member-suggest-av">
+                  <img v-if="m.avatar_url" :src="m.avatar_url" alt="" />
+                  <span v-else>{{ m.nickname.slice(0, 2) }}</span>
+                </span>
+                <span class="members-who-text">
+                  <span>{{ m.nickname }}</span>
+                  <span v-if="m.id === groupInfo.owner_id" class="muted small">создатель</span>
+                </span>
+              </RouterLink>
+              <button
+                v-if="canRemoveMember(m)"
+                type="button"
+                class="members-kick"
+                :aria-label="m.id === auth.user?.id ? 'выйти' : 'убрать'"
+                @click="kickMember(m)"
+              >
+                <AppIcon :name="m.id === auth.user?.id ? 'logout' : 'delete'" :size="15" />
+              </button>
+            </li>
+          </ul>
         </div>
       </div>
     </Teleport>
@@ -1505,10 +1596,21 @@ onUnmounted(() => {
   color: var(--text);
   background: var(--surface2);
 }
+.group-form {
+  display: grid;
+  gap: 0.75rem;
+  width: 100%;
+}
+.group-form-top {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  gap: 0.65rem;
+  align-items: center;
+}
 .group-avatar-pick {
-  width: 72px;
-  height: 72px;
-  margin: 0 auto;
+  width: 64px;
+  height: 64px;
+  margin: 0;
   padding: 0;
   border: 1px solid var(--border);
   border-radius: var(--avatar-radius);
@@ -1519,6 +1621,7 @@ onUnmounted(() => {
   justify-content: center;
   overflow: hidden;
   cursor: pointer;
+  flex-shrink: 0;
 }
 .group-avatar-pick img {
   width: 100%;
@@ -1526,6 +1629,7 @@ onUnmounted(() => {
   object-fit: cover;
 }
 .group-title-in {
+  width: 100%;
   border: 1px solid var(--border);
   border-radius: 999px;
   padding: 0.55rem 1rem;
@@ -1533,7 +1637,7 @@ onUnmounted(() => {
   font-size: 0.92rem;
   background: transparent;
   color: var(--text);
-  text-align: center;
+  text-align: left;
 }
 .group-title-in:focus {
   outline: none;
@@ -1541,12 +1645,14 @@ onUnmounted(() => {
 }
 .member-picker {
   position: relative;
+  width: 100%;
 }
 .member-combo {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.35rem;
+  width: 100%;
   min-height: 44px;
   padding: 0.35rem 0.55rem;
   border: 1px solid var(--border);
@@ -1560,8 +1666,8 @@ onUnmounted(() => {
 .member-chip {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.22rem 0.55rem 0.22rem 0.28rem;
+  gap: 0.35rem;
+  padding: 0.22rem 0.35rem 0.22rem 0.28rem;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--bg, #000);
@@ -1569,6 +1675,100 @@ onUnmounted(() => {
   color: var(--text);
   text-transform: lowercase;
   flex-shrink: 0;
+}
+.member-chip-x {
+  width: 20px;
+  height: 20px;
+  min-height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.member-chip-x:hover {
+  color: var(--text);
+  background: var(--surface2);
+}
+.group-create-btn {
+  width: 100%;
+  min-height: 40px;
+  border-radius: 999px;
+  font-size: 0.88rem;
+}
+.members-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0;
+  max-height: min(50vh, 360px);
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.members-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.35rem 0.35rem 0.55rem;
+  border-bottom: 1px solid var(--border);
+}
+.members-row:last-child {
+  border-bottom: none;
+}
+.members-who {
+  display: grid;
+  grid-template-columns: 32px 1fr;
+  gap: 0.55rem;
+  align-items: center;
+  min-width: 0;
+  color: var(--text);
+  text-transform: lowercase;
+  text-decoration: none;
+}
+.members-who:hover {
+  text-decoration: none;
+}
+.members-who-text {
+  display: grid;
+  gap: 0.05rem;
+  min-width: 0;
+}
+.members-kick {
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.members-kick:hover {
+  color: var(--text);
+  background: var(--surface2);
+}
+.who--group {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.who--group:hover .who-text > span:first-child {
+  color: var(--text);
 }
 .member-chip-av {
   width: 24px;
@@ -1651,11 +1851,6 @@ onUnmounted(() => {
 }
 .member-hint {
   padding: 0.2rem 0.4rem;
-}
-.group-create-btn {
-  min-height: 40px;
-  border-radius: 999px;
-  font-size: 0.88rem;
 }
 .list-head h2 {
   font-size: 1.25rem;

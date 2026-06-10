@@ -450,6 +450,50 @@ router.post("/chats/:id/members", authRequired, (req, res) => {
   res.json({ ok: true, member_count: groupMemberCount(thread.id) });
 });
 
+router.get("/chats/:id/members", authRequired, (req, res) => {
+  const thread = getThread(req.params.id);
+  if (!thread || thread.kind !== "group") return res.status(404).json({ error: "not found" });
+  if (!isMember(thread, req.user.id)) return res.status(403).json({ error: "forbidden" });
+  res.json({
+    title: thread.title ?? "",
+    owner_id: thread.owner_id ?? "",
+    avatar_url: thread.avatar_url ?? "",
+    members: groupMembers(thread.id),
+  });
+});
+
+router.delete("/chats/:id/members/:userId", authRequired, (req, res) => {
+  const thread = getThread(req.params.id);
+  if (!thread || thread.kind !== "group") return res.status(404).json({ error: "not found" });
+  if (!isMember(thread, req.user.id)) return res.status(403).json({ error: "forbidden" });
+  const targetId = req.params.userId;
+  const meId = req.user.id;
+  if (targetId !== meId && thread.owner_id !== meId) {
+    return res.status(403).json({ error: "forbidden" });
+  }
+  if (targetId !== meId && targetId === thread.owner_id) {
+    return res.status(403).json({ error: "нельзя удалить создателя" });
+  }
+  if (!get("SELECT 1 FROM chat_thread_members WHERE thread_id = ? AND user_id = ?", thread.id, targetId)) {
+    return res.status(404).json({ error: "not found" });
+  }
+  run("DELETE FROM chat_thread_members WHERE thread_id = ? AND user_id = ?", thread.id, targetId);
+  if (!groupMemberCount(thread.id)) {
+    const msgs = all("SELECT image_url FROM chat_messages WHERE thread_id = ?", thread.id);
+    for (const m of msgs) {
+      const url = m.image_url && String(m.image_url);
+      if (url && url.startsWith("/uploads/chat/")) {
+        unlinkUploadUrl(url, ["chat"]);
+      }
+    }
+    run("DELETE FROM chat_messages WHERE thread_id = ?", thread.id);
+    unlinkGroupAvatar(thread.avatar_url);
+    run("DELETE FROM chat_threads WHERE id = ?", thread.id);
+    return res.json({ ok: true, members: [], removed: true });
+  }
+  res.json({ ok: true, members: groupMembers(thread.id), removed: false });
+});
+
 router.post("/chats/with/:nickname", authRequired, (req, res) => {
   if (!guardChatOutgoing(req, res)) return;
   const other = get(
