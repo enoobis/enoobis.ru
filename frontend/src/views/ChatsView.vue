@@ -15,11 +15,13 @@ import {
   openChatWith,
   sendMessage,
   uploadChatImage,
+  uploadGroupAvatar,
   type ChatGroupInfo,
   type ChatMessage,
   type ChatReplyRef,
   type ChatThread,
 } from "../api/chat";
+import { search, type SearchUser } from "../api/search";
 import AppIcon from "../components/AppIcon.vue";
 import { useAuthStore } from "../stores/auth";
 import { useChatStore } from "../stores/chat";
@@ -40,9 +42,236 @@ const otherOnline = ref<boolean | null>(null);
 const otherLastSeenAt = ref<string | null>(null);
 const groupInfo = ref<ChatGroupInfo | null>(null);
 const groupFormOpen = ref(false);
+const addMemberOpen = ref(false);
 const groupTitle = ref("");
-const groupNicks = ref("");
+const groupAvatarFile = ref<File | null>(null);
+const groupAvatarPreview = ref("");
+const selectedMembers = ref<SearchUser[]>([]);
+const memberQuery = ref("");
+const memberSuggestions = ref<SearchUser[]>([]);
+const memberPickIdx = ref(0);
+const memberSearching = ref(false);
 const creatingGroup = ref(false);
+const groupAvatarInput = ref<HTMLInputElement | null>(null);
+const memberInput = ref<HTMLInputElement | null>(null);
+let memberSearchTimer: ReturnType<typeof setTimeout> | null = null;
+
+const pickedNicknames = computed(() => new Set(selectedMembers.value.map((u) => u.nickname)));
+
+function resetGroupForm() {
+  groupTitle.value = "";
+  memberQuery.value = "";
+  memberSuggestions.value = [];
+  memberPickIdx.value = 0;
+  selectedMembers.value = [];
+  if (groupAvatarPreview.value) {
+    URL.revokeObjectURL(groupAvatarPreview.value);
+    groupAvatarPreview.value = "";
+  }
+  groupAvatarFile.value = null;
+}
+
+function openGroupForm() {
+  resetGroupForm();
+  groupFormOpen.value = true;
+}
+
+function closeGroupForm() {
+  groupFormOpen.value = false;
+  resetGroupForm();
+}
+
+function pickGroupAvatar() {
+  groupAvatarInput.value?.click();
+}
+
+function onGroupAvatarChange(e: Event) {
+  const f = (e.target as HTMLInputElement).files?.[0] ?? null;
+  (e.target as HTMLInputElement).value = "";
+  if (!f || !f.type.startsWith("image/")) return;
+  if (f.size > 10 * 1024 * 1024) {
+    toastError(new Error("до 10 мб"));
+    return;
+  }
+  if (groupAvatarPreview.value) URL.revokeObjectURL(groupAvatarPreview.value);
+  groupAvatarFile.value = f;
+  groupAvatarPreview.value = URL.createObjectURL(f);
+}
+
+async function fetchMemberSuggestions(q: string) {
+  const needle = q.trim();
+  if (!needle) {
+    memberSuggestions.value = [];
+    memberPickIdx.value = 0;
+    return;
+  }
+  memberSearching.value = true;
+  try {
+    const data = await search(needle, 8);
+    memberSuggestions.value = data.users.filter(
+      (u) => u.nickname !== auth.nickname && !pickedNicknames.value.has(u.nickname),
+    );
+    memberPickIdx.value = 0;
+  } catch {
+    memberSuggestions.value = [];
+  } finally {
+    memberSearching.value = false;
+  }
+}
+
+watch(memberQuery, (q) => {
+  if (!groupFormOpen.value) return;
+  if (memberSearchTimer) clearTimeout(memberSearchTimer);
+  memberSearchTimer = setTimeout(() => void fetchMemberSuggestions(q), 180);
+});
+
+function addPickedMember(u: SearchUser) {
+  if (pickedNicknames.value.has(u.nickname)) return;
+  selectedMembers.value = [...selectedMembers.value, u];
+  memberQuery.value = "";
+  memberSuggestions.value = [];
+  memberPickIdx.value = 0;
+  memberInput.value?.focus();
+}
+
+function removePickedMember(nick: string) {
+  selectedMembers.value = selectedMembers.value.filter((u) => u.nickname !== nick);
+  if (memberQuery.value.trim()) void fetchMemberSuggestions(memberQuery.value);
+}
+
+function pickHighlightedMember() {
+  const u = memberSuggestions.value[memberPickIdx.value];
+  if (u) addPickedMember(u);
+}
+
+function onMemberKey(e: KeyboardEvent) {
+  const list = memberSuggestions.value;
+  if (e.key === "ArrowDown" && list.length) {
+    e.preventDefault();
+    memberPickIdx.value = (memberPickIdx.value + 1) % list.length;
+    return;
+  }
+  if (e.key === "ArrowUp" && list.length) {
+    e.preventDefault();
+    memberPickIdx.value = (memberPickIdx.value - 1 + list.length) % list.length;
+    return;
+  }
+  if ((e.key === "Enter" || e.key === "Tab") && list.length) {
+    e.preventDefault();
+    pickHighlightedMember();
+    return;
+  }
+  if (e.key === "Backspace" && !memberQuery.value && selectedMembers.value.length) {
+    selectedMembers.value = selectedMembers.value.slice(0, -1);
+  }
+  if (e.key === "Escape") {
+    memberSuggestions.value = [];
+  }
+}
+
+async function createGroup() {
+  if (!auth.token || creatingGroup.value) return;
+  const title = groupTitle.value.trim();
+  if (!title) return;
+  creatingGroup.value = true;
+  try {
+    let avatarUrl = "";
+    if (groupAvatarFile.value) {
+      const r = await uploadGroupAvatar(auth.token, groupAvatarFile.value);
+      avatarUrl = r.url;
+    }
+    const t = await createGroupChat(auth.token, {
+      title,
+      members: selectedMembers.value.map((u) => u.nickname),
+      avatar_url: avatarUrl || undefined,
+    });
+    if (t.missing.length) toastError(new Error(`не найдены: ${t.missing.join(", ")}`));
+    closeGroupForm();
+    await loadChats();
+    router.replace({ name: "chats", query: { id: t.id } });
+  } catch (e) {
+    toastError(e);
+  } finally {
+    creatingGroup.value = false;
+  }
+}
+
+function openAddMember() {
+  memberQuery.value = "";
+  memberSuggestions.value = [];
+  memberPickIdx.value = 0;
+  addMemberOpen.value = true;
+  nextTick(() => memberInput.value?.focus());
+}
+
+function closeAddMember() {
+  addMemberOpen.value = false;
+  memberQuery.value = "";
+  memberSuggestions.value = [];
+  memberPickIdx.value = 0;
+}
+
+async function confirmAddMember(u: SearchUser) {
+  if (!auth.token || !activeId.value) return;
+  try {
+    await addGroupMember(activeId.value, auth.token, u.nickname);
+    closeAddMember();
+    await loadMessages(false);
+  } catch (e) {
+    toastError(e);
+  }
+}
+
+function onAddMemberKey(e: KeyboardEvent) {
+  const list = memberSuggestions.value;
+  if (e.key === "ArrowDown" && list.length) {
+    e.preventDefault();
+    memberPickIdx.value = (memberPickIdx.value + 1) % list.length;
+    return;
+  }
+  if (e.key === "ArrowUp" && list.length) {
+    e.preventDefault();
+    memberPickIdx.value = (memberPickIdx.value - 1 + list.length) % list.length;
+    return;
+  }
+  if ((e.key === "Enter" || e.key === "Tab") && list.length) {
+    e.preventDefault();
+    void confirmAddMember(list[memberPickIdx.value]!);
+    return;
+  }
+  if (e.key === "Escape") closeAddMember();
+}
+
+async function fetchAddMemberSuggestions(q: string) {
+  const needle = q.trim();
+  if (!needle) {
+    memberSuggestions.value = [];
+    memberPickIdx.value = 0;
+    return;
+  }
+  memberSearching.value = true;
+  try {
+    const data = await search(needle, 8);
+    const inGroup = new Set(groupInfo.value?.members.map((m) => m.nickname) ?? []);
+    memberSuggestions.value = data.users.filter(
+      (u) => u.nickname !== auth.nickname && !inGroup.has(u.nickname),
+    );
+    memberPickIdx.value = 0;
+  } catch {
+    memberSuggestions.value = [];
+  } finally {
+    memberSearching.value = false;
+  }
+}
+
+watch(
+  () => (addMemberOpen.value ? memberQuery.value : ""),
+  (q) => {
+    if (!addMemberOpen.value) return;
+    if (memberSearchTimer) clearTimeout(memberSearchTimer);
+    memberSearchTimer = setTimeout(() => void fetchAddMemberSuggestions(q), 180);
+  },
+);
 
 const isGroup = computed(() => groupInfo.value !== null);
 
@@ -58,42 +287,6 @@ const groupMembersLabel = computed(() => {
   const n = groupInfo.value?.members.length ?? 0;
   return `${n} ${memberWord(n)}`;
 });
-
-async function createGroup() {
-  if (!auth.token || creatingGroup.value) return;
-  const title = groupTitle.value.trim();
-  if (!title) return;
-  const members = groupNicks.value
-    .split(/[,\s]+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-  creatingGroup.value = true;
-  try {
-    const t = await createGroupChat(auth.token, title, members);
-    if (t.missing.length) toastError(new Error(`не найдены: ${t.missing.join(", ")}`));
-    groupFormOpen.value = false;
-    groupTitle.value = "";
-    groupNicks.value = "";
-    await loadChats();
-    router.replace({ name: "chats", query: { id: t.id } });
-  } catch (e) {
-    toastError(e);
-  } finally {
-    creatingGroup.value = false;
-  }
-}
-
-async function addMember() {
-  if (!auth.token || !activeId.value) return;
-  const nick = window.prompt("ник участника")?.trim();
-  if (!nick) return;
-  try {
-    await addGroupMember(activeId.value, auth.token, nick);
-    await loadMessages(false);
-  } catch (e) {
-    toastError(e);
-  }
-}
 
 function applyOtherPresence(online: OnlineStatus | null | undefined) {
   if (online === null || online === undefined) {
@@ -598,9 +791,14 @@ onMounted(async () => {
 onUnmounted(() => {
   if (chatsTimer) clearInterval(chatsTimer);
   if (messagesTimer) clearInterval(messagesTimer);
+  if (memberSearchTimer) clearTimeout(memberSearchTimer);
   if (pendingPreview.value) {
     URL.revokeObjectURL(pendingPreview.value);
     pendingPreview.value = "";
+  }
+  if (groupAvatarPreview.value) {
+    URL.revokeObjectURL(groupAvatarPreview.value);
+    groupAvatarPreview.value = "";
   }
 });
 </script>
@@ -615,18 +813,11 @@ onUnmounted(() => {
           class="list-head-act"
           aria-label="новая группа"
           title="новая группа"
-          @click="groupFormOpen = !groupFormOpen"
+          @click="openGroupForm"
         >
           <AppIcon name="plus" :size="18" />
         </button>
       </div>
-      <form v-if="groupFormOpen" class="group-form" @submit.prevent="createGroup">
-        <input v-model="groupTitle" type="text" placeholder="название группы" :maxlength="80" />
-        <input v-model="groupNicks" type="text" placeholder="ники через запятую" />
-        <button type="submit" :disabled="creatingGroup || !groupTitle.trim()">
-          {{ creatingGroup ? "…" : "создать" }}
-        </button>
-      </form>
       <p v-if="loadingChats && !chats.length" class="page-empty muted">загрузка</p>
       <p v-else-if="!chats.length" class="page-empty muted">пусто</p>
       <div
@@ -641,7 +832,8 @@ onUnmounted(() => {
       >
         <div class="chat-row">
           <span class="avatar" :class="{ 'has-online': c.other_online === true }">
-            <AppIcon v-if="c.kind === 'group'" name="users" :size="16" />
+            <img v-if="c.kind === 'group' && c.other_avatar" :src="c.other_avatar" alt="" />
+            <AppIcon v-else-if="c.kind === 'group'" name="users" :size="16" />
             <img v-else-if="c.other_avatar" :src="c.other_avatar" alt="" />
             <span v-else>{{ c.other_nickname.slice(0, 2) }}</span>
             <span v-if="c.other_online === true" class="online-star" title="онлайн">
@@ -680,7 +872,8 @@ onUnmounted(() => {
           <button class="back" type="button" @click="router.replace({ name: 'chats' })">←</button>
           <div v-if="groupInfo" class="who">
             <span class="avatar small">
-              <AppIcon name="users" :size="13" />
+              <img v-if="groupInfo.avatar_url" :src="groupInfo.avatar_url" alt="" />
+              <AppIcon v-else name="users" :size="13" />
             </span>
             <span class="who-text">
               <span>{{ groupInfo.title }}</span>
@@ -709,7 +902,7 @@ onUnmounted(() => {
               class="thread-act"
               aria-label="добавить участника"
               title="добавить участника"
-              @click="addMember"
+              @click="openAddMember"
             >
               <AppIcon name="register" :size="16" />
             </button>
@@ -908,6 +1101,119 @@ onUnmounted(() => {
       <p v-else class="page-empty muted center">выберите чат слева</p>
     </main>
 
+    <Teleport to="body">
+      <div v-if="groupFormOpen" class="group-modal" @click.self="closeGroupForm">
+        <form class="group-modal-card" @submit.prevent="createGroup">
+          <div class="group-modal-head">
+            <span>новая группа</span>
+            <button type="button" class="group-modal-x" aria-label="закрыть" @click="closeGroupForm">
+              ×
+            </button>
+          </div>
+          <button type="button" class="group-avatar-pick" aria-label="аватар группы" @click="pickGroupAvatar">
+            <img v-if="groupAvatarPreview" :src="groupAvatarPreview" alt="" />
+            <AppIcon v-else name="users" :size="28" />
+          </button>
+          <input
+            ref="groupAvatarInput"
+            type="file"
+            accept="image/*"
+            hidden
+            @change="onGroupAvatarChange"
+          />
+          <input
+            v-model="groupTitle"
+            type="text"
+            class="group-title-in"
+            placeholder="название"
+            :maxlength="80"
+          />
+          <div class="member-picker">
+            <div v-if="selectedMembers.length" class="member-chips">
+              <span v-for="u in selectedMembers" :key="u.nickname" class="member-chip">
+                <span class="member-chip-av">
+                  <img v-if="u.avatar_url" :src="u.avatar_url" alt="" />
+                  <span v-else>{{ u.nickname.slice(0, 2) }}</span>
+                </span>
+                <span>{{ u.nickname }}</span>
+                <button type="button" aria-label="убрать" @click="removePickedMember(u.nickname)">×</button>
+              </span>
+            </div>
+            <input
+              ref="memberInput"
+              v-model="memberQuery"
+              type="text"
+              class="member-query"
+              placeholder="ник участника"
+              autocomplete="off"
+              @keydown="onMemberKey"
+            />
+            <ul v-if="memberSuggestions.length" class="member-suggest">
+              <li
+                v-for="(u, i) in memberSuggestions"
+                :key="u.nickname"
+                :class="{ on: i === memberPickIdx }"
+                @mousedown.prevent="addPickedMember(u)"
+              >
+                <span class="member-suggest-av">
+                  <img v-if="u.avatar_url" :src="u.avatar_url" alt="" />
+                  <span v-else>{{ u.nickname.slice(0, 2) }}</span>
+                </span>
+                <span class="member-suggest-text">
+                  <span>{{ u.nickname }}</span>
+                  <span v-if="u.full_name" class="muted small">{{ u.full_name }}</span>
+                </span>
+              </li>
+            </ul>
+            <p v-else-if="memberSearching" class="muted small member-hint">поиск…</p>
+          </div>
+          <button type="submit" class="group-create-btn" :disabled="creatingGroup || !groupTitle.trim()">
+            {{ creatingGroup ? "…" : "создать" }}
+          </button>
+        </form>
+      </div>
+    </Teleport>
+
+    <Teleport to="body">
+      <div v-if="addMemberOpen" class="group-modal" @click.self="closeAddMember">
+        <div class="group-modal-card">
+          <div class="group-modal-head">
+            <span>добавить участника</span>
+            <button type="button" class="group-modal-x" aria-label="закрыть" @click="closeAddMember">×</button>
+          </div>
+          <div class="member-picker">
+            <input
+              ref="memberInput"
+              v-model="memberQuery"
+              type="text"
+              class="member-query"
+              placeholder="ник"
+              autocomplete="off"
+              @keydown="onAddMemberKey"
+            />
+            <ul v-if="memberSuggestions.length" class="member-suggest">
+              <li
+                v-for="(u, i) in memberSuggestions"
+                :key="u.nickname"
+                :class="{ on: i === memberPickIdx }"
+                @mousedown.prevent="confirmAddMember(u)"
+              >
+                <span class="member-suggest-av">
+                  <img v-if="u.avatar_url" :src="u.avatar_url" alt="" />
+                  <span v-else>{{ u.nickname.slice(0, 2) }}</span>
+                </span>
+                <span class="member-suggest-text">
+                  <span>{{ u.nickname }}</span>
+                  <span v-if="u.full_name" class="muted small">{{ u.full_name }}</span>
+                </span>
+              </li>
+            </ul>
+            <p v-else-if="memberSearching" class="muted small member-hint">поиск…</p>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
     <div v-if="lightboxUrl" class="lightbox" @click="lightboxUrl = ''">
       <img :src="lightboxUrl" alt="" />
     </div>
@@ -967,29 +1273,204 @@ onUnmounted(() => {
   color: var(--text);
   background: var(--surface2);
 }
-.group-form {
+.group-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: rgba(0, 0, 0, 0.72);
   display: grid;
-  gap: 0.45rem;
-  padding: 0.7rem 1rem;
-  border-bottom: 1px solid var(--border);
+  place-items: center;
+  padding: 1rem;
 }
-.group-form input {
+.group-modal-card {
+  width: min(420px, 100%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg, #000);
+  padding: 1rem;
+  display: grid;
+  gap: 0.75rem;
+}
+.group-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.95rem;
+  color: var(--text);
+  text-transform: lowercase;
+}
+.group-modal-x {
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.group-modal-x:hover {
+  color: var(--text);
+  background: var(--surface2);
+}
+.group-avatar-pick {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--avatar-radius);
+  background: var(--surface);
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  cursor: pointer;
+}
+.group-avatar-pick img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.group-title-in {
   border: 1px solid var(--border);
   border-radius: 999px;
-  padding: 0.45rem 0.9rem;
+  padding: 0.55rem 1rem;
   font: inherit;
-  font-size: 0.88rem;
+  font-size: 0.92rem;
   background: transparent;
   color: var(--text);
+  text-align: center;
 }
-.group-form input:focus {
+.group-title-in:focus {
   outline: none;
   border-color: var(--focus-border);
 }
-.group-form button {
-  min-height: 36px;
+.member-picker {
+  position: relative;
+  display: grid;
+  gap: 0.45rem;
+}
+.member-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.member-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.45rem 0.2rem 0.25rem;
+  border: 1px solid var(--border);
   border-radius: 999px;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
+  color: var(--text);
+  text-transform: lowercase;
+}
+.member-chip-av {
+  width: 22px;
+  height: 22px;
+  border-radius: var(--avatar-radius);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.62rem;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.member-chip-av img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.member-chip button {
+  width: 20px;
+  height: 20px;
+  min-height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.member-chip button:hover {
+  color: var(--text);
+  background: var(--surface2);
+}
+.member-query {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.55rem 1rem;
+  font: inherit;
+  font-size: 0.9rem;
+  background: transparent;
+  color: var(--text);
+}
+.member-query:focus {
+  outline: none;
+  border-color: var(--focus-border);
+}
+.member-suggest {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  max-height: 220px;
+  overflow-y: auto;
+}
+.member-suggest li {
+  display: grid;
+  grid-template-columns: 32px 1fr;
+  gap: 0.55rem;
+  align-items: center;
+  padding: 0.5rem 0.65rem;
+  cursor: pointer;
+}
+.member-suggest li.on,
+.member-suggest li:hover {
+  background: var(--surface2);
+}
+.member-suggest-av {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--avatar-radius);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+.member-suggest-av img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.member-suggest-text {
+  display: grid;
+  gap: 0.05rem;
+  min-width: 0;
+  text-transform: lowercase;
+}
+.member-hint {
+  padding: 0.2rem 0.4rem;
+}
+.group-create-btn {
+  min-height: 40px;
+  border-radius: 999px;
+  font-size: 0.88rem;
 }
 .list-head h2 {
   font-size: 1.25rem;

@@ -60,9 +60,14 @@ const MAX_GROUP_MEMBERS = 50;
 
 function getThread(id) {
   return get(
-    "SELECT id, user_a_id, user_b_id, last_message_at, kind, title, owner_id FROM chat_threads WHERE id = ?",
+    "SELECT id, user_a_id, user_b_id, last_message_at, kind, title, owner_id, avatar_url FROM chat_threads WHERE id = ?",
     id,
   );
+}
+
+function unlinkGroupAvatar(url) {
+  const u = url && String(url);
+  if (u && u.startsWith("/uploads/chat/")) unlinkUploadUrl(u, ["chat"]);
 }
 
 function isMember(thread, userId) {
@@ -205,7 +210,7 @@ function groupDto(row, meId) {
     owner_id: row.owner_id ?? "",
     member_count: groupMemberCount(row.id),
     other_nickname: row.title ?? "",
-    other_avatar: "",
+    other_avatar: row.avatar_url ?? "",
     other_online: null,
     other_last_seen_at: null,
     last_body: previewOf(last),
@@ -235,7 +240,7 @@ function threadDto(row, meId) {
 
 router.get("/chats", authRequired, (req, res) => {
   const rows = all(
-    `SELECT id, user_a_id, user_b_id, last_message_at, kind, title, owner_id
+    `SELECT id, user_a_id, user_b_id, last_message_at, kind, title, owner_id, avatar_url
      FROM chat_threads t
      WHERE (
          t.kind = 'dm'
@@ -289,18 +294,22 @@ router.post("/chats/group", authRequired, (req, res) => {
   const title = String(req.body?.title ?? "").trim();
   if (!title) return res.status(400).json({ error: "нужно название" });
   if (title.length > MAX_GROUP_TITLE) return res.status(400).json({ error: "название слишком длинное" });
+  const avatarUrl = String(req.body?.avatar_url ?? "").trim();
+  if (avatarUrl && !avatarUrl.startsWith("/uploads/chat/")) {
+    return res.status(400).json({ error: "bad avatar" });
+  }
   const rawNicks = Array.isArray(req.body?.members) ? req.body.members : [];
   const id = uuidv4();
   const now = nowIso();
-  /* для групп user_b_id = id треда: NOT NULL и UNIQUE(a,b) не мешают */
   run(
-    "INSERT INTO chat_threads (id, user_a_id, user_b_id, created_at, kind, title, owner_id) VALUES (?, ?, ?, ?, 'group', ?, ?)",
+    "INSERT INTO chat_threads (id, user_a_id, user_b_id, created_at, kind, title, owner_id, avatar_url) VALUES (?, ?, ?, ?, 'group', ?, ?, ?)",
     id,
     req.user.id,
     id,
     now,
     title,
     req.user.id,
+    avatarUrl,
   );
   run(
     "INSERT INTO chat_thread_members (thread_id, user_id, joined_at) VALUES (?, ?, ?)",
@@ -326,6 +335,43 @@ router.post("/chats/group", authRequired, (req, res) => {
   }
   res.status(201).json({ ...groupDto(getThread(id), req.user.id), missing });
 });
+
+router.post(
+  "/chats/group-avatar",
+  authRequired,
+  (req, res, next) => {
+    chatUpload.single("file")(req, res, (err) => {
+      if (err) {
+        const msg = err?.message ?? "upload error";
+        return res.status(400).json({ error: msg });
+      }
+      next();
+    });
+  },
+  async (req, res) => {
+    if (!guardChatOutgoing(req, res)) {
+      if (req.file?.path) {
+        try {
+          fs.unlinkSync(req.file.path);
+        } catch {}
+      }
+      return;
+    }
+    if (!req.file) return res.status(400).json({ error: "no file" });
+    const probe = await verifyRasterImage(req.file.path);
+    if (!probe.ok) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch {
+        /* ignore */
+      }
+      return res.status(400).json({ error: "invalid image" });
+    }
+    const r = await optimizeUploadedFile(req.file.path, "chat");
+    if (r.ok) req.file.filename = r.filename;
+    res.json({ url: `/uploads/chat/${req.file.filename}` });
+  },
+);
 
 router.post("/chats/:id/members", authRequired, (req, res) => {
   const thread = getThread(req.params.id);
@@ -398,6 +444,7 @@ router.get("/chats/:id/messages", authRequired, (req, res) => {
       group: {
         title: thread.title ?? "",
         owner_id: thread.owner_id ?? "",
+        avatar_url: thread.avatar_url ?? "",
         members: groupMembers(thread.id),
       },
     });
@@ -458,6 +505,7 @@ router.delete("/chats/:id", authRequired, (req, res) => {
         }
       }
       run("DELETE FROM chat_messages WHERE thread_id = ?", thread.id);
+      unlinkGroupAvatar(thread.avatar_url);
       run("DELETE FROM chat_threads WHERE id = ?", thread.id);
     }
     return res.json({ ok: true });

@@ -442,6 +442,16 @@ try {
 }
 
 try {
+  db.prepare("SELECT avatar_url FROM chat_threads LIMIT 1").get();
+} catch {
+  try {
+    db.exec("ALTER TABLE chat_threads ADD COLUMN avatar_url TEXT NOT NULL DEFAULT ''");
+  } catch {
+    // ignore
+  }
+}
+
+try {
   db.prepare("SELECT nickname_change_count FROM users LIMIT 1").get();
 } catch {
   try {
@@ -571,6 +581,7 @@ db.exec(`
     kind TEXT NOT NULL DEFAULT 'dm',
     title TEXT NOT NULL DEFAULT '',
     owner_id TEXT,
+    avatar_url TEXT NOT NULL DEFAULT '',
     UNIQUE (user_a_id, user_b_id),
     FOREIGN KEY (user_a_id) REFERENCES users(id),
     FOREIGN KEY (user_b_id) REFERENCES users(id)

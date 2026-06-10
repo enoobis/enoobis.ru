@@ -45,6 +45,7 @@ export type ChatGroupMember = { id: string; nickname: string; avatar_url: string
 export type ChatGroupInfo = {
   title: string;
   owner_id: string;
+  avatar_url?: string;
   members: ChatGroupMember[];
 };
 
@@ -69,12 +70,30 @@ export function openChatWith(nickname: string, token: string) {
   });
 }
 
-export function createGroupChat(token: string, title: string, members: string[]) {
+export function createGroupChat(
+  token: string,
+  payload: { title: string; members: string[]; avatar_url?: string },
+) {
   return api<ChatThread & { missing: string[] }>("/api/chats/group", {
     method: "POST",
     token,
-    body: JSON.stringify({ title, members }),
+    body: JSON.stringify(payload),
   });
+}
+
+export async function uploadGroupAvatar(token: string, file: File) {
+  const fd = new FormData();
+  fd.append("file", file);
+  const res = await fetch("/api/chats/group-avatar", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: fd,
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data?.error ?? "upload error");
+  }
+  return (await res.json()) as { url: string };
 }
 
 export function addGroupMember(threadId: string, token: string, nickname: string) {
