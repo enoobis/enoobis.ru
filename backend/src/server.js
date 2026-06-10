@@ -55,7 +55,7 @@ app.use("/api", adminRoutes);
 
 app.use("/api", (req, res) => res.status(404).json({ error: "api not found" }));
 app.use((err, _req, res, _next) => {
-  if (process.env.NODE_ENV !== "production") console.error(err);
+  console.error("api error:", err?.message ?? err);
   res.status(500).json({ error: "internal error" });
 });
 

@@ -14,6 +14,46 @@ import { unlinkUploadUrl } from "../utils/uploadSafe.js";
 const router = express.Router();
 const MAX_BODY = 4000;
 
+function ensureChatSchema() {
+  try {
+    const cols = new Set(all("PRAGMA table_info(chat_threads)").map((c) => c.name));
+    if (cols.size && !cols.has("kind")) {
+      run("ALTER TABLE chat_threads ADD COLUMN kind TEXT NOT NULL DEFAULT 'dm'");
+    }
+    if (cols.size && !cols.has("title")) {
+      run("ALTER TABLE chat_threads ADD COLUMN title TEXT NOT NULL DEFAULT ''");
+    }
+    if (cols.size && !cols.has("owner_id")) {
+      run("ALTER TABLE chat_threads ADD COLUMN owner_id TEXT");
+    }
+    if (cols.size && !cols.has("avatar_url")) {
+      run("ALTER TABLE chat_threads ADD COLUMN avatar_url TEXT NOT NULL DEFAULT ''");
+    }
+    run(`
+      CREATE TABLE IF NOT EXISTS chat_thread_members (
+        thread_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        joined_at TEXT NOT NULL,
+        last_read_at TEXT,
+        PRIMARY KEY (thread_id, user_id),
+        FOREIGN KEY (thread_id) REFERENCES chat_threads(id),
+        FOREIGN KEY (user_id) REFERENCES users(id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_chat_thread_members_user ON chat_thread_members(user_id);
+    `);
+  } catch (e) {
+    console.warn("chat schema ensure:", e?.message ?? e);
+  }
+}
+
+function asyncRoute(fn) {
+  return (req, res, next) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
+}
+
+ensureChatSchema();
+
 function userLimitsJson(userId) {
   return get("SELECT content_limits_json FROM users WHERE id = ?", userId)?.content_limits_json ?? "{}";
 }
@@ -348,29 +388,38 @@ router.post(
       next();
     });
   },
-  async (req, res) => {
-    if (!guardChatOutgoing(req, res)) {
+  asyncRoute(async (req, res) => {
+    try {
+      if (!guardChatOutgoing(req, res)) {
+        if (req.file?.path) {
+          try {
+            fs.unlinkSync(req.file.path);
+          } catch {}
+        }
+        return;
+      }
+      if (!req.file) return res.status(400).json({ error: "no file" });
+      const probe = await verifyRasterImage(req.file.path);
+      if (!probe.ok) {
+        try {
+          fs.unlinkSync(req.file.path);
+        } catch {
+          /* ignore */
+        }
+        return res.status(400).json({ error: "invalid image" });
+      }
+      const r = await optimizeUploadedFile(req.file.path, "chat");
+      if (r.ok) req.file.filename = r.filename;
+      res.json({ url: `/uploads/chat/${req.file.filename}` });
+    } catch (e) {
       if (req.file?.path) {
         try {
           fs.unlinkSync(req.file.path);
         } catch {}
       }
-      return;
+      throw e;
     }
-    if (!req.file) return res.status(400).json({ error: "no file" });
-    const probe = await verifyRasterImage(req.file.path);
-    if (!probe.ok) {
-      try {
-        fs.unlinkSync(req.file.path);
-      } catch {
-        /* ignore */
-      }
-      return res.status(400).json({ error: "invalid image" });
-    }
-    const r = await optimizeUploadedFile(req.file.path, "chat");
-    if (r.ok) req.file.filename = r.filename;
-    res.json({ url: `/uploads/chat/${req.file.filename}` });
-  },
+  }),
 );
 
 router.post("/chats/:id/members", authRequired, (req, res) => {
@@ -603,7 +652,7 @@ router.post(
       next();
     });
   },
-  async (req, res) => {
+  asyncRoute(async (req, res) => {
     const thread = getThread(req.params.id);
     if (!thread) {
       if (req.file?.path) {
@@ -643,7 +692,7 @@ router.post(
     if (r.ok) req.file.filename = r.filename;
     const url = `/uploads/chat/${req.file.filename}`;
     res.json({ url });
-  },
+  }),
 );
 
 router.patch("/chats/messages/:id", authRequired, (req, res) => {
