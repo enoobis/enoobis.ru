@@ -1446,7 +1446,6 @@ onUnmounted(() => {
   grid-template-columns: 320px 1fr;
   gap: 0;
   border: 1px solid var(--border);
-  border-radius: var(--radius);
   /* сначала vh — старые браузеры; dvh — мобильный chrome без «обрезания» композера */
   height: calc(100vh - 8.75rem);
   max-height: calc(100vh - 8.75rem);
