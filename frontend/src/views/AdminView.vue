@@ -4,6 +4,7 @@ import { RouterLink } from "vue-router";
 import FilterSearch from "../components/FilterSearch.vue";
 import PageHeader from "../components/PageHeader.vue";
 import AdminWorkTab from "../components/AdminWorkTab.vue";
+import AppIcon from "../components/AppIcon.vue";
 import { api } from "../api/http";
 import {
   approveBlogPost,
@@ -472,6 +473,7 @@ function onShopEditEscape(e: KeyboardEvent) {
   if (e.key !== "Escape") return;
   if (shopAddOpen.value) closeShopAdd();
   else if (shopEditOpen.value) closeShopEdit();
+  else if (moderateUserId.value) closeModerate();
 }
 
 function shopKindRu(k: ShopItemKind): string {
@@ -673,6 +675,68 @@ function closeModerate() {
   moderateGemInput.value = "";
 }
 
+const moderateRole = computed(
+  () => users.value.find((x) => x.id === moderateUserId.value)?.role ?? "",
+);
+
+function roleRu(r: string) {
+  if (r === "admin") return "админ";
+  if (r === "teacher") return "ментор";
+  if (r === "master") return "мастер";
+  return "ученик";
+}
+
+const coinsRowId = ref<string | null>(null);
+const coinsRowInput = ref("");
+const coinsRowBusy = ref(false);
+
+function toggleCoinsRow(id: string) {
+  coinsRowId.value = coinsRowId.value === id ? null : id;
+  coinsRowInput.value = "";
+}
+
+async function giveCoinsRow(u: AdminUser) {
+  if (!auth.token || coinsRowBusy.value) return;
+  const n = Math.floor(Number(coinsRowInput.value.trim()));
+  if (!Number.isFinite(n) || n < 1 || n > 100_000) {
+    err.value = "монеты: число от 1 до 100000";
+    return;
+  }
+  coinsRowBusy.value = true;
+  err.value = "";
+  try {
+    const r = await postAdminUserCoins(auth.token, u.id, n);
+    u.coins = r.coins;
+    coinsRowId.value = null;
+    coinsRowInput.value = "";
+  } catch (e) {
+    err.value = e instanceof Error ? e.message : "ошибка";
+  } finally {
+    coinsRowBusy.value = false;
+  }
+}
+
+async function setModerateRole(role: "student" | "teacher" | "master") {
+  if (!moderateUserId.value || modBusy.value) return;
+  modBusy.value = true;
+  modMsg.value = "";
+  try {
+    await setRole(moderateUserId.value, role);
+    modMsg.value = "роль обновлена";
+  } catch (e) {
+    modMsg.value = e instanceof Error ? e.message : "ошибка";
+  } finally {
+    modBusy.value = false;
+  }
+}
+
+async function removeModerateUser() {
+  const u = users.value.find((x) => x.id === moderateUserId.value);
+  if (!u) return;
+  await removeUser(u.id, u.nickname);
+  if (!users.value.some((x) => x.id === u.id)) closeModerate();
+}
+
 async function giveModerateGems() {
   const id = moderateUserId.value;
   if (!auth.token || !id || !moderateDetail.value) return;
@@ -844,10 +908,7 @@ async function approveBlog(id: string) {
         заявки <span v-if="pending.length" class="muted small">{{ pending.length }}</span>
       </button>
       <button class="filter-tab" :class="{ on: tab === 'users' }" type="button" @click="tab = 'users'">
-        пользователи
-      </button>
-      <button class="filter-tab" :class="{ on: tab === 'reports' }" type="button" @click="tab = 'reports'">
-        жалобы <span v-if="reports.length" class="muted small">{{ reports.length }}</span>
+        люди
       </button>
       <button class="filter-tab" :class="{ on: tab === 'shop' }" type="button" @click="tab = 'shop'">
         магазин
@@ -857,6 +918,9 @@ async function approveBlog(id: string) {
       </button>
       <button class="filter-tab" :class="{ on: tab === 'work' }" type="button" @click="tab = 'work'">
         работа
+      </button>
+       <button class="filter-tab" :class="{ on: tab === 'reports' }" type="button" @click="tab = 'reports'">
+        жалобы <span v-if="reports.length" class="muted small">{{ reports.length }}</span>
       </button>
     </nav>
 
@@ -903,14 +967,66 @@ async function approveBlog(id: string) {
 
     <template v-else-if="tab === 'users'">
       <FilterSearch v-model="usersQuery" class="admin-users-search" />
-      <div v-if="moderateUserId" class="mod-panel">
+      <p v-if="!filteredUsers.length" class="muted">не найдено</p>
+      <ul v-else class="list user-list">
+        <li v-for="u in filteredUsers" :key="u.id" class="user-row">
+          <span class="user-ava">
+            <img v-if="u.avatar_url" :src="u.avatar_url" alt="" loading="lazy" />
+          </span>
+          <div class="user-info">
+            <strong>{{ u.nickname }}</strong>
+            <span class="muted small">{{ roleRu(u.role) }} · {{ u.status }} · {{ u.email }}</span>
+          </div>
+          <div class="user-side">
+            <template v-if="coinsRowId === u.id">
+              <input
+                v-model="coinsRowInput"
+                class="gem-in"
+                type="number"
+                min="1"
+                max="100000"
+                step="1"
+                placeholder="сколько"
+                @keydown.enter.prevent="giveCoinsRow(u)"
+              />
+              <button type="button" :disabled="coinsRowBusy" @click="giveCoinsRow(u)">выдать</button>
+              <button class="secondary user-coins-cancel" type="button" aria-label="отмена" @click="toggleCoinsRow(u.id)">
+                <AppIcon name="close" :size="14" />
+              </button>
+            </template>
+            <template v-else>
+              <button class="user-coins" type="button" title="начислить монеты" @click="toggleCoinsRow(u.id)">
+                <img src="/coin-gem.png" alt="" width="16" height="16" />
+                <span>{{ u.coins ?? 0 }}</span>
+                <span class="user-coins-plus">+</span>
+              </button>
+              <button class="secondary" type="button" :disabled="modBusy" @click="openModerate(u)">открыть</button>
+            </template>
+          </div>
+        </li>
+      </ul>
+
+      <Teleport to="body">
+      <div v-if="moderateUserId" class="shop-edit-root" role="presentation">
+        <button type="button" class="shop-edit-backdrop" aria-label="закрыть" @click="closeModerate" />
+        <div class="shop-edit-dialog card mod-modal" role="dialog" aria-modal="true" aria-label="пользователь">
         <template v-if="moderateDetail">
-          <p class="mod-title">
-            <strong>{{ moderateDetail.nickname }}</strong>
-            <span class="muted small"> · {{ moderateDetail.email }}</span>
-          </p>
-          <div class="mod-gems">
-            <span class="muted small">монеты · {{ moderateDetail.coins ?? 0 }}</span>
+          <header class="mod-head">
+            <span class="mod-avatar">
+              <img v-if="moderateDetail.avatar_url" :src="moderateDetail.avatar_url" alt="" />
+            </span>
+            <div class="mod-head-info">
+              <strong>{{ moderateDetail.nickname }}</strong>
+              <span class="muted small">{{ moderateDetail.email }}</span>
+            </div>
+            <button class="mod-close" type="button" aria-label="закрыть" @click="closeModerate">
+              <AppIcon name="close" :size="18" />
+            </button>
+          </header>
+
+          <div class="mod-coins">
+            <img src="/coin-gem.png" alt="" width="18" height="18" />
+            <strong>{{ moderateDetail.coins ?? 0 }}</strong>
             <input
               v-model="moderateGemInput"
               type="number"
@@ -919,12 +1035,19 @@ async function approveBlog(id: string) {
               step="1"
               class="gem-in"
               placeholder="сколько"
+              @keydown.enter.prevent="giveModerateGems"
             />
-            <button type="button" class="secondary" :disabled="modBusy" @click="giveModerateGems">выдать</button>
+            <button type="button" class="secondary" :disabled="modBusy" @click="giveModerateGems">начислить</button>
           </div>
-          <div v-if="moderateDetail.avatar_url" class="mod-avatar">
-            <img :src="moderateDetail.avatar_url" alt="" />
+
+          <div v-if="moderateRole !== 'admin'" class="filter-tabs mod-role">
+            <button class="filter-tab" type="button" :class="{ on: moderateRole === 'student' }" :disabled="modBusy" @click="setModerateRole('student')">ученик</button>
+            <button class="filter-tab" type="button" :class="{ on: moderateRole === 'teacher' }" :disabled="modBusy" @click="setModerateRole('teacher')">ментор</button>
+            <button class="filter-tab" type="button" :class="{ on: moderateRole === 'master' }" :disabled="modBusy" @click="setModerateRole('master')">мастер</button>
           </div>
+
+          <details class="mod-sec">
+            <summary>профиль</summary>
           <div class="mod-grid">
             <label class="mod-field">
               <span class="muted small">ник</span>
@@ -979,10 +1102,12 @@ async function approveBlog(id: string) {
               />
             </label>
             <button class="secondary" type="button" :disabled="modBusy" @click="resetModerateAvatar">сбросить аватар</button>
-            <button class="secondary" type="button" :disabled="modBusy" @click="closeModerate">закрыть</button>
           </div>
+          </details>
+
+          <details class="mod-sec">
+            <summary>лимиты</summary>
           <div class="mod-limits">
-            <p class="muted small">лимиты</p>
             <div class="lim-block">
               <span class="lim-title">блог</span>
               <label class="lim-row">
@@ -1105,8 +1230,11 @@ async function approveBlog(id: string) {
             </div>
             <button type="button" :disabled="modBusy" @click="saveModerateLimits">сохранить лимиты</button>
           </div>
+          </details>
+
+          <details class="mod-sec">
+            <summary>инвайты</summary>
           <div class="mod-invites">
-            <p class="muted small">инвайты пользователя</p>
             <ul v-if="modInvites.length" class="invite-list">
               <li v-for="inv in modInvites" :key="inv.id">
                 <code class="invite-code">{{ fullInviteUrl(inv.code) }}</code>
@@ -1126,40 +1254,23 @@ async function approveBlog(id: string) {
               </button>
             </div>
           </div>
+          </details>
+
+          <button
+            v-if="moderateRole !== 'admin'"
+            class="secondary danger mod-delete"
+            type="button"
+            :disabled="modBusy"
+            @click="removeModerateUser"
+          >
+            удалить пользователя
+          </button>
         </template>
+        <p v-if="!moderateDetail" class="muted small">загрузка…</p>
         <p v-if="modMsg" class="muted small">{{ modMsg }}</p>
-        <button v-if="!moderateDetail" class="secondary" type="button" @click="closeModerate">закрыть</button>
+        </div>
       </div>
-      <p v-if="!filteredUsers.length" class="muted">не найдено</p>
-      <ul v-else class="list">
-        <li v-for="u in filteredUsers" :key="u.id">
-          <div>
-            <strong>{{ u.nickname }}</strong>
-            <span class="muted small"> · {{ u.role }} · {{ u.status }} · {{ u.coins ?? 0 }} · {{ u.email }}</span>
-          </div>
-          <div class="row-actions">
-            <button class="secondary" type="button" :disabled="modBusy" @click="openModerate(u)">модерация</button>
-            <button class="secondary" type="button" :disabled="u.role === 'student'" @click="setRole(u.id, 'student')">
-              ученик
-            </button>
-            <button class="secondary" type="button" :disabled="u.role === 'teacher' || u.role === 'admin'" @click="setRole(u.id, 'teacher')">
-              ментор
-            </button>
-            <button class="secondary" type="button" :disabled="u.role === 'master' || u.role === 'admin'" @click="setRole(u.id, 'master')">
-              мастер
-            </button>
-            <button class="secondary" type="button" @click="addInvite(u.id, 'student')">+ инвайт</button>
-            <button
-              v-if="u.role !== 'admin'"
-              class="secondary danger"
-              type="button"
-              @click="removeUser(u.id, u.nickname)"
-            >
-              удалить
-            </button>
-          </div>
-        </li>
-      </ul>
+      </Teleport>
     </template>
 
     <template v-else-if="tab === 'reports'">
@@ -1451,21 +1562,135 @@ async function approveBlog(id: string) {
 strong {
   font-weight: 500;
 }
-.mod-panel {
-  margin-bottom: 1.25rem;
-  padding: 1rem 0;
-  border-bottom: 1px solid var(--border);
+.user-list .user-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+.user-ava {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: var(--avatar-radius);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+.user-ava img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.user-info {
+  min-width: 0;
+  flex: 1;
   display: grid;
-  gap: 0.6rem;
+  gap: 0.1rem;
 }
-.mod-title {
-  margin: 0;
+.user-info strong,
+.user-info .small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.mod-gems {
+.user-side {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+.user-coins {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.55rem;
+  min-height: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text);
+  font-size: 0.875rem;
+}
+.user-coins:hover {
+  background: var(--surface);
+  transform: none;
+}
+.user-coins-plus {
+  color: var(--muted);
+}
+.user-coins-cancel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.3rem;
+  min-height: 0;
+}
+.shop-edit-dialog.mod-modal {
+  width: min(100%, 32rem);
+  max-height: 86vh;
+  overflow-y: auto;
+}
+.mod-head {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+.mod-head-info {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 0.1rem;
+}
+.mod-head-info strong,
+.mod-head-info .small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mod-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.3rem;
+  min-height: 0;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+}
+.mod-close:hover {
+  color: var(--text);
+  background: transparent;
+  transform: none;
+}
+.mod-coins {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.45rem;
+}
+.mod-role {
+  display: flex;
+  gap: 0.35rem;
+}
+.mod-sec summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.875rem;
+  padding: 0.35rem 0;
+  user-select: none;
+}
+.mod-sec summary:hover {
+  color: var(--text);
+}
+.mod-sec[open] summary {
+  color: var(--text);
+}
+.mod-sec > :not(summary) {
+  margin-top: 0.5rem;
+}
+.mod-delete {
+  justify-self: start;
 }
 .gem-in {
   width: 5.5rem;
@@ -1481,6 +1706,7 @@ strong {
 .mod-avatar {
   width: 48px;
   height: 48px;
+  flex-shrink: 0;
   border-radius: var(--avatar-radius);
   overflow: hidden;
   border: 1px solid var(--border);
@@ -1567,9 +1793,8 @@ strong {
   word-break: break-all;
 }
 .mod-invites {
-  margin-top: 1rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--border);
+  display: grid;
+  gap: 0.5rem;
 }
 .mod-actions {
   display: flex;
@@ -1590,9 +1815,6 @@ strong {
   background: var(--surface);
 }
 .mod-limits {
-  margin-top: 1rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--border);
   display: grid;
   gap: 0.65rem;
 }
