@@ -330,50 +330,59 @@ router.get("/chats/unread-count", authRequired, (req, res) => {
 });
 
 router.post("/chats/group", authRequired, (req, res) => {
-  if (!guardChatOutgoing(req, res)) return;
-  const title = String(req.body?.title ?? "").trim();
-  if (!title) return res.status(400).json({ error: "нужно название" });
-  if (title.length > MAX_GROUP_TITLE) return res.status(400).json({ error: "название слишком длинное" });
-  const avatarUrl = String(req.body?.avatar_url ?? "").trim();
-  if (avatarUrl && !avatarUrl.startsWith("/uploads/chat/")) {
-    return res.status(400).json({ error: "bad avatar" });
-  }
-  const rawNicks = Array.isArray(req.body?.members) ? req.body.members : [];
-  const id = uuidv4();
-  const now = nowIso();
-  run(
-    "INSERT INTO chat_threads (id, user_a_id, user_b_id, created_at, kind, title, owner_id, avatar_url) VALUES (?, ?, ?, ?, 'group', ?, ?, ?)",
-    id,
-    req.user.id,
-    id,
-    now,
-    title,
-    req.user.id,
-    avatarUrl,
-  );
-  run(
-    "INSERT INTO chat_thread_members (thread_id, user_id, joined_at) VALUES (?, ?, ?)",
-    id,
-    req.user.id,
-    now,
-  );
-  const missing = [];
-  for (const raw of rawNicks.slice(0, MAX_GROUP_MEMBERS)) {
-    const nick = String(raw).trim();
-    if (!nick) continue;
-    const u = get("SELECT id FROM users WHERE nickname = ?", nick);
-    if (!u) {
-      missing.push(nick);
-      continue;
+  try {
+    if (!guardChatOutgoing(req, res)) return;
+    const title = String(req.body?.title ?? "").trim();
+    if (!title) return res.status(400).json({ error: "нужно название" });
+    if (title.length > MAX_GROUP_TITLE) return res.status(400).json({ error: "название слишком длинное" });
+    const avatarUrl = String(req.body?.avatar_url ?? "").trim();
+    if (avatarUrl && !avatarUrl.startsWith("/uploads/chat/")) {
+      return res.status(400).json({ error: "bad avatar" });
     }
+    const rawNicks = Array.isArray(req.body?.members) ? req.body.members : [];
+    const id = uuidv4();
+    const now = nowIso();
+    const ownerId = req.user.id;
     run(
-      "INSERT OR IGNORE INTO chat_thread_members (thread_id, user_id, joined_at) VALUES (?, ?, ?)",
+      "INSERT INTO chat_threads (id, user_a_id, user_b_id, created_at, kind, title, owner_id, avatar_url) VALUES (?, ?, ?, ?, 'group', ?, ?, ?)",
       id,
-      u.id,
+      ownerId,
+      ownerId,
+      now,
+      title,
+      ownerId,
+      avatarUrl,
+    );
+    run(
+      "INSERT INTO chat_thread_members (thread_id, user_id, joined_at) VALUES (?, ?, ?)",
+      id,
+      ownerId,
       now,
     );
+    const missing = [];
+    for (const raw of rawNicks.slice(0, MAX_GROUP_MEMBERS)) {
+      const nick = String(raw).trim();
+      if (!nick) continue;
+      const u = get("SELECT id FROM users WHERE nickname = ?", nick);
+      if (!u) {
+        missing.push(nick);
+        continue;
+      }
+      if (u.id === ownerId) continue;
+      run(
+        "INSERT OR IGNORE INTO chat_thread_members (thread_id, user_id, joined_at) VALUES (?, ?, ?)",
+        id,
+        u.id,
+        now,
+      );
+    }
+    const row = getThread(id);
+    if (!row) return res.status(500).json({ error: "create failed" });
+    res.status(201).json({ ...groupDto(row, req.user.id), missing });
+  } catch (e) {
+    console.error("POST /chats/group:", e?.message ?? e);
+    res.status(500).json({ error: "internal error" });
   }
-  res.status(201).json({ ...groupDto(getThread(id), req.user.id), missing });
 });
 
 router.post(

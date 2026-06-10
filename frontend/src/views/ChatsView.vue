@@ -41,7 +41,12 @@ const otherAvatar = ref("");
 const otherOnline = ref<boolean | null>(null);
 const otherLastSeenAt = ref<string | null>(null);
 const groupInfo = ref<ChatGroupInfo | null>(null);
-const groupFormOpen = ref(false);
+const composeOpen = ref(false);
+const composeMode = ref<"user" | "group">("user");
+const composeQuery = ref("");
+const composeSuggestions = ref<SearchUser[]>([]);
+const composePickIdx = ref(0);
+const composeSearching = ref(false);
 const addMemberOpen = ref(false);
 const groupTitle = ref("");
 const groupAvatarFile = ref<File | null>(null);
@@ -54,6 +59,7 @@ const memberSearching = ref(false);
 const creatingGroup = ref(false);
 const groupAvatarInput = ref<HTMLInputElement | null>(null);
 const memberInput = ref<HTMLInputElement | null>(null);
+const composeInput = ref<HTMLInputElement | null>(null);
 let memberSearchTimer: ReturnType<typeof setTimeout> | null = null;
 
 const pickedNicknames = computed(() => new Set(selectedMembers.value.map((u) => u.nickname)));
@@ -75,14 +81,87 @@ function focusMemberInput() {
   memberInput.value?.focus();
 }
 
-function openGroupForm() {
+function openCompose() {
+  composeMode.value = "user";
+  composeQuery.value = "";
+  composeSuggestions.value = [];
+  composePickIdx.value = 0;
   resetGroupForm();
-  groupFormOpen.value = true;
+  composeOpen.value = true;
+  nextTick(() => composeInput.value?.focus());
 }
 
-function closeGroupForm() {
-  groupFormOpen.value = false;
+function closeCompose() {
+  composeOpen.value = false;
+  composeMode.value = "user";
+  composeQuery.value = "";
+  composeSuggestions.value = [];
   resetGroupForm();
+}
+
+function switchComposeGroup() {
+  composeMode.value = "group";
+  nextTick(() => memberInput.value?.focus());
+}
+
+function switchComposeUser() {
+  composeMode.value = "user";
+  nextTick(() => composeInput.value?.focus());
+}
+
+async function fetchComposeSuggestions(q: string) {
+  const needle = q.trim();
+  if (!needle) {
+    composeSuggestions.value = [];
+    composePickIdx.value = 0;
+    return;
+  }
+  composeSearching.value = true;
+  try {
+    const data = await search(needle, 8);
+    composeSuggestions.value = data.users.filter((u) => u.nickname !== auth.nickname);
+    composePickIdx.value = 0;
+  } catch {
+    composeSuggestions.value = [];
+  } finally {
+    composeSearching.value = false;
+  }
+}
+
+watch(composeQuery, (q) => {
+  if (!composeOpen.value || composeMode.value !== "user") return;
+  if (memberSearchTimer) clearTimeout(memberSearchTimer);
+  memberSearchTimer = setTimeout(() => void fetchComposeSuggestions(q), 180);
+});
+
+async function startChatWith(u: SearchUser) {
+  if (!auth.token) return;
+  try {
+    const t = await openChatWith(u.nickname, auth.token);
+    closeCompose();
+    await loadChats();
+    router.replace({ name: "chats", query: { id: t.id } });
+  } catch (e) {
+    toastError(e);
+  }
+}
+
+function onComposeKey(e: KeyboardEvent) {
+  const list = composeSuggestions.value;
+  if (e.key === "ArrowDown" && list.length) {
+    e.preventDefault();
+    composePickIdx.value = (composePickIdx.value + 1) % list.length;
+    return;
+  }
+  if (e.key === "ArrowUp" && list.length) {
+    e.preventDefault();
+    composePickIdx.value = (composePickIdx.value - 1 + list.length) % list.length;
+    return;
+  }
+  if ((e.key === "Enter" || e.key === "Tab") && list.length) {
+    e.preventDefault();
+    void startChatWith(list[composePickIdx.value]!);
+  }
 }
 
 function pickGroupAvatar() {
@@ -124,7 +203,7 @@ async function fetchMemberSuggestions(q: string) {
 }
 
 watch(memberQuery, (q) => {
-  if (!groupFormOpen.value) return;
+  if (!composeOpen.value || composeMode.value !== "group") return;
   if (memberSearchTimer) clearTimeout(memberSearchTimer);
   memberSearchTimer = setTimeout(() => void fetchMemberSuggestions(q), 180);
 });
@@ -189,8 +268,8 @@ async function createGroup() {
       members: selectedMembers.value.map((u) => u.nickname),
       avatar_url: avatarUrl || undefined,
     });
-    if (t.missing.length) toastError(new Error(`не найдены: ${t.missing.join(", ")}`));
-    closeGroupForm();
+    if (t.missing?.length) toastError(new Error(`не найдены: ${t.missing.join(", ")}`));
+    closeCompose();
     await loadChats();
     router.replace({ name: "chats", query: { id: t.id } });
   } catch (e) {
@@ -815,9 +894,9 @@ onUnmounted(() => {
         <button
           type="button"
           class="list-head-act"
-          aria-label="новая группа"
-          title="новая группа"
-          @click="openGroupForm"
+          aria-label="новый чат"
+          title="новый чат"
+          @click="openCompose"
         >
           <AppIcon name="plus" :size="18" />
         </button>
@@ -1106,57 +1185,39 @@ onUnmounted(() => {
     </main>
 
     <Teleport to="body">
-      <div v-if="groupFormOpen" class="group-modal" @click.self="closeGroupForm">
-        <form class="group-modal-card" @submit.prevent="createGroup">
+      <div v-if="composeOpen" class="group-modal" @click.self="closeCompose">
+        <div class="group-modal-card">
           <div class="group-modal-head">
-            <span>новая группа</span>
-            <button type="button" class="group-modal-x" aria-label="закрыть" @click="closeGroupForm">
-              ×
+            <button
+              v-if="composeMode === 'group'"
+              type="button"
+              class="group-modal-back"
+              aria-label="назад"
+              @click="switchComposeUser"
+            >
+              ←
             </button>
+            <span v-else class="group-modal-spacer" aria-hidden="true" />
+            <span>{{ composeMode === "group" ? "новая группа" : "новый чат" }}</span>
+            <button type="button" class="group-modal-x" aria-label="закрыть" @click="closeCompose">×</button>
           </div>
-          <button type="button" class="group-avatar-pick" aria-label="аватар группы" @click="pickGroupAvatar">
-            <img v-if="groupAvatarPreview" :src="groupAvatarPreview" alt="" />
-            <AppIcon v-else name="users" :size="28" />
-          </button>
-          <input
-            ref="groupAvatarInput"
-            type="file"
-            accept="image/*"
-            hidden
-            @change="onGroupAvatarChange"
-          />
-          <input
-            v-model="groupTitle"
-            type="text"
-            class="group-title-in"
-            placeholder="название"
-            :maxlength="80"
-          />
-          <div class="member-picker">
-            <div class="member-combo" @click="focusMemberInput">
-              <span v-for="u in selectedMembers" :key="u.nickname" class="member-chip">
-                <span class="member-chip-av">
-                  <img v-if="u.avatar_url" :src="u.avatar_url" alt="" />
-                  <AppIcon v-else name="profile" :size="12" />
-                </span>
-                <span class="member-chip-nick">{{ u.nickname }}</span>
-              </span>
-              <input
-                ref="memberInput"
-                v-model="memberQuery"
-                type="text"
-                class="member-query"
-                :placeholder="selectedMembers.length ? '' : 'ник участника'"
-                autocomplete="off"
-                @keydown="onMemberKey"
-              />
-            </div>
-            <ul v-if="memberSuggestions.length" class="member-suggest">
+
+          <template v-if="composeMode === 'user'">
+            <input
+              ref="composeInput"
+              v-model="composeQuery"
+              type="text"
+              class="compose-query"
+              placeholder="ник"
+              autocomplete="off"
+              @keydown="onComposeKey"
+            />
+            <ul v-if="composeSuggestions.length" class="member-suggest">
               <li
-                v-for="(u, i) in memberSuggestions"
+                v-for="(u, i) in composeSuggestions"
                 :key="u.nickname"
-                :class="{ on: i === memberPickIdx }"
-                @mousedown.prevent="addPickedMember(u)"
+                :class="{ on: i === composePickIdx }"
+                @mousedown.prevent="startChatWith(u)"
               >
                 <span class="member-suggest-av">
                   <img v-if="u.avatar_url" :src="u.avatar_url" alt="" />
@@ -1168,12 +1229,75 @@ onUnmounted(() => {
                 </span>
               </li>
             </ul>
-            <p v-else-if="memberSearching" class="muted small member-hint">поиск…</p>
-          </div>
-          <button type="submit" class="group-create-btn" :disabled="creatingGroup || !groupTitle.trim()">
-            {{ creatingGroup ? "…" : "создать" }}
-          </button>
-        </form>
+            <p v-else-if="composeSearching" class="muted small member-hint">поиск…</p>
+            <button type="button" class="compose-switch" @click="switchComposeGroup">
+              <AppIcon name="users" :size="16" />
+              <span>создать группу</span>
+            </button>
+          </template>
+
+          <form v-else @submit.prevent="createGroup">
+            <button type="button" class="group-avatar-pick" aria-label="аватар группы" @click="pickGroupAvatar">
+              <img v-if="groupAvatarPreview" :src="groupAvatarPreview" alt="" />
+              <AppIcon v-else name="users" :size="28" />
+            </button>
+            <input
+              ref="groupAvatarInput"
+              type="file"
+              accept="image/*"
+              hidden
+              @change="onGroupAvatarChange"
+            />
+            <input
+              v-model="groupTitle"
+              type="text"
+              class="group-title-in"
+              placeholder="название"
+              :maxlength="80"
+            />
+            <div class="member-picker">
+              <div class="member-combo" @click="focusMemberInput">
+                <span v-for="u in selectedMembers" :key="u.nickname" class="member-chip">
+                  <span class="member-chip-av">
+                    <img v-if="u.avatar_url" :src="u.avatar_url" alt="" />
+                    <AppIcon v-else name="profile" :size="12" />
+                  </span>
+                  <span class="member-chip-nick">{{ u.nickname }}</span>
+                </span>
+                <input
+                  ref="memberInput"
+                  v-model="memberQuery"
+                  type="text"
+                  class="member-query"
+                  :placeholder="selectedMembers.length ? '' : 'ник участника'"
+                  autocomplete="off"
+                  @keydown="onMemberKey"
+                />
+              </div>
+              <ul v-if="memberSuggestions.length" class="member-suggest">
+                <li
+                  v-for="(u, i) in memberSuggestions"
+                  :key="u.nickname"
+                  :class="{ on: i === memberPickIdx }"
+                  @mousedown.prevent="addPickedMember(u)"
+                >
+                  <span class="member-suggest-av">
+                    <img v-if="u.avatar_url" :src="u.avatar_url" alt="" />
+                    <span v-else>{{ u.nickname.slice(0, 2) }}</span>
+                  </span>
+                  <span class="member-suggest-text">
+                    <span>{{ u.nickname }}</span>
+                    <span v-if="u.full_name" class="muted small">{{ u.full_name }}</span>
+                  </span>
+                </li>
+              </ul>
+              <p v-else-if="memberSearching" class="muted small member-hint">поиск…</p>
+            </div>
+            <button type="submit" class="group-create-btn" :disabled="creatingGroup || !groupTitle.trim()">
+              {{ creatingGroup ? "…" : "создать" }}
+            </button>
+          </form>
+        </div>
       </div>
     </Teleport>
 
@@ -1297,13 +1421,72 @@ onUnmounted(() => {
   gap: 0.75rem;
 }
 .group-modal-head {
-  display: flex;
+  display: grid;
+  grid-template-columns: 36px 1fr 36px;
   align-items: center;
-  justify-content: space-between;
   gap: 0.5rem;
   font-size: 0.95rem;
   color: var(--text);
   text-transform: lowercase;
+}
+.group-modal-head > span {
+  text-align: center;
+}
+.group-modal-spacer {
+  width: 36px;
+  height: 36px;
+}
+.group-modal-back {
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.group-modal-back:hover {
+  color: var(--text);
+  background: var(--surface2);
+}
+.compose-query {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.55rem 1rem;
+  font: inherit;
+  font-size: 0.9rem;
+  background: transparent;
+  color: var(--text);
+  width: 100%;
+}
+.compose-query:focus {
+  outline: none;
+  border-color: var(--focus-border);
+}
+.compose-switch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  width: 100%;
+  min-height: 40px;
+  margin-top: 0.25rem;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.88rem;
+  cursor: pointer;
+  text-transform: lowercase;
+}
+.compose-switch:hover {
+  background: var(--surface2);
 }
 .group-modal-x {
   width: 36px;

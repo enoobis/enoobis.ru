@@ -446,9 +446,49 @@ try {
 } catch {
   try {
     db.exec("ALTER TABLE chat_threads ADD COLUMN avatar_url TEXT NOT NULL DEFAULT ''");
-  } catch {
-    // ignore
+  } catch (e) {
+    console.warn("migration chat_threads.avatar_url:", e?.message ?? e);
   }
+}
+
+try {
+  const dmIdx = get(
+    "SELECT 1 AS v FROM sqlite_master WHERE type='index' AND name='idx_chat_threads_dm'",
+  );
+  if (!dmIdx && get("SELECT 1 AS v FROM sqlite_master WHERE type='table' AND name='chat_threads'")) {
+    db.pragma("foreign_keys = OFF");
+    try {
+      db.exec(`
+        CREATE TABLE chat_threads_new (
+          id TEXT PRIMARY KEY,
+          user_a_id TEXT NOT NULL,
+          user_b_id TEXT NOT NULL,
+          last_message_at TEXT,
+          created_at TEXT NOT NULL,
+          kind TEXT NOT NULL DEFAULT 'dm',
+          title TEXT NOT NULL DEFAULT '',
+          owner_id TEXT,
+          avatar_url TEXT NOT NULL DEFAULT '',
+          FOREIGN KEY (user_a_id) REFERENCES users(id),
+          FOREIGN KEY (user_b_id) REFERENCES users(id)
+        );
+        INSERT INTO chat_threads_new
+          SELECT id, user_a_id, user_b_id, last_message_at, created_at,
+                 COALESCE(kind, 'dm'), COALESCE(title, ''), owner_id, COALESCE(avatar_url, '')
+          FROM chat_threads;
+        DROP TABLE chat_threads;
+        ALTER TABLE chat_threads_new RENAME TO chat_threads;
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_chat_threads_dm
+          ON chat_threads(user_a_id, user_b_id) WHERE kind = 'dm';
+        CREATE INDEX IF NOT EXISTS idx_chat_threads_a ON chat_threads(user_a_id, last_message_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_chat_threads_b ON chat_threads(user_b_id, last_message_at DESC);
+      `);
+    } finally {
+      db.pragma("foreign_keys = ON");
+    }
+  }
+} catch (e) {
+  console.warn("migration chat_threads groups:", e?.message ?? e);
 }
 
 try {
@@ -582,10 +622,11 @@ db.exec(`
     title TEXT NOT NULL DEFAULT '',
     owner_id TEXT,
     avatar_url TEXT NOT NULL DEFAULT '',
-    UNIQUE (user_a_id, user_b_id),
     FOREIGN KEY (user_a_id) REFERENCES users(id),
     FOREIGN KEY (user_b_id) REFERENCES users(id)
   );
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_chat_threads_dm
+    ON chat_threads(user_a_id, user_b_id) WHERE kind = 'dm';
   CREATE INDEX IF NOT EXISTS idx_chat_threads_a ON chat_threads(user_a_id, last_message_at DESC);
   CREATE INDEX IF NOT EXISTS idx_chat_threads_b ON chat_threads(user_b_id, last_message_at DESC);
 
