@@ -61,7 +61,18 @@ EOF
 fi
 
 run_as_owner "cd \"$BACKEND\" && npm ci"
-run_as_owner "cd \"$FRONTEND\" && npm ci && npm run build"
+
+# на маленьких vps vite+vue-tsc часто падают с killed — swap и build:deploy без tsc
+if [[ ! -f /swapfile ]] && [[ $(swapon --show 2>/dev/null | wc -l) -lt 1 ]]; then
+  echo "создаём swap 1g для сборки фронта…"
+  fallocate -l 1G /swapfile 2>/dev/null || dd if=/dev/zero of=/swapfile bs=1M count=1024 status=none
+  chmod 600 /swapfile
+  mkswap /swapfile >/dev/null
+  swapon /swapfile
+  grep -q '^/swapfile ' /etc/fstab 2>/dev/null || echo '/swapfile none swap sw 0 0' >>/etc/fstab
+fi
+
+run_as_owner "cd \"$FRONTEND\" && npm ci && npm run build:deploy"
 
 NODE_BIN="$(command -v node)"
 cat >/etc/systemd/system/enoobis-backend.service <<EOF

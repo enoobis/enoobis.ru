@@ -12,11 +12,14 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       target: "es2022",
+      sourcemap: false,
       rollupOptions: {
+        maxParallelFileOps: 2,
         output: {
           manualChunks(id) {
             const norm = id.replace(/\\/g, "/");
             if (!norm.includes("node_modules")) return;
+            if (norm.includes("@lucide/vue")) return "lucide";
             if (
               norm.includes("marked") ||
               norm.includes("dompurify") ||
