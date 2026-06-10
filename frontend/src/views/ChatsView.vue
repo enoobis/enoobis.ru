@@ -71,6 +71,10 @@ function resetGroupForm() {
   groupAvatarFile.value = null;
 }
 
+function focusMemberInput() {
+  memberInput.value?.focus();
+}
+
 function openGroupForm() {
   resetGroupForm();
   groupFormOpen.value = true;
@@ -1129,25 +1133,24 @@ onUnmounted(() => {
             :maxlength="80"
           />
           <div class="member-picker">
-            <div v-if="selectedMembers.length" class="member-chips">
+            <div class="member-combo" @click="focusMemberInput">
               <span v-for="u in selectedMembers" :key="u.nickname" class="member-chip">
                 <span class="member-chip-av">
                   <img v-if="u.avatar_url" :src="u.avatar_url" alt="" />
-                  <span v-else>{{ u.nickname.slice(0, 2) }}</span>
+                  <AppIcon v-else name="profile" :size="12" />
                 </span>
-                <span>{{ u.nickname }}</span>
-                <button type="button" aria-label="убрать" @click="removePickedMember(u.nickname)">×</button>
+                <span class="member-chip-nick">{{ u.nickname }}</span>
               </span>
+              <input
+                ref="memberInput"
+                v-model="memberQuery"
+                type="text"
+                class="member-query"
+                :placeholder="selectedMembers.length ? '' : 'ник участника'"
+                autocomplete="off"
+                @keydown="onMemberKey"
+              />
             </div>
-            <input
-              ref="memberInput"
-              v-model="memberQuery"
-              type="text"
-              class="member-query"
-              placeholder="ник участника"
-              autocomplete="off"
-              @keydown="onMemberKey"
-            />
             <ul v-if="memberSuggestions.length" class="member-suggest">
               <li
                 v-for="(u, i) in memberSuggestions"
@@ -1182,15 +1185,17 @@ onUnmounted(() => {
             <button type="button" class="group-modal-x" aria-label="закрыть" @click="closeAddMember">×</button>
           </div>
           <div class="member-picker">
-            <input
-              ref="memberInput"
-              v-model="memberQuery"
-              type="text"
-              class="member-query"
-              placeholder="ник"
-              autocomplete="off"
-              @keydown="onAddMemberKey"
-            />
+            <div class="member-combo" @click="focusMemberInput">
+              <input
+                ref="memberInput"
+                v-model="memberQuery"
+                type="text"
+                class="member-query"
+                placeholder="ник"
+                autocomplete="off"
+                @keydown="onAddMemberKey"
+              />
+            </div>
             <ul v-if="memberSuggestions.length" class="member-suggest">
               <li
                 v-for="(u, i) in memberSuggestions"
@@ -1353,76 +1358,73 @@ onUnmounted(() => {
 }
 .member-picker {
   position: relative;
-  display: grid;
-  gap: 0.45rem;
 }
-.member-chips {
+.member-combo {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 0.35rem;
+  min-height: 44px;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  cursor: text;
+}
+.member-combo:focus-within {
+  border-color: var(--focus-border);
 }
 .member-chip {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  padding: 0.2rem 0.45rem 0.2rem 0.25rem;
+  gap: 0.4rem;
+  padding: 0.22rem 0.55rem 0.22rem 0.28rem;
   border: 1px solid var(--border);
   border-radius: 999px;
-  font-size: 0.82rem;
+  background: var(--bg, #000);
+  font-size: 0.84rem;
   color: var(--text);
   text-transform: lowercase;
+  flex-shrink: 0;
 }
 .member-chip-av {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   border-radius: var(--avatar-radius);
   border: 1px solid var(--border);
   overflow: hidden;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.62rem;
   color: var(--muted);
   flex-shrink: 0;
+  background: var(--surface2);
 }
 .member-chip-av img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
-.member-chip button {
-  width: 20px;
-  height: 20px;
-  min-height: 20px;
-  padding: 0;
-  border: none;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--muted);
-  font-size: 0.95rem;
-  line-height: 1;
-  cursor: pointer;
-}
-.member-chip button:hover {
-  color: var(--text);
-  background: var(--surface2);
+.member-chip-nick {
+  line-height: 1.2;
+  white-space: nowrap;
 }
 .member-query {
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 0.55rem 1rem;
+  flex: 1 1 80px;
+  min-width: 80px;
+  border: none;
+  background: transparent;
+  padding: 0.25rem 0.35rem;
   font: inherit;
   font-size: 0.9rem;
-  background: transparent;
   color: var(--text);
 }
 .member-query:focus {
   outline: none;
-  border-color: var(--focus-border);
 }
 .member-suggest {
   list-style: none;
-  margin: 0;
+  margin: 0.35rem 0 0;
   padding: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius);
