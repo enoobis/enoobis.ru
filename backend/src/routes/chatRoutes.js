@@ -55,6 +55,40 @@ const chatUpload = multer({
   },
 });
 
+const MAX_GROUP_TITLE = 80;
+const MAX_GROUP_MEMBERS = 50;
+
+function getThread(id) {
+  return get(
+    "SELECT id, user_a_id, user_b_id, last_message_at, kind, title, owner_id FROM chat_threads WHERE id = ?",
+    id,
+  );
+}
+
+function isMember(thread, userId) {
+  if (thread.kind === "group") {
+    return !!get(
+      "SELECT 1 FROM chat_thread_members WHERE thread_id = ? AND user_id = ?",
+      thread.id,
+      userId,
+    );
+  }
+  return thread.user_a_id === userId || thread.user_b_id === userId;
+}
+
+function groupMemberCount(threadId) {
+  return get("SELECT COUNT(*) AS v FROM chat_thread_members WHERE thread_id = ?", threadId)?.v ?? 0;
+}
+
+function groupMembers(threadId) {
+  return all(
+    `SELECT u.id, u.nickname, u.avatar_url
+     FROM chat_thread_members m JOIN users u ON u.id = m.user_id
+     WHERE m.thread_id = ? ORDER BY m.joined_at`,
+    threadId,
+  ).map((u) => ({ id: u.id, nickname: u.nickname, avatar_url: u.avatar_url ?? "" }));
+}
+
 function pairKey(a, b) {
   return a < b ? [a, b] : [b, a];
 }
@@ -62,7 +96,7 @@ function pairKey(a, b) {
 function ensureThread(meId, otherId) {
   const [a, b] = pairKey(meId, otherId);
   let row = get(
-    "SELECT id, user_a_id, user_b_id, last_message_at FROM chat_threads WHERE user_a_id = ? AND user_b_id = ?",
+    "SELECT id, user_a_id, user_b_id, last_message_at, kind FROM chat_threads WHERE user_a_id = ? AND user_b_id = ? AND kind = 'dm'",
     a,
     b,
   );
@@ -75,10 +109,7 @@ function ensureThread(meId, otherId) {
     b,
     nowIso(),
   );
-  return get(
-    "SELECT id, user_a_id, user_b_id, last_message_at FROM chat_threads WHERE id = ?",
-    id,
-  );
+  return getThread(id);
 }
 
 function otherUser(thread, meId) {
@@ -132,6 +163,7 @@ function messageRowDto(r, meId) {
         from_me: r.r_sender_id === meId,
         body: r.r_body ?? "",
         image_url: (r.r_image_url && String(r.r_image_url)) || "",
+        sender_nickname: r.r_sender_nickname ?? "",
       }
     : null;
   return {
@@ -143,14 +175,53 @@ function messageRowDto(r, meId) {
     edited_at: r.edited_at ?? null,
     read: !!r.read_at,
     reply_to,
+    sender_nickname: r.sender_nickname ?? "",
+    sender_avatar: r.sender_avatar ?? "",
+  };
+}
+
+function groupUnread(threadId, meId) {
+  const mem = get(
+    "SELECT last_read_at FROM chat_thread_members WHERE thread_id = ? AND user_id = ?",
+    threadId,
+    meId,
+  );
+  return (
+    get(
+      "SELECT COUNT(*) AS v FROM chat_messages WHERE thread_id = ? AND sender_id != ? AND created_at > ?",
+      threadId,
+      meId,
+      mem?.last_read_at ?? "",
+    )?.v ?? 0
+  );
+}
+
+function groupDto(row, meId) {
+  const last = lastMessageOf(row.id);
+  return {
+    id: row.id,
+    kind: "group",
+    title: row.title ?? "",
+    owner_id: row.owner_id ?? "",
+    member_count: groupMemberCount(row.id),
+    other_nickname: row.title ?? "",
+    other_avatar: "",
+    other_online: null,
+    other_last_seen_at: null,
+    last_body: previewOf(last),
+    last_from_me: last ? last.sender_id === meId : false,
+    last_at: last?.created_at ?? row.last_message_at ?? null,
+    unread: groupUnread(row.id, meId),
   };
 }
 
 function threadDto(row, meId) {
+  if (row.kind === "group") return groupDto(row, meId);
   const other = otherUser(row, meId);
   const last = lastMessageOf(row.id);
   return {
     id: row.id,
+    kind: "dm",
     other_nickname: other?.nickname ?? "",
     other_avatar: other?.avatar_url ?? "",
     other_online: other?.online?.online ?? null,
@@ -164,14 +235,22 @@ function threadDto(row, meId) {
 
 router.get("/chats", authRequired, (req, res) => {
   const rows = all(
-    `SELECT id, user_a_id, user_b_id, last_message_at
-     FROM chat_threads
-     WHERE (user_a_id = ? OR user_b_id = ?)
-       AND NOT EXISTS (
-         SELECT 1 FROM chat_thread_hidden h
-         WHERE h.thread_id = chat_threads.id AND h.user_id = ?
+    `SELECT id, user_a_id, user_b_id, last_message_at, kind, title, owner_id
+     FROM chat_threads t
+     WHERE (
+         t.kind = 'dm'
+         AND (t.user_a_id = ? OR t.user_b_id = ?)
+         AND NOT EXISTS (
+           SELECT 1 FROM chat_thread_hidden h
+           WHERE h.thread_id = t.id AND h.user_id = ?
+         )
+       )
+       OR EXISTS (
+         SELECT 1 FROM chat_thread_members m
+         WHERE m.thread_id = t.id AND m.user_id = ?
        )
      ORDER BY COALESCE(last_message_at, created_at) DESC`,
+    req.user.id,
     req.user.id,
     req.user.id,
     req.user.id,
@@ -180,18 +259,91 @@ router.get("/chats", authRequired, (req, res) => {
 });
 
 router.get("/chats/unread-count", authRequired, (req, res) => {
-  const v =
+  const dm =
     get(
       `SELECT COUNT(*) as v FROM chat_messages m
        JOIN chat_threads t ON t.id = m.thread_id
        WHERE m.read_at IS NULL
          AND m.sender_id != ?
+         AND t.kind = 'dm'
          AND (t.user_a_id = ? OR t.user_b_id = ?)`,
       req.user.id,
       req.user.id,
       req.user.id,
     )?.v ?? 0;
-  res.json({ unread: v });
+  const grp =
+    get(
+      `SELECT COUNT(*) as v FROM chat_messages m
+       JOIN chat_thread_members mem ON mem.thread_id = m.thread_id
+       WHERE mem.user_id = ?
+         AND m.sender_id != ?
+         AND m.created_at > COALESCE(mem.last_read_at, '')`,
+      req.user.id,
+      req.user.id,
+    )?.v ?? 0;
+  res.json({ unread: dm + grp });
+});
+
+router.post("/chats/group", authRequired, (req, res) => {
+  if (!guardChatOutgoing(req, res)) return;
+  const title = String(req.body?.title ?? "").trim();
+  if (!title) return res.status(400).json({ error: "нужно название" });
+  if (title.length > MAX_GROUP_TITLE) return res.status(400).json({ error: "название слишком длинное" });
+  const rawNicks = Array.isArray(req.body?.members) ? req.body.members : [];
+  const id = uuidv4();
+  const now = nowIso();
+  /* для групп user_b_id = id треда: NOT NULL и UNIQUE(a,b) не мешают */
+  run(
+    "INSERT INTO chat_threads (id, user_a_id, user_b_id, created_at, kind, title, owner_id) VALUES (?, ?, ?, ?, 'group', ?, ?)",
+    id,
+    req.user.id,
+    id,
+    now,
+    title,
+    req.user.id,
+  );
+  run(
+    "INSERT INTO chat_thread_members (thread_id, user_id, joined_at) VALUES (?, ?, ?)",
+    id,
+    req.user.id,
+    now,
+  );
+  const missing = [];
+  for (const raw of rawNicks.slice(0, MAX_GROUP_MEMBERS)) {
+    const nick = String(raw).trim();
+    if (!nick) continue;
+    const u = get("SELECT id FROM users WHERE nickname = ?", nick);
+    if (!u) {
+      missing.push(nick);
+      continue;
+    }
+    run(
+      "INSERT OR IGNORE INTO chat_thread_members (thread_id, user_id, joined_at) VALUES (?, ?, ?)",
+      id,
+      u.id,
+      now,
+    );
+  }
+  res.status(201).json({ ...groupDto(getThread(id), req.user.id), missing });
+});
+
+router.post("/chats/:id/members", authRequired, (req, res) => {
+  const thread = getThread(req.params.id);
+  if (!thread || thread.kind !== "group") return res.status(404).json({ error: "not found" });
+  if (!isMember(thread, req.user.id)) return res.status(403).json({ error: "forbidden" });
+  if (groupMemberCount(thread.id) >= MAX_GROUP_MEMBERS) {
+    return res.status(400).json({ error: "слишком много участников" });
+  }
+  const nick = String(req.body?.nickname ?? "").trim();
+  const u = get("SELECT id FROM users WHERE nickname = ?", nick);
+  if (!u) return res.status(404).json({ error: "пользователь не найден" });
+  run(
+    "INSERT OR IGNORE INTO chat_thread_members (thread_id, user_id, joined_at) VALUES (?, ?, ?)",
+    thread.id,
+    u.id,
+    nowIso(),
+  );
+  res.json({ ok: true, member_count: groupMemberCount(thread.id) });
 });
 
 router.post("/chats/with/:nickname", authRequired, (req, res) => {
@@ -208,22 +360,24 @@ router.post("/chats/with/:nickname", authRequired, (req, res) => {
 });
 
 router.get("/chats/:id/messages", authRequired, (req, res) => {
-  const thread = get(
-    "SELECT id, user_a_id, user_b_id FROM chat_threads WHERE id = ?",
-    req.params.id,
-  );
+  const thread = getThread(req.params.id);
   if (!thread) return res.status(404).json({ error: "not found" });
-  if (thread.user_a_id !== req.user.id && thread.user_b_id !== req.user.id) {
+  if (!isMember(thread, req.user.id)) {
     return res.status(403).json({ error: "forbidden" });
   }
   const after = req.query.after ? String(req.query.after) : null;
   const sel = `m.id, m.sender_id, m.body, m.image_url, m.read_at, m.created_at, m.edited_at, m.reply_to_id,
-     r.id as r_id, r.sender_id as r_sender_id, r.body as r_body, r.image_url as r_image_url`;
+     su.nickname as sender_nickname, su.avatar_url as sender_avatar,
+     r.id as r_id, r.sender_id as r_sender_id, r.body as r_body, r.image_url as r_image_url,
+     ru.nickname as r_sender_nickname`;
+  const joins = `FROM chat_messages m
+         LEFT JOIN users su ON su.id = m.sender_id
+         LEFT JOIN chat_messages r ON r.id = m.reply_to_id
+         LEFT JOIN users ru ON ru.id = r.sender_id`;
   const rows = after
     ? all(
         `SELECT ${sel}
-         FROM chat_messages m
-         LEFT JOIN chat_messages r ON r.id = m.reply_to_id
+         ${joins}
          WHERE m.thread_id = ? AND m.created_at > ?
          ORDER BY m.created_at`,
         req.params.id,
@@ -231,13 +385,23 @@ router.get("/chats/:id/messages", authRequired, (req, res) => {
       )
     : all(
         `SELECT ${sel}
-         FROM chat_messages m
-         LEFT JOIN chat_messages r ON r.id = m.reply_to_id
+         ${joins}
          WHERE m.thread_id = ?
          ORDER BY m.created_at DESC LIMIT 200`,
         req.params.id,
       );
   const ordered = after ? rows : rows.reverse();
+  if (thread.kind === "group") {
+    return res.json({
+      items: ordered.map((r) => messageRowDto(r, req.user.id)),
+      other: null,
+      group: {
+        title: thread.title ?? "",
+        owner_id: thread.owner_id ?? "",
+        members: groupMembers(thread.id),
+      },
+    });
+  }
   const other = otherUser(thread, req.user.id);
   res.json({
     items: ordered.map((r) => messageRowDto(r, req.user.id)),
@@ -253,13 +417,13 @@ router.get("/chats/:id/messages", authRequired, (req, res) => {
 });
 
 router.delete("/chats/:id/messages", authRequired, (req, res) => {
-  const thread = get(
-    "SELECT id, user_a_id, user_b_id FROM chat_threads WHERE id = ?",
-    req.params.id,
-  );
+  const thread = getThread(req.params.id);
   if (!thread) return res.status(404).json({ error: "not found" });
-  if (thread.user_a_id !== req.user.id && thread.user_b_id !== req.user.id) {
+  if (!isMember(thread, req.user.id)) {
     return res.status(403).json({ error: "forbidden" });
+  }
+  if (thread.kind === "group" && thread.owner_id !== req.user.id) {
+    return res.status(403).json({ error: "только создатель группы" });
   }
   const msgs = all("SELECT image_url FROM chat_messages WHERE thread_id = ?", thread.id);
   for (const m of msgs) {
@@ -274,27 +438,41 @@ router.delete("/chats/:id/messages", authRequired, (req, res) => {
 });
 
 router.delete("/chats/:id", authRequired, (req, res) => {
-  const thread = get(
-    "SELECT id, user_a_id, user_b_id FROM chat_threads WHERE id = ?",
-    req.params.id,
-  );
+  const thread = getThread(req.params.id);
   if (!thread) return res.status(404).json({ error: "not found" });
-  if (thread.user_a_id !== req.user.id && thread.user_b_id !== req.user.id) {
+  if (!isMember(thread, req.user.id)) {
     return res.status(403).json({ error: "forbidden" });
+  }
+  if (thread.kind === "group") {
+    run(
+      "DELETE FROM chat_thread_members WHERE thread_id = ? AND user_id = ?",
+      thread.id,
+      req.user.id,
+    );
+    if (!groupMemberCount(thread.id)) {
+      const msgs = all("SELECT image_url FROM chat_messages WHERE thread_id = ?", thread.id);
+      for (const m of msgs) {
+        const url = m.image_url && String(m.image_url);
+        if (url && url.startsWith("/uploads/chat/")) {
+          unlinkUploadUrl(url, ["chat"]);
+        }
+      }
+      run("DELETE FROM chat_messages WHERE thread_id = ?", thread.id);
+      run("DELETE FROM chat_threads WHERE id = ?", thread.id);
+    }
+    return res.json({ ok: true });
   }
   run("INSERT OR IGNORE INTO chat_thread_hidden (user_id, thread_id) VALUES (?, ?)", req.user.id, thread.id);
   res.json({ ok: true });
 });
 
 router.get("/chats/:id/outgoing-read", authRequired, (req, res) => {
-  const thread = get(
-    "SELECT id, user_a_id, user_b_id FROM chat_threads WHERE id = ?",
-    req.params.id,
-  );
+  const thread = getThread(req.params.id);
   if (!thread) return res.status(404).json({ error: "not found" });
-  if (thread.user_a_id !== req.user.id && thread.user_b_id !== req.user.id) {
+  if (!isMember(thread, req.user.id)) {
     return res.status(403).json({ error: "forbidden" });
   }
+  if (thread.kind === "group") return res.json({ items: [] });
   const rows = all(
     "SELECT id, read_at FROM chat_messages WHERE thread_id = ? AND sender_id = ?",
     req.params.id,
@@ -306,12 +484,9 @@ router.get("/chats/:id/outgoing-read", authRequired, (req, res) => {
 });
 
 router.post("/chats/:id/messages", authRequired, (req, res) => {
-  const thread = get(
-    "SELECT id, user_a_id, user_b_id FROM chat_threads WHERE id = ?",
-    req.params.id,
-  );
+  const thread = getThread(req.params.id);
   if (!thread) return res.status(404).json({ error: "not found" });
-  if (thread.user_a_id !== req.user.id && thread.user_b_id !== req.user.id) {
+  if (!isMember(thread, req.user.id)) {
     return res.status(403).json({ error: "forbidden" });
   }
   if (!guardChatOutgoing(req, res)) return;
@@ -381,10 +556,7 @@ router.post(
     });
   },
   async (req, res) => {
-    const thread = get(
-      "SELECT id, user_a_id, user_b_id FROM chat_threads WHERE id = ?",
-      req.params.id,
-    );
+    const thread = getThread(req.params.id);
     if (!thread) {
       if (req.file?.path) {
         try {
@@ -393,7 +565,7 @@ router.post(
       }
       return res.status(404).json({ error: "not found" });
     }
-    if (thread.user_a_id !== req.user.id && thread.user_b_id !== req.user.id) {
+    if (!isMember(thread, req.user.id)) {
       if (req.file?.path) {
         try {
           fs.unlinkSync(req.file.path);
@@ -463,11 +635,15 @@ router.delete("/chats/messages/:id", authRequired, (req, res) => {
     req.params.id,
   );
   if (!msg) return res.status(404).json({ error: "not found" });
-  const thread = get(
-    "SELECT id, user_a_id, user_b_id FROM chat_threads WHERE id = ?",
-    msg.thread_id,
-  );
-  if (!thread || (thread.user_a_id !== req.user.id && thread.user_b_id !== req.user.id)) {
+  const thread = getThread(msg.thread_id);
+  if (!thread || !isMember(thread, req.user.id)) {
+    return res.status(403).json({ error: "forbidden" });
+  }
+  if (
+    thread.kind === "group" &&
+    msg.sender_id !== req.user.id &&
+    thread.owner_id !== req.user.id
+  ) {
     return res.status(403).json({ error: "forbidden" });
   }
   if (msg.image_url && msg.image_url.startsWith("/uploads/chat/")) {
@@ -485,13 +661,19 @@ router.delete("/chats/messages/:id", authRequired, (req, res) => {
 });
 
 router.post("/chats/:id/read", authRequired, (req, res) => {
-  const thread = get(
-    "SELECT id, user_a_id, user_b_id FROM chat_threads WHERE id = ?",
-    req.params.id,
-  );
+  const thread = getThread(req.params.id);
   if (!thread) return res.status(404).json({ error: "not found" });
-  if (thread.user_a_id !== req.user.id && thread.user_b_id !== req.user.id) {
+  if (!isMember(thread, req.user.id)) {
     return res.status(403).json({ error: "forbidden" });
+  }
+  if (thread.kind === "group") {
+    run(
+      "UPDATE chat_thread_members SET last_read_at = ? WHERE thread_id = ? AND user_id = ?",
+      nowIso(),
+      thread.id,
+      req.user.id,
+    );
+    return res.json({ ok: true });
   }
   run(
     "UPDATE chat_messages SET read_at = ? WHERE thread_id = ? AND sender_id != ? AND read_at IS NULL",

@@ -4,6 +4,10 @@ export type OnlineStatus = { online: boolean; last_seen_at: string | null } | nu
 
 export type ChatThread = {
   id: string;
+  kind?: "dm" | "group";
+  title?: string;
+  owner_id?: string;
+  member_count?: number;
   other_nickname: string;
   other_avatar: string;
   /** true = онлайн, false = не в сети (но статус виден), null = скрыто */
@@ -20,6 +24,7 @@ export type ChatReplyRef = {
   from_me: boolean;
   body: string;
   image_url: string;
+  sender_nickname?: string;
 };
 
 export type ChatMessage = {
@@ -31,11 +36,22 @@ export type ChatMessage = {
   edited_at?: string | null;
   read: boolean;
   reply_to?: ChatReplyRef | null;
+  sender_nickname?: string;
+  sender_avatar?: string;
+};
+
+export type ChatGroupMember = { id: string; nickname: string; avatar_url: string };
+
+export type ChatGroupInfo = {
+  title: string;
+  owner_id: string;
+  members: ChatGroupMember[];
 };
 
 export type ChatMessages = {
   items: ChatMessage[];
   other: { id: string; nickname: string; avatar_url: string; online: OnlineStatus } | null;
+  group?: ChatGroupInfo | null;
 };
 
 export function listChats(token: string) {
@@ -50,6 +66,22 @@ export function openChatWith(nickname: string, token: string) {
   return api<ChatThread>(`/api/chats/with/${encodeURIComponent(nickname)}`, {
     method: "POST",
     token,
+  });
+}
+
+export function createGroupChat(token: string, title: string, members: string[]) {
+  return api<ChatThread & { missing: string[] }>("/api/chats/group", {
+    method: "POST",
+    token,
+    body: JSON.stringify({ title, members }),
+  });
+}
+
+export function addGroupMember(threadId: string, token: string, nickname: string) {
+  return api<{ ok: boolean; member_count: number }>(`/api/chats/${threadId}/members`, {
+    method: "POST",
+    token,
+    body: JSON.stringify({ nickname }),
   });
 }
 

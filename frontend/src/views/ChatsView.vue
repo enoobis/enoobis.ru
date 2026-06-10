@@ -2,7 +2,9 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import {
+  addGroupMember,
   clearThreadMessages,
+  createGroupChat,
   deleteChatThread,
   deleteMessage,
   editMessage,
@@ -13,7 +15,9 @@ import {
   openChatWith,
   sendMessage,
   uploadChatImage,
+  type ChatGroupInfo,
   type ChatMessage,
+  type ChatReplyRef,
   type ChatThread,
 } from "../api/chat";
 import AppIcon from "../components/AppIcon.vue";
@@ -34,6 +38,62 @@ const otherNickname = ref("");
 const otherAvatar = ref("");
 const otherOnline = ref<boolean | null>(null);
 const otherLastSeenAt = ref<string | null>(null);
+const groupInfo = ref<ChatGroupInfo | null>(null);
+const groupFormOpen = ref(false);
+const groupTitle = ref("");
+const groupNicks = ref("");
+const creatingGroup = ref(false);
+
+const isGroup = computed(() => groupInfo.value !== null);
+
+function memberWord(n: number): string {
+  const d10 = n % 10;
+  const d100 = n % 100;
+  if (d10 === 1 && d100 !== 11) return "участник";
+  if (d10 >= 2 && d10 <= 4 && (d100 < 12 || d100 > 14)) return "участника";
+  return "участников";
+}
+
+const groupMembersLabel = computed(() => {
+  const n = groupInfo.value?.members.length ?? 0;
+  return `${n} ${memberWord(n)}`;
+});
+
+async function createGroup() {
+  if (!auth.token || creatingGroup.value) return;
+  const title = groupTitle.value.trim();
+  if (!title) return;
+  const members = groupNicks.value
+    .split(/[,\s]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  creatingGroup.value = true;
+  try {
+    const t = await createGroupChat(auth.token, title, members);
+    if (t.missing.length) toastError(new Error(`не найдены: ${t.missing.join(", ")}`));
+    groupFormOpen.value = false;
+    groupTitle.value = "";
+    groupNicks.value = "";
+    await loadChats();
+    router.replace({ name: "chats", query: { id: t.id } });
+  } catch (e) {
+    toastError(e);
+  } finally {
+    creatingGroup.value = false;
+  }
+}
+
+async function addMember() {
+  if (!auth.token || !activeId.value) return;
+  const nick = window.prompt("ник участника")?.trim();
+  if (!nick) return;
+  try {
+    await addGroupMember(activeId.value, auth.token, nick);
+    await loadMessages(false);
+  } catch (e) {
+    toastError(e);
+  }
+}
 
 function applyOtherPresence(online: OnlineStatus | null | undefined) {
   if (online === null || online === undefined) {
@@ -155,13 +215,22 @@ function replyPreviewLines(m: ChatMessage): string {
   return t.length > 120 ? `${t.slice(0, 117)}…` : t;
 }
 
-function replyAuthorLabel(fromMe: boolean): string {
-  return fromMe ? "вы" : otherNickname.value || "собеседник";
+function replyRefAuthor(r: ChatReplyRef): string {
+  if (r.from_me) return "вы";
+  if (isGroup.value) return r.sender_nickname || "участник";
+  return otherNickname.value || "собеседник";
+}
+
+function replyAuthorLabel(m: ChatMessage): string {
+  if (m.from_me) return "вы";
+  if (isGroup.value) return m.sender_nickname || "участник";
+  return otherNickname.value || "собеседник";
 }
 
 async function removeChatFromList(c: ChatThread) {
   if (!auth.token) return;
-  if (!window.confirm("убрать чат из списка?")) return;
+  const q = c.kind === "group" ? "выйти из группы?" : "убрать чат из списка?";
+  if (!window.confirm(q)) return;
   try {
     await deleteChatThread(c.id, auth.token);
     chats.value = chats.value.filter((x) => x.id !== c.id);
@@ -226,6 +295,7 @@ async function loadMessages(scrollEnd = true) {
     const data = await listMessages(chatId, auth.token);
     if (chatId !== activeId.value) return;
     messages.value = data.items;
+    groupInfo.value = data.group ?? null;
     otherNickname.value = data.other?.nickname ?? "";
     otherAvatar.value = data.other?.avatar_url ?? "";
     applyOtherPresence(data.other?.online);
@@ -265,6 +335,7 @@ async function pollMessages() {
   try {
     const data = await listMessages(chatId, auth.token, last);
     if (chatId !== activeId.value) return;
+    if (data.group) groupInfo.value = data.group;
     if (data.other) applyOtherPresence(data.other.online);
     if (data.items.length) {
       messages.value = [...messages.value, ...data.items];
@@ -486,6 +557,7 @@ watch(
     if (id !== activeId.value) {
       activeId.value = id;
       messages.value = [];
+      groupInfo.value = null;
       otherOnline.value = null;
       otherLastSeenAt.value = null;
       replyTarget.value = null;
@@ -538,7 +610,23 @@ onUnmounted(() => {
     <aside class="list" :class="{ hidden: activeId }">
       <div class="list-head">
         <h2>чаты</h2>
+        <button
+          type="button"
+          class="list-head-act"
+          aria-label="новая группа"
+          title="новая группа"
+          @click="groupFormOpen = !groupFormOpen"
+        >
+          <AppIcon name="plus" :size="18" />
+        </button>
       </div>
+      <form v-if="groupFormOpen" class="group-form" @submit.prevent="createGroup">
+        <input v-model="groupTitle" type="text" placeholder="название группы" :maxlength="80" />
+        <input v-model="groupNicks" type="text" placeholder="ники через запятую" />
+        <button type="submit" :disabled="creatingGroup || !groupTitle.trim()">
+          {{ creatingGroup ? "…" : "создать" }}
+        </button>
+      </form>
       <p v-if="loadingChats && !chats.length" class="page-empty muted">загрузка</p>
       <p v-else-if="!chats.length" class="page-empty muted">пусто</p>
       <div
@@ -553,7 +641,8 @@ onUnmounted(() => {
       >
         <div class="chat-row">
           <span class="avatar" :class="{ 'has-online': c.other_online === true }">
-            <img v-if="c.other_avatar" :src="c.other_avatar" alt="" />
+            <AppIcon v-if="c.kind === 'group'" name="users" :size="16" />
+            <img v-else-if="c.other_avatar" :src="c.other_avatar" alt="" />
             <span v-else>{{ c.other_nickname.slice(0, 2) }}</span>
             <span v-if="c.other_online === true" class="online-star" title="онлайн">
               <AppIcon name="spark" :size="9" />
@@ -589,7 +678,16 @@ onUnmounted(() => {
       <template v-if="activeId">
         <header class="thread-head">
           <button class="back" type="button" @click="router.replace({ name: 'chats' })">←</button>
-          <RouterLink v-if="otherNickname" :to="`/u/${otherNickname}`" class="who">
+          <div v-if="groupInfo" class="who">
+            <span class="avatar small">
+              <AppIcon name="users" :size="13" />
+            </span>
+            <span class="who-text">
+              <span>{{ groupInfo.title }}</span>
+              <span class="presence-label">{{ groupMembersLabel }}</span>
+            </span>
+          </div>
+          <RouterLink v-else-if="otherNickname" :to="`/u/${otherNickname}`" class="who">
             <span class="avatar small" :class="{ 'has-online': otherOnline === true }">
               <img v-if="otherAvatar" :src="otherAvatar" alt="" />
               <span v-else>{{ otherNickname.slice(0, 2) }}</span>
@@ -604,8 +702,19 @@ onUnmounted(() => {
               </span>
             </span>
           </RouterLink>
-          <span v-if="otherNickname" class="thread-head-actions">
+          <span v-if="otherNickname || groupInfo" class="thread-head-actions">
             <button
+              v-if="groupInfo"
+              type="button"
+              class="thread-act"
+              aria-label="добавить участника"
+              title="добавить участника"
+              @click="addMember"
+            >
+              <AppIcon name="register" :size="16" />
+            </button>
+            <button
+              v-if="!groupInfo || groupInfo.owner_id === auth.user?.id"
               type="button"
               class="thread-act"
               aria-label="очистить переписку"
@@ -617,11 +726,11 @@ onUnmounted(() => {
             <button
               type="button"
               class="thread-act"
-              aria-label="убрать чат из списка"
-              title="убрать чат"
+              :aria-label="groupInfo ? 'выйти из группы' : 'убрать чат из списка'"
+              :title="groupInfo ? 'выйти из группы' : 'убрать чат'"
               @click="removeCurrentChat"
             >
-              <AppIcon name="delete" :size="16" />
+              <AppIcon :name="groupInfo ? 'logout' : 'delete'" :size="16" />
             </button>
           </span>
         </header>
@@ -635,8 +744,15 @@ onUnmounted(() => {
             </div>
             <div v-else class="msg" :class="{ me: row.m.from_me }">
               <span class="bubble">
+                <RouterLink
+                  v-if="isGroup && !row.m.from_me && row.m.sender_nickname"
+                  :to="`/u/${row.m.sender_nickname}`"
+                  class="msg-sender"
+                >
+                  {{ row.m.sender_nickname }}
+                </RouterLink>
                 <div v-if="row.m.reply_to" class="msg-reply muted small">
-                  <span class="msg-reply-author">{{ replyAuthorLabel(row.m.reply_to.from_me) }}</span>
+                  <span class="msg-reply-author">{{ replyRefAuthor(row.m.reply_to) }}</span>
                   <span class="msg-reply-snippet">{{ replyPreviewLines(row.m) }}</span>
                 </div>
                 <img
@@ -689,6 +805,7 @@ onUnmounted(() => {
                   <AppIcon name="reply" :size="14" />
                 </button>
                 <button
+                  v-if="!isGroup || groupInfo?.owner_id === auth.user?.id"
                   type="button"
                   class="msg-act"
                   aria-label="удалить"
@@ -736,7 +853,7 @@ onUnmounted(() => {
         <div class="composer-wrap">
           <div v-if="replyTarget" class="reply-bar">
             <span class="reply-bar-lines muted small">
-              <span class="reply-bar-who">{{ replyAuthorLabel(replyTarget.from_me) }}</span>
+              <span class="reply-bar-who">{{ replyAuthorLabel(replyTarget) }}</span>
               <span class="reply-bar-snippet">{{ messageSnippetForReply(replyTarget) }}</span>
             </span>
             <button type="button" class="reply-bar-x" aria-label="отменить" @click="clearReplyTarget">
@@ -822,12 +939,57 @@ onUnmounted(() => {
   overflow-y: auto;
 }
 .list-head {
-  padding: 0.85rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.55rem 0.6rem 0.55rem 1rem;
   border-bottom: 1px solid var(--border);
   position: sticky;
   top: 0;
   background: var(--bg, #000);
   z-index: 1;
+}
+.list-head-act {
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.list-head-act:hover {
+  color: var(--text);
+  background: var(--surface2);
+}
+.group-form {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.group-form input {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.45rem 0.9rem;
+  font: inherit;
+  font-size: 0.88rem;
+  background: transparent;
+  color: var(--text);
+}
+.group-form input:focus {
+  outline: none;
+  border-color: var(--focus-border);
+}
+.group-form button {
+  min-height: 36px;
+  border-radius: 999px;
+  font-size: 0.85rem;
 }
 .list-head h2 {
   font-size: 1.25rem;
@@ -1142,6 +1304,17 @@ onUnmounted(() => {
 }
 .bubble > .msg-img {
   flex-basis: 100%;
+}
+.msg-sender {
+  flex-basis: 100%;
+  font-size: 0.74rem;
+  color: var(--muted);
+  text-transform: lowercase;
+  line-height: 1.2;
+}
+.msg-sender:hover {
+  color: var(--text);
+  text-decoration: none;
 }
 .msg-reply {
   flex-basis: 100%;

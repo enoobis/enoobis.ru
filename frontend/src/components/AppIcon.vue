@@ -51,9 +51,11 @@ import {
   Triangle,
   Trophy,
   Undo2,
+  Plus,
   Upload,
   User,
   UserPlus,
+  Users,
   X,
 } from "@lucide/vue";
 
@@ -115,7 +117,9 @@ export type AppIconName =
   | "reply"
   | "clear"
   | "qr"
-  | "briefcase";
+  | "briefcase"
+  | "users"
+  | "plus";
 
 const icons: Record<AppIconName, Component> = {
   home: House,
@@ -176,6 +180,8 @@ const icons: Record<AppIconName, Component> = {
   clear: Eraser,
   qr: QrCode,
   briefcase: BriefcaseBusiness,
+  users: Users,
+  plus: Plus,
 };
 
 const FILLED = new Set<AppIconName>([

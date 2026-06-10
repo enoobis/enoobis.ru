@@ -413,6 +413,35 @@ try {
 }
 
 try {
+  db.prepare("SELECT kind FROM chat_threads LIMIT 1").get();
+} catch {
+  try {
+    db.exec("ALTER TABLE chat_threads ADD COLUMN kind TEXT NOT NULL DEFAULT 'dm'");
+    db.exec("ALTER TABLE chat_threads ADD COLUMN title TEXT NOT NULL DEFAULT ''");
+    db.exec("ALTER TABLE chat_threads ADD COLUMN owner_id TEXT");
+  } catch {
+    // ignore
+  }
+}
+
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS chat_thread_members (
+      thread_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      joined_at TEXT NOT NULL,
+      last_read_at TEXT,
+      PRIMARY KEY (thread_id, user_id),
+      FOREIGN KEY (thread_id) REFERENCES chat_threads(id),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_chat_thread_members_user ON chat_thread_members(user_id);
+  `);
+} catch {
+  // ignore
+}
+
+try {
   db.prepare("SELECT nickname_change_count FROM users LIMIT 1").get();
 } catch {
   try {
@@ -539,6 +568,9 @@ db.exec(`
     user_b_id TEXT NOT NULL,
     last_message_at TEXT,
     created_at TEXT NOT NULL,
+    kind TEXT NOT NULL DEFAULT 'dm',
+    title TEXT NOT NULL DEFAULT '',
+    owner_id TEXT,
     UNIQUE (user_a_id, user_b_id),
     FOREIGN KEY (user_a_id) REFERENCES users(id),
     FOREIGN KEY (user_b_id) REFERENCES users(id)
