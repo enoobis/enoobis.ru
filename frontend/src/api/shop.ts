@@ -103,6 +103,10 @@ export function equipAvatar(token: string, avatarId: string): Promise<EquipResul
   return api(`/api/shop/avatars/${avatarId}/equip`, { method: "POST", token });
 }
 
+export function deleteOwnedShopItem(token: string, itemId: string): Promise<EquipResult> {
+  return api(`/api/shop/my-items/${itemId}`, { method: "DELETE", token });
+}
+
 export type ImageShopKind = ShopItemKind;
 
 export async function adminUploadShopItem(

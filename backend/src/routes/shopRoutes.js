@@ -3,6 +3,7 @@ import { run, get, all, nowIso, db } from "../db.js";
 import { authRequired } from "../auth.js";
 import { SHOP_KINDS } from "../utils/shopPresets.js";
 import { attachCategoriesToItems, listShopCategories } from "../utils/shopCategories.js";
+import { regenerateUserAvatar } from "../utils/profileCosmetics.js";
 
 const router = express.Router();
 
@@ -255,6 +256,40 @@ router.post("/shop/avatars/:id/equip", authRequired, (req, res) => {
   if (!owned) return res.status(403).json({ error: "not owned" });
   const applyErr = applyEquip(req.user.id, item);
   if (applyErr) return res.status(400).json({ error: applyErr });
+  const row = cosmeticRow(req.user.id);
+  return res.json(equipPayload(row));
+});
+
+/* удалить из инвентаря: предмет снимается, если надет; вернуть можно только новой покупкой */
+router.delete("/shop/my-items/:id", authRequired, (req, res) => {
+  const item = get("SELECT id, kind, url FROM shop_items WHERE id = ?", req.params.id);
+  if (!item) return res.status(404).json({ error: "not found" });
+  const owned = get(
+    "SELECT 1 FROM user_owned_shop_items WHERE user_id = ? AND item_id = ?",
+    req.user.id,
+    item.id,
+  );
+  if (!owned) return res.status(404).json({ error: "not owned" });
+
+  const me = get(
+    "SELECT nickname, avatar_url, wallpaper_url, avatar_frame_url, profile_cover_url FROM users WHERE id = ?",
+    req.user.id,
+  );
+  if (item.kind === "avatar" && me?.avatar_url === item.url) {
+    regenerateUserAvatar(req.user.id, me.nickname ?? req.user.id);
+  } else if (item.kind === "frame" && me?.avatar_frame_url === item.url) {
+    run("UPDATE users SET avatar_frame_url = '' WHERE id = ?", req.user.id);
+  } else if (item.kind === "wallpaper" && me?.wallpaper_url === item.url) {
+    run("UPDATE users SET wallpaper_url = '' WHERE id = ?", req.user.id);
+  } else if (item.kind === "cover" && me?.profile_cover_url === item.url) {
+    run("UPDATE users SET profile_cover_url = '' WHERE id = ?", req.user.id);
+  }
+
+  run(
+    "DELETE FROM user_owned_shop_items WHERE user_id = ? AND item_id = ?",
+    req.user.id,
+    item.id,
+  );
   const row = cosmeticRow(req.user.id);
   return res.json(equipPayload(row));
 });

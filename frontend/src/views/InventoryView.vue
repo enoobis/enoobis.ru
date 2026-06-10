@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import { api } from "../api/http";
 import {
+  deleteOwnedShopItem,
   listMyShopItems,
   equipShopItem,
   type EquipResult,
@@ -13,6 +14,7 @@ import { useAuthStore } from "../stores/auth";
 import { useSessionStore } from "../stores/session";
 import { toastError, toastSuccess } from "../utils/toast";
 import PageHeader from "../components/PageHeader.vue";
+import AppIcon from "../components/AppIcon.vue";
 
 const auth = useAuthStore();
 const session = useSessionStore();
@@ -106,6 +108,23 @@ async function onApply(a: OwnedShopItem) {
   }
 }
 
+async function onRemove(a: OwnedShopItem) {
+  if (!auth.token || busy.value) return;
+  if (!window.confirm(`удалить «${a.name}»? вернуть можно только новой покупкой`)) return;
+  busy.value = a.id;
+  try {
+    const r = await deleteOwnedShopItem(auth.token, a.id);
+    applyCosmeticsFromEquip(r);
+    items.value = items.value.filter((x) => x.id !== a.id);
+    toastSuccess("удалено");
+    window.dispatchEvent(new CustomEvent("enoobis:profile-cosmetics-updated"));
+  } catch (e) {
+    toastError(e);
+  } finally {
+    busy.value = null;
+  }
+}
+
 async function onCancel(a: OwnedShopItem) {
   if (!auth.token || busy.value) return;
   busy.value = a.id;
@@ -182,6 +201,16 @@ onMounted(load);
           </button>
           <button v-else type="button" class="btn-pill-sm btn-equip" :disabled="busy === a.id" @click="onApply(a)">
             применить
+          </button>
+          <button
+            type="button"
+            class="btn-remove"
+            aria-label="удалить"
+            title="удалить"
+            :disabled="busy === a.id"
+            @click="onRemove(a)"
+          >
+            <AppIcon name="delete" :size="15" />
           </button>
         </div>
       </li>
@@ -285,8 +314,25 @@ onMounted(load);
 }
 .item-footer {
   display: flex;
+  align-items: center;
   justify-content: center;
+  gap: 0.35rem;
   margin-top: auto;
+}
+.btn-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.3rem;
+  min-height: 0;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+}
+.btn-remove:hover {
+  color: var(--text);
+  background: transparent;
+  transform: none;
 }
 .btn-equip {
   border-color: var(--text);
