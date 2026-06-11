@@ -41,6 +41,9 @@ export const useAuthStore = defineStore("auth", () => {
   const isStaff = computed(
     () => role.value === "teacher" || role.value === "master" || role.value === "admin",
   );
+  const isAdmin = computed(() => role.value === "admin");
+  const isModerator = computed(() => role.value === "moderator");
+  const isPanelStaff = computed(() => isAdmin.value || isModerator.value);
 
   async function login(email: string, password: string) {
     const r = await api<{ token: string; user: User }>("/api/login", {
@@ -96,5 +99,19 @@ export const useAuthStore = defineStore("auth", () => {
     persist(null, null);
   }
 
-  return { token, user, nickname, role, isStaff, login, register, applySession, syncFromMe, logout };
+  return {
+    token,
+    user,
+    nickname,
+    role,
+    isStaff,
+    isAdmin,
+    isModerator,
+    isPanelStaff,
+    login,
+    register,
+    applySession,
+    syncFromMe,
+    logout,
+  };
 });

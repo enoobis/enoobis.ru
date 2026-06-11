@@ -533,12 +533,12 @@ watch(
               магазин
             </RouterLink>
             <RouterLink
-              v-if="auth.role === 'admin'"
+              v-if="auth.isPanelStaff"
               to="/admin"
               class="nav-menu-link"
               @click="closeNavDrawer"
             >
-              админ
+              {{ auth.isModerator ? "модерация" : "админ" }}
             </RouterLink>
           </nav>
         </div>
@@ -665,12 +665,12 @@ watch(
                   магазин
                 </RouterLink>
                 <RouterLink
-                  v-if="auth.role === 'admin'"
+                  v-if="auth.isPanelStaff"
                   to="/admin"
                   class="nav-menu-link"
                   @click="closeNavDrawer"
                 >
-                  админ
+                  {{ auth.isModerator ? "модерация" : "админ" }}
                 </RouterLink>
               </nav>
             </div>

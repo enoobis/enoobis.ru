@@ -5,6 +5,7 @@ import fs from "node:fs";
 import { v4 as uuidv4 } from "uuid";
 import { nowIso, run, get } from "../db.js";
 import { authRequired } from "../auth.js";
+import { isPanelStaff } from "../utils/roles.js";
 import { isRasterImageMimetype, optimizeUploadedFile } from "../utils/imageOptimize.js";
 import { SHOP_KINDS } from "../utils/shopPresets.js";
 import {
@@ -282,7 +283,7 @@ const shopItemUpload = multer({
 });
 
 router.post("/admin/shop/items", authRequired, (req, res, next) => {
-  if (req.user.role !== "admin") return res.status(403).json({ error: "forbidden" });
+  if (!isPanelStaff(req.user.role)) return res.status(403).json({ error: "forbidden" });
   shopItemUpload.single("file")(req, res, (err) => {
     if (err) return res.status(400).json({ error: err.message ?? "upload error" });
     next();
@@ -353,12 +354,12 @@ router.post("/admin/shop/items", authRequired, (req, res, next) => {
 });
 
 router.get("/admin/shop/categories", authRequired, (req, res) => {
-  if (req.user.role !== "admin") return res.status(403).json({ error: "forbidden" });
+  if (!isPanelStaff(req.user.role)) return res.status(403).json({ error: "forbidden" });
   return res.json(listShopCategories());
 });
 
 router.post("/admin/shop/categories", authRequired, (req, res) => {
-  if (req.user.role !== "admin") return res.status(403).json({ error: "forbidden" });
+  if (!isPanelStaff(req.user.role)) return res.status(403).json({ error: "forbidden" });
   try {
     const row = createShopCategory(req.body?.id, req.body?.name);
     return res.json(row);
@@ -368,7 +369,7 @@ router.post("/admin/shop/categories", authRequired, (req, res) => {
 });
 
 router.patch("/admin/shop/categories/:id", authRequired, (req, res) => {
-  if (req.user.role !== "admin") return res.status(403).json({ error: "forbidden" });
+  if (!isPanelStaff(req.user.role)) return res.status(403).json({ error: "forbidden" });
   try {
     const row = updateShopCategory(req.params.id, req.body?.name);
     if (!row) return res.status(404).json({ error: "not found" });
@@ -379,13 +380,13 @@ router.patch("/admin/shop/categories/:id", authRequired, (req, res) => {
 });
 
 router.delete("/admin/shop/categories/:id", authRequired, (req, res) => {
-  if (req.user.role !== "admin") return res.status(403).json({ error: "forbidden" });
+  if (!isPanelStaff(req.user.role)) return res.status(403).json({ error: "forbidden" });
   deleteShopCategory(req.params.id);
   return res.json({ ok: true });
 });
 
 router.patch("/admin/shop/items/:id", authRequired, (req, res) => {
-  if (req.user.role !== "admin") return res.status(403).json({ error: "forbidden" });
+  if (!isPanelStaff(req.user.role)) return res.status(403).json({ error: "forbidden" });
   const row = get("SELECT id FROM shop_items WHERE id = ?", req.params.id);
   if (!row) return res.status(404).json({ error: "not found" });
   const sets = [];
@@ -450,7 +451,7 @@ router.patch("/admin/shop/items/:id", authRequired, (req, res) => {
 });
 
 router.delete("/admin/shop/items/:id", authRequired, (req, res) => {
-  if (req.user.role !== "admin") return res.status(403).json({ error: "forbidden" });
+  if (!isPanelStaff(req.user.role)) return res.status(403).json({ error: "forbidden" });
   const row = get("SELECT kind, url FROM shop_items WHERE id = ?", req.params.id);
   if (!row) return res.status(404).json({ error: "not found" });
   detachShopItemFromUsers(row.kind, row.url);

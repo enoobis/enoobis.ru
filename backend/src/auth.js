@@ -91,7 +91,7 @@ function attachUserFromToken(req, res, next, token) {
   if (Number(row.token_version ?? 0) !== tvClaim) {
     return res.status(401).json({ error: "unauthorized" });
   }
-  if (row.status !== "approved" && row.role !== "admin") {
+  if (row.status !== "approved" && row.role !== "admin" && row.role !== "moderator") {
     return res.status(403).json({ error: "not approved" });
   }
   req.user = { id: row.id, role: row.role, status: row.status };

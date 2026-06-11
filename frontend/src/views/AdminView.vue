@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, type Ref } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch, type Ref } from "vue";
 import { RouterLink } from "vue-router";
 import FilterSearch from "../components/FilterSearch.vue";
 import PageHeader from "../components/PageHeader.vue";
@@ -67,6 +67,7 @@ type AdminUser = {
 type Tab = "pending" | "users" | "reports" | "shop" | "blogs" | "work";
 
 const auth = useAuthStore();
+const isFullAdmin = computed(() => auth.isAdmin);
 const tab = ref<Tab>("pending");
 const pending = ref<Pending[]>([]);
 const blogPending = ref<PendingBlogPost[]>([]);
@@ -563,15 +564,17 @@ async function load() {
     if (auth.token) {
       blogPending.value = await listPendingBlogPosts(auth.token);
     }
-    users.value = await api<AdminUser[]>("/api/admin/users", { token: auth.token });
     reports.value = await listBlogReports(auth.token ?? "");
-    if (moderateUserId.value && auth.token) {
-      try {
-        moderateDetail.value = await getAdminUserDetail(auth.token, moderateUserId.value);
-        syncModerateFromDetail();
-        modInvites.value = await listAdminUserInvites(auth.token, moderateUserId.value);
-      } catch {
-        /* панель закроется при ошибке */
+    if (isFullAdmin.value) {
+      users.value = await api<AdminUser[]>("/api/admin/users", { token: auth.token });
+      if (moderateUserId.value && auth.token) {
+        try {
+          moderateDetail.value = await getAdminUserDetail(auth.token, moderateUserId.value);
+          syncModerateFromDetail();
+          modInvites.value = await listAdminUserInvites(auth.token, moderateUserId.value);
+        } catch {
+          /* панель закроется при ошибке */
+        }
       }
     }
   } catch (e) {
@@ -579,7 +582,12 @@ async function load() {
   }
 }
 
+watch(tab, (t) => {
+  if (!isFullAdmin.value && (t === "users" || t === "work")) tab.value = "reports";
+});
+
 onMounted(() => {
+  if (!isFullAdmin.value) tab.value = "reports";
   void load();
   void loadShopItems();
   document.addEventListener("visibilitychange", onAdminModerateVisibility);
@@ -606,7 +614,7 @@ async function reject(id: string) {
   await load();
 }
 
-async function setRole(id: string, role: "student" | "teacher" | "master") {
+async function setRole(id: string, role: "student" | "teacher" | "master" | "moderator") {
   if (!auth.token) return;
   await api(`/api/admin/users/${id}/role`, {
     method: "POST",
@@ -681,6 +689,7 @@ const moderateRole = computed(
 
 function roleRu(r: string) {
   if (r === "admin") return "админ";
+  if (r === "moderator") return "модератор";
   if (r === "teacher") return "ментор";
   if (r === "master") return "мастер";
   return "ученик";
@@ -716,7 +725,7 @@ async function giveCoinsRow(u: AdminUser) {
   }
 }
 
-async function setModerateRole(role: "student" | "teacher" | "master") {
+async function setModerateRole(role: "student" | "teacher" | "master" | "moderator") {
   if (!moderateUserId.value || modBusy.value) return;
   modBusy.value = true;
   modMsg.value = "";
@@ -902,12 +911,18 @@ async function approveBlog(id: string) {
 
 <template>
   <section class="admin page-shell">
-    <PageHeader title="админ" />
+    <PageHeader :title="isFullAdmin ? 'админ' : 'модерация'" />
     <nav class="filter-tabs admin-tabs">
       <button class="filter-tab" :class="{ on: tab === 'pending' }" type="button" @click="tab = 'pending'">
         заявки <span v-if="pending.length" class="muted small">{{ pending.length }}</span>
       </button>
-      <button class="filter-tab" :class="{ on: tab === 'users' }" type="button" @click="tab = 'users'">
+      <button
+        v-if="isFullAdmin"
+        class="filter-tab"
+        :class="{ on: tab === 'users' }"
+        type="button"
+        @click="tab = 'users'"
+      >
         люди
       </button>
       <button class="filter-tab" :class="{ on: tab === 'shop' }" type="button" @click="tab = 'shop'">
@@ -916,10 +931,16 @@ async function approveBlog(id: string) {
       <button class="filter-tab" :class="{ on: tab === 'blogs' }" type="button" @click="tab = 'blogs'">
         блоги <span v-if="blogPending.length" class="muted small">{{ blogPending.length }}</span>
       </button>
-      <button class="filter-tab" :class="{ on: tab === 'work' }" type="button" @click="tab = 'work'">
+      <button
+        v-if="isFullAdmin"
+        class="filter-tab"
+        :class="{ on: tab === 'work' }"
+        type="button"
+        @click="tab = 'work'"
+      >
         работа
       </button>
-       <button class="filter-tab" :class="{ on: tab === 'reports' }" type="button" @click="tab = 'reports'">
+      <button class="filter-tab" :class="{ on: tab === 'reports' }" type="button" @click="tab = 'reports'">
         жалобы <span v-if="reports.length" class="muted small">{{ reports.length }}</span>
       </button>
     </nav>
@@ -937,7 +958,12 @@ async function approveBlog(id: string) {
           <div class="row-actions">
             <button type="button" @click="approve(u.id)">одобрить</button>
             <button class="secondary" type="button" @click="reject(u.id)">отклонить</button>
-            <button class="secondary danger" type="button" @click="removeUser(u.id, u.nickname)">
+            <button
+              v-if="isFullAdmin"
+              class="secondary danger"
+              type="button"
+              @click="removeUser(u.id, u.nickname)"
+            >
               удалить
             </button>
           </div>
@@ -965,7 +991,7 @@ async function approveBlog(id: string) {
       </ul>
     </template>
 
-    <template v-else-if="tab === 'users'">
+    <template v-else-if="tab === 'users' && isFullAdmin">
       <FilterSearch v-model="usersQuery" class="admin-users-search" />
       <p v-if="!filteredUsers.length" class="muted">не найдено</p>
       <ul v-else class="list user-list">
@@ -1040,10 +1066,23 @@ async function approveBlog(id: string) {
             <button type="button" class="secondary" :disabled="modBusy" @click="giveModerateGems">начислить</button>
           </div>
 
-          <div v-if="moderateRole !== 'admin'" class="filter-tabs mod-role">
+          <div
+            v-if="moderateRole !== 'admin' && moderateRole !== 'moderator'"
+            class="filter-tabs mod-role"
+          >
             <button class="filter-tab" type="button" :class="{ on: moderateRole === 'student' }" :disabled="modBusy" @click="setModerateRole('student')">ученик</button>
             <button class="filter-tab" type="button" :class="{ on: moderateRole === 'teacher' }" :disabled="modBusy" @click="setModerateRole('teacher')">ментор</button>
             <button class="filter-tab" type="button" :class="{ on: moderateRole === 'master' }" :disabled="modBusy" @click="setModerateRole('master')">мастер</button>
+            <button
+              v-if="isFullAdmin"
+              class="filter-tab"
+              type="button"
+              :class="{ on: moderateRole === 'moderator' }"
+              :disabled="modBusy"
+              @click="setModerateRole('moderator')"
+            >
+              модератор
+            </button>
           </div>
 
           <details class="mod-sec">
@@ -1257,7 +1296,7 @@ async function approveBlog(id: string) {
           </details>
 
           <button
-            v-if="moderateRole !== 'admin'"
+            v-if="isFullAdmin && moderateRole !== 'admin' && moderateRole !== 'moderator'"
             class="secondary danger mod-delete"
             type="button"
             :disabled="modBusy"
@@ -1501,7 +1540,7 @@ async function approveBlog(id: string) {
       </Teleport>
     </template>
 
-    <AdminWorkTab v-else-if="tab === 'work'" />
+    <AdminWorkTab v-else-if="tab === 'work' && isFullAdmin" />
   </section>
 </template>
 

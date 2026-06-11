@@ -125,7 +125,7 @@ const router = createRouter({
       path: "/admin",
       name: "admin",
       component: () => import("../views/AdminView.vue"),
-      meta: { requiresAuth: true, requiresAdmin: true },
+      meta: { requiresAuth: true, requiresPanel: true },
     },
     {
       path: "/u/:nickname",
@@ -172,7 +172,7 @@ router.beforeEach((to, from) => {
     return { name: "micro", replace: true };
   }
   if (to.meta.requiresAuth && !auth.token) return { name: "login", query: { next: to.fullPath } };
-  if (to.meta.requiresAdmin && auth.role !== "admin") return { name: "home" };
+  if (to.meta.requiresPanel && !auth.isPanelStaff) return { name: "home" };
   if (to.meta.requiresWork && auth.role !== "master" && auth.role !== "admin") {
     return { name: "home" };
   }

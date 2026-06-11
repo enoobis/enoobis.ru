@@ -173,7 +173,7 @@ router.post("/qr/claim", qrClaimLimit, async (req, res) => {
     row.user_id,
   );
   if (!user) return res.status(404).json({ error: "invalid_code" });
-  if (user.status !== "approved" && user.role !== "admin") {
+  if (user.status !== "approved" && user.role !== "admin" && user.role !== "moderator") {
     return res.status(403).json({ error: "forbidden" });
   }
 
@@ -244,7 +244,7 @@ router.post("/qr/poll", qrPollLimit, (req, res) => {
     row.user_id,
   );
   if (!user) return res.status(404).json({ error: "invalid_code" });
-  if (user.status !== "approved" && user.role !== "admin") {
+  if (user.status !== "approved" && user.role !== "admin" && user.role !== "moderator") {
     return res.status(403).json({ error: "forbidden" });
   }
 

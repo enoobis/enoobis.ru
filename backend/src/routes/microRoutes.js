@@ -218,7 +218,7 @@ router.get("/micro/:id", (req, res) => {
 });
 
 router.post("/micro", authRequired, (req, res) => {
-  if (req.user.status !== "approved" && req.user.role !== "admin") {
+  if (req.user.status !== "approved" && req.user.role !== "admin" && req.user.role !== "moderator") {
     return res.status(403).json({ error: "not approved" });
   }
   const lim = userLimitsJson(req.user.id);

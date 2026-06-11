@@ -14,15 +14,21 @@ import { limitsFromAdminBody, limitsToJson, parseContentLimits } from "../utils/
 import { optimizeUploadedFile } from "../utils/imageOptimize.js";
 import { finalizeBlogPublish } from "../utils/blogPublish.js";
 import { ensureUserFollowsAdmins } from "../utils/adminFollow.js";
+import { isAdmin, isPanelStaff } from "../utils/roles.js";
 
 const router = express.Router();
 
-function adminOnly(req, res, next) {
-  if (req.user.role !== "admin") return res.status(403).json({ error: "forbidden" });
+function panelStaff(req, res, next) {
+  if (!isPanelStaff(req.user.role)) return res.status(403).json({ error: "forbidden" });
   next();
 }
 
-router.use(authRequired, adminOnly);
+function adminOnly(req, res, next) {
+  if (!isAdmin(req.user.role)) return res.status(403).json({ error: "forbidden" });
+  next();
+}
+
+router.use(authRequired, panelStaff);
 
 const PRIVATE_FILES_ROOT = path.resolve(process.env.PRIVATE_FILES_DIR ?? "./data/private-files");
 const LIBRARY_ROOT = path.resolve(process.env.LIBRARY_DIR ?? "./data/library");
@@ -60,7 +66,7 @@ router.get("/admin/pending", (_req, res) => {
   return res.json(rows);
 });
 
-router.get("/admin/users", (_req, res) => {
+router.get("/admin/users", adminOnly, (_req, res) => {
   const rows = all(
     `SELECT id, email, nickname, role, status, created_at, bio, avatar_url, coins
      FROM users ORDER BY created_at DESC`,
@@ -73,7 +79,7 @@ router.get("/admin/users", (_req, res) => {
   );
 });
 
-router.get("/admin/users/:id", (req, res) => {
+router.get("/admin/users/:id", adminOnly, (req, res) => {
   const row = get(
     `SELECT id, email, nickname, role, status, bio, full_name, website_url, readme_md,
             social_links_json, avatar_url, nickname_change_count, created_at, content_limits_json, coins
@@ -110,7 +116,7 @@ router.get("/admin/users/:id", (req, res) => {
 const ADMIN_COIN_GRANT_MIN = 1;
 const ADMIN_COIN_GRANT_MAX = 100_000;
 
-router.post("/admin/users/:id/coins", (req, res) => {
+router.post("/admin/users/:id/coins", adminOnly, (req, res) => {
   const id = req.params.id;
   const target = get("SELECT id FROM users WHERE id = ?", id);
   if (!target) return res.status(404).json({ error: "not found" });
@@ -125,7 +131,7 @@ router.post("/admin/users/:id/coins", (req, res) => {
   return res.json({ ok: true, coins });
 });
 
-router.get("/admin/users/:id/invites", (req, res) => {
+router.get("/admin/users/:id/invites", adminOnly, (req, res) => {
   const target = get("SELECT id FROM users WHERE id = ?", req.params.id);
   if (!target) return res.status(404).json({ error: "not found" });
   const rows = all(
@@ -141,7 +147,7 @@ router.get("/admin/users/:id/invites", (req, res) => {
   );
 });
 
-router.delete("/admin/users/:userId/invites/:inviteId", (req, res) => {
+router.delete("/admin/users/:userId/invites/:inviteId", adminOnly, (req, res) => {
   const row = get(
     "SELECT id FROM invite_links WHERE id = ? AND owner_user_id = ?",
     req.params.inviteId,
@@ -152,7 +158,7 @@ router.delete("/admin/users/:userId/invites/:inviteId", (req, res) => {
   return res.json({ ok: true });
 });
 
-router.patch("/admin/users/:id/profile", async (req, res) => {
+router.patch("/admin/users/:id/profile", adminOnly, async (req, res) => {
   const id = req.params.id;
   const target = get("SELECT id, nickname FROM users WHERE id = ?", id);
   if (!target) return res.status(404).json({ error: "not found" });
@@ -224,7 +230,7 @@ router.patch("/admin/users/:id/profile", async (req, res) => {
   }
 });
 
-router.patch("/admin/users/:id/publish-limits", (req, res) => {
+router.patch("/admin/users/:id/publish-limits", adminOnly, (req, res) => {
   const id = req.params.id;
   const target = get("SELECT id, content_limits_json FROM users WHERE id = ?", id);
   if (!target) return res.status(404).json({ error: "not found" });
@@ -235,6 +241,7 @@ router.patch("/admin/users/:id/publish-limits", (req, res) => {
 
 router.post(
   "/admin/users/:id/avatar",
+  adminOnly,
   uploadSingle(adminAvatarUpload, "file"),
   async (req, res) => {
     if (!req.file) return res.status(400).json({ error: "no file" });
@@ -259,9 +266,11 @@ router.post("/admin/users/:id/reject", (req, res) => {
   return res.json({ ok: true });
 });
 
-router.post("/admin/users/:id/role", (req, res) => {
+router.post("/admin/users/:id/role", adminOnly, (req, res) => {
   const role = String(req.body?.role ?? "");
-  if (!["student", "teacher", "master", "admin"].includes(role)) return res.status(400).json({ error: "bad role" });
+  if (!["student", "teacher", "master", "moderator", "admin"].includes(role)) {
+    return res.status(400).json({ error: "bad role" });
+  }
   run("UPDATE users SET role = ? WHERE id = ?", role, req.params.id);
   logAdminAction(req.user.id, "user_role", req.params.id, { role });
   if (role === "teacher" || role === "master" || role === "admin") {
@@ -485,15 +494,15 @@ function removeDeletedUserFiles(fileRows, bookRows, avatarUrl) {
   }
 }
 
-router.delete("/admin/users/:id", (req, res) => {
+router.delete("/admin/users/:id", adminOnly, (req, res) => {
   const id = req.params.id;
   if (id === req.user.id) {
     return res.status(400).json({ error: "нельзя удалить самого себя" });
   }
   const u = get("SELECT id, role FROM users WHERE id = ?", id);
   if (!u) return res.status(404).json({ error: "не найдено" });
-  if (u.role === "admin") {
-    return res.status(400).json({ error: "нельзя удалить другого админа" });
+  if (u.role === "admin" || u.role === "moderator") {
+    return res.status(400).json({ error: "нельзя удалить админа или модератора" });
   }
   try {
     const { fileRows, bookRows, avatarUrl } = deleteUserFully(id);
@@ -506,7 +515,7 @@ router.delete("/admin/users/:id", (req, res) => {
   }
 });
 
-router.post("/admin/users/:id/invites", (req, res) => {
+router.post("/admin/users/:id/invites", adminOnly, (req, res) => {
   const count = Math.max(1, Math.min(50, Number(req.body?.count ?? 1) | 0));
   const targetRole = ["teacher", "student"].includes(req.body?.target_role) ? req.body.target_role : "student";
   const created = [];
