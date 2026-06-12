@@ -181,7 +181,18 @@ onMounted(load);
             </div>
           </template>
           <template v-else-if="a.kind === 'wallpaper' || a.kind === 'cover'">
+            <video
+              v-if="a.kind === 'wallpaper' && /\.mp4(\?|#|$)/i.test(a.url)"
+              class="wide-thumb wide-thumb-video"
+              :class="a.kind === 'wallpaper' ? 'wallpaper-strip-thumb' : ''"
+              :src="a.url"
+              autoplay
+              loop
+              muted
+              playsinline
+            />
             <div
+              v-else
               class="wide-thumb"
               :class="a.kind === 'wallpaper' ? 'wallpaper-strip-thumb' : ''"
               :style="{ backgroundImage: `url(${a.url})` }"
@@ -300,6 +311,12 @@ onMounted(load);
   border: 1px solid var(--border);
   background-size: cover;
   background-position: center;
+}
+.wide-thumb-video {
+  display: block;
+  object-fit: cover;
+  object-position: center;
+  pointer-events: none;
 }
 .wallpaper-strip-thumb {
   height: 56px;

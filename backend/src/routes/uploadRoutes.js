@@ -18,7 +18,7 @@ import {
   updateShopCategory,
 } from "../utils/shopCategories.js";
 import { detachShopItemFromUsers } from "../utils/profileCosmetics.js";
-import { verifyLectureFile, verifyRasterImage } from "../utils/mimeVerify.js";
+import { verifyLectureFile, verifyMp4Video, verifyRasterImage } from "../utils/mimeVerify.js";
 import { assertSafeUploadExtension } from "../utils/security.js";
 import { unlinkUploadUrl, UPLOAD_ROOT } from "../utils/uploadSafe.js";
 
@@ -270,6 +270,13 @@ router.post(
   },
 );
 
+const SHOP_MIMES = new Set([...IMAGE_MIMES, "video/mp4"]);
+
+function shopFileFilter(_req, file, cb) {
+  if (SHOP_MIMES.has(file.mimetype)) cb(null, true);
+  else cb(new Error("only jpeg, png, gif, webp, mp4"));
+}
+
 const shopItemUpload = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, path.join(UPLOAD_ROOT, "shop-items")),
@@ -278,8 +285,8 @@ const shopItemUpload = multer({
       cb(null, `shop-${uuidv4().replace(/-/g, "")}${ext}`);
     },
   }),
-  limits: { fileSize: 6 * 1024 * 1024 },
-  fileFilter: imageFileFilter,
+  limits: { fileSize: 32 * 1024 * 1024 },
+  fileFilter: shopFileFilter,
 });
 
 router.post("/admin/shop/items", authRequired, (req, res, next) => {
@@ -290,17 +297,37 @@ router.post("/admin/shop/items", authRequired, (req, res, next) => {
   });
 }, async (req, res) => {
   if (!req.file) return res.status(400).json({ error: "no file" });
-  const probe = await verifyRasterImage(req.file.path);
-  if (!probe.ok) {
-    try {
-      fs.unlinkSync(req.file.path);
-    } catch {
-      /* ignore */
-    }
-    return res.status(400).json({ error: "invalid image" });
-  }
   const kind = String(req.body?.kind ?? "avatar").trim();
   if (!SHOP_KINDS.has(kind)) return res.status(400).json({ error: "bad kind" });
+  const isMp4 = req.file.mimetype === "video/mp4";
+  if (isMp4) {
+    if (kind !== "wallpaper") {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch {
+        /* ignore */
+      }
+      return res.status(400).json({ error: "mp4 only for wallpaper" });
+    }
+    if (!verifyMp4Video(req.file.path)) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch {
+        /* ignore */
+      }
+      return res.status(400).json({ error: "invalid mp4" });
+    }
+  } else {
+    const probe = await verifyRasterImage(req.file.path);
+    if (!probe.ok) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch {
+        /* ignore */
+      }
+      return res.status(400).json({ error: "invalid image" });
+    }
+  }
   const name = String(req.body?.name ?? "").trim() || req.file.originalname;
   const categoryIds = parseCategoryIdsInput(req.body);
   const price = Math.max(0, parseInt(req.body?.price ?? "0", 10) || 0);
@@ -312,12 +339,12 @@ router.post("/admin/shop/items", authRequired, (req, res, next) => {
     if (!Number.isFinite(n) || n < 1) return res.status(400).json({ error: "bad stock_limit" });
     stockLimit = n;
   }
-  let isAnimated = req.file.mimetype === "image/gif" ? 1 : 0;
+  let isAnimated = req.file.mimetype === "image/gif" || isMp4 ? 1 : 0;
   let presetKey = "avatar";
   if (kind === "frame") presetKey = "shop_frame";
   else if (kind === "wallpaper") presetKey = "shop_wallpaper";
   else if (kind === "cover") presetKey = "shop_cover";
-  if (isRasterImageMimetype(req.file.mimetype) && req.file.mimetype !== "image/gif") {
+  if (!isMp4 && isRasterImageMimetype(req.file.mimetype) && req.file.mimetype !== "image/gif") {
     const r = await optimizeUploadedFile(req.file.path, /** @type {"avatar"|"shop_frame"|"shop_wallpaper"|"shop_cover"} */ (presetKey));
     if (r.ok) req.file.filename = r.filename;
     if (kind === "frame" && r.animated) isAnimated = 1;

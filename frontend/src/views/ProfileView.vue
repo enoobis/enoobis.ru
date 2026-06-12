@@ -70,13 +70,21 @@ const presenceLabel = computed(() => {
   return "";
 });
 
+function isMp4Url(url: string) {
+  return /\.mp4(\?|#|$)/i.test(url);
+}
+
 const showWallpaper = computed(
   () => !!profile.value?.wallpaper_url && !wallpaperBroken.value,
 );
 
+const isWallpaperVideo = computed(
+  () => isMp4Url(profile.value?.wallpaper_url ?? ""),
+);
+
 const WALLPAPER_STAGE_REF = 1920;
 /** рамка обоев — чуть шире layout, по внутренним краям крыльев на фоне */
-const WALLPAPER_PANEL_REF = 920;
+const WALLPAPER_PANEL_REF = 948;
 const WALLPAPER_DESKTOP_MIN = 761;
 
 const wallpaperDesktop = ref(false);
@@ -149,7 +157,7 @@ watch(
   () => profile.value?.wallpaper_url ?? "",
   (url) => {
     wallpaperBroken.value = false;
-    if (url) probeImage(url, () => { wallpaperBroken.value = true; });
+    if (url && !isMp4Url(url)) probeImage(url, () => { wallpaperBroken.value = true; });
   },
 );
 
@@ -310,7 +318,18 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
         aria-hidden="true"
       >
         <div class="profile-bg-stage" :style="wallpaperStageStyle">
+          <video
+            v-if="isWallpaperVideo"
+            class="profile-bg-img profile-bg-video"
+            :src="profile.wallpaper_url"
+            autoplay
+            loop
+            muted
+            playsinline
+            @error="wallpaperBroken = true"
+          />
           <img
+            v-else
             class="profile-bg-img"
             :src="profile.wallpaper_url"
             alt=""
@@ -512,7 +531,8 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   display: block;
   padding-top: 56.25%;
 }
-.profile-bg-img {
+.profile-bg-img,
+.profile-bg-video {
   position: absolute;
   top: 0;
   left: 0;
@@ -521,6 +541,10 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   display: block;
   object-fit: cover;
   object-position: center top;
+}
+.profile-bg-video {
+  border: 0;
+  pointer-events: none;
 }
 .profile-bg-fade {
   position: absolute;

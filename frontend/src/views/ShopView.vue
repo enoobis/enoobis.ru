@@ -284,7 +284,18 @@ watch(
             </div>
           </template>
           <template v-else-if="item.kind === 'wallpaper' || item.kind === 'cover'">
+            <video
+              v-if="item.kind === 'wallpaper' && /\.mp4(\?|#|$)/i.test(item.url)"
+              class="wide-thumb wide-thumb-video"
+              :class="item.kind === 'wallpaper' ? 'wallpaper-strip-thumb' : ''"
+              :src="item.url"
+              autoplay
+              loop
+              muted
+              playsinline
+            />
             <div
+              v-else
               class="wide-thumb"
               :class="item.kind === 'wallpaper' ? 'wallpaper-strip-thumb' : ''"
               :style="{ backgroundImage: `url(${item.url})` }"
@@ -456,6 +467,12 @@ watch(
   border: 1px solid var(--border);
   background-size: cover;
   background-position: center;
+}
+.wide-thumb-video {
+  display: block;
+  object-fit: cover;
+  object-position: center;
+  pointer-events: none;
 }
 .wallpaper-strip-thumb {
   height: 56px;

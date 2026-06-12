@@ -35,6 +35,17 @@ export async function verifyRasterImage(absPath) {
   return probeFileFormats(absPath, RASTER);
 }
 
+/** mp4 container: bytes 4–7 are "ftyp" */
+export function verifyMp4Video(absPath) {
+  const ext = path.extname(absPath).toLowerCase();
+  if (ext !== ".mp4") return false;
+  try {
+    return readFileHead(absPath, 8).toString("ascii", 4, 8) === "ftyp";
+  } catch {
+    return false;
+  }
+}
+
 export async function verifyLectureFile(absPath, declaredMime) {
   const mime = String(declaredMime ?? "").toLowerCase();
   const ext = path.extname(absPath).toLowerCase();
