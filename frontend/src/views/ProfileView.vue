@@ -243,6 +243,7 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
       class="cover-banner"
       :style="{ backgroundImage: `url(${profile.profile_cover_url})` }"
     />
+    <div class="profile-inner" :class="{ 'profile-steam-panel': showWallpaper }">
     <header class="head" :class="{ 'head-with-cover': showCover }">
       <div class="avatar-cell">
         <div
@@ -324,6 +325,7 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
       </div>
     </header>
 
+    <div class="profile-body">
     <ul v-if="moderationNotices.length" class="mod-notes">
       <li v-for="(line, i) in moderationNotices" :key="i">{{ line }}</li>
     </ul>
@@ -384,6 +386,8 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
       </div>
       <p v-else class="page-empty muted">записей нет</p>
     </template>
+    </div>
+    </div>
     </section>
   </div>
   <p v-else-if="err" class="error">{{ err }}</p>
@@ -414,45 +418,76 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   max-width: 640px;
   margin: 0 auto;
 }
+.profile-inner {
+  display: grid;
+  gap: 0;
+}
+.profile-body {
+  display: grid;
+  gap: 0;
+}
 .profile.on-wallpaper {
   --profile-wide: min(calc(880px - 2rem), calc(100vw - 2 * var(--layout-pad, 1rem)));
+  --profile-steam-bg: rgba(8, 9, 12, 0.55);
+  --profile-steam-border: rgba(255, 255, 255, 0.12);
+  --profile-steam-line: rgba(255, 255, 255, 0.1);
+  --profile-steam-blur: 22px;
   max-width: var(--profile-wide);
-  padding: 0.75rem 0 0;
+  padding: 0.75rem 0 1.5rem;
+}
+:global(html[data-theme="white"]) .profile.on-wallpaper {
+  --profile-steam-bg: rgba(255, 255, 255, 0.58);
+  --profile-steam-border: rgba(0, 0, 0, 0.1);
+  --profile-steam-line: rgba(0, 0, 0, 0.08);
+}
+.profile-steam-panel {
+  border-radius: 4px;
+  border: 1px solid var(--profile-steam-border);
+  background: var(--profile-steam-bg);
+  -webkit-backdrop-filter: blur(var(--profile-steam-blur)) saturate(1.2);
+  backdrop-filter: blur(var(--profile-steam-blur)) saturate(1.2);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 8px 32px rgba(0, 0, 0, 0.22);
+  overflow: hidden;
+}
+:global(html[data-theme="white"]) .profile-steam-panel {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.65),
+    0 8px 28px rgba(0, 0, 0, 0.12);
+}
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .profile-steam-panel {
+    background: color-mix(in srgb, var(--bg) 92%, transparent);
+  }
 }
 .profile.on-wallpaper .head {
-  padding: 1rem 1.15rem;
-  margin-bottom: 1rem;
-  border-bottom: none;
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--bg) 86%, transparent);
-  -webkit-backdrop-filter: blur(20px) saturate(1.08);
-  backdrop-filter: blur(20px) saturate(1.08);
+  padding: 1rem 1.15rem 1.1rem;
+  margin-bottom: 0;
+  border-bottom: 1px solid var(--profile-steam-line);
+  border-radius: 0;
+  background: transparent;
+}
+.profile.on-wallpaper .profile-body {
+  padding: 0.85rem 1.15rem 1.15rem;
+  background: transparent;
 }
 .profile.on-wallpaper .readme {
   border: none;
   padding: 0;
+  margin-bottom: 1rem;
   background: transparent;
 }
 .profile.on-wallpaper .readme :deep(img) {
   width: 100%;
-  border-radius: 12px;
+  border-radius: 4px;
 }
-.profile.on-wallpaper .info h1,
-.profile.on-wallpaper .info .nick-line,
-.profile.on-wallpaper .info .bio,
-.profile.on-wallpaper .info .meta,
-.profile.on-wallpaper .info a {
-  text-shadow:
-    0 0 1px color-mix(in srgb, var(--bg) 95%, transparent),
-    0 2px 14px color-mix(in srgb, var(--bg) 82%, transparent);
+.profile.on-wallpaper .content-tabs {
+  margin-top: 0;
+  border-bottom-color: var(--profile-steam-line);
 }
-.profile.on-wallpaper .content-tabs,
-.profile.on-wallpaper .readme,
-.profile.on-wallpaper .post-list,
-.profile.on-wallpaper .micro-list,
-.profile.on-wallpaper .ach,
-.profile.on-wallpaper .mod-notes {
-  padding-inline: 0.15rem;
+.profile.on-wallpaper .page-empty {
+  color: var(--muted);
 }
 .cover-banner {
   width: 100%;
