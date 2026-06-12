@@ -235,12 +235,13 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
 </script>
 
 <template>
-  <div
-    v-if="profile"
-    class="profile-wrap"
-    :class="{ 'profile-bg-style-2': profileWallpaperStyle === '2' }"
-  >
-    <div v-if="showWallpaper" class="profile-bg" aria-hidden="true">
+  <div v-if="profile" class="profile-wrap">
+    <div
+      v-if="showWallpaper"
+      class="profile-bg"
+      :class="`profile-bg--${profileWallpaperStyle}`"
+      aria-hidden="true"
+    >
       <div
         class="profile-bg-sharp"
         :style="{ backgroundImage: `url(${profile.wallpaper_url})` }"
@@ -411,7 +412,9 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
 .profile-bg {
   /* ширина колонки = ширина шапки (.layout 880px минус её padding) */
   --profile-col: min(calc(880px - 2rem), calc(100vw - 2 * var(--layout-pad, 1rem)));
-  --profile-fade: 120px;
+  --profile-fade: 96px;
+  --profile-tint: color-mix(in srgb, var(--bg) 78%, transparent);
+  --profile-tint-strong: color-mix(in srgb, var(--bg) 88%, transparent);
   position: fixed;
   inset: 0;
   z-index: 0;
@@ -423,28 +426,24 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   background-size: cover;
   background-position: center top;
 }
-/* узкая полоса перехода: blur + чёрный, гаснет наружу */
 .profile-bg-side {
   position: absolute;
   top: 0;
   bottom: 0;
   width: var(--profile-fade);
-  -webkit-backdrop-filter: blur(22px);
-  backdrop-filter: blur(22px);
 }
 .profile-bg-side--left {
   left: calc(50% - var(--profile-col) / 2 - var(--profile-fade));
-  background: linear-gradient(to right, transparent, rgba(0, 0, 0, 0.96));
-  -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 55%);
-  mask-image: linear-gradient(to right, transparent 0%, #000 55%);
+  background: linear-gradient(to right, transparent, var(--profile-tint-strong));
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 72%);
+  mask-image: linear-gradient(to right, transparent 0%, #000 72%);
 }
 .profile-bg-side--right {
   right: calc(50% - var(--profile-col) / 2 - var(--profile-fade));
-  background: linear-gradient(to left, transparent, rgba(0, 0, 0, 0.96));
-  -webkit-mask-image: linear-gradient(to left, transparent 0%, #000 55%);
-  mask-image: linear-gradient(to left, transparent 0%, #000 55%);
+  background: linear-gradient(to left, transparent, var(--profile-tint-strong));
+  -webkit-mask-image: linear-gradient(to left, transparent 0%, #000 72%);
+  mask-image: linear-gradient(to left, transparent 0%, #000 72%);
 }
-/* чёрная колонка строго по ширине шапки */
 .profile-bg-center {
   position: absolute;
   top: 0;
@@ -454,26 +453,51 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   width: var(--profile-col);
   background: linear-gradient(
     to bottom,
-    rgba(0, 0, 0, 0.96),
-    rgba(0, 0, 0, 0.98) 44%,
+    var(--profile-tint-strong) 0%,
+    var(--profile-tint) 42%,
     var(--bg) 100%
   );
 }
-.profile-wrap.profile-bg-style-2 .profile-bg-side--left {
-  background: linear-gradient(to right, transparent, var(--glass-bg, rgba(15, 15, 15, 0.55)));
+/* тема 1 — мягкая колонка без чистого чёрного */
+.profile-bg--1 .profile-bg-sharp {
+  filter: saturate(1.05);
 }
-.profile-wrap.profile-bg-style-2 .profile-bg-side--right {
-  background: linear-gradient(to left, transparent, var(--glass-bg, rgba(15, 15, 15, 0.55)));
+/* тема 2 — стекло: фон виден, лёгкий blur по колонке */
+.profile-bg--2 {
+  --profile-glass: color-mix(in srgb, var(--surface) 24%, transparent);
+  --profile-glass-mid: color-mix(in srgb, var(--surface) 14%, transparent);
+  --profile-glass-line: color-mix(in srgb, var(--border) 38%, transparent);
 }
-.profile-wrap.profile-bg-style-2 .profile-bg-center {
+.profile-bg--2 .profile-bg-side {
+  display: none;
+}
+.profile-bg--2 .profile-bg-sharp {
+  filter: saturate(1.08) brightness(1.02);
+}
+.profile-bg--2 .profile-bg-center {
+  -webkit-backdrop-filter: blur(36px) saturate(1.25);
+  backdrop-filter: blur(36px) saturate(1.25);
+  border-inline: 1px solid var(--profile-glass-line);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--text) 7%, transparent),
+    0 0 80px color-mix(in srgb, var(--bg) 18%, transparent);
   background: linear-gradient(
-    to bottom,
-    var(--glass-bg, rgba(15, 15, 15, 0.55)),
-    var(--glass-bg, rgba(15, 15, 15, 0.62)) 44%,
-    transparent 100%
+    180deg,
+    var(--profile-glass) 0%,
+    var(--profile-glass-mid) 45%,
+    color-mix(in srgb, var(--bg) 42%, transparent) 78%,
+    var(--bg) 100%
   );
-  -webkit-backdrop-filter: blur(20px);
-  backdrop-filter: blur(20px);
+}
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .profile-bg--2 .profile-bg-center {
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface) 82%, transparent) 0%,
+      color-mix(in srgb, var(--bg) 92%, transparent) 70%,
+      var(--bg) 100%
+    );
+  }
 }
 .profile {
   position: relative;

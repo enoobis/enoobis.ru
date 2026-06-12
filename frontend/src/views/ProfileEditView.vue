@@ -518,7 +518,7 @@ function closeSettings() {
               <span class="profile-theme-opt-label">{{ s.label }}</span>
             </button>
           </div>
-          <p class="muted small">тема 2 — мутное стекло вместо чёрного фона по бокам</p>
+          <p class="muted small">тема 2 — полупрозрачное стекло, фон виден сквозь колонку</p>
         </section>
 
       </template>
@@ -894,12 +894,14 @@ function closeSettings() {
   pointer-events: none;
 }
 .profile-theme-opt:not(.glass)::before {
-  background: linear-gradient(90deg, transparent 42%, #000 58%, #000 100%);
+  background: linear-gradient(90deg, transparent 38%, color-mix(in srgb, var(--bg) 82%, transparent) 58%, var(--bg) 100%);
 }
 .profile-theme-opt.glass::before {
-  background: linear-gradient(90deg, transparent 30%, rgba(120, 120, 120, 0.35) 55%, rgba(40, 40, 40, 0.5) 100%);
-  -webkit-backdrop-filter: blur(6px);
-  backdrop-filter: blur(6px);
+  background:
+    linear-gradient(90deg, transparent 22%, color-mix(in srgb, var(--surface) 45%, transparent) 50%, transparent 78%),
+    linear-gradient(180deg, color-mix(in srgb, var(--surface) 35%, transparent), color-mix(in srgb, var(--bg) 55%, transparent));
+  -webkit-backdrop-filter: blur(8px) saturate(1.2);
+  backdrop-filter: blur(8px) saturate(1.2);
 }
 .profile-theme-opt.on {
   border-color: var(--text);
