@@ -232,10 +232,16 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
 <template>
   <div v-if="profile" class="profile-wrap">
     <div v-if="showWallpaper" class="profile-bg" aria-hidden="true">
-      <div
-        class="profile-bg-sharp"
-        :style="{ backgroundImage: `url(${profile.wallpaper_url})` }"
-      />
+      <div class="profile-bg-stage">
+        <img
+          class="profile-bg-img"
+          :src="profile.wallpaper_url"
+          alt=""
+          decoding="async"
+          @error="wallpaperBroken = true"
+        />
+        <div class="profile-bg-fade" />
+      </div>
     </div>
     <section class="profile" :class="{ 'on-wallpaper': showWallpaper }">
     <div
@@ -402,15 +408,34 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
 }
 .profile-bg {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
   z-index: 0;
   pointer-events: none;
+  background: var(--bg);
 }
-.profile-bg-sharp {
+.profile-bg-stage {
+  position: relative;
+  width: 100%;
+  max-width: 1920px;
+  margin: 0 auto;
+}
+.profile-bg-img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  object-position: center top;
+}
+.profile-bg-fade {
   position: absolute;
-  inset: 0;
-  background-size: cover;
-  background-position: center top;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 42%;
+  max-height: 360px;
+  background: linear-gradient(to bottom, transparent, var(--bg));
 }
 .profile {
   position: relative;
@@ -789,22 +814,15 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
     margin-right: calc(50% - 50vw);
     width: 100vw;
     max-width: 100vw;
+    overflow-x: clip;
   }
   .profile-bg {
-    overflow: hidden;
-    background: var(--bg);
+    --profile-stage-ref: 1920px;
+    --profile-stage-w: min(100vw, var(--profile-stage-ref));
   }
-  .profile-bg-sharp {
-    top: 0;
-    left: 50%;
-    right: auto;
-    bottom: auto;
-    width: var(--profile-stage-w, min(100vw, 1920px));
-    height: 100%;
-    transform: translateX(-50%);
-    background-repeat: no-repeat;
-    background-position: center top;
-    background-size: 100% auto;
+  .profile-bg-stage {
+    width: var(--profile-stage-w);
+    max-width: var(--profile-stage-ref);
   }
   .profile.on-wallpaper {
     --profile-wide: calc(var(--profile-stage-w) * var(--profile-panel-ref) / var(--profile-stage-ref));
