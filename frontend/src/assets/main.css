@@ -776,6 +776,14 @@ input[type="search"]::-webkit-search-cancel-button:hover {
   margin: 0 auto;
   padding: 1rem;
 }
+
+html.profile-wallpaper-desktop .nav-bar {
+  width: var(--profile-wallpaper-panel);
+  max-width: var(--profile-wallpaper-panel);
+  margin-left: var(--profile-wallpaper-margin);
+  margin-right: auto;
+  box-sizing: border-box;
+}
 @media (max-width: 640px) {
   :root {
     --layout-pad: 0.6rem;

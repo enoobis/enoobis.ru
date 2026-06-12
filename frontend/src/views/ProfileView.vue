@@ -77,34 +77,61 @@ const showWallpaper = computed(
 const WALLPAPER_STAGE_REF = 1920;
 const WALLPAPER_PANEL_REF = 880;
 const WALLPAPER_DESKTOP_MIN = 761;
+const LAYOUT_MAX = 880;
 
 const wallpaperDesktop = ref(false);
 const wallpaperStageWidthPx = ref(WALLPAPER_STAGE_REF);
 
+function readLayoutPadPx() {
+  const root = getComputedStyle(document.documentElement);
+  const raw = root.getPropertyValue("--layout-pad").trim();
+  if (!raw) return 16;
+  if (raw.endsWith("rem")) {
+    return parseFloat(raw) * (parseFloat(root.fontSize) || 16);
+  }
+  return parseFloat(raw) || 16;
+}
+
+function clearWallpaperDocumentVars() {
+  const root = document.documentElement;
+  root.classList.remove("profile-wallpaper-desktop");
+  root.style.removeProperty("--profile-wallpaper-panel");
+  root.style.removeProperty("--profile-wallpaper-margin");
+}
+
+function applyWallpaperDocumentVars(active: boolean) {
+  if (!active) {
+    clearWallpaperDocumentVars();
+    return;
+  }
+  const cw = document.documentElement.clientWidth;
+  const stage = Math.min(cw, WALLPAPER_STAGE_REF);
+  const panel = Math.round(stage * WALLPAPER_PANEL_REF / WALLPAPER_STAGE_REF);
+  const pad = readLayoutPadPx();
+  const layoutW = Math.min(cw, LAYOUT_MAX);
+  const contentLeft = (cw - layoutW) / 2 + pad;
+  const panelLeft = (cw - panel) / 2;
+  const root = document.documentElement;
+  root.classList.add("profile-wallpaper-desktop");
+  root.style.setProperty("--profile-wallpaper-panel", `${panel}px`);
+  root.style.setProperty("--profile-wallpaper-margin", `${panelLeft - contentLeft}px`);
+  wallpaperStageWidthPx.value = stage;
+}
+
 function syncWallpaperLayout() {
   if (typeof window === "undefined") return;
-  const w = document.documentElement.clientWidth;
-  wallpaperDesktop.value = w >= WALLPAPER_DESKTOP_MIN;
-  wallpaperStageWidthPx.value = Math.min(w, WALLPAPER_STAGE_REF);
+  const cw = document.documentElement.clientWidth;
+  wallpaperDesktop.value = cw >= WALLPAPER_DESKTOP_MIN;
+  applyWallpaperDocumentVars(showWallpaper.value && wallpaperDesktop.value);
 }
 
 const showDesktopWallpaper = computed(
   () => showWallpaper.value && wallpaperDesktop.value,
 );
 
-const wallpaperPanelWidthPx = computed(() =>
-  Math.round(wallpaperStageWidthPx.value * WALLPAPER_PANEL_REF / WALLPAPER_STAGE_REF),
-);
-
 const wallpaperStageStyle = computed(() => ({
   width: `${wallpaperStageWidthPx.value}px`,
 }));
-
-const wallpaperPanelStyle = computed(() => {
-  if (!showDesktopWallpaper.value) return undefined;
-  const w = wallpaperPanelWidthPx.value;
-  return { width: `${w}px`, maxWidth: `${w}px` };
-});
 const showCover = computed(
   () => !!profile.value?.profile_cover_url && !coverBroken.value,
 );
@@ -257,12 +284,13 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener("resize", syncWallpaperLayout);
   document.removeEventListener("visibilitychange", onProfileVisibility);
+  clearWallpaperDocumentVars();
 });
 
 watch(nick, load);
 
-watch(showWallpaper, (on) => {
-  if (on) syncWallpaperLayout();
+watch(showDesktopWallpaper, () => {
+  syncWallpaperLayout();
 });
 
 useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
@@ -298,14 +326,13 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
         'on-wallpaper': showWallpaper,
         'on-wallpaper-desktop': showDesktopWallpaper,
       }"
-      :style="wallpaperPanelStyle"
     >
+    <div class="profile-inner" :class="{ 'profile-steam-panel': showWallpaper }">
     <div
       v-if="showCover"
       class="cover-banner"
       :style="{ backgroundImage: `url(${profile.profile_cover_url})` }"
     />
-    <div class="profile-inner" :class="{ 'profile-steam-panel': showWallpaper }">
     <header class="head" :class="{ 'head-with-cover': showCover }">
       <div class="avatar-cell">
         <div
@@ -868,9 +895,14 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
 }
 
 .profile-wrap.has-wallpaper-desktop {
+  width: var(--profile-wallpaper-panel);
+  margin-left: var(--profile-wallpaper-margin);
+  margin-right: auto;
   margin-top: -1.5rem;
 }
 .profile.on-wallpaper-desktop {
+  width: 100%;
+  max-width: none;
   padding: 0 0 1.5rem;
 }
 .profile.on-wallpaper-desktop .profile-steam-panel {
@@ -882,6 +914,10 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   aspect-ratio: var(--profile-cover-ratio);
   background-repeat: no-repeat;
   margin-bottom: -2.5rem;
+  border-radius: 0;
+  border-top: none;
+  border-left: none;
+  border-right: none;
 }
 
 @media (max-width: 600px) {
