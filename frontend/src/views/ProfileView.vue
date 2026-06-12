@@ -405,22 +405,12 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  overflow: hidden;
 }
 .profile-bg-sharp {
-  --profile-wallpaper-ratio: 16 / 9;
   position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  width: 100vw;
-  height: calc(100vw * 9 / 16);
-  min-height: 100vh;
-  min-width: calc(100vh * 16 / 9);
-  aspect-ratio: var(--profile-wallpaper-ratio);
+  inset: 0;
   background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
+  background-position: center top;
 }
 .profile {
   position: relative;
@@ -500,14 +490,12 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   color: var(--muted);
 }
 .cover-banner {
-  --profile-cover-ratio: 5 / 2;
   width: 100%;
-  aspect-ratio: var(--profile-cover-ratio);
+  height: 180px;
   border-radius: var(--radius);
   background-size: cover;
   background-position: center;
-  background-repeat: no-repeat;
-  margin-bottom: -2.5rem;
+  margin-bottom: -40px;
   border: 1px solid var(--border);
 }
 .head-with-cover {
@@ -783,8 +771,56 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   font-size: 0.82rem;
 }
 @media (max-width: 760px) {
+  .profile-bg {
+    display: none;
+  }
   .profile.on-wallpaper {
     padding: 0;
+  }
+}
+
+@media (min-width: 761px) {
+  .profile-wrap:has(.on-wallpaper) {
+    --profile-stage-ref: 1920px;
+    --profile-panel-ref: 880px;
+    --profile-stage-w: min(100vw, var(--profile-stage-ref));
+    margin-top: -1.5rem;
+    margin-left: calc(50% - 50vw);
+    margin-right: calc(50% - 50vw);
+    width: 100vw;
+    max-width: 100vw;
+  }
+  .profile-bg {
+    overflow: hidden;
+    background: var(--bg);
+  }
+  .profile-bg-sharp {
+    top: 0;
+    left: 50%;
+    right: auto;
+    bottom: auto;
+    width: var(--profile-stage-w, min(100vw, 1920px));
+    height: 100%;
+    transform: translateX(-50%);
+    background-repeat: no-repeat;
+    background-position: center top;
+    background-size: 100% auto;
+  }
+  .profile.on-wallpaper {
+    --profile-wide: calc(var(--profile-stage-w) * var(--profile-panel-ref) / var(--profile-stage-ref));
+    width: var(--profile-wide);
+    max-width: var(--profile-wide);
+    padding: 0 0 1.5rem;
+  }
+  .profile.on-wallpaper .profile-steam-panel {
+    border-radius: 0 0 4px 4px;
+  }
+  .cover-banner {
+    --profile-cover-ratio: 5 / 2;
+    height: auto;
+    aspect-ratio: var(--profile-cover-ratio);
+    background-repeat: no-repeat;
+    margin-bottom: -2.5rem;
   }
 }
 
