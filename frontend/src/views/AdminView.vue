@@ -506,8 +506,12 @@ function onShopItemFile(e: Event) {
 async function confirmShopUpload() {
   const file = shopPendingFile.value;
   if (!file || !auth.token) return;
-  if (file.type === "video/mp4" && shopUploadKind.value !== "wallpaper") {
-    shopMsg.value = "mp4 только для фона";
+  if ((file.type === "video/mp4" || file.type === "video/webm") && shopUploadKind.value !== "wallpaper") {
+    shopMsg.value = "видео только для фона";
+    return;
+  }
+  if ((file.type === "video/mp4" || file.type === "video/webm") && file.size > 10 * 1024 * 1024) {
+    shopMsg.value = "видео до 10 мб";
     return;
   }
   const name = shopUploadName.value.trim();
@@ -1368,7 +1372,7 @@ async function approveBlog(id: string) {
       <p v-if="shopMsg" class="ok-msg small">{{ shopMsg }}</p>
 
       <label class="btn-file shop-upload-btn" :class="{ disabled: shopUploadBusy }">
-        <input type="file" accept="image/jpeg,image/png,image/gif,image/webp,video/mp4" :disabled="shopUploadBusy" @change="onShopItemFile" />
+        <input type="file" accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/webm" :disabled="shopUploadBusy" @change="onShopItemFile" />
         {{ shopUploadBusy ? "загрузка…" : "загрузить" }}
       </label>
       <p v-if="shopLoading" class="muted small">загрузка…</p>

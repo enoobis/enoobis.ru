@@ -182,7 +182,7 @@ onMounted(load);
           </template>
           <template v-else-if="a.kind === 'wallpaper' || a.kind === 'cover'">
             <video
-              v-if="a.kind === 'wallpaper' && /\.mp4(\?|#|$)/i.test(a.url)"
+              v-if="a.kind === 'wallpaper' && /\.(mp4|webm)(\?|#|$)/i.test(a.url)"
               class="wide-thumb wide-thumb-video"
               :class="a.kind === 'wallpaper' ? 'wallpaper-strip-thumb' : ''"
               :src="a.url"

@@ -70,8 +70,8 @@ const presenceLabel = computed(() => {
   return "";
 });
 
-function isMp4Url(url: string) {
-  return /\.mp4(\?|#|$)/i.test(url);
+function isWallpaperVideoUrl(url: string) {
+  return /\.(mp4|webm)(\?|#|$)/i.test(url);
 }
 
 const showWallpaper = computed(
@@ -79,7 +79,7 @@ const showWallpaper = computed(
 );
 
 const isWallpaperVideo = computed(
-  () => isMp4Url(profile.value?.wallpaper_url ?? ""),
+  () => isWallpaperVideoUrl(profile.value?.wallpaper_url ?? ""),
 );
 
 const WALLPAPER_STAGE_REF = 1920;
@@ -157,7 +157,7 @@ watch(
   () => profile.value?.wallpaper_url ?? "",
   (url) => {
     wallpaperBroken.value = false;
-    if (url && !isMp4Url(url)) probeImage(url, () => { wallpaperBroken.value = true; });
+    if (url && !isWallpaperVideoUrl(url)) probeImage(url, () => { wallpaperBroken.value = true; });
   },
 );
 

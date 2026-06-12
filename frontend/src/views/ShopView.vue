@@ -285,7 +285,7 @@ watch(
           </template>
           <template v-else-if="item.kind === 'wallpaper' || item.kind === 'cover'">
             <video
-              v-if="item.kind === 'wallpaper' && /\.mp4(\?|#|$)/i.test(item.url)"
+              v-if="item.kind === 'wallpaper' && /\.(mp4|webm)(\?|#|$)/i.test(item.url)"
               class="wide-thumb wide-thumb-video"
               :class="item.kind === 'wallpaper' ? 'wallpaper-strip-thumb' : ''"
               :src="item.url"

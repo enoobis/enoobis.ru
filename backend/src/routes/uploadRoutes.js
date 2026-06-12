@@ -18,7 +18,12 @@ import {
   updateShopCategory,
 } from "../utils/shopCategories.js";
 import { detachShopItemFromUsers } from "../utils/profileCosmetics.js";
-import { verifyLectureFile, verifyMp4Video, verifyRasterImage } from "../utils/mimeVerify.js";
+import {
+  verifyLectureFile,
+  verifyMp4Video,
+  verifyRasterImage,
+  verifyWebmVideo,
+} from "../utils/mimeVerify.js";
 import { assertSafeUploadExtension } from "../utils/security.js";
 import { unlinkUploadUrl, UPLOAD_ROOT } from "../utils/uploadSafe.js";
 
@@ -270,11 +275,17 @@ router.post(
   },
 );
 
-const SHOP_MIMES = new Set([...IMAGE_MIMES, "video/mp4"]);
+const SHOP_MIMES = new Set([...IMAGE_MIMES, "video/mp4", "video/webm"]);
+const SHOP_IMAGE_MAX = 6 * 1024 * 1024;
+const SHOP_VIDEO_MAX = 10 * 1024 * 1024;
+
+function isShopWallpaperVideoMime(mime) {
+  return mime === "video/mp4" || mime === "video/webm";
+}
 
 function shopFileFilter(_req, file, cb) {
   if (SHOP_MIMES.has(file.mimetype)) cb(null, true);
-  else cb(new Error("only jpeg, png, gif, webp, mp4"));
+  else cb(new Error("only jpeg, png, gif, webp, mp4, webm"));
 }
 
 const shopItemUpload = multer({
@@ -285,7 +296,7 @@ const shopItemUpload = multer({
       cb(null, `shop-${uuidv4().replace(/-/g, "")}${ext}`);
     },
   }),
-  limits: { fileSize: 32 * 1024 * 1024 },
+  limits: { fileSize: SHOP_VIDEO_MAX },
   fileFilter: shopFileFilter,
 });
 
@@ -299,25 +310,45 @@ router.post("/admin/shop/items", authRequired, (req, res, next) => {
   if (!req.file) return res.status(400).json({ error: "no file" });
   const kind = String(req.body?.kind ?? "avatar").trim();
   if (!SHOP_KINDS.has(kind)) return res.status(400).json({ error: "bad kind" });
-  const isMp4 = req.file.mimetype === "video/mp4";
-  if (isMp4) {
+  const isVideo = isShopWallpaperVideoMime(req.file.mimetype);
+  if (isVideo) {
     if (kind !== "wallpaper") {
       try {
         fs.unlinkSync(req.file.path);
       } catch {
         /* ignore */
       }
-      return res.status(400).json({ error: "mp4 only for wallpaper" });
+      return res.status(400).json({ error: "video only for wallpaper" });
     }
-    if (!verifyMp4Video(req.file.path)) {
+    if (req.file.size > SHOP_VIDEO_MAX) {
       try {
         fs.unlinkSync(req.file.path);
       } catch {
         /* ignore */
       }
-      return res.status(400).json({ error: "invalid mp4" });
+      return res.status(400).json({ error: "video max 10mb" });
+    }
+    const validVideo =
+      req.file.mimetype === "video/mp4"
+        ? verifyMp4Video(req.file.path)
+        : verifyWebmVideo(req.file.path);
+    if (!validVideo) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch {
+        /* ignore */
+      }
+      return res.status(400).json({ error: "invalid video" });
     }
   } else {
+    if (req.file.size > SHOP_IMAGE_MAX) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch {
+        /* ignore */
+      }
+      return res.status(400).json({ error: "image max 6mb" });
+    }
     const probe = await verifyRasterImage(req.file.path);
     if (!probe.ok) {
       try {
@@ -339,12 +370,12 @@ router.post("/admin/shop/items", authRequired, (req, res, next) => {
     if (!Number.isFinite(n) || n < 1) return res.status(400).json({ error: "bad stock_limit" });
     stockLimit = n;
   }
-  let isAnimated = req.file.mimetype === "image/gif" || isMp4 ? 1 : 0;
+  let isAnimated = req.file.mimetype === "image/gif" || isVideo ? 1 : 0;
   let presetKey = "avatar";
   if (kind === "frame") presetKey = "shop_frame";
   else if (kind === "wallpaper") presetKey = "shop_wallpaper";
   else if (kind === "cover") presetKey = "shop_cover";
-  if (!isMp4 && isRasterImageMimetype(req.file.mimetype) && req.file.mimetype !== "image/gif") {
+  if (!isVideo && isRasterImageMimetype(req.file.mimetype) && req.file.mimetype !== "image/gif") {
     const r = await optimizeUploadedFile(req.file.path, /** @type {"avatar"|"shop_frame"|"shop_wallpaper"|"shop_cover"} */ (presetKey));
     if (r.ok) req.file.filename = r.filename;
     if (kind === "frame" && r.animated) isAnimated = 1;

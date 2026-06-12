@@ -46,6 +46,18 @@ export function verifyMp4Video(absPath) {
   }
 }
 
+/** webm/matroska: EBML header 0x1A45DFA3 */
+export function verifyWebmVideo(absPath) {
+  const ext = path.extname(absPath).toLowerCase();
+  if (ext !== ".webm") return false;
+  try {
+    const head = readFileHead(absPath, 4);
+    return head[0] === 0x1a && head[1] === 0x45 && head[2] === 0xdf && head[3] === 0xa3;
+  } catch {
+    return false;
+  }
+}
+
 export async function verifyLectureFile(absPath, declaredMime) {
   const mime = String(declaredMime ?? "").toLowerCase();
   const ext = path.extname(absPath).toLowerCase();
