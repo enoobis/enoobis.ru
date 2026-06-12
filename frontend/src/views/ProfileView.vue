@@ -75,22 +75,14 @@ const showWallpaper = computed(
 );
 
 const WALLPAPER_STAGE_REF = 1920;
-const WALLPAPER_PANEL_REF = 880;
+/** внутренняя рамка обоев = layout 880px минус боковые отступы */
+const WALLPAPER_PANEL_REF = 848;
 const WALLPAPER_DESKTOP_MIN = 761;
-const LAYOUT_MAX = 880;
 
 const wallpaperDesktop = ref(false);
 const wallpaperStageWidthPx = ref(WALLPAPER_STAGE_REF);
-
-function readLayoutPadPx() {
-  const root = getComputedStyle(document.documentElement);
-  const raw = root.getPropertyValue("--layout-pad").trim();
-  if (!raw) return 16;
-  if (raw.endsWith("rem")) {
-    return parseFloat(raw) * (parseFloat(root.fontSize) || 16);
-  }
-  return parseFloat(raw) || 16;
-}
+const wallpaperPanelWidthPx = ref(WALLPAPER_PANEL_REF);
+const wallpaperPanelMarginPx = ref(0);
 
 function clearWallpaperDocumentVars() {
   const root = document.documentElement;
@@ -106,16 +98,16 @@ function applyWallpaperDocumentVars(active: boolean) {
   }
   const cw = document.documentElement.clientWidth;
   const stage = Math.min(cw, WALLPAPER_STAGE_REF);
-  const panel = Math.round(stage * WALLPAPER_PANEL_REF / WALLPAPER_STAGE_REF);
-  const pad = readLayoutPadPx();
-  const layoutW = Math.min(cw, LAYOUT_MAX);
-  const contentLeft = (cw - layoutW) / 2 + pad;
-  const panelLeft = (cw - panel) / 2;
+  const panel = Math.round((stage * WALLPAPER_PANEL_REF) / WALLPAPER_STAGE_REF);
+  const stageLeft = (cw - stage) / 2;
+  const panelLeft = stageLeft + (stage - panel) / 2;
   const root = document.documentElement;
   root.classList.add("profile-wallpaper-desktop");
   root.style.setProperty("--profile-wallpaper-panel", `${panel}px`);
-  root.style.setProperty("--profile-wallpaper-margin", `${panelLeft - contentLeft}px`);
+  root.style.setProperty("--profile-wallpaper-margin", `${panelLeft}px`);
   wallpaperStageWidthPx.value = stage;
+  wallpaperPanelWidthPx.value = panel;
+  wallpaperPanelMarginPx.value = panelLeft;
 }
 
 function syncWallpaperLayout() {
@@ -132,6 +124,14 @@ const showDesktopWallpaper = computed(
 const wallpaperStageStyle = computed(() => ({
   width: `${wallpaperStageWidthPx.value}px`,
 }));
+
+const wallpaperWrapStyle = computed(() => {
+  if (!showDesktopWallpaper.value) return undefined;
+  return {
+    width: `${wallpaperPanelWidthPx.value}px`,
+    marginLeft: `${wallpaperPanelMarginPx.value}px`,
+  };
+});
 const showCover = computed(
   () => !!profile.value?.profile_cover_url && !coverBroken.value,
 );
@@ -301,6 +301,7 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
     v-if="profile"
     class="profile-wrap"
     :class="{ 'has-wallpaper-desktop': showDesktopWallpaper }"
+    :style="wallpaperWrapStyle"
   >
     <Teleport to="body">
       <div
@@ -895,8 +896,6 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
 }
 
 .profile-wrap.has-wallpaper-desktop {
-  width: var(--profile-wallpaper-panel);
-  margin-left: var(--profile-wallpaper-margin);
   margin-right: auto;
   margin-top: -1.5rem;
 }

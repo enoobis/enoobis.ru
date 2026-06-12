@@ -777,6 +777,11 @@ input[type="search"]::-webkit-search-cancel-button:hover {
   padding: 1rem;
 }
 
+html.profile-wallpaper-desktop .layout {
+  max-width: none;
+  padding-left: 0;
+  padding-right: 0;
+}
 html.profile-wallpaper-desktop .nav-bar {
   width: var(--profile-wallpaper-panel);
   max-width: var(--profile-wallpaper-panel);
