@@ -8,11 +8,6 @@ import AppIcon from "../components/AppIcon.vue";
 import { useAuthStore } from "../stores/auth";
 import { useSessionStore } from "../stores/session";
 import { setViewerPreferences } from "../utils/preferences";
-import {
-  PROFILE_WALLPAPER_STYLES,
-  normalizeProfileWallpaperStyle,
-  type ProfileWallpaperStyleId,
-} from "../utils/profileWallpaper";
 import { THEMES, normalizeThemeId, type ThemeId } from "../utils/themes";
 import { toastError, toastSuccess } from "../utils/toast";
 
@@ -32,7 +27,6 @@ type Me = {
   bio: string;
   avatar_url: string;
   wallpaper_url: string;
-  profile_wallpaper_style: string;
   readme_md: string;
   language_preference: "ru" | "en";
   theme_preference: string;
@@ -74,8 +68,6 @@ const websiteUrl = ref("");
 const socialLinks = ref<SocialLink[]>([]);
 const birthday = ref("");
 const country = ref("");
-const profileWallpaperStyle = ref<ProfileWallpaperStyleId>("1");
-
 const err = ref("");
 const avatarMsg = ref("");
 const uploadingAvatar = ref(false);
@@ -112,11 +104,6 @@ function applyMeMerge(oldMe: Me, fresh: Me) {
   }
   if (themePreference.value === normalizeThemeId(oldMe.theme_preference)) {
     themePreference.value = normalizeThemeId(fresh.theme_preference);
-  }
-  if (
-    profileWallpaperStyle.value === normalizeProfileWallpaperStyle(oldMe.profile_wallpaper_style)
-  ) {
-    profileWallpaperStyle.value = normalizeProfileWallpaperStyle(fresh.profile_wallpaper_style);
   }
   if (fullName.value === normStr(oldMe.full_name)) fullName.value = normStr(fresh.full_name);
   if (websiteUrl.value === normStr(oldMe.website_url)) websiteUrl.value = normStr(fresh.website_url);
@@ -296,9 +283,6 @@ onMounted(async () => {
     socialLinks.value = Array.isArray(me.value.social_links) ? [...me.value.social_links] : [];
     birthday.value = me.value.birthday ?? "";
     country.value = me.value.country ?? "";
-    profileWallpaperStyle.value = normalizeProfileWallpaperStyle(
-      me.value.profile_wallpaper_style,
-    );
     setViewerPreferences({
       language_preference: me.value.language_preference,
       theme_preference: me.value.theme_preference,
@@ -384,7 +368,6 @@ async function save() {
         social_links: socialLinks.value,
         birthday: birthday.value,
         country: country.value,
-        profile_wallpaper_style: profileWallpaperStyle.value,
       }),
     });
     setViewerPreferences({
@@ -501,25 +484,6 @@ function closeSettings() {
             </button>
           </div>
         </div>
-
-        <section class="profile-theme-block">
-          <span class="theme-label muted">фон профиля</span>
-          <div class="profile-theme-picker">
-            <button
-              v-for="s in PROFILE_WALLPAPER_STYLES"
-              :key="s.id"
-              type="button"
-              class="profile-theme-opt"
-              :class="{ on: profileWallpaperStyle === s.id, glass: s.id === '2' }"
-              :aria-label="s.label"
-              :title="s.label"
-              @click="profileWallpaperStyle = s.id"
-            >
-              <span class="profile-theme-opt-label">{{ s.label }}</span>
-            </button>
-          </div>
-          <p class="muted small">тема 2 — полупрозрачное стекло, фон виден сквозь колонку</p>
-        </section>
 
       </template>
 
@@ -862,54 +826,6 @@ function closeSettings() {
   margin: 0;
   font-size: 1rem;
   font-weight: 500;
-}
-.profile-theme-block {
-  margin-top: 1.25rem;
-  margin-bottom: 0.5rem;
-}
-.profile-theme-picker {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.5rem;
-}
-.profile-theme-opt {
-  display: grid;
-  gap: 0.35rem;
-  padding: 0.65rem 0.75rem;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--surface);
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-  min-height: 3.25rem;
-  position: relative;
-  overflow: hidden;
-}
-.profile-theme-opt::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  opacity: 0.35;
-  pointer-events: none;
-}
-.profile-theme-opt:not(.glass)::before {
-  background: linear-gradient(90deg, transparent 38%, color-mix(in srgb, var(--bg) 82%, transparent) 58%, var(--bg) 100%);
-}
-.profile-theme-opt.glass::before {
-  background:
-    linear-gradient(90deg, transparent 22%, color-mix(in srgb, var(--surface) 45%, transparent) 50%, transparent 78%),
-    linear-gradient(180deg, color-mix(in srgb, var(--surface) 35%, transparent), color-mix(in srgb, var(--bg) 55%, transparent));
-  -webkit-backdrop-filter: blur(8px) saturate(1.2);
-  backdrop-filter: blur(8px) saturate(1.2);
-}
-.profile-theme-opt.on {
-  border-color: var(--text);
-}
-.profile-theme-opt-label {
-  position: relative;
-  z-index: 1;
-  font-size: 0.8125rem;
 }
 .theme-block {
   margin-bottom: 1rem;

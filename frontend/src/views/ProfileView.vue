@@ -12,7 +12,6 @@ import { useAuthStore } from "../stores/auth";
 import { renderMarkdown } from "../utils/markdown";
 import { formatLastSeen } from "../utils/lastSeen";
 import { useProfileOwnerThemeFromValue } from "../composables/useProfileOwnerTheme";
-import { normalizeProfileWallpaperStyle } from "../utils/profileWallpaper";
 type Profile = {
   nickname: string;
   role: string;
@@ -20,7 +19,6 @@ type Profile = {
   avatar_url: string;
   avatar_frame_url: string;
   wallpaper_url: string;
-  profile_wallpaper_style: string;
   profile_cover_url: string;
   theme_preference: string;
   full_name: string;
@@ -74,9 +72,6 @@ const presenceLabel = computed(() => {
 
 const showWallpaper = computed(
   () => !!profile.value?.wallpaper_url && !wallpaperBroken.value,
-);
-const profileWallpaperStyle = computed(() =>
-  normalizeProfileWallpaperStyle(profile.value?.profile_wallpaper_style),
 );
 const showCover = computed(
   () => !!profile.value?.profile_cover_url && !coverBroken.value,
@@ -236,19 +231,11 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
 
 <template>
   <div v-if="profile" class="profile-wrap">
-    <div
-      v-if="showWallpaper"
-      class="profile-bg"
-      :class="`profile-bg--${profileWallpaperStyle}`"
-      aria-hidden="true"
-    >
+    <div v-if="showWallpaper" class="profile-bg" aria-hidden="true">
       <div
         class="profile-bg-sharp"
         :style="{ backgroundImage: `url(${profile.wallpaper_url})` }"
       />
-      <div class="profile-bg-side profile-bg-side--left" />
-      <div class="profile-bg-side profile-bg-side--right" />
-      <div class="profile-bg-center" />
     </div>
     <section class="profile" :class="{ 'on-wallpaper': showWallpaper }">
     <div
@@ -410,11 +397,6 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   margin: 0 auto;
 }
 .profile-bg {
-  /* ширина колонки = ширина шапки (.layout 880px минус её padding) */
-  --profile-col: min(calc(880px - 2rem), calc(100vw - 2 * var(--layout-pad, 1rem)));
-  --profile-fade: 96px;
-  --profile-tint: color-mix(in srgb, var(--bg) 78%, transparent);
-  --profile-tint-strong: color-mix(in srgb, var(--bg) 88%, transparent);
   position: fixed;
   inset: 0;
   z-index: 0;
@@ -426,79 +408,6 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   background-size: cover;
   background-position: center top;
 }
-.profile-bg-side {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: var(--profile-fade);
-}
-.profile-bg-side--left {
-  left: calc(50% - var(--profile-col) / 2 - var(--profile-fade));
-  background: linear-gradient(to right, transparent, var(--profile-tint-strong));
-  -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 72%);
-  mask-image: linear-gradient(to right, transparent 0%, #000 72%);
-}
-.profile-bg-side--right {
-  right: calc(50% - var(--profile-col) / 2 - var(--profile-fade));
-  background: linear-gradient(to left, transparent, var(--profile-tint-strong));
-  -webkit-mask-image: linear-gradient(to left, transparent 0%, #000 72%);
-  mask-image: linear-gradient(to left, transparent 0%, #000 72%);
-}
-.profile-bg-center {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: var(--profile-col);
-  background: linear-gradient(
-    to bottom,
-    var(--profile-tint-strong) 0%,
-    var(--profile-tint) 42%,
-    var(--bg) 100%
-  );
-}
-/* тема 1 — мягкая колонка без чистого чёрного */
-.profile-bg--1 .profile-bg-sharp {
-  filter: saturate(1.05);
-}
-/* тема 2 — стекло: фон виден, лёгкий blur по колонке */
-.profile-bg--2 {
-  --profile-glass: color-mix(in srgb, var(--surface) 24%, transparent);
-  --profile-glass-mid: color-mix(in srgb, var(--surface) 14%, transparent);
-  --profile-glass-line: color-mix(in srgb, var(--border) 38%, transparent);
-}
-.profile-bg--2 .profile-bg-side {
-  display: none;
-}
-.profile-bg--2 .profile-bg-sharp {
-  filter: saturate(1.08) brightness(1.02);
-}
-.profile-bg--2 .profile-bg-center {
-  -webkit-backdrop-filter: blur(36px) saturate(1.25);
-  backdrop-filter: blur(36px) saturate(1.25);
-  border-inline: 1px solid var(--profile-glass-line);
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, var(--text) 7%, transparent),
-    0 0 80px color-mix(in srgb, var(--bg) 18%, transparent);
-  background: linear-gradient(
-    180deg,
-    var(--profile-glass) 0%,
-    var(--profile-glass-mid) 45%,
-    color-mix(in srgb, var(--bg) 42%, transparent) 78%,
-    var(--bg) 100%
-  );
-}
-@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
-  .profile-bg--2 .profile-bg-center {
-    background: linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--surface) 82%, transparent) 0%,
-      color-mix(in srgb, var(--bg) 92%, transparent) 70%,
-      var(--bg) 100%
-    );
-  }
-}
 .profile {
   position: relative;
   z-index: 1;
@@ -506,7 +415,44 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   margin: 0 auto;
 }
 .profile.on-wallpaper {
-  padding: 0.5rem 0.35rem 0;
+  --profile-wide: min(calc(880px - 2rem), calc(100vw - 2 * var(--layout-pad, 1rem)));
+  max-width: var(--profile-wide);
+  padding: 0.75rem 0 0;
+}
+.profile.on-wallpaper .head {
+  padding: 1rem 1.15rem;
+  margin-bottom: 1rem;
+  border-bottom: none;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--bg) 86%, transparent);
+  -webkit-backdrop-filter: blur(20px) saturate(1.08);
+  backdrop-filter: blur(20px) saturate(1.08);
+}
+.profile.on-wallpaper .readme {
+  border: none;
+  padding: 0;
+  background: transparent;
+}
+.profile.on-wallpaper .readme :deep(img) {
+  width: 100%;
+  border-radius: 12px;
+}
+.profile.on-wallpaper .info h1,
+.profile.on-wallpaper .info .nick-line,
+.profile.on-wallpaper .info .bio,
+.profile.on-wallpaper .info .meta,
+.profile.on-wallpaper .info a {
+  text-shadow:
+    0 0 1px color-mix(in srgb, var(--bg) 95%, transparent),
+    0 2px 14px color-mix(in srgb, var(--bg) 82%, transparent);
+}
+.profile.on-wallpaper .content-tabs,
+.profile.on-wallpaper .readme,
+.profile.on-wallpaper .post-list,
+.profile.on-wallpaper .micro-list,
+.profile.on-wallpaper .ach,
+.profile.on-wallpaper .mod-notes {
+  padding-inline: 0.15rem;
 }
 .cover-banner {
   width: 100%;
