@@ -75,8 +75,8 @@ const showWallpaper = computed(
 );
 
 const WALLPAPER_STAGE_REF = 1920;
-/** рамка обоев = ширина layout */
-const WALLPAPER_PANEL_REF = 880;
+/** рамка обоев — чуть шире layout, по внутренним краям крыльев на фоне */
+const WALLPAPER_PANEL_REF = 920;
 const WALLPAPER_DESKTOP_MIN = 761;
 
 const wallpaperDesktop = ref(false);
