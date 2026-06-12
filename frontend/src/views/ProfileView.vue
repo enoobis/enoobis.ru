@@ -401,25 +401,16 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   margin: 0 auto;
 }
 .profile-bg {
-  --profile-wallpaper-ref: 1920px;
   position: fixed;
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  overflow: hidden;
-  background: var(--bg);
 }
-/* один масштаб на fhd, 2k и шире — как steam, без «зума» на больших мониторах */
 .profile-bg-sharp {
   position: absolute;
-  top: 0;
-  left: 50%;
-  width: min(100vw, var(--profile-wallpaper-ref));
-  height: 100%;
-  transform: translateX(-50%);
-  background-repeat: no-repeat;
+  inset: 0;
+  background-size: cover;
   background-position: center top;
-  background-size: 100% auto;
 }
 .profile {
   position: relative;
