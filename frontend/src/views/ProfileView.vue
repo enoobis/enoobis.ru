@@ -405,12 +405,22 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   inset: 0;
   z-index: 0;
   pointer-events: none;
+  overflow: hidden;
 }
 .profile-bg-sharp {
+  --profile-wallpaper-ratio: 16 / 9;
   position: absolute;
-  inset: 0;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 100vw;
+  height: calc(100vw * 9 / 16);
+  min-height: 100vh;
+  min-width: calc(100vh * 16 / 9);
+  aspect-ratio: var(--profile-wallpaper-ratio);
   background-size: cover;
-  background-position: center top;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 .profile {
   position: relative;
@@ -490,12 +500,14 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   color: var(--muted);
 }
 .cover-banner {
+  --profile-cover-ratio: 5 / 2;
   width: 100%;
-  height: 180px;
+  aspect-ratio: var(--profile-cover-ratio);
   border-radius: var(--radius);
   background-size: cover;
   background-position: center;
-  margin-bottom: -40px;
+  background-repeat: no-repeat;
+  margin-bottom: -2.5rem;
   border: 1px solid var(--border);
 }
 .head-with-cover {
@@ -771,9 +783,6 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   font-size: 0.82rem;
 }
 @media (max-width: 760px) {
-  .profile-bg {
-    display: none;
-  }
   .profile.on-wallpaper {
     padding: 0;
   }
