@@ -782,12 +782,17 @@ html.profile-wallpaper-desktop .layout {
   padding-left: 0;
   padding-right: 0;
 }
-html.profile-wallpaper-desktop .nav-bar {
+html.profile-wallpaper-desktop .nav {
   width: var(--profile-wallpaper-panel);
-  max-width: var(--profile-wallpaper-panel);
   margin-left: var(--profile-wallpaper-margin);
   margin-right: auto;
   box-sizing: border-box;
+}
+html.profile-wallpaper-desktop .nav-bar {
+  width: 100%;
+  max-width: none;
+  margin-left: 0;
+  padding: 0.28rem 0.45rem;
 }
 @media (max-width: 640px) {
   :root {
