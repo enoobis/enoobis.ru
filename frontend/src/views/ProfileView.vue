@@ -12,6 +12,7 @@ import { useAuthStore } from "../stores/auth";
 import { renderMarkdown } from "../utils/markdown";
 import { formatLastSeen } from "../utils/lastSeen";
 import { useProfileOwnerThemeFromValue } from "../composables/useProfileOwnerTheme";
+import { normalizeProfileWallpaperStyle } from "../utils/profileWallpaper";
 type Profile = {
   nickname: string;
   role: string;
@@ -19,6 +20,7 @@ type Profile = {
   avatar_url: string;
   avatar_frame_url: string;
   wallpaper_url: string;
+  profile_wallpaper_style: string;
   profile_cover_url: string;
   theme_preference: string;
   full_name: string;
@@ -72,6 +74,9 @@ const presenceLabel = computed(() => {
 
 const showWallpaper = computed(
   () => !!profile.value?.wallpaper_url && !wallpaperBroken.value,
+);
+const profileWallpaperStyle = computed(() =>
+  normalizeProfileWallpaperStyle(profile.value?.profile_wallpaper_style),
 );
 const showCover = computed(
   () => !!profile.value?.profile_cover_url && !coverBroken.value,
@@ -230,7 +235,11 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
 </script>
 
 <template>
-  <div v-if="profile" class="profile-wrap">
+  <div
+    v-if="profile"
+    class="profile-wrap"
+    :class="{ 'profile-bg-style-2': profileWallpaperStyle === '2' }"
+  >
     <div v-if="showWallpaper" class="profile-bg" aria-hidden="true">
       <div
         class="profile-bg-sharp"
@@ -449,6 +458,22 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
     rgba(0, 0, 0, 0.98) 44%,
     var(--bg) 100%
   );
+}
+.profile-wrap.profile-bg-style-2 .profile-bg-side--left {
+  background: linear-gradient(to right, transparent, var(--glass-bg, rgba(15, 15, 15, 0.55)));
+}
+.profile-wrap.profile-bg-style-2 .profile-bg-side--right {
+  background: linear-gradient(to left, transparent, var(--glass-bg, rgba(15, 15, 15, 0.55)));
+}
+.profile-wrap.profile-bg-style-2 .profile-bg-center {
+  background: linear-gradient(
+    to bottom,
+    var(--glass-bg, rgba(15, 15, 15, 0.55)),
+    var(--glass-bg, rgba(15, 15, 15, 0.62)) 44%,
+    transparent 100%
+  );
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
 }
 .profile {
   position: relative;

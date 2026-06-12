@@ -49,6 +49,7 @@ function buildMe(row) {
     avatar_url: row.avatar_url ?? "",
     avatar_frame_url: row.avatar_frame_url ?? "",
     profile_cover_url: row.profile_cover_url ?? "",
+    profile_wallpaper_style: normalizeProfileWallpaperStyle(row.profile_wallpaper_style),
     theme_preference: row.theme_preference ?? "black",
     language_preference: row.language_preference ?? "ru",
     font_preference: row.font_preference ?? "normal",
@@ -91,7 +92,7 @@ function isoAddDays(isoStr, days) {
 router.get("/me", authRequired, (req, res) => {
   const row = get(
     `SELECT id, email, nickname, role, status, bio, wallpaper_url, avatar_url, avatar_frame_url, profile_cover_url,
-            theme_preference, language_preference, font_preference, full_name, website_url,
+            profile_wallpaper_style, theme_preference, language_preference, font_preference, full_name, website_url,
             social_links_json, birthday, country, readme_md, created_at, last_seen_at,
             nickname_change_count, pinned_post_id, pinned_post_type, content_limits_json, coins
      FROM users WHERE id = ?`,
@@ -156,12 +157,19 @@ router.post("/me/nickname", authRequired, (req, res) => {
 });
 
 const ALLOWED_THEMES = new Set(["black", "white", "contrast", "contrast-white"]);
+const ALLOWED_PROFILE_WALLPAPER_STYLES = new Set(["1", "2"]);
 
 function normalizeThemePreference(raw) {
   const v = String(raw ?? "black").trim();
   if (v === "graphite") return "black";
   if (ALLOWED_THEMES.has(v)) return v;
   return null;
+}
+
+function normalizeProfileWallpaperStyle(raw) {
+  const v = String(raw ?? "1").trim();
+  if (ALLOWED_PROFILE_WALLPAPER_STYLES.has(v)) return v;
+  return "1";
 }
 
 function ownsShopUrl(userId, url) {
@@ -199,6 +207,7 @@ router.patch("/me", authRequired, (req, res) => {
     "wallpaper_url",
     "avatar_frame_url",
     "profile_cover_url",
+    "profile_wallpaper_style",
     "theme_preference",
     "language_preference",
     "font_preference",
@@ -228,6 +237,9 @@ router.patch("/me", authRequired, (req, res) => {
     const theme = normalizeThemePreference(body.theme_preference);
     if (!theme) return res.status(400).json({ error: "invalid_theme" });
     body.theme_preference = theme;
+  }
+  if (body.profile_wallpaper_style !== undefined) {
+    body.profile_wallpaper_style = normalizeProfileWallpaperStyle(body.profile_wallpaper_style);
   }
   const COSMETIC_FIELDS = new Set([
     "avatar_url",
@@ -713,9 +725,9 @@ router.get("/leaderboard", authRequired, (req, res) => {
 router.get("/profile/:nickname", (req, res) => {
   const viewer = viewerId(req);
   const p = get(
-    `SELECT id, nickname, role, bio, wallpaper_url, avatar_url, avatar_frame_url, profile_cover_url, theme_preference,
-            language_preference, font_preference, full_name, website_url, social_links_json,
-            birthday, country, readme_md, created_at, last_seen_at, content_limits_json
+    `SELECT id, nickname, role, bio, wallpaper_url, avatar_url, avatar_frame_url, profile_cover_url,
+            profile_wallpaper_style, theme_preference, language_preference, font_preference, full_name, website_url,
+            social_links_json, birthday, country, readme_md, created_at, last_seen_at, content_limits_json
      FROM users WHERE nickname = ?`,
     req.params.nickname,
   );
@@ -756,6 +768,7 @@ router.get("/profile/:nickname", (req, res) => {
     avatar_url: cosmetics.avatar_url,
     avatar_frame_url: cosmetics.avatar_frame_url,
     profile_cover_url: cosmetics.profile_cover_url,
+    profile_wallpaper_style: normalizeProfileWallpaperStyle(p.profile_wallpaper_style),
     theme_preference: p.theme_preference ?? "black",
     language_preference: p.language_preference ?? "ru",
     font_preference: p.font_preference ?? "normal",

@@ -774,6 +774,18 @@ try {
 }
 
 try {
+  db.prepare("SELECT profile_wallpaper_style FROM users LIMIT 1").get();
+} catch {
+  try {
+    db.exec(
+      "ALTER TABLE users ADD COLUMN profile_wallpaper_style TEXT NOT NULL DEFAULT '1'",
+    );
+  } catch {
+    // ignore
+  }
+}
+
+try {
   db.prepare("SELECT stock_limit FROM shop_items LIMIT 1").get();
 } catch {
   try {

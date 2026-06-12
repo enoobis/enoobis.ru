@@ -3,11 +3,16 @@ import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { api } from "../api/http";
 import { uploadAvatar } from "../api/uploadAvatar";
-import { changeMyPassword, getMyPrivacy, patchMyPrivacy } from "../api/profile";
+import { changeMyPassword } from "../api/profile";
 import AppIcon from "../components/AppIcon.vue";
 import { useAuthStore } from "../stores/auth";
 import { useSessionStore } from "../stores/session";
 import { setViewerPreferences } from "../utils/preferences";
+import {
+  PROFILE_WALLPAPER_STYLES,
+  normalizeProfileWallpaperStyle,
+  type ProfileWallpaperStyleId,
+} from "../utils/profileWallpaper";
 import { THEMES, normalizeThemeId, type ThemeId } from "../utils/themes";
 import { toastError, toastSuccess } from "../utils/toast";
 
@@ -27,6 +32,7 @@ type Me = {
   bio: string;
   avatar_url: string;
   wallpaper_url: string;
+  profile_wallpaper_style: string;
   readme_md: string;
   language_preference: "ru" | "en";
   theme_preference: string;
@@ -68,7 +74,7 @@ const websiteUrl = ref("");
 const socialLinks = ref<SocialLink[]>([]);
 const birthday = ref("");
 const country = ref("");
-const showOnlineStatus = ref(false);
+const profileWallpaperStyle = ref<ProfileWallpaperStyleId>("1");
 
 const err = ref("");
 const avatarMsg = ref("");
@@ -106,6 +112,11 @@ function applyMeMerge(oldMe: Me, fresh: Me) {
   }
   if (themePreference.value === normalizeThemeId(oldMe.theme_preference)) {
     themePreference.value = normalizeThemeId(fresh.theme_preference);
+  }
+  if (
+    profileWallpaperStyle.value === normalizeProfileWallpaperStyle(oldMe.profile_wallpaper_style)
+  ) {
+    profileWallpaperStyle.value = normalizeProfileWallpaperStyle(fresh.profile_wallpaper_style);
   }
   if (fullName.value === normStr(oldMe.full_name)) fullName.value = normStr(fresh.full_name);
   if (websiteUrl.value === normStr(oldMe.website_url)) websiteUrl.value = normStr(fresh.website_url);
@@ -285,20 +296,15 @@ onMounted(async () => {
     socialLinks.value = Array.isArray(me.value.social_links) ? [...me.value.social_links] : [];
     birthday.value = me.value.birthday ?? "";
     country.value = me.value.country ?? "";
+    profileWallpaperStyle.value = normalizeProfileWallpaperStyle(
+      me.value.profile_wallpaper_style,
+    );
     setViewerPreferences({
       language_preference: me.value.language_preference,
       theme_preference: me.value.theme_preference,
     });
     avatarMsg.value = "";
     await loadInvites();
-    if (auth.token) {
-      try {
-        const priv = await getMyPrivacy(auth.token);
-        showOnlineStatus.value = priv.show_online_status;
-      } catch {
-        showOnlineStatus.value = false;
-      }
-    }
     document.addEventListener("visibilitychange", onMeVisibility);
     void session.ensureMe(true);
   } catch (e) {
@@ -378,12 +384,9 @@ async function save() {
         social_links: socialLinks.value,
         birthday: birthday.value,
         country: country.value,
+        profile_wallpaper_style: profileWallpaperStyle.value,
       }),
     });
-    await patchMyPrivacy(auth.token, { show_online_status: showOnlineStatus.value });
-    if (showOnlineStatus.value) {
-      window.dispatchEvent(new CustomEvent("enoobis:online-preference-updated"));
-    }
     setViewerPreferences({
       language_preference: languagePreference.value,
       theme_preference: themePreference.value,
@@ -499,6 +502,25 @@ function closeSettings() {
           </div>
         </div>
 
+        <section class="profile-theme-block">
+          <span class="theme-label muted">фон профиля</span>
+          <div class="profile-theme-picker">
+            <button
+              v-for="s in PROFILE_WALLPAPER_STYLES"
+              :key="s.id"
+              type="button"
+              class="profile-theme-opt"
+              :class="{ on: profileWallpaperStyle === s.id, glass: s.id === '2' }"
+              :aria-label="s.label"
+              :title="s.label"
+              @click="profileWallpaperStyle = s.id"
+            >
+              <span class="profile-theme-opt-label">{{ s.label }}</span>
+            </button>
+          </div>
+          <p class="muted small">тема 2 — мутное стекло вместо чёрного фона по бокам</p>
+        </section>
+
       </template>
 
       <template v-else-if="tab === 'account'">
@@ -583,13 +605,6 @@ function closeSettings() {
           </label>
         </div>
 
-        <section class="privacy-block">
-          <label class="toggle-row">
-            <input v-model="showOnlineStatus" type="checkbox" />
-            <span>показывать, что я онлайн</span>
-          </label>
-          <p class="muted small">по умолчанию выключено · «онлайн» или когда был в сети</p>
-        </section>
       </template>
 
       <template v-else-if="tab === 'security'">
@@ -847,6 +862,52 @@ function closeSettings() {
   margin: 0;
   font-size: 1rem;
   font-weight: 500;
+}
+.profile-theme-block {
+  margin-top: 1.25rem;
+  margin-bottom: 0.5rem;
+}
+.profile-theme-picker {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+.profile-theme-opt {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  min-height: 3.25rem;
+  position: relative;
+  overflow: hidden;
+}
+.profile-theme-opt::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.35;
+  pointer-events: none;
+}
+.profile-theme-opt:not(.glass)::before {
+  background: linear-gradient(90deg, transparent 42%, #000 58%, #000 100%);
+}
+.profile-theme-opt.glass::before {
+  background: linear-gradient(90deg, transparent 30%, rgba(120, 120, 120, 0.35) 55%, rgba(40, 40, 40, 0.5) 100%);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+.profile-theme-opt.on {
+  border-color: var(--text);
+}
+.profile-theme-opt-label {
+  position: relative;
+  z-index: 1;
+  font-size: 0.8125rem;
 }
 .theme-block {
   margin-bottom: 1rem;
