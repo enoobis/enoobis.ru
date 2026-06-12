@@ -73,6 +73,38 @@ const presenceLabel = computed(() => {
 const showWallpaper = computed(
   () => !!profile.value?.wallpaper_url && !wallpaperBroken.value,
 );
+
+const WALLPAPER_STAGE_REF = 1920;
+const WALLPAPER_PANEL_REF = 880;
+const WALLPAPER_DESKTOP_MIN = 761;
+
+const wallpaperDesktop = ref(false);
+const wallpaperStageWidthPx = ref(WALLPAPER_STAGE_REF);
+
+function syncWallpaperLayout() {
+  if (typeof window === "undefined") return;
+  const w = document.documentElement.clientWidth;
+  wallpaperDesktop.value = w >= WALLPAPER_DESKTOP_MIN;
+  wallpaperStageWidthPx.value = Math.min(w, WALLPAPER_STAGE_REF);
+}
+
+const showDesktopWallpaper = computed(
+  () => showWallpaper.value && wallpaperDesktop.value,
+);
+
+const wallpaperPanelWidthPx = computed(() =>
+  Math.round(wallpaperStageWidthPx.value * WALLPAPER_PANEL_REF / WALLPAPER_STAGE_REF),
+);
+
+const wallpaperStageStyle = computed(() => ({
+  width: `${wallpaperStageWidthPx.value}px`,
+}));
+
+const wallpaperPanelStyle = computed(() => {
+  if (!showDesktopWallpaper.value) return undefined;
+  const w = wallpaperPanelWidthPx.value;
+  return { width: `${w}px`, maxWidth: `${w}px` };
+});
 const showCover = computed(
   () => !!profile.value?.profile_cover_url && !coverBroken.value,
 );
@@ -216,34 +248,58 @@ function onProfileVisibility() {
 }
 
 onMounted(() => {
+  syncWallpaperLayout();
   void load();
+  window.addEventListener("resize", syncWallpaperLayout);
   document.addEventListener("visibilitychange", onProfileVisibility);
 });
 
 onUnmounted(() => {
+  window.removeEventListener("resize", syncWallpaperLayout);
   document.removeEventListener("visibilitychange", onProfileVisibility);
 });
 
 watch(nick, load);
 
+watch(showWallpaper, (on) => {
+  if (on) syncWallpaperLayout();
+});
+
 useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
 </script>
 
 <template>
-  <div v-if="profile" class="profile-wrap">
-    <div v-if="showWallpaper" class="profile-bg" aria-hidden="true">
-      <div class="profile-bg-stage">
-        <img
-          class="profile-bg-img"
-          :src="profile.wallpaper_url"
-          alt=""
-          decoding="async"
-          @error="wallpaperBroken = true"
-        />
-        <div class="profile-bg-fade" />
+  <div
+    v-if="profile"
+    class="profile-wrap"
+    :class="{ 'has-wallpaper-desktop': showDesktopWallpaper }"
+  >
+    <Teleport to="body">
+      <div
+        v-if="showDesktopWallpaper"
+        class="profile-bg"
+        aria-hidden="true"
+      >
+        <div class="profile-bg-stage" :style="wallpaperStageStyle">
+          <img
+            class="profile-bg-img"
+            :src="profile.wallpaper_url"
+            alt=""
+            decoding="async"
+            @error="wallpaperBroken = true"
+          />
+          <div class="profile-bg-fade" />
+        </div>
       </div>
-    </div>
-    <section class="profile" :class="{ 'on-wallpaper': showWallpaper }">
+    </Teleport>
+    <section
+      class="profile"
+      :class="{
+        'on-wallpaper': showWallpaper,
+        'on-wallpaper-desktop': showDesktopWallpaper,
+      }"
+      :style="wallpaperPanelStyle"
+    >
     <div
       v-if="showCover"
       class="cover-banner"
@@ -414,17 +470,27 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   z-index: 0;
   pointer-events: none;
   background: var(--bg);
+  display: flex;
+  justify-content: center;
 }
 .profile-bg-stage {
   position: relative;
-  width: 100%;
+  flex: 0 0 auto;
   max-width: 1920px;
-  margin: 0 auto;
+  overflow: hidden;
+}
+.profile-bg-stage::before {
+  content: "";
+  display: block;
+  padding-top: 56.25%;
 }
 .profile-bg-img {
-  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
-  aspect-ratio: 16 / 9;
+  height: 100%;
+  display: block;
   object-fit: cover;
   object-position: center top;
 }
@@ -796,50 +862,26 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   font-size: 0.82rem;
 }
 @media (max-width: 760px) {
-  .profile-bg {
-    display: none;
-  }
   .profile.on-wallpaper {
     padding: 0;
   }
 }
 
-@media (min-width: 761px) {
-  .profile-wrap:has(.on-wallpaper) {
-    --profile-stage-ref: 1920px;
-    --profile-panel-ref: 880px;
-    --profile-stage-w: min(100vw, var(--profile-stage-ref));
-    margin-top: -1.5rem;
-    margin-left: calc(50% - 50vw);
-    margin-right: calc(50% - 50vw);
-    width: 100vw;
-    max-width: 100vw;
-    overflow-x: clip;
-  }
-  .profile-bg {
-    --profile-stage-ref: 1920px;
-    --profile-stage-w: min(100vw, var(--profile-stage-ref));
-  }
-  .profile-bg-stage {
-    width: var(--profile-stage-w);
-    max-width: var(--profile-stage-ref);
-  }
-  .profile.on-wallpaper {
-    --profile-wide: calc(var(--profile-stage-w) * var(--profile-panel-ref) / var(--profile-stage-ref));
-    width: var(--profile-wide);
-    max-width: var(--profile-wide);
-    padding: 0 0 1.5rem;
-  }
-  .profile.on-wallpaper .profile-steam-panel {
-    border-radius: 0 0 4px 4px;
-  }
-  .cover-banner {
-    --profile-cover-ratio: 5 / 2;
-    height: auto;
-    aspect-ratio: var(--profile-cover-ratio);
-    background-repeat: no-repeat;
-    margin-bottom: -2.5rem;
-  }
+.profile-wrap.has-wallpaper-desktop {
+  margin-top: -1.5rem;
+}
+.profile.on-wallpaper-desktop {
+  padding: 0 0 1.5rem;
+}
+.profile.on-wallpaper-desktop .profile-steam-panel {
+  border-radius: 0 0 4px 4px;
+}
+.profile.on-wallpaper-desktop .cover-banner {
+  --profile-cover-ratio: 5 / 2;
+  height: auto;
+  aspect-ratio: var(--profile-cover-ratio);
+  background-repeat: no-repeat;
+  margin-bottom: -2.5rem;
 }
 
 @media (max-width: 600px) {
