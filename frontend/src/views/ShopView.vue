@@ -3,19 +3,15 @@ import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import {
   listShopCategories,
   listShopItemsPage,
-  getShopStorage,
-  shopStorageMeta,
   SHOP_PAGE_SIZE,
   buyShopItem,
   type ShopCategory,
   type ShopItem,
   type ShopItemKind,
-  type ShopStorage,
 } from "../api/shop";
 import { useAuthStore } from "../stores/auth";
 import { useSessionStore } from "../stores/session";
 import { toastError, toastSuccess } from "../utils/toast";
-import { fmtBytes } from "../utils/bytes";
 import PageHeader from "../components/PageHeader.vue";
 
 const auth = useAuthStore();
@@ -39,9 +35,7 @@ const pageDraft = ref(1);
 const total = ref(0);
 const loading = ref(true);
 const busy = ref<string | null>(null);
-const shopStorage = ref<ShopStorage | null>(null);
 const profileCoins = computed(() => session.coins);
-const shopHeadMeta = computed(() => shopStorageMeta(shopStorage.value, tab.value));
 
 let shopLoadSeq = 0;
 
@@ -116,7 +110,7 @@ async function load() {
     await loadCoins();
     if (seq !== shopLoadSeq) return;
 
-    const [listPage, cats, storage] = await Promise.all([
+    const [listPage, cats] = await Promise.all([
       listShopItemsPage(auth.token, {
         kind,
         category: categoryFilter.value || undefined,
@@ -125,11 +119,8 @@ async function load() {
       shopCategories.value.length
         ? Promise.resolve(shopCategories.value)
         : listShopCategories(auth.token),
-      getShopStorage(auth.token),
     ]);
     if (seq !== shopLoadSeq) return;
-
-    shopStorage.value = storage;
 
     if (!shopCategories.value.length) shopCategories.value = cats;
     const maxPage = Math.max(1, Math.ceil(listPage.total / SHOP_PAGE_SIZE));
@@ -210,7 +201,7 @@ watch(
 
 <template>
   <section class="shop page-shell">
-    <PageHeader title="магазин" :meta="shopHeadMeta || undefined">
+    <PageHeader title="магазин">
       <template #actions>
         <div class="coins-badge" title="монеты">
           <img src="/coin-gem.png" alt="" width="18" height="18" loading="lazy" />
@@ -312,7 +303,6 @@ watch(
           </template>
         </div>
         <p class="item-name">{{ item.name }}</p>
-        <p v-if="item.size_bytes" class="item-size muted small">{{ fmtBytes(item.size_bytes) }}</p>
         <p v-if="itemCategoryLine(item)" class="item-category muted small">{{ itemCategoryLine(item) }}</p>
         <p v-if="shopStockCap(item) !== null" class="stock-line muted">
           {{ shopSoldOut(item) ? "распродано" : `ещё ${shopStockLeft(item)}` }}

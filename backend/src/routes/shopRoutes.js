@@ -5,6 +5,7 @@ import { SHOP_KINDS } from "../utils/shopPresets.js";
 import { attachCategoriesToItems, listShopCategories } from "../utils/shopCategories.js";
 import { regenerateUserAvatar } from "../utils/profileCosmetics.js";
 import { enrichShopItems, getShopStorageStats } from "../utils/shopStorage.js";
+import { isPanelStaff } from "../utils/roles.js";
 
 const router = express.Router();
 
@@ -35,6 +36,12 @@ function listItemsQuery(kinds) {
 
 function listItemsWithSize(kinds) {
   return enrichShopItems(listItemsQuery(kinds));
+}
+
+/** @param {string[]} kinds @param {string} role */
+function listItemsForUser(kinds, role) {
+  const rows = isPanelStaff(role) ? listItemsWithSize(kinds) : listItemsQuery(kinds);
+  return attachCategoriesToItems(rows);
 }
 
 /** @param {number} status @param {string} code */
@@ -113,7 +120,8 @@ router.get("/shop/categories", authRequired, (_req, res) => {
   return res.json(listShopCategories());
 });
 
-router.get("/shop/storage", authRequired, (_req, res) => {
+router.get("/shop/storage", authRequired, (req, res) => {
+  if (!isPanelStaff(req.user.role)) return res.status(403).json({ error: "forbidden" });
   return res.json(getShopStorageStats());
 });
 
@@ -129,7 +137,7 @@ router.get("/shop/items", authRequired, (req, res) => {
   } else {
     kinds = DEFAULT_LIST_KINDS;
   }
-  let items = attachCategoriesToItems(listItemsWithSize(kinds));
+  let items = listItemsForUser(kinds, req.user.role);
   if (catFilter) {
     items = items.filter((i) => i.categories.some((c) => c.id === catFilter));
   }
@@ -152,7 +160,7 @@ router.get("/shop/items", authRequired, (req, res) => {
 });
 
 router.get("/shop/avatars", authRequired, (req, res) => {
-  const items = attachCategoriesToItems(listItemsWithSize(["avatar"]));
+  const items = listItemsForUser(["avatar"], req.user.role);
   const owned = ownedIdsForUser(req.user.id);
   return res.json(items.map((i) => ({ ...i, owned: owned.has(i.id) })));
 });

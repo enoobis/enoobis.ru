@@ -47,6 +47,12 @@ const uploading = ref(false);
 const totalCount = computed(() => books.value.length);
 const storageBytesUsed = ref(0);
 
+const libraryHeadMeta = computed(() => {
+  if (!isStaff.value) return undefined;
+  const n = totalCount.value;
+  return `${n} ${n === 1 ? "книга" : "книг"} · ${fmtUsed(storageBytesUsed.value)} / ${libraryQuotaLabel.value}`;
+});
+
 const libraryQuotaLabel = computed(() => {
   const gb = LIBRARY_QUOTA_BYTES / 1024 ** 3;
   return `${gb} гб`;
@@ -305,7 +311,7 @@ onBeforeUnmount(() => {
     <template v-else>
       <PageHeader
         title="библиотека"
-        :meta="`${totalCount} ${totalCount === 1 ? 'книга' : 'книг'} · ${fmtUsed(storageBytesUsed)} / ${libraryQuotaLabel}`"
+        :meta="libraryHeadMeta"
       >
         <template v-if="isStaff && !showForm" #actions>
           <button type="button" @click="showForm = true">добавить</button>
@@ -390,7 +396,7 @@ onBeforeUnmount(() => {
               <span v-if="b.description" class="muted small desc">{{ b.description }}</span>
               <span class="muted small meta">
                 <span v-if="b.category" class="cat-pill">{{ b.category }}</span>
-                @{{ b.uploader_nickname }} · {{ fmt(b.size_bytes) }}
+                @{{ b.uploader_nickname }}<template v-if="isStaff"> · {{ fmt(b.size_bytes) }}</template>
               </span>
             </div>
             <div class="row-actions">
