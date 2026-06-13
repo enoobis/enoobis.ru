@@ -62,6 +62,12 @@ const mediaUrl = ref("");
 const mediaKind = ref<"image" | "video" | null>(null);
 const mediaTitle = ref("");
 
+const mediaFullUrl = computed(() => {
+  if (!mediaUrl.value) return "";
+  if (mediaUrl.value.startsWith("http")) return mediaUrl.value;
+  return `${window.location.origin}${mediaUrl.value}`;
+});
+
 const usedPercent = computed(() =>
   quota.value > 0 ? Math.min(100, Math.round((used.value / quota.value) * 100)) : 0,
 );
@@ -484,6 +490,15 @@ onBeforeUnmount(() => {
         playsinline
       />
       <button class="secondary media-close" type="button" @click="closeMedia">закрыть</button>
+      <a
+        v-if="mediaFullUrl"
+        :href="mediaFullUrl"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="muted small media-tab-link"
+      >
+        в новой вкладке
+      </a>
     </div>
   </div>
 </template>
@@ -740,5 +755,11 @@ onBeforeUnmount(() => {
 
 .media-close {
   justify-self: end;
+}
+
+.media-tab-link {
+  justify-self: end;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 </style>

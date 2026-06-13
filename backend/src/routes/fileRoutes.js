@@ -6,8 +6,8 @@ import { v4 as uuidv4 } from "uuid";
 import { all, get, nowIso, run } from "../db.js";
 import { authRequired, mintScopedAccessToken, verifyScopedAccessToken } from "../auth.js";
 import { assertSafeUploadExtension, rateLimit, safePathUnder } from "../utils/security.js";
-import { contentDispositionInline } from "../utils/contentDisposition.js";
 import { previewKind, previewMime } from "../utils/filePreview.js";
+import { streamFileInline } from "../utils/streamPrivateFile.js";
 import { TEACHER_QUOTA_BYTES, enforceTeacherStorageQuota } from "../utils/teacherStorageQuota.js";
 import { canBlogAndStorage } from "../utils/roles.js";
 
@@ -164,13 +164,13 @@ router.get("/files/:id/read", fileReadLimit, (req, res) => {
   if (!kind) return res.status(415).json({ error: "preview_not_supported" });
   const abs = safePathUnder(FILES_ROOT, row.storage_path);
   if (!abs || !fs.existsSync(abs)) return res.status(404).json({ error: "not_found" });
-  res.setHeader("Content-Type", previewMime(kind, row.mime_type, row.original_name));
-  res.setHeader("Content-Disposition", contentDispositionInline(row.original_name));
-  fs.createReadStream(abs)
-    .on("error", () => {
-      if (!res.headersSent) res.sendStatus(500);
-    })
-    .pipe(res);
+  return streamFileInline(
+    req,
+    res,
+    abs,
+    previewMime(kind, row.mime_type, row.original_name),
+    row.original_name,
+  );
 });
 
 router.delete("/files/:id", authRequired, staffOnly, (req, res) => {

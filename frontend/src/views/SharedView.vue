@@ -26,6 +26,10 @@ const shareReadSrc = computed(() =>
   sharePreviewKind.value && sharePreviewKind.value !== "pdf" ? shareReadUrl(tokenStr.value) : "",
 );
 
+const shareReadFullUrl = computed(() =>
+  shareReadSrc.value ? `${window.location.origin}${shareReadSrc.value}` : "",
+);
+
 const ttlText = computed(() => {
   const exp = data.value?.expires_at;
   if (!exp) return "без срока";
@@ -95,6 +99,15 @@ onBeforeUnmount(() => {
       </p>
       <div class="file-actions">
         <button v-if="sharePreviewKind === 'pdf'" type="button" class="btn-link" @click="openReader">читать</button>
+        <a
+          v-else-if="shareReadFullUrl"
+          :href="shareReadFullUrl"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="btn-link"
+        >
+          открыть
+        </a>
         <a :href="shareDownloadUrl(tokenStr)" class="btn-link">скачать</a>
       </div>
       <img
