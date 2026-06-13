@@ -41,7 +41,7 @@ const loading = ref(true);
 const busy = ref<string | null>(null);
 const shopStorage = ref<ShopStorage | null>(null);
 const profileCoins = computed(() => session.coins);
-const shopHeadMeta = computed(() => shopStorageMeta(shopStorage.value));
+const shopHeadMeta = computed(() => shopStorageMeta(shopStorage.value, tab.value));
 
 let shopLoadSeq = 0;
 

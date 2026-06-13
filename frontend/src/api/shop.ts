@@ -1,5 +1,5 @@
 import { api } from "./http";
-import { fmtBytes, fmtQuotaGb, fmtUsed } from "../utils/bytes";
+import { fmtBytes } from "../utils/bytes";
 
 export type ShopItemKind = "avatar" | "frame" | "wallpaper" | "cover";
 
@@ -63,15 +63,15 @@ const SHOP_KIND_LABELS: Record<ShopItemKind, string> = {
   cover: "обложка",
 };
 
-export function shopStorageMeta(stats: ShopStorage | null): string {
+export function shopStorageMeta(stats: ShopStorage | null, kind?: ShopItemKind): string {
   if (!stats) return "";
-  const n = stats.item_count;
-  const itemsLabel = n === 1 ? "товар" : "товаров";
-  const head = `${n} ${itemsLabel} · ${fmtUsed(stats.storage_bytes_used)} / ${fmtQuotaGb(stats.quota_bytes)}`;
-  const kinds = (["avatar", "frame", "wallpaper", "cover"] as ShopItemKind[])
-    .filter((k) => (stats.by_kind[k] ?? 0) > 0)
-    .map((k) => `${SHOP_KIND_LABELS[k]} ${fmtBytes(stats.by_kind[k])}`);
-  return kinds.length ? `${head} · ${kinds.join(" · ")}` : head;
+  const kinds = kind
+    ? [kind]
+    : (["avatar", "frame", "wallpaper", "cover"] as ShopItemKind[]);
+  const parts = kinds
+    .filter((k) => (stats.counts[k] ?? 0) > 0)
+    .map((k) => `${SHOP_KIND_LABELS[k]} ${stats.counts[k]} · ${fmtBytes(stats.by_kind[k] ?? 0)}`);
+  return parts.join(" · ");
 }
 
 export function listShopCategories(token: string): Promise<ShopCategory[]> {
