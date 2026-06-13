@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from "uuid";
 import { all, get, nowIso, run } from "../db.js";
 import { authRequired } from "../auth.js";
 import { contentDispositionInline } from "../utils/contentDisposition.js";
+import { previewKind, previewMime } from "../utils/filePreview.js";
 import { rateLimit, safePathUnder } from "../utils/security.js";
 import { canBlogAndStorage } from "../utils/roles.js";
 
@@ -235,9 +236,7 @@ router.get("/share/:token", publicShareLimit, (req, res) => {
 });
 
 function isPdfFile(mime, originalName) {
-  const m = String(mime ?? "").toLowerCase();
-  if (m.includes("pdf")) return true;
-  return path.extname(String(originalName ?? "")).toLowerCase() === ".pdf";
+  return previewKind(mime, originalName) === "pdf";
 }
 
 router.get("/share/:token/read", publicShareLimit, (req, res) => {
@@ -252,12 +251,11 @@ router.get("/share/:token/read", publicShareLimit, (req, res) => {
     link.target_id,
   );
   if (!f) return res.status(404).json({ error: "not_found" });
-  if (!isPdfFile(f.mime_type, f.original_name)) {
-    return res.status(415).json({ error: "read_only_pdf" });
-  }
+  const kind = previewKind(f.mime_type, f.original_name);
+  if (!kind) return res.status(415).json({ error: "preview_not_supported" });
   const abs = safePathUnder(FILES_ROOT, f.storage_path);
   if (!abs || !fs.existsSync(abs)) return res.status(404).json({ error: "not_found" });
-  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Type", previewMime(kind, f.mime_type, f.original_name));
   res.setHeader("Content-Disposition", contentDispositionInline(f.original_name));
   fs.createReadStream(abs)
     .on("error", () => {

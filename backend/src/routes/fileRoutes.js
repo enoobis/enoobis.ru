@@ -7,6 +7,7 @@ import { all, get, nowIso, run } from "../db.js";
 import { authRequired, mintScopedAccessToken, verifyScopedAccessToken } from "../auth.js";
 import { assertSafeUploadExtension, rateLimit, safePathUnder } from "../utils/security.js";
 import { contentDispositionInline } from "../utils/contentDisposition.js";
+import { previewKind, previewMime } from "../utils/filePreview.js";
 import { TEACHER_QUOTA_BYTES, enforceTeacherStorageQuota } from "../utils/teacherStorageQuota.js";
 import { canBlogAndStorage } from "../utils/roles.js";
 
@@ -18,12 +19,6 @@ fs.mkdirSync(FILES_ROOT, { recursive: true });
 const ADMIN_QUOTA_BYTES = 3 * 1024 * 1024 * 1024;
 const STAFF_FILE_MAX_BYTES = 200 * 1024 * 1024;
 const fileReadLimit = rateLimit({ windowMs: 60_000, max: 120, keyPrefix: "file-read" });
-
-function isPdfFile(mime, originalName) {
-  const m = String(mime ?? "").toLowerCase();
-  if (m.includes("pdf")) return true;
-  return path.extname(String(originalName ?? "")).toLowerCase() === ".pdf";
-}
 
 function quotaBytesForRole(role) {
   return role === "admin" ? ADMIN_QUOTA_BYTES : TEACHER_QUOTA_BYTES;
@@ -146,11 +141,10 @@ router.post("/files/:id/read-access", authRequired, (req, res) => {
   if (row.owner_id !== req.user.id && req.user.role !== "admin") {
     return res.status(403).json({ error: "forbidden" });
   }
-  if (!isPdfFile(row.mime_type, row.original_name)) {
-    return res.status(415).json({ error: "read_only_pdf" });
-  }
+  const kind = previewKind(row.mime_type, row.original_name);
+  if (!kind) return res.status(415).json({ error: "preview_not_supported" });
   const access = mintScopedAccessToken(req.user.id, "file_read", row.id, 900);
-  return res.json({ access, expires_in: 900 });
+  return res.json({ access, expires_in: 900, preview_kind: kind });
 });
 
 router.get("/files/:id/read", fileReadLimit, (req, res) => {
@@ -166,12 +160,11 @@ router.get("/files/:id/read", fileReadLimit, (req, res) => {
     req.params.id,
   );
   if (!row) return res.status(404).json({ error: "not_found" });
-  if (!isPdfFile(row.mime_type, row.original_name)) {
-    return res.status(415).json({ error: "read_only_pdf" });
-  }
+  const kind = previewKind(row.mime_type, row.original_name);
+  if (!kind) return res.status(415).json({ error: "preview_not_supported" });
   const abs = safePathUnder(FILES_ROOT, row.storage_path);
   if (!abs || !fs.existsSync(abs)) return res.status(404).json({ error: "not_found" });
-  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Type", previewMime(kind, row.mime_type, row.original_name));
   res.setHeader("Content-Disposition", contentDispositionInline(row.original_name));
   fs.createReadStream(abs)
     .on("error", () => {

@@ -24,6 +24,7 @@ import AppIcon from "../components/AppIcon.vue";
 import PageHeader from "../components/PageHeader.vue";
 import PdfReader from "../components/PdfReader.vue";
 import { useAuthStore } from "../stores/auth";
+import { filePreviewKind } from "../utils/filePreview";
 import { toastError, toastSuccess } from "../utils/toast";
 
 type Section = "files" | "notes";
@@ -56,6 +57,11 @@ const readerOpen = ref(false);
 const readerUrl = ref<string | null>(null);
 const readerTitle = ref("");
 
+const mediaOpen = ref(false);
+const mediaUrl = ref("");
+const mediaKind = ref<"image" | "video" | null>(null);
+const mediaTitle = ref("");
+
 const usedPercent = computed(() =>
   quota.value > 0 ? Math.min(100, Math.round((used.value / quota.value) * 100)) : 0,
 );
@@ -72,22 +78,29 @@ function describe(code: string) {
   if (code === "file_too_large") return "файл слишком большой";
   if (code === "note_too_long") return "заметка слишком длинная";
   if (code === "read_only_pdf") return "чтение только для pdf";
+  if (code === "preview_not_supported") return "просмотр недоступен";
   return code || "ошибка";
 }
 
-function isPdfFile(f: StoredFile) {
-  const m = (f.mime_type || "").toLowerCase();
-  if (m.includes("pdf")) return true;
-  return f.original_name.toLowerCase().endsWith(".pdf");
+function canPreview(f: StoredFile) {
+  return filePreviewKind(f.mime_type, f.original_name) !== null;
 }
 
-async function openReader(f: StoredFile) {
-  if (!auth.token || !isPdfFile(f)) return;
+async function openPreview(f: StoredFile) {
+  if (!auth.token || !canPreview(f)) return;
   err.value = "";
   try {
-    readerTitle.value = f.original_name;
-    readerUrl.value = await fileReadUrl(f.id, auth.token);
-    readerOpen.value = true;
+    const { url, preview_kind } = await fileReadUrl(f.id, auth.token);
+    if (preview_kind === "pdf") {
+      readerTitle.value = f.original_name;
+      readerUrl.value = url;
+      readerOpen.value = true;
+      return;
+    }
+    mediaTitle.value = f.original_name;
+    mediaUrl.value = url;
+    mediaKind.value = preview_kind;
+    mediaOpen.value = true;
   } catch (e) {
     err.value = describe(e instanceof Error ? e.message : "ошибка");
   }
@@ -97,6 +110,18 @@ function closeReader() {
   readerOpen.value = false;
   readerUrl.value = null;
   readerTitle.value = "";
+}
+
+function closeMedia() {
+  mediaOpen.value = false;
+  mediaUrl.value = "";
+  mediaKind.value = null;
+  mediaTitle.value = "";
+}
+
+function closeAllPreview() {
+  closeReader();
+  closeMedia();
 }
 
 async function loadFiles() {
@@ -303,13 +328,13 @@ onMounted(async () => {
   await Promise.all([loadFiles(), loadNotes(), loadShares()]);
 });
 
-watch(readerOpen, (open) => {
-  document.documentElement.style.overflow = open ? "hidden" : "";
+watch([readerOpen, mediaOpen], ([pdf, media]) => {
+  document.documentElement.style.overflow = pdf || media ? "hidden" : "";
 });
 
 onBeforeUnmount(() => {
   document.documentElement.style.overflow = "";
-  closeReader();
+  closeAllPreview();
 });
 </script>
 
@@ -360,7 +385,7 @@ onBeforeUnmount(() => {
               <span class="muted small">{{ fmt(f.size_bytes) }}</span>
             </div>
             <div class="actions">
-              <button v-if="isPdfFile(f)" class="secondary" type="button" @click="openReader(f)">читать</button>
+              <button v-if="canPreview(f)" class="secondary" type="button" @click="openPreview(f)">открыть</button>
               <button class="secondary" type="button" @click="onDownload(f)">скачать</button>
               <button class="secondary" type="button" @click="openShare('file', f.id)">
                 {{ shareFor("file", f.id) ? "ещё ссылка" : "поделиться" }}
@@ -446,6 +471,21 @@ onBeforeUnmount(() => {
     :title="readerTitle"
     @close="closeReader"
   />
+
+  <div v-if="mediaOpen && mediaUrl" class="media-backdrop" role="presentation" @click.self="closeMedia">
+    <div class="media-dialog" role="dialog" aria-modal="true" :aria-label="mediaTitle">
+      <p class="media-title muted small">{{ mediaTitle }}</p>
+      <img v-if="mediaKind === 'image'" class="media-img" :src="mediaUrl" :alt="mediaTitle" />
+      <video
+        v-else-if="mediaKind === 'video'"
+        class="media-video"
+        :src="mediaUrl"
+        controls
+        playsinline
+      />
+      <button class="secondary media-close" type="button" @click="closeMedia">закрыть</button>
+    </div>
+  </div>
 </template>
 
 <style scoped>
@@ -663,5 +703,42 @@ onBeforeUnmount(() => {
 
 .modal .actions {
   justify-content: flex-end;
+}
+
+.media-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.72);
+}
+
+.media-dialog {
+  display: grid;
+  gap: 0.65rem;
+  width: min(920px, 100%);
+  max-height: min(90vh, 900px);
+}
+
+.media-title {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.media-img,
+.media-video {
+  width: 100%;
+  max-height: calc(90vh - 5rem);
+  object-fit: contain;
+  border-radius: var(--radius);
+  background: #000;
+}
+
+.media-close {
+  justify-self: end;
 }
 </style>

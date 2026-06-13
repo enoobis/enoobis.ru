@@ -45,13 +45,24 @@ export function deleteFile(token: string, id: string) {
   return api<{ ok: boolean }>(`/api/files/${id}`, { method: "DELETE", token });
 }
 
-export async function fileReadUrl(id: string, token: string): Promise<string> {
-  const r = await api<{ access: string }>(`/api/files/${encodeURIComponent(id)}/read-access`, {
-    method: "POST",
-    token,
-  });
+export type FilePreviewKind = "pdf" | "image" | "video";
+
+export async function fileReadUrl(
+  id: string,
+  token: string,
+): Promise<{ url: string; preview_kind: FilePreviewKind }> {
+  const r = await api<{ access: string; preview_kind: FilePreviewKind }>(
+    `/api/files/${encodeURIComponent(id)}/read-access`,
+    {
+      method: "POST",
+      token,
+    },
+  );
   const qs = new URLSearchParams({ access: r.access });
-  return `/api/files/${encodeURIComponent(id)}/read?${qs}`;
+  return {
+    url: `/api/files/${encodeURIComponent(id)}/read?${qs}`,
+    preview_kind: r.preview_kind,
+  };
 }
 
 export async function downloadFile(token: string, id: string, name: string) {

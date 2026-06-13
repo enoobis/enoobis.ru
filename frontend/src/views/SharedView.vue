@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { getShare, shareDownloadUrl, shareReadUrl, type SharePayload } from "../api/storage";
 import { renderMarkdown } from "../utils/markdown";
+import { filePreviewKind } from "../utils/filePreview";
 import PdfReader from "../components/PdfReader.vue";
 
 const route = useRoute();
@@ -16,12 +17,14 @@ const readerUrl = ref<string | null>(null);
 
 const tokenStr = computed(() => String(route.params.token ?? ""));
 
-const isPdfShare = computed(() => {
-  if (data.value?.kind !== "file") return false;
-  const m = (data.value.file.mime_type || "").toLowerCase();
-  if (m.includes("pdf")) return true;
-  return data.value.file.original_name.toLowerCase().endsWith(".pdf");
+const sharePreviewKind = computed(() => {
+  if (data.value?.kind !== "file") return null;
+  return filePreviewKind(data.value.file.mime_type, data.value.file.original_name);
 });
+
+const shareReadSrc = computed(() =>
+  sharePreviewKind.value && sharePreviewKind.value !== "pdf" ? shareReadUrl(tokenStr.value) : "",
+);
 
 const ttlText = computed(() => {
   const exp = data.value?.expires_at;
@@ -46,7 +49,7 @@ function fmt(n: number) {
 }
 
 function openReader() {
-  if (!isPdfShare.value) return;
+  if (sharePreviewKind.value !== "pdf") return;
   readerUrl.value = shareReadUrl(tokenStr.value);
   readerOpen.value = true;
 }
@@ -91,9 +94,22 @@ onBeforeUnmount(() => {
         {{ fmt(data.file.size_bytes) }} · от @{{ data.owner_nickname }} · {{ ttlText }}
       </p>
       <div class="file-actions">
-        <button v-if="isPdfShare" type="button" class="btn-link" @click="openReader">читать</button>
+        <button v-if="sharePreviewKind === 'pdf'" type="button" class="btn-link" @click="openReader">читать</button>
         <a :href="shareDownloadUrl(tokenStr)" class="btn-link">скачать</a>
       </div>
+      <img
+        v-if="sharePreviewKind === 'image'"
+        class="media-preview"
+        :src="shareReadSrc"
+        :alt="data.file.original_name"
+      />
+      <video
+        v-else-if="sharePreviewKind === 'video'"
+        class="media-preview"
+        :src="shareReadSrc"
+        controls
+        playsinline
+      />
     </template>
 
     <template v-else-if="data?.kind === 'note'">
@@ -139,6 +155,14 @@ onBeforeUnmount(() => {
 
 .btn-link:hover {
   background: var(--surface2);
+}
+
+.media-preview {
+  width: 100%;
+  max-height: 70vh;
+  object-fit: contain;
+  border-radius: var(--radius);
+  background: #000;
 }
 
 .markdown-body {
