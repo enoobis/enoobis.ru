@@ -41,12 +41,16 @@ import {
   adminPatchShopItem,
   adminUpdateShopCategory,
   adminUploadShopItem,
+  getShopStorage,
   listShopItems,
+  shopStorageMeta,
   type ImageShopKind,
   type ShopCategory,
   type ShopItem,
   type ShopItemKind,
+  type ShopStorage,
 } from "../api/shop";
+import { fmtBytes } from "../utils/bytes";
 
 const README_MAX = 4000;
 
@@ -90,6 +94,8 @@ const modMsg = ref("");
 const modBusy = ref(false);
 
 const shopItems = ref<ShopItem[]>([]);
+const shopStorage = ref<ShopStorage | null>(null);
+const shopHeadMeta = computed(() => shopStorageMeta(shopStorage.value));
 const shopLoading = ref(false);
 const shopUploadName = ref("");
 const shopUploadPrice = ref(0);
@@ -394,7 +400,12 @@ async function loadShopItems() {
   shopLoading.value = true;
   try {
     await loadShopCategories();
-    shopItems.value = await listShopItems(auth.token);
+    const [items, storage] = await Promise.all([
+      listShopItems(auth.token),
+      getShopStorage(auth.token),
+    ]);
+    shopItems.value = items;
+    shopStorage.value = storage;
   } catch {
     /* ignore */
   } finally {
@@ -1369,6 +1380,7 @@ async function approveBlog(id: string) {
 
     <template v-else-if="tab === 'shop'">
       <h2>товары магазина</h2>
+      <p v-if="shopHeadMeta" class="muted small">{{ shopHeadMeta }}</p>
       <p v-if="shopMsg" class="ok-msg small">{{ shopMsg }}</p>
 
       <label class="btn-file shop-upload-btn" :class="{ disabled: shopUploadBusy }">
@@ -1383,7 +1395,7 @@ async function approveBlog(id: string) {
             <span>{{ a.name }}</span>
             <span class="muted small">
               {{ shopKindRu(a.kind) }}<template v-if="shopItemCatsLine(a)"> · {{ shopItemCatsLine(a) }}</template> ·
-              {{ a.price }}{{ a.is_animated ? " · gif" : "" }}{{ shopStockLine(a) }}
+              {{ a.price }}{{ a.is_animated ? " · gif" : "" }}{{ shopStockLine(a) }}<template v-if="a.size_bytes"> · {{ fmtBytes(a.size_bytes) }}</template>
             </span>
           </span>
           <div class="shop-item-actions">

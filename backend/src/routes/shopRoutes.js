@@ -4,6 +4,7 @@ import { authRequired } from "../auth.js";
 import { SHOP_KINDS } from "../utils/shopPresets.js";
 import { attachCategoriesToItems, listShopCategories } from "../utils/shopCategories.js";
 import { regenerateUserAvatar } from "../utils/profileCosmetics.js";
+import { enrichShopItems, getShopStorageStats } from "../utils/shopStorage.js";
 
 const router = express.Router();
 
@@ -30,6 +31,10 @@ function listItemsQuery(kinds) {
      WHERE si.kind IN (${placeholders}) ORDER BY si.created_at DESC`,
     ...kinds,
   );
+}
+
+function listItemsWithSize(kinds) {
+  return enrichShopItems(listItemsQuery(kinds));
 }
 
 /** @param {number} status @param {string} code */
@@ -108,6 +113,10 @@ router.get("/shop/categories", authRequired, (_req, res) => {
   return res.json(listShopCategories());
 });
 
+router.get("/shop/storage", authRequired, (_req, res) => {
+  return res.json(getShopStorageStats());
+});
+
 router.get("/shop/items", authRequired, (req, res) => {
   const raw = String(req.query.kind ?? "").trim();
   const catFilter = String(req.query.category ?? "").trim();
@@ -120,7 +129,7 @@ router.get("/shop/items", authRequired, (req, res) => {
   } else {
     kinds = DEFAULT_LIST_KINDS;
   }
-  let items = attachCategoriesToItems(listItemsQuery(kinds));
+  let items = attachCategoriesToItems(listItemsWithSize(kinds));
   if (catFilter) {
     items = items.filter((i) => i.categories.some((c) => c.id === catFilter));
   }
@@ -143,7 +152,7 @@ router.get("/shop/items", authRequired, (req, res) => {
 });
 
 router.get("/shop/avatars", authRequired, (req, res) => {
-  const items = attachCategoriesToItems(listItemsQuery(["avatar"]));
+  const items = attachCategoriesToItems(listItemsWithSize(["avatar"]));
   const owned = ownedIdsForUser(req.user.id);
   return res.json(items.map((i) => ({ ...i, owned: owned.has(i.id) })));
 });

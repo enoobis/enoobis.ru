@@ -1,4 +1,5 @@
 import { api } from "./http";
+import { fmtBytes, fmtQuotaGb, fmtUsed } from "../utils/bytes";
 
 export type ShopItemKind = "avatar" | "frame" | "wallpaper" | "cover";
 
@@ -20,6 +21,7 @@ export type ShopItem = {
   sold_count: number;
   preset_value: string | null;
   owned: boolean;
+  size_bytes?: number;
 };
 
 export type OwnedShopItem = {
@@ -41,6 +43,36 @@ export type EquipResult = {
   avatar_frame_url: string;
   profile_cover_url: string;
 };
+
+export type ShopStorage = {
+  storage_bytes_used: number;
+  quota_bytes: number;
+  item_count: number;
+  by_kind: Record<ShopItemKind, number>;
+  counts: Record<ShopItemKind, number>;
+};
+
+export function getShopStorage(token: string): Promise<ShopStorage> {
+  return api("/api/shop/storage", { token });
+}
+
+const SHOP_KIND_LABELS: Record<ShopItemKind, string> = {
+  avatar: "аватар",
+  frame: "рамка",
+  wallpaper: "фон",
+  cover: "обложка",
+};
+
+export function shopStorageMeta(stats: ShopStorage | null): string {
+  if (!stats) return "";
+  const n = stats.item_count;
+  const itemsLabel = n === 1 ? "товар" : "товаров";
+  const head = `${n} ${itemsLabel} · ${fmtUsed(stats.storage_bytes_used)} / ${fmtQuotaGb(stats.quota_bytes)}`;
+  const kinds = (["avatar", "frame", "wallpaper", "cover"] as ShopItemKind[])
+    .filter((k) => (stats.by_kind[k] ?? 0) > 0)
+    .map((k) => `${SHOP_KIND_LABELS[k]} ${fmtBytes(stats.by_kind[k])}`);
+  return kinds.length ? `${head} · ${kinds.join(" · ")}` : head;
+}
 
 export function listShopCategories(token: string): Promise<ShopCategory[]> {
   return api("/api/shop/categories", { token });
