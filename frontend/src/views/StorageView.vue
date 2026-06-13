@@ -29,7 +29,7 @@ type Section = "files" | "notes";
 const auth = useAuthStore();
 
 const section = ref<Section>("files");
-const isStaff = computed(() => auth.isStaff);
+const canBlogAndStorage = computed(() => auth.canBlogAndStorage);
 
 const files = ref<StoredFile[]>([]);
 const used = ref(0);
@@ -268,7 +268,7 @@ function ttlLabel(expires_at: string | null) {
 }
 
 onMounted(async () => {
-  if (!isStaff.value) return;
+  if (!canBlogAndStorage.value) return;
   await Promise.all([loadFiles(), loadNotes(), loadShares()]);
 });
 </script>
@@ -277,13 +277,13 @@ onMounted(async () => {
   <section class="page page-shell">
     <PageHeader
       title="хранилище"
-      :meta="isStaff ? `${fmt(used)} из ${fmt(quota)} · ${usedPercent}%` : undefined"
+      :meta="canBlogAndStorage ? `${fmt(used)} из ${fmt(quota)} · ${usedPercent}%` : undefined"
     />
 
-    <p v-if="!isStaff" class="muted">доступно только менторам и админам</p>
+    <p v-if="!canBlogAndStorage" class="muted">нет доступа</p>
 
     <template v-else>
-      <div v-if="isStaff" class="quota-bar-wrap">
+      <div class="quota-bar-wrap">
         <div class="quota-bar"><span :style="{ width: usedPercent + '%' }" /></div>
       </div>
 

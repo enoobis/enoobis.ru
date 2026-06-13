@@ -464,7 +464,7 @@ watch(
             <span v-if="chatStore.unread > 0" class="chat-badge">{{ chatBadge }}</span>
           </RouterLink>
           <RouterLink
-            v-if="auth.isStaff"
+            v-if="auth.canBlogAndStorage"
             to="/storage"
             class="icon-btn"
             aria-label="хранилище"
@@ -473,7 +473,7 @@ watch(
             <AppIcon name="folder" :size="20" />
           </RouterLink>
           <RouterLink
-            v-if="auth.isStaff"
+            v-if="auth.canBlogAndStorage"
             to="/blogs/write"
             class="icon-btn desktop-only"
             aria-label="написать"

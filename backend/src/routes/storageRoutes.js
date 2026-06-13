@@ -7,7 +7,7 @@ import { all, get, nowIso, run } from "../db.js";
 import { authRequired } from "../auth.js";
 import { contentDispositionInline } from "../utils/contentDisposition.js";
 import { rateLimit, safePathUnder } from "../utils/security.js";
-import { isStaffRole } from "../utils/roles.js";
+import { canBlogAndStorage } from "../utils/roles.js";
 
 const router = express.Router();
 
@@ -17,7 +17,7 @@ const NOTE_BODY_MAX = 64 * 1024;
 const NOTE_TITLE_MAX = 200;
 
 function staffOnly(req, res, next) {
-  if (!isStaffRole(req.user?.role)) {
+  if (!canBlogAndStorage(req.user?.role)) {
     return res.status(403).json({ error: "forbidden" });
   }
   next();

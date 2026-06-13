@@ -18,6 +18,11 @@ export function isStaffRole(role) {
   return role === "teacher" || role === "master" || role === "admin";
 }
 
+/** блог и личное хранилище: менторы, админ, модератор */
+export function canBlogAndStorage(role) {
+  return isStaffRole(role) || isModerator(role);
+}
+
 export function canBypassApproval(role) {
   return isAdmin(role) || isModerator(role);
 }

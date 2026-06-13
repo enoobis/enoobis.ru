@@ -22,7 +22,7 @@ function deleteStoredFile(row) {
 
 export function enforceTeacherStorageQuota(userId) {
   const user = get("SELECT role FROM users WHERE id = ?", userId);
-  if (!user || (user.role !== "teacher" && user.role !== "master")) return;
+  if (!user || (user.role !== "teacher" && user.role !== "master" && user.role !== "moderator")) return;
 
   const files = all(
     "SELECT id, storage_path, size_bytes FROM user_files WHERE owner_id = ?",
@@ -54,7 +54,7 @@ export function enforceTeacherStorageQuota(userId) {
 }
 
 export function enforceAllTeachersStorageQuota() {
-  const teachers = all("SELECT id FROM users WHERE role IN ('teacher', 'master')");
+  const teachers = all("SELECT id FROM users WHERE role IN ('teacher', 'master', 'moderator')");
   for (const t of teachers) {
     enforceTeacherStorageQuota(t.id);
   }

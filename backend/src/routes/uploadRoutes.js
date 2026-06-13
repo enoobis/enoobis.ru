@@ -5,7 +5,7 @@ import fs from "node:fs";
 import { v4 as uuidv4 } from "uuid";
 import { nowIso, run, get } from "../db.js";
 import { authRequired } from "../auth.js";
-import { isPanelStaff } from "../utils/roles.js";
+import { canBlogAndStorage, isPanelStaff } from "../utils/roles.js";
 import { isRasterImageMimetype, optimizeUploadedFile } from "../utils/imageOptimize.js";
 import { SHOP_KINDS } from "../utils/shopPresets.js";
 import {
@@ -144,6 +144,7 @@ router.post("/me/avatar", authRequired, uploadSingle(avatarUpload, "file"), asyn
 });
 
 router.post("/blog/upload-image", authRequired, uploadSingle(blogUpload, "file"), async (req, res) => {
+  if (!canBlogAndStorage(req.user.role)) return res.status(403).json({ error: "forbidden" });
   if (!req.file) return res.status(400).json({ error: "no file" });
   const probe = await verifyRasterImage(req.file.path);
   if (!probe.ok) {

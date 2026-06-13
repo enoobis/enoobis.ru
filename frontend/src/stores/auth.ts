@@ -43,6 +43,7 @@ export const useAuthStore = defineStore("auth", () => {
   );
   const isAdmin = computed(() => role.value === "admin");
   const isModerator = computed(() => role.value === "moderator");
+  const canBlogAndStorage = computed(() => isStaff.value || isModerator.value);
   const isPanelStaff = computed(() => isAdmin.value || isModerator.value);
 
   async function login(email: string, password: string) {
@@ -105,6 +106,7 @@ export const useAuthStore = defineStore("auth", () => {
     nickname,
     role,
     isStaff,
+    canBlogAndStorage,
     isAdmin,
     isModerator,
     isPanelStaff,
