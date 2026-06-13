@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import {
   deleteFile,
   downloadFile,
+  fileReadUrl,
   listFiles,
   uploadFile,
   type StoredFile,
@@ -21,6 +22,7 @@ import {
 } from "../api/storage";
 import AppIcon from "../components/AppIcon.vue";
 import PageHeader from "../components/PageHeader.vue";
+import PdfReader from "../components/PdfReader.vue";
 import { useAuthStore } from "../stores/auth";
 import { toastError, toastSuccess } from "../utils/toast";
 
@@ -50,6 +52,10 @@ const sharePicker = ref<{ type: "file" | "note"; id: string } | null>(null);
 
 const err = ref("");
 
+const readerOpen = ref(false);
+const readerUrl = ref<string | null>(null);
+const readerTitle = ref("");
+
 const usedPercent = computed(() =>
   quota.value > 0 ? Math.min(100, Math.round((used.value / quota.value) * 100)) : 0,
 );
@@ -65,7 +71,32 @@ function describe(code: string) {
   if (code === "quota_exceeded") return "не хватает места";
   if (code === "file_too_large") return "файл слишком большой";
   if (code === "note_too_long") return "заметка слишком длинная";
+  if (code === "read_only_pdf") return "чтение только для pdf";
   return code || "ошибка";
+}
+
+function isPdfFile(f: StoredFile) {
+  const m = (f.mime_type || "").toLowerCase();
+  if (m.includes("pdf")) return true;
+  return f.original_name.toLowerCase().endsWith(".pdf");
+}
+
+async function openReader(f: StoredFile) {
+  if (!auth.token || !isPdfFile(f)) return;
+  err.value = "";
+  try {
+    readerTitle.value = f.original_name;
+    readerUrl.value = await fileReadUrl(f.id, auth.token);
+    readerOpen.value = true;
+  } catch (e) {
+    err.value = describe(e instanceof Error ? e.message : "ошибка");
+  }
+}
+
+function closeReader() {
+  readerOpen.value = false;
+  readerUrl.value = null;
+  readerTitle.value = "";
 }
 
 async function loadFiles() {
@@ -271,6 +302,15 @@ onMounted(async () => {
   if (!canBlogAndStorage.value) return;
   await Promise.all([loadFiles(), loadNotes(), loadShares()]);
 });
+
+watch(readerOpen, (open) => {
+  document.documentElement.style.overflow = open ? "hidden" : "";
+});
+
+onBeforeUnmount(() => {
+  document.documentElement.style.overflow = "";
+  closeReader();
+});
 </script>
 
 <template>
@@ -320,6 +360,7 @@ onMounted(async () => {
               <span class="muted small">{{ fmt(f.size_bytes) }}</span>
             </div>
             <div class="actions">
+              <button v-if="isPdfFile(f)" class="secondary" type="button" @click="openReader(f)">читать</button>
               <button class="secondary" type="button" @click="onDownload(f)">скачать</button>
               <button class="secondary" type="button" @click="openShare('file', f.id)">
                 {{ shareFor("file", f.id) ? "ещё ссылка" : "поделиться" }}
@@ -398,6 +439,13 @@ onMounted(async () => {
       </div>
     </div>
   </section>
+
+  <PdfReader
+    v-if="readerOpen && readerUrl"
+    :url="readerUrl"
+    :title="readerTitle"
+    @close="closeReader"
+  />
 </template>
 
 <style scoped>

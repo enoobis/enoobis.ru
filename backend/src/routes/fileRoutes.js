@@ -4,8 +4,9 @@ import path from "node:path";
 import fs from "node:fs";
 import { v4 as uuidv4 } from "uuid";
 import { all, get, nowIso, run } from "../db.js";
-import { authRequired } from "../auth.js";
-import { assertSafeUploadExtension, safePathUnder } from "../utils/security.js";
+import { authRequired, mintScopedAccessToken, verifyScopedAccessToken } from "../auth.js";
+import { assertSafeUploadExtension, rateLimit, safePathUnder } from "../utils/security.js";
+import { contentDispositionInline } from "../utils/contentDisposition.js";
 import { TEACHER_QUOTA_BYTES, enforceTeacherStorageQuota } from "../utils/teacherStorageQuota.js";
 import { canBlogAndStorage } from "../utils/roles.js";
 
@@ -16,6 +17,13 @@ fs.mkdirSync(FILES_ROOT, { recursive: true });
 
 const ADMIN_QUOTA_BYTES = 3 * 1024 * 1024 * 1024;
 const STAFF_FILE_MAX_BYTES = 200 * 1024 * 1024;
+const fileReadLimit = rateLimit({ windowMs: 60_000, max: 120, keyPrefix: "file-read" });
+
+function isPdfFile(mime, originalName) {
+  const m = String(mime ?? "").toLowerCase();
+  if (m.includes("pdf")) return true;
+  return path.extname(String(originalName ?? "")).toLowerCase() === ".pdf";
+}
 
 function quotaBytesForRole(role) {
   return role === "admin" ? ADMIN_QUOTA_BYTES : TEACHER_QUOTA_BYTES;
@@ -127,6 +135,49 @@ router.get("/files/:id/download", authRequired, (req, res) => {
   const abs = safePathUnder(FILES_ROOT, row.storage_path);
   if (!abs || !fs.existsSync(abs)) return res.status(404).json({ error: "not_found" });
   return res.download(abs, row.original_name);
+});
+
+router.post("/files/:id/read-access", authRequired, (req, res) => {
+  const row = get(
+    "SELECT id, owner_id, original_name, mime_type FROM user_files WHERE id = ?",
+    req.params.id,
+  );
+  if (!row) return res.status(404).json({ error: "not_found" });
+  if (row.owner_id !== req.user.id && req.user.role !== "admin") {
+    return res.status(403).json({ error: "forbidden" });
+  }
+  if (!isPdfFile(row.mime_type, row.original_name)) {
+    return res.status(415).json({ error: "read_only_pdf" });
+  }
+  const access = mintScopedAccessToken(req.user.id, "file_read", row.id, 900);
+  return res.json({ access, expires_in: 900 });
+});
+
+router.get("/files/:id/read", fileReadLimit, (req, res) => {
+  const access = typeof req.query?.access === "string" ? req.query.access.trim() : "";
+  if (!access) return res.status(401).json({ error: "unauthorized" });
+  try {
+    verifyScopedAccessToken(access, "file_read", req.params.id);
+  } catch {
+    return res.status(401).json({ error: "unauthorized" });
+  }
+  const row = get(
+    "SELECT storage_path, original_name, mime_type FROM user_files WHERE id = ?",
+    req.params.id,
+  );
+  if (!row) return res.status(404).json({ error: "not_found" });
+  if (!isPdfFile(row.mime_type, row.original_name)) {
+    return res.status(415).json({ error: "read_only_pdf" });
+  }
+  const abs = safePathUnder(FILES_ROOT, row.storage_path);
+  if (!abs || !fs.existsSync(abs)) return res.status(404).json({ error: "not_found" });
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", contentDispositionInline(row.original_name));
+  fs.createReadStream(abs)
+    .on("error", () => {
+      if (!res.headersSent) res.sendStatus(500);
+    })
+    .pipe(res);
 });
 
 router.delete("/files/:id", authRequired, staffOnly, (req, res) => {

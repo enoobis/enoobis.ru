@@ -45,6 +45,15 @@ export function deleteFile(token: string, id: string) {
   return api<{ ok: boolean }>(`/api/files/${id}`, { method: "DELETE", token });
 }
 
+export async function fileReadUrl(id: string, token: string): Promise<string> {
+  const r = await api<{ access: string }>(`/api/files/${encodeURIComponent(id)}/read-access`, {
+    method: "POST",
+    token,
+  });
+  const qs = new URLSearchParams({ access: r.access });
+  return `/api/files/${encodeURIComponent(id)}/read?${qs}`;
+}
+
 export async function downloadFile(token: string, id: string, name: string) {
   const res = await fetch(`/api/files/${id}/download`, {
     headers: { Authorization: `Bearer ${token}` },
