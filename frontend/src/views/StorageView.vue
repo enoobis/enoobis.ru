@@ -15,6 +15,7 @@ import {
   deleteShare,
   listNotes,
   listShares,
+  shareReadUrl,
   updateNote,
   type Note,
   type ShareLink,
@@ -50,6 +51,13 @@ const noteBody = ref("");
 
 const shares = ref<ShareLink[]>([]);
 const sharePicker = ref<{ type: "file" | "note"; id: string } | null>(null);
+const shareDirectMode = ref(false);
+
+const sharePickerFile = computed(() => {
+  const p = sharePicker.value;
+  if (!p || p.type !== "file") return null;
+  return files.value.find((f) => f.id === p.id) ?? null;
+});
 
 const err = ref("");
 
@@ -90,6 +98,24 @@ function describe(code: string) {
 
 function canPreview(f: StoredFile) {
   return filePreviewKind(f.mime_type, f.original_name) !== null;
+}
+
+function canDirectLink(f: StoredFile) {
+  const k = filePreviewKind(f.mime_type, f.original_name);
+  return k === "video" || k === "image";
+}
+
+function sharePageUrl(token: string) {
+  return `${window.location.origin}/s/${token}`;
+}
+
+function shareMediaUrl(token: string) {
+  return `${window.location.origin}${shareReadUrl(token)}`;
+}
+
+async function copyText(url: string, msg: string) {
+  await navigator.clipboard.writeText(url).catch(() => undefined);
+  toastSuccess(msg);
 }
 
 async function openPreview(f: StoredFile) {
@@ -279,7 +305,34 @@ function shareFor(targetType: "file" | "note", id: string) {
 }
 
 function openShare(type: "file" | "note", id: string) {
+  shareDirectMode.value = false;
   sharePicker.value = { type, id };
+}
+
+async function ensureFileShare(fileId: string, ttl: ShareTtl = "forever"): Promise<ShareLink | null> {
+  if (!auth.token) return null;
+  const existing = shareFor("file", fileId);
+  if (existing) return existing;
+  const created = await createShare(auth.token, {
+    target_type: "file",
+    target_id: fileId,
+    ttl,
+  });
+  shares.value = [created, ...shares.value];
+  return created;
+}
+
+async function copyDirectFileLink(f: StoredFile) {
+  if (!auth.token || !canDirectLink(f)) return;
+  err.value = "";
+  try {
+    const s = await ensureFileShare(f.id);
+    if (!s) return;
+    await copyText(shareMediaUrl(s.token), "прямая ссылка скопирована");
+  } catch (e) {
+    err.value = describe(e instanceof Error ? e.message : "ошибка");
+    toastError(e);
+  }
 }
 
 async function makeShare(ttl: ShareTtl) {
@@ -291,9 +344,11 @@ async function makeShare(ttl: ShareTtl) {
       ttl,
     });
     shares.value = [created, ...shares.value];
-    const url = `${window.location.origin}/s/${created.token}`;
-    await navigator.clipboard.writeText(url).catch(() => undefined);
-    toastSuccess("ссылка скопирована");
+    const picked = sharePicker.value;
+    const pickedFile = picked?.type === "file" ? files.value.find((f) => f.id === picked.id) : null;
+    const direct = shareDirectMode.value && !!pickedFile && canDirectLink(pickedFile);
+    const url = direct ? shareMediaUrl(created.token) : sharePageUrl(created.token);
+    await copyText(url, direct ? "прямая ссылка скопирована" : "ссылка скопирована");
     sharePicker.value = null;
   } catch (e) {
     err.value = describe(e instanceof Error ? e.message : "ошибка");
@@ -302,9 +357,20 @@ async function makeShare(ttl: ShareTtl) {
 }
 
 async function copyShare(s: ShareLink) {
-  const url = `${window.location.origin}/s/${s.token}`;
-  await navigator.clipboard.writeText(url).catch(() => undefined);
-  toastSuccess("скопировано");
+  await copyText(sharePageUrl(s.token), "скопировано");
+}
+
+async function copyDirectShare(s: ShareLink) {
+  if (s.target_type !== "file") return;
+  const f = files.value.find((x) => x.id === s.target_id);
+  if (!f || !canDirectLink(f)) return;
+  await copyText(shareMediaUrl(s.token), "прямая ссылка скопирована");
+}
+
+function shareCanDirect(s: ShareLink) {
+  if (s.target_type !== "file") return false;
+  const f = files.value.find((x) => x.id === s.target_id);
+  return !!f && canDirectLink(f);
 }
 
 async function revokeShare(s: ShareLink) {
@@ -391,6 +457,9 @@ onBeforeUnmount(() => {
               <span class="muted small">{{ fmt(f.size_bytes) }}</span>
             </div>
             <div class="actions">
+              <button v-if="canDirectLink(f)" class="secondary" type="button" @click="copyDirectFileLink(f)">
+                прямая ссылка
+              </button>
               <button v-if="canPreview(f)" class="secondary" type="button" @click="openPreview(f)">открыть</button>
               <button class="secondary" type="button" @click="onDownload(f)">скачать</button>
               <button class="secondary" type="button" @click="openShare('file', f.id)">
@@ -443,8 +512,17 @@ onBeforeUnmount(() => {
             </div>
             <code class="token" :title="`/s/${s.token}`" @click="copyShare(s)">/s/{{ s.token }}</code>
             <div class="actions">
-              <button class="icon-btn-sm" type="button" title="скопировать" @click="copyShare(s)">
+              <button class="icon-btn-sm" type="button" title="страница" @click="copyShare(s)">
                 <AppIcon name="copy" :size="16" />
+              </button>
+              <button
+                v-if="shareCanDirect(s)"
+                class="icon-btn-sm"
+                type="button"
+                title="прямая ссылка"
+                @click="copyDirectShare(s)"
+              >
+                <AppIcon name="link" :size="16" />
               </button>
               <button class="icon-btn-sm" type="button" title="отозвать" @click="revokeShare(s)">
                 <AppIcon name="delete" :size="16" />
@@ -458,6 +536,10 @@ onBeforeUnmount(() => {
     <div v-if="sharePicker" class="modal-backdrop" @click.self="sharePicker = null">
       <div class="modal card">
         <h2>срок ссылки</h2>
+        <label v-if="sharePickerFile && canDirectLink(sharePickerFile)" class="share-direct-opt">
+          <input v-model="shareDirectMode" type="checkbox" />
+          <span class="muted small">прямая ссылка на файл (для markdown)</span>
+        </label>
         <div class="ttl-grid">
           <button type="button" @click="makeShare('1h')">1 час</button>
           <button type="button" @click="makeShare('1d')">1 день</button>
@@ -714,6 +796,13 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.45rem;
+}
+
+.share-direct-opt {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  cursor: pointer;
 }
 
 .modal .actions {

@@ -90,7 +90,48 @@ function safeMediaSrc(url: string): string | null {
   if (!u) return null;
   if (/^https?:\/\//i.test(u)) return u;
   if (/^\/uploads\/[a-z0-9-]+\/[^/\s]+$/i.test(u)) return u;
+  if (/^\/api\/share\/[a-z0-9]+\/read$/i.test(u)) return u;
   return null;
+}
+
+type VideoFlags = {
+  autoplay: boolean;
+  loop: boolean;
+  controls: boolean;
+  muted: boolean;
+};
+
+function parseVideoFlags(alt: string, title?: string | null): VideoFlags {
+  const raw = `${alt} ${title ?? ""}`.toLowerCase();
+  const has = (w: string) => new RegExp(`\\b${w.replace(/-/g, "[-_]?")}\\b`).test(raw);
+  const autoplay = has("autoplay");
+  const unmuted = has("sound") || has("unmuted") || has("audio");
+  return {
+    autoplay,
+    loop: has("noloop") || has("no-loop") ? false : true,
+    controls: has("nocontrols") || has("no-controls") ? false : true,
+    muted: unmuted ? false : true,
+  };
+}
+
+function isShareReadUrl(url: string): boolean {
+  return /^https?:\/\/[^/]+\/api\/share\/[a-z0-9]+\/read$/i.test(url)
+    || /^\/api\/share\/[a-z0-9]+\/read$/i.test(url);
+}
+
+function isVideoMarkdown(href: string, alt: string, title?: string | null): boolean {
+  if (isVideoUrl(href) || isShareReadUrl(href)) return true;
+  return /\bvideo\b/i.test(`${alt} ${title ?? ""}`);
+}
+
+function renderVideoTag(src: string, alt: string, title?: string | null): string {
+  const flags = parseVideoFlags(alt, title);
+  const attrs = [`class="md-video"`, `src="${escapeHtmlAttr(src)}"`, "playsinline"];
+  if (flags.controls) attrs.push("controls");
+  if (flags.loop) attrs.push("loop");
+  if (flags.muted) attrs.push("muted");
+  if (flags.autoplay) attrs.push("autoplay");
+  return `<video ${attrs.join(" ")}></video>\n`;
 }
 
 marked.use({
@@ -111,8 +152,8 @@ marked.use({
     image({ href, title, text }: Tokens.Image) {
       const src = safeMediaSrc(href);
       if (!src) return escapeHtmlText(text || href || "");
-      if (isVideoUrl(src)) {
-        return `<video class="md-video" src="${escapeHtmlAttr(src)}" controls playsinline loop muted></video>\n`;
+      if (isVideoMarkdown(src, text, title)) {
+        return renderVideoTag(src, text, title);
       }
       const alt = escapeHtmlAttr(text || "");
       const titleAttr = title ? ` title="${escapeHtmlAttr(title)}"` : "";
@@ -142,6 +183,6 @@ export function renderMarkdown(md: string): string {
   return DOMPurify.sanitize(asString, {
     USE_PROFILES: { html: true },
     ADD_TAGS: ["video"],
-    ADD_ATTR: ["controls", "playsinline", "loop", "muted", "preload", "src", "class"],
+    ADD_ATTR: ["controls", "playsinline", "loop", "muted", "autoplay", "preload", "src", "class"],
   });
 }
