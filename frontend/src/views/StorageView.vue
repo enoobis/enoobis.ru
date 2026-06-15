@@ -335,7 +335,7 @@ async function copyDirectFileLink(f: StoredFile) {
   try {
     const s = await ensureForeverFileShare(f.id);
     if (!s) return;
-    await copyText(shareMediaUrl(s.token), "прямая ссылка скопирована · навсегда");
+    await copyText(shareMediaUrl(s.token), "ссылка скопирована");
   } catch (e) {
     err.value = describe(e instanceof Error ? e.message : "ошибка");
     toastError(e);
@@ -365,7 +365,7 @@ async function makeShare(ttl: ShareTtl) {
     }
 
     const url = direct ? shareMediaUrl(created.token) : sharePageUrl(created.token);
-    await copyText(url, direct ? "прямая ссылка скопирована · навсегда" : "ссылка скопирована");
+    await copyText(url, "ссылка скопирована");
     sharePicker.value = null;
   } catch (e) {
     err.value = describe(e instanceof Error ? e.message : "ошибка");
@@ -383,7 +383,7 @@ async function copyDirectShare(s: ShareLink) {
   if (!f || !canDirectLink(f)) return;
   const forever = await ensureForeverFileShare(s.target_id);
   if (!forever) return;
-  await copyText(shareMediaUrl(forever.token), "прямая ссылка скопирована · навсегда");
+  await copyText(shareMediaUrl(forever.token), "ссылка скопирована");
 }
 
 function shareCanDirect(s: ShareLink) {
@@ -557,11 +557,8 @@ onBeforeUnmount(() => {
         <h2>срок ссылки</h2>
         <label v-if="sharePickerFile && canDirectLink(sharePickerFile)" class="share-direct-opt">
           <input v-model="shareDirectMode" type="checkbox" />
-          <span class="muted small">прямая ссылка на файл · всегда навсегда (для markdown)</span>
+          <span class="muted small">прямая ссылка</span>
         </label>
-        <p v-if="shareDirectMode && sharePickerFile && canDirectLink(sharePickerFile)" class="muted small share-direct-hint">
-          срок не нужен — ссылка бессрочная, пока вы её не отзовёте
-        </p>
         <div v-if="shareDirectMode && sharePickerFile && canDirectLink(sharePickerFile)" class="ttl-grid ttl-grid--one">
           <button type="button" @click="makeShare('forever')">скопировать</button>
         </div>
@@ -825,11 +822,6 @@ onBeforeUnmount(() => {
 
 .ttl-grid--one {
   grid-template-columns: 1fr;
-}
-
-.share-direct-hint {
-  margin: 0;
-  line-height: 1.4;
 }
 
 .share-direct-opt {
