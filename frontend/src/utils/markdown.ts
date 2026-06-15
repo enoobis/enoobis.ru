@@ -67,6 +67,32 @@ function safeFenceLang(lang: string | undefined): string | undefined {
   return t;
 }
 
+function escapeHtmlAttr(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;");
+}
+
+function escapeHtmlText(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+export function isVideoUrl(url: string): boolean {
+  return /\.(mp4|webm|mov|m4v)(\?|#|$)/i.test(String(url ?? "").trim());
+}
+
+function safeMediaSrc(url: string): string | null {
+  const u = String(url ?? "").trim();
+  if (!u) return null;
+  if (/^https?:\/\//i.test(u)) return u;
+  if (/^\/uploads\/[a-z0-9-]+\/[^/\s]+$/i.test(u)) return u;
+  return null;
+}
+
 marked.use({
   renderer: {
     code({ text, lang }: Tokens.Code) {
@@ -82,8 +108,25 @@ marked.use({
       const { value } = hljs.highlightAuto(text, HL_AUTO_SUBSET);
       return `<pre><code class="hljs">${value}</code></pre>\n`;
     },
+    image({ href, title, text }: Tokens.Image) {
+      const src = safeMediaSrc(href);
+      if (!src) return escapeHtmlText(text || href || "");
+      if (isVideoUrl(src)) {
+        return `<video class="md-video" src="${escapeHtmlAttr(src)}" controls playsinline loop muted></video>\n`;
+      }
+      const alt = escapeHtmlAttr(text || "");
+      const titleAttr = title ? ` title="${escapeHtmlAttr(title)}"` : "";
+      return `<img src="${escapeHtmlAttr(src)}" alt="${alt}"${titleAttr} loading="lazy" />\n`;
+    },
   },
 });
+
+function convertLegacyVideoLines(md: string): string {
+  return md.replace(
+    /(^|\n)((?:https?:\/\/\S+|\/uploads\/\S+)\.(?:mp4|webm|mov|m4v))(\n|$)/gi,
+    (_m, pre: string, url: string, post: string) => `${pre}![video](${url})${post}`,
+  );
+}
 
 function convertLegacyImageLines(md: string): string {
   return md.replace(
@@ -93,8 +136,12 @@ function convertLegacyImageLines(md: string): string {
 }
 
 export function renderMarkdown(md: string): string {
-  const normalized = convertLegacyImageLines(md ?? "");
+  const normalized = convertLegacyImageLines(convertLegacyVideoLines(md ?? ""));
   const html = marked.parse(normalized);
   const asString = typeof html === "string" ? html : "";
-  return DOMPurify.sanitize(asString, { USE_PROFILES: { html: true } });
+  return DOMPurify.sanitize(asString, {
+    USE_PROFILES: { html: true },
+    ADD_TAGS: ["video"],
+    ADD_ATTR: ["controls", "playsinline", "loop", "muted", "preload", "src", "class"],
+  });
 }

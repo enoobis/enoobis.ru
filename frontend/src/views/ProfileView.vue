@@ -625,6 +625,10 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   width: 100%;
   border-radius: 4px;
 }
+.profile.on-wallpaper .readme :deep(video) {
+  width: 100%;
+  border-radius: 4px;
+}
 .profile.on-wallpaper .content-tabs {
   margin-top: 0;
   border-bottom-color: var(--profile-steam-line);
@@ -818,6 +822,14 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   max-width: 100%;
   border-radius: var(--radius);
   margin: 0.6rem 0;
+}
+.readme :deep(video) {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  border-radius: var(--radius);
+  margin: 0.6rem 0;
+  background: #000;
 }
 .readme :deep(a) {
   color: var(--text);

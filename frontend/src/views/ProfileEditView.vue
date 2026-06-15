@@ -8,6 +8,7 @@ import AppIcon from "../components/AppIcon.vue";
 import { useAuthStore } from "../stores/auth";
 import { useSessionStore } from "../stores/session";
 import { setViewerPreferences } from "../utils/preferences";
+import { renderMarkdown } from "../utils/markdown";
 import { THEMES, normalizeThemeId, type ThemeId } from "../utils/themes";
 import { toastError, toastSuccess } from "../utils/toast";
 
@@ -61,6 +62,7 @@ const tab = ref<SettingsTab>("profile");
 
 const bio = ref("");
 const readmeMd = ref("");
+const readmePreview = computed(() => renderMarkdown(readmeMd.value));
 const languagePreference = ref<"ru" | "en">("ru");
 const themePreference = ref<ThemeId>("black");
 const fullName = ref("");
@@ -464,10 +466,14 @@ function closeSettings() {
               v-model="readmeMd"
               rows="10"
               :maxlength="README_MAX"
-              placeholder="# привет&#10;немного о себе, проекты, ссылки…"
+              placeholder="# привет&#10;картинка: ![img](url.png)&#10;видео: ![video](url.mp4) или ссылка на отдельной строке"
               class="readme-input"
             />
             <span class="readme-counter muted">{{ readmeMd.length }} / {{ README_MAX }}</span>
+            <details v-if="readmeMd.trim()" class="readme-preview-wrap">
+              <summary class="muted small">превью</summary>
+              <article class="readme-preview" v-html="readmePreview" />
+            </details>
           </label>
         </div>
 
@@ -753,6 +759,31 @@ function closeSettings() {
 .readme-counter {
   font-size: 0.78rem;
   text-align: right;
+}
+
+.readme-preview-wrap {
+  margin-top: 0.5rem;
+}
+
+.readme-preview {
+  margin-top: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.85rem 1rem;
+  line-height: 1.6;
+  font-size: 0.92rem;
+}
+
+.readme-preview :deep(img),
+.readme-preview :deep(video) {
+  display: block;
+  max-width: 100%;
+  border-radius: var(--radius);
+  margin: 0.5rem 0;
+}
+
+.readme-preview :deep(video) {
+  background: #000;
 }
 
 .col-2 {
