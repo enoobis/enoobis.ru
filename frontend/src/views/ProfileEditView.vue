@@ -3,7 +3,7 @@ import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { api } from "../api/http";
 import { uploadAvatar } from "../api/uploadAvatar";
-import { changeMyPassword } from "../api/profile";
+import { changeMyPassword, getMyPrivacy, patchMyPrivacy } from "../api/profile";
 import AppIcon from "../components/AppIcon.vue";
 import { useAuthStore } from "../stores/auth";
 import { useSessionStore } from "../stores/session";
@@ -70,6 +70,7 @@ const websiteUrl = ref("");
 const socialLinks = ref<SocialLink[]>([]);
 const birthday = ref("");
 const country = ref("");
+const showOnlineStatus = ref(false);
 const err = ref("");
 const avatarMsg = ref("");
 const uploadingAvatar = ref(false);
@@ -291,6 +292,14 @@ onMounted(async () => {
     });
     avatarMsg.value = "";
     await loadInvites();
+    if (auth.token) {
+      try {
+        const priv = await getMyPrivacy(auth.token);
+        showOnlineStatus.value = priv.show_online_status;
+      } catch {
+        showOnlineStatus.value = false;
+      }
+    }
     document.addEventListener("visibilitychange", onMeVisibility);
     void session.ensureMe(true);
   } catch (e) {
@@ -372,6 +381,10 @@ async function save() {
         country: country.value,
       }),
     });
+    await patchMyPrivacy(auth.token, { show_online_status: showOnlineStatus.value });
+    if (showOnlineStatus.value) {
+      window.dispatchEvent(new CustomEvent("enoobis:online-preference-updated"));
+    }
     setViewerPreferences({
       language_preference: languagePreference.value,
       theme_preference: themePreference.value,
@@ -574,6 +587,14 @@ function closeSettings() {
             </select>
           </label>
         </div>
+
+        <section class="privacy-block">
+          <label class="toggle-row">
+            <input v-model="showOnlineStatus" type="checkbox" />
+            <span>показывать, что я онлайн</span>
+          </label>
+          <p class="muted small">видно в профиле и чатах · «онлайн» или когда был в сети</p>
+        </section>
 
       </template>
 
@@ -902,12 +923,6 @@ function closeSettings() {
   gap: 0.55rem;
   cursor: pointer;
   font-size: 0.92rem;
-}
-.toggle-row input {
-  width: 1rem;
-  height: 1rem;
-  margin: 0;
-  accent-color: var(--text);
 }
 .nick-row {
   display: flex;
