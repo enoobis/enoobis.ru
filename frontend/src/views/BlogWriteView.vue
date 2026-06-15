@@ -737,7 +737,7 @@ onBeforeUnmount(() => {
   border: none;
   background: transparent;
   resize: vertical;
-  padding: 0;
+  padding: 0.5rem 1rem;
   font-family: var(--mono);
   font-size: 0.92rem;
   line-height: 1.7;

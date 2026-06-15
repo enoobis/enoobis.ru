@@ -1804,7 +1804,7 @@ strong {
 .mod-field input,
 .mod-field textarea {
   font: inherit;
-  padding: 0.45rem 0.5rem;
+  padding: 0.55rem 0.85rem;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg);

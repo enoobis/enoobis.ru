@@ -12,6 +12,8 @@
   --glass-blur: 16px;
   --layout-pad: 1rem;
   --control-h: 44px;
+  --input-pad-y: 0.7rem;
+  --input-pad-x: 1.15rem;
 
   /* motion */
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
@@ -238,7 +240,7 @@ select {
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text);
-  padding: 0.7rem 1rem;
+  padding: var(--input-pad-y) var(--input-pad-x);
   min-height: var(--control-h);
   width: 100%;
   font-size: 0.95rem;
@@ -269,7 +271,7 @@ textarea {
   border-radius: var(--radius);
   min-height: auto;
   line-height: 1.5;
-  padding: 0.85rem 1rem;
+  padding: 0.85rem var(--input-pad-x);
 }
 input::placeholder,
 textarea::placeholder {
@@ -439,7 +441,7 @@ a.card:hover {
   min-height: 0;
   border: none;
   background: transparent;
-  padding: 0.45rem 0;
+  padding: 0.45rem 0.15rem 0.45rem 0.1rem;
   width: auto;
 }
 
@@ -1053,15 +1055,15 @@ h3 {
   textarea,
   select {
     font-size: 16px;
-    padding: 0.6rem 0.7rem;
+    padding: 0.65rem 1rem;
   }
   .filter-search input {
-    padding: 0.45rem 0;
+    padding: 0.45rem 0.15rem 0.45rem 0.1rem;
     min-height: 0;
   }
   .composer textarea {
     font-size: 16px;
-    padding: 0;
+    padding: 0.5rem 0.85rem;
     min-height: 0;
   }
 }

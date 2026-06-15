@@ -3497,7 +3497,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   flex: 0 0 auto;
   margin: 0.4rem 0.4rem 0.1rem;
   min-height: 36px;
-  padding: 0 0.7rem;
+  padding: 0.55rem 0.85rem;
 }
 .grade-picker-list {
   list-style: none;

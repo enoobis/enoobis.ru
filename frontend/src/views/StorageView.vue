@@ -697,7 +697,7 @@ onBeforeUnmount(() => {
   border-bottom: 1px solid var(--border);
   border-radius: 0;
   background: transparent;
-  padding: 0.35rem 0;
+  padding: 0.5rem 0.85rem;
   min-height: 0;
   width: 100%;
 }
@@ -706,7 +706,7 @@ onBeforeUnmount(() => {
   flex: 1;
   min-width: 0;
   border-bottom: none;
-  padding: 0;
+  padding: 0.5rem 0.85rem;
 }
 
 .composer textarea {

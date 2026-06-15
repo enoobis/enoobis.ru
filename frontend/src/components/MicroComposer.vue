@@ -169,7 +169,7 @@ textarea {
   resize: none;
   border: none;
   background: transparent;
-  padding: 0;
+  padding: 0.5rem 0.85rem;
   font-size: 1rem;
   line-height: 1.5;
   min-height: 2.75rem;
