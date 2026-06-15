@@ -304,19 +304,26 @@ function shareFor(targetType: "file" | "note", id: string) {
   return shares.value.find((s) => s.target_type === targetType && s.target_id === id);
 }
 
+function foreverShareForFile(fileId: string) {
+  return shares.value.find(
+    (s) => s.target_type === "file" && s.target_id === fileId && !s.expires_at,
+  );
+}
+
 function openShare(type: "file" | "note", id: string) {
-  shareDirectMode.value = false;
+  const file = type === "file" ? files.value.find((f) => f.id === id) : null;
+  shareDirectMode.value = !!file && canDirectLink(file);
   sharePicker.value = { type, id };
 }
 
-async function ensureFileShare(fileId: string, ttl: ShareTtl = "forever"): Promise<ShareLink | null> {
+async function ensureForeverFileShare(fileId: string): Promise<ShareLink | null> {
   if (!auth.token) return null;
-  const existing = shareFor("file", fileId);
+  const existing = foreverShareForFile(fileId);
   if (existing) return existing;
   const created = await createShare(auth.token, {
     target_type: "file",
     target_id: fileId,
-    ttl,
+    ttl: "forever",
   });
   shares.value = [created, ...shares.value];
   return created;
@@ -326,9 +333,9 @@ async function copyDirectFileLink(f: StoredFile) {
   if (!auth.token || !canDirectLink(f)) return;
   err.value = "";
   try {
-    const s = await ensureFileShare(f.id);
+    const s = await ensureForeverFileShare(f.id);
     if (!s) return;
-    await copyText(shareMediaUrl(s.token), "прямая ссылка скопирована");
+    await copyText(shareMediaUrl(s.token), "прямая ссылка скопирована · навсегда");
   } catch (e) {
     err.value = describe(e instanceof Error ? e.message : "ошибка");
     toastError(e);
@@ -338,17 +345,27 @@ async function copyDirectFileLink(f: StoredFile) {
 async function makeShare(ttl: ShareTtl) {
   if (!auth.token || !sharePicker.value) return;
   try {
-    const created = await createShare(auth.token, {
-      target_type: sharePicker.value.type,
-      target_id: sharePicker.value.id,
-      ttl,
-    });
-    shares.value = [created, ...shares.value];
     const picked = sharePicker.value;
-    const pickedFile = picked?.type === "file" ? files.value.find((f) => f.id === picked.id) : null;
+    const pickedFile = picked.type === "file" ? files.value.find((f) => f.id === picked.id) : null;
     const direct = shareDirectMode.value && !!pickedFile && canDirectLink(pickedFile);
+    const effectiveTtl: ShareTtl = direct ? "forever" : ttl;
+
+    let created: ShareLink;
+    if (direct && picked.type === "file") {
+      const forever = await ensureForeverFileShare(picked.id);
+      if (!forever) return;
+      created = forever;
+    } else {
+      created = await createShare(auth.token, {
+        target_type: picked.type,
+        target_id: picked.id,
+        ttl: effectiveTtl,
+      });
+      shares.value = [created, ...shares.value];
+    }
+
     const url = direct ? shareMediaUrl(created.token) : sharePageUrl(created.token);
-    await copyText(url, direct ? "прямая ссылка скопирована" : "ссылка скопирована");
+    await copyText(url, direct ? "прямая ссылка скопирована · навсегда" : "ссылка скопирована");
     sharePicker.value = null;
   } catch (e) {
     err.value = describe(e instanceof Error ? e.message : "ошибка");
@@ -361,10 +378,12 @@ async function copyShare(s: ShareLink) {
 }
 
 async function copyDirectShare(s: ShareLink) {
-  if (s.target_type !== "file") return;
+  if (s.target_type !== "file" || !auth.token) return;
   const f = files.value.find((x) => x.id === s.target_id);
   if (!f || !canDirectLink(f)) return;
-  await copyText(shareMediaUrl(s.token), "прямая ссылка скопирована");
+  const forever = await ensureForeverFileShare(s.target_id);
+  if (!forever) return;
+  await copyText(shareMediaUrl(forever.token), "прямая ссылка скопирована · навсегда");
 }
 
 function shareCanDirect(s: ShareLink) {
@@ -538,9 +557,15 @@ onBeforeUnmount(() => {
         <h2>срок ссылки</h2>
         <label v-if="sharePickerFile && canDirectLink(sharePickerFile)" class="share-direct-opt">
           <input v-model="shareDirectMode" type="checkbox" />
-          <span class="muted small">прямая ссылка на файл (для markdown)</span>
+          <span class="muted small">прямая ссылка на файл · всегда навсегда (для markdown)</span>
         </label>
-        <div class="ttl-grid">
+        <p v-if="shareDirectMode && sharePickerFile && canDirectLink(sharePickerFile)" class="muted small share-direct-hint">
+          срок не нужен — ссылка бессрочная, пока вы её не отзовёте
+        </p>
+        <div v-if="shareDirectMode && sharePickerFile && canDirectLink(sharePickerFile)" class="ttl-grid ttl-grid--one">
+          <button type="button" @click="makeShare('forever')">скопировать</button>
+        </div>
+        <div v-else class="ttl-grid">
           <button type="button" @click="makeShare('1h')">1 час</button>
           <button type="button" @click="makeShare('1d')">1 день</button>
           <button type="button" @click="makeShare('7d')">7 дней</button>
@@ -796,6 +821,15 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.45rem;
+}
+
+.ttl-grid--one {
+  grid-template-columns: 1fr;
+}
+
+.share-direct-hint {
+  margin: 0;
+  line-height: 1.4;
 }
 
 .share-direct-opt {
