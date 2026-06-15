@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
-import { RouterLink, useRoute } from "vue-router";
+import { RouterLink, useRoute, useRouter } from "vue-router";
 import { api } from "../api/http";
 import { listAuthorPosts, type BlogListItem } from "../api/blog";
 import { listMicroByAuthor, type MicroPost } from "../api/micro";
@@ -35,6 +35,7 @@ type Profile = {
 type Tab = "blog" | "micro";
 
 const route = useRoute();
+const router = useRouter();
 const auth = useAuthStore();
 const profile = ref<Profile | null>(null);
 const posts = ref<BlogListItem[]>([]);
@@ -215,6 +216,10 @@ async function load() {
   } catch (e) {
     if (seq !== loadSeq) return;
     const msg = e instanceof Error ? e.message : "ошибка";
+    if (!auth.token && msg.toLowerCase().includes("login required")) {
+      await router.push({ name: "login", query: { next: route.fullPath } });
+      return;
+    }
     err.value = msg.toLowerCase().includes("forbidden") || msg.includes("403") ? "профиль скрыт" : msg;
   }
 }

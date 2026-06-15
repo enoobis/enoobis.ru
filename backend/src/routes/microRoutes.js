@@ -13,6 +13,10 @@ import { applyVote, voteSummary } from "../utils/votes.js";
 import { assertMicroPublish } from "../utils/contentLimits.js";
 import { optimizeUploadedFile } from "../utils/imageOptimize.js";
 import { verifyRasterImage } from "../utils/mimeVerify.js";
+import {
+  guestMayViewProfile,
+  guestProfileAccessError,
+} from "../utils/profileGuestAccess.js";
 
 const router = express.Router();
 const MAX_BODY = 480;
@@ -105,8 +109,17 @@ router.get("/micro", (req, res) => {
     params.push(`%${String(req.query.q)}%`);
   }
   if (req.query.author) {
+    const authorNick = String(req.query.author);
+    const author = get("SELECT role FROM users WHERE nickname = ?", authorNick);
+    if (!author) {
+      return res.json({ items: [], page, page_size: pageSize, total: 0 });
+    }
+    if (!guestMayViewProfile(viewerId, author.role)) {
+      const err = guestProfileAccessError();
+      return res.status(err.status).json({ error: err.error });
+    }
     where.push("u.nickname = ?");
-    params.push(String(req.query.author));
+    params.push(authorNick);
   }
   if (req.query.feed === "following" && viewerId) {
     where.push(

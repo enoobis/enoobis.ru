@@ -10,6 +10,10 @@ import { assertBlogPatchField } from "../utils/sqlAllowlist.js";
 import { assertBlogComment, assertBlogPublish } from "../utils/contentLimits.js";
 import { finalizeBlogPublish } from "../utils/blogPublish.js";
 import { canBlogAndStorage } from "../utils/roles.js";
+import {
+  guestMayViewProfile,
+  guestProfileAccessError,
+} from "../utils/profileGuestAccess.js";
 
 const router = express.Router();
 
@@ -132,8 +136,13 @@ router.get("/blog/mine", authRequired, (req, res) => {
 });
 
 router.get("/blog/author/:nickname", (req, res) => {
-  const u = get("SELECT id FROM users WHERE nickname = ?", req.params.nickname);
+  const viewer = optionalUserId(req);
+  const u = get("SELECT id, role FROM users WHERE nickname = ?", req.params.nickname);
   if (!u) return res.json({ items: [], page: 1, page_size: 10, total: 0 });
+  if (!guestMayViewProfile(viewer, u.role)) {
+    const err = guestProfileAccessError();
+    return res.status(err.status).json({ error: err.error });
+  }
   return res.json(listPaged(req, { authorId: u.id, publishedOnly: true }));
 });
 

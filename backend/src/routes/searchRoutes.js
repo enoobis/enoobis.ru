@@ -1,9 +1,11 @@
 import express from "express";
 import { all } from "../db.js";
+import { optionalUserId } from "../auth.js";
 
 const router = express.Router();
 
 router.get("/search", (req, res) => {
+  const viewer = optionalUserId(req);
   const q = String(req.query.q ?? "").trim();
   if (!q) return res.json({ blog: [], micro: [], users: [] });
   const like = `%${q}%`;
@@ -37,11 +39,17 @@ router.get("/search", (req, res) => {
   );
 
   const users = all(
-    `SELECT nickname, full_name, avatar_url
-     FROM users
-     WHERE status = 'approved' AND (nickname LIKE ? OR full_name LIKE ?)
-     ORDER BY nickname
-     LIMIT ?`,
+    viewer
+      ? `SELECT nickname, full_name, avatar_url
+         FROM users
+         WHERE status = 'approved' AND (nickname LIKE ? OR full_name LIKE ?)
+         ORDER BY nickname
+         LIMIT ?`
+      : `SELECT nickname, full_name, avatar_url
+         FROM users
+         WHERE status = 'approved' AND role = 'admin' AND (nickname LIKE ? OR full_name LIKE ?)
+         ORDER BY nickname
+         LIMIT ?`,
     like,
     like,
     limit,

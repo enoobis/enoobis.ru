@@ -42,7 +42,12 @@ async function load() {
     followers.value = a;
     following.value = b;
   } catch (e) {
-    err.value = e instanceof Error ? e.message : "ошибка";
+    const msg = e instanceof Error ? e.message : "ошибка";
+    if (!auth.token && msg.toLowerCase().includes("login required")) {
+      await router.push({ name: "login", query: { next: route.fullPath } });
+      return;
+    }
+    err.value = msg;
   } finally {
     loading.value = false;
   }

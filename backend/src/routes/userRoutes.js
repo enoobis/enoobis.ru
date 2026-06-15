@@ -18,6 +18,10 @@ import { buildModerationNotices, parseContentLimits } from "../utils/contentLimi
 import { regenerateUserAvatar, sanitizeUserCosmetics } from "../utils/profileCosmetics.js";
 import { isValidNickname } from "../utils/nickname.js";
 import { isStaffRole } from "../utils/roles.js";
+import {
+  guestMayViewProfile,
+  guestProfileAccessError,
+} from "../utils/profileGuestAccess.js";
 function viewerId(req) {
   return optionalUserId(req);
 }
@@ -682,6 +686,10 @@ router.get("/profile/:nickname", (req, res) => {
     req.params.nickname,
   );
   if (!p) return res.status(404).json({ error: "not found" });
+  if (!guestMayViewProfile(viewer, p.role)) {
+    const err = guestProfileAccessError();
+    return res.status(err.status).json({ error: err.error });
+  }
   const privacy = privacySettingsFor(p.id);
   const isSelf = viewer === p.id;
   if (!isSelf && !visibilityAllows(viewer, p.id, privacy.profile_visibility)) {
@@ -784,8 +792,12 @@ router.get("/me/achievements", authRequired, (req, res) => {
 
 router.get("/profile/:nickname/activity", (req, res) => {
   const viewer = viewerId(req);
-  const p = get("SELECT id, created_at FROM users WHERE nickname = ?", req.params.nickname);
+  const p = get("SELECT id, role, created_at FROM users WHERE nickname = ?", req.params.nickname);
   if (!p) return res.status(404).json({ error: "not found" });
+  if (!guestMayViewProfile(viewer, p.role)) {
+    const err = guestProfileAccessError();
+    return res.status(err.status).json({ error: err.error });
+  }
   const privacy = privacySettingsFor(p.id);
   if (!visibilityAllows(viewer, p.id, privacy.activity_visibility)) {
     return res.status(403).json({ error: "forbidden" });
@@ -870,8 +882,13 @@ function decorateFollows(rows, viewer) {
 }
 
 router.get("/profile/:nickname/followers", (req, res) => {
-  const p = get("SELECT id FROM users WHERE nickname = ?", req.params.nickname);
+  const viewer = viewerId(req);
+  const p = get("SELECT id, role FROM users WHERE nickname = ?", req.params.nickname);
   if (!p) return res.json([]);
+  if (!guestMayViewProfile(viewer, p.role)) {
+    const err = guestProfileAccessError();
+    return res.status(err.status).json({ error: err.error });
+  }
   const rows = all(
     `SELECT u.id, u.nickname, u.avatar_url, u.full_name
      FROM user_follows f
@@ -884,8 +901,13 @@ router.get("/profile/:nickname/followers", (req, res) => {
 });
 
 router.get("/profile/:nickname/following", (req, res) => {
-  const p = get("SELECT id FROM users WHERE nickname = ?", req.params.nickname);
+  const viewer = viewerId(req);
+  const p = get("SELECT id, role FROM users WHERE nickname = ?", req.params.nickname);
   if (!p) return res.json([]);
+  if (!guestMayViewProfile(viewer, p.role)) {
+    const err = guestProfileAccessError();
+    return res.status(err.status).json({ error: err.error });
+  }
   const rows = all(
     `SELECT u.id, u.nickname, u.avatar_url, u.full_name
      FROM user_follows f
