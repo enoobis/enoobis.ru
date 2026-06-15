@@ -466,13 +466,10 @@ function closeSettings() {
               v-model="readmeMd"
               rows="10"
               :maxlength="README_MAX"
-              placeholder="# привет&#10;картинка: ![img](url.png)&#10;видео: ![video](url.mp4)&#10;флаги: ![autoplay loop nocontrols](url)"
+              placeholder="# привет&#10;![img](url.png)&#10;![video](url.mp4)"
               class="readme-input"
             />
             <span class="readme-counter muted">{{ readmeMd.length }} / {{ README_MAX }}</span>
-            <p class="muted small readme-hint">
-              видео: `![video](url)` · без меню: `nocontrols` · автостарт: `autoplay` · без цикла: `noloop` · со звуком: `sound`
-            </p>
             <details v-if="readmeMd.trim()" class="readme-preview-wrap">
               <summary class="muted small">превью</summary>
               <article class="readme-preview" v-html="readmePreview" />
@@ -787,11 +784,6 @@ function closeSettings() {
 
 .readme-preview :deep(video) {
   background: #000;
-}
-
-.readme-hint {
-  margin: 0.35rem 0 0;
-  line-height: 1.45;
 }
 
 .col-2 {

@@ -114,13 +114,8 @@ function parseVideoFlags(alt: string, title?: string | null): VideoFlags {
   };
 }
 
-function isShareReadUrl(url: string): boolean {
-  return /^https?:\/\/[^/]+\/api\/share\/[a-z0-9]+\/read$/i.test(url)
-    || /^\/api\/share\/[a-z0-9]+\/read$/i.test(url);
-}
-
 function isVideoMarkdown(href: string, alt: string, title?: string | null): boolean {
-  if (isVideoUrl(href) || isShareReadUrl(href)) return true;
+  if (isVideoUrl(href)) return true;
   return /\bvideo\b/i.test(`${alt} ${title ?? ""}`);
 }
 
