@@ -2648,9 +2648,6 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   font-size: 0.9rem;
   cursor: pointer;
 }
-.check input {
-  width: auto;
-}
 
 .course-grid {
   display: grid;

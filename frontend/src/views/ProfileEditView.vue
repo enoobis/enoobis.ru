@@ -828,11 +828,6 @@ function closeSettings() {
   gap: 0.6rem;
 }
 
-.inline-check input[type="checkbox"] {
-  width: auto;
-  flex-shrink: 0;
-}
-
 .actions {
   margin-top: 1rem;
   display: flex;
