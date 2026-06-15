@@ -1,5 +1,6 @@
 import { type WatchSource, watch } from "vue";
 import { api } from "../api/http";
+import { useAuthStore } from "../stores/auth";
 import { applyProfileOwnerTheme } from "../utils/preferences";
 
 export function useProfileOwnerThemeFromValue(theme: WatchSource<string | undefined>) {
@@ -13,6 +14,7 @@ export function useProfileOwnerThemeFromValue(theme: WatchSource<string | undefi
 }
 
 export function useProfileOwnerThemeFromApi(nickname: WatchSource<string>) {
+  const auth = useAuthStore();
   watch(
     nickname,
     async (nick) => {
@@ -20,6 +22,7 @@ export function useProfileOwnerThemeFromApi(nickname: WatchSource<string>) {
       try {
         const p = await api<{ theme_preference?: string }>(
           `/api/profile/${encodeURIComponent(nick)}`,
+          { token: auth.token },
         );
         applyProfileOwnerTheme(p.theme_preference);
       } catch {

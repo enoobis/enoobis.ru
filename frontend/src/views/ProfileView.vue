@@ -165,7 +165,7 @@ async function onAvatarError() {
   }
   avatarHealTried.value = true;
   try {
-    const p = await api<Profile>(`/api/profile/${nick.value}`);
+    const p = await api<Profile>(`/api/profile/${nick.value}`, { token: auth.token });
     if (!profile.value) return;
     profile.value = { ...profile.value, ...p };
     avatarBroken.value = false;
@@ -196,11 +196,11 @@ async function load() {
     following.value = false;
   }
   try {
-    const loaded = await api<Profile>(`/api/profile/${target}`);
+    const loaded = await api<Profile>(`/api/profile/${target}`, { token: auth.token });
     if (seq !== loadSeq) return;
     profile.value = loaded;
     const [pBlog, pMicro] = await Promise.all([
-      listAuthorPosts(target, { page: 1, page_size: 20 }),
+      listAuthorPosts(target, { page: 1, page_size: 20 }, auth.token),
       listMicroByAuthor(target, auth.token),
     ]);
     if (seq !== loadSeq) return;

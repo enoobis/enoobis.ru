@@ -127,8 +127,14 @@ export function listMyPosts(token: string, query: BlogListQuery = {}) {
   return api<PagedPosts>(withQuery("/api/blog/mine", query), { token });
 }
 
-export function listAuthorPosts(nickname: string, query: BlogListQuery = {}) {
-  return api<PagedPosts>(withQuery(`/api/blog/author/${encodeURIComponent(nickname)}`, query));
+export function listAuthorPosts(
+  nickname: string,
+  query: BlogListQuery = {},
+  token?: string | null,
+) {
+  return api<PagedPosts>(withQuery(`/api/blog/author/${encodeURIComponent(nickname)}`, query), {
+    token,
+  });
 }
 
 export function getPost(id: string, token?: string | null) {
