@@ -8,7 +8,6 @@ import { authRequired } from "../auth.js";
 import { assertChatOutgoing } from "../utils/contentLimits.js";
 import { optimizeUploadedFile } from "../utils/imageOptimize.js";
 import { verifyRasterImage } from "../utils/mimeVerify.js";
-import { onlinePayload } from "../utils/onlineStatus.js";
 import { unlinkUploadUrl } from "../utils/uploadSafe.js";
 
 const router = express.Router();
@@ -160,20 +159,14 @@ function ensureThread(meId, otherId) {
 function otherUser(thread, meId) {
   const otherId = thread.user_a_id === meId ? thread.user_b_id : thread.user_a_id;
   const u = get(
-    "SELECT id, nickname, avatar_url, last_seen_at FROM users WHERE id = ?",
+    "SELECT id, nickname, avatar_url FROM users WHERE id = ?",
     otherId,
   );
   if (!u) return null;
-  const priv = get(
-    "SELECT show_online_status FROM user_privacy_settings WHERE user_id = ?",
-    otherId,
-  );
-  const showOnline = !!priv?.show_online_status;
   return {
     id: u.id,
     nickname: u.nickname,
     avatar_url: u.avatar_url ?? "",
-    online: onlinePayload(u.last_seen_at, showOnline),
   };
 }
 
@@ -251,8 +244,6 @@ function groupDto(row, meId) {
     member_count: groupMemberCount(row.id),
     other_nickname: row.title ?? "",
     other_avatar: row.avatar_url ?? "",
-    other_online: null,
-    other_last_seen_at: null,
     last_body: previewOf(last),
     last_from_me: last ? last.sender_id === meId : false,
     last_at: last?.created_at ?? row.last_message_at ?? null,
@@ -269,8 +260,6 @@ function threadDto(row, meId) {
     kind: "dm",
     other_nickname: other?.nickname ?? "",
     other_avatar: other?.avatar_url ?? "",
-    other_online: other?.online?.online ?? null,
-    other_last_seen_at: other?.online?.last_seen_at ?? null,
     last_body: previewOf(last),
     last_from_me: last ? last.sender_id === meId : false,
     last_at: last?.created_at ?? row.last_message_at ?? null,
@@ -559,7 +548,6 @@ router.get("/chats/:id/messages", authRequired, (req, res) => {
           id: other.id,
           nickname: other.nickname,
           avatar_url: other.avatar_url,
-          online: other.online,
         }
       : null,
   });

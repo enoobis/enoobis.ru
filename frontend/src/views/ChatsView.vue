@@ -27,8 +27,6 @@ import { search, type SearchUser } from "../api/search";
 import AppIcon from "../components/AppIcon.vue";
 import { useAuthStore } from "../stores/auth";
 import { useChatStore } from "../stores/chat";
-import type { OnlineStatus } from "../api/chat";
-import { formatLastSeen } from "../utils/lastSeen";
 import { toastError } from "../utils/toast";
 
 const auth = useAuthStore();
@@ -40,8 +38,6 @@ const chats = ref<ChatThread[]>([]);
 const activeId = ref<string>("");
 const otherNickname = ref("");
 const otherAvatar = ref("");
-const otherOnline = ref<boolean | null>(null);
-const otherLastSeenAt = ref<string | null>(null);
 const groupInfo = ref<ChatGroupInfo | null>(null);
 const composeOpen = ref(false);
 const composeMode = ref<"user" | "group">("user");
@@ -413,27 +409,6 @@ const groupMembersLabel = computed(() => {
   return `${n} ${memberWord(n)}`;
 });
 
-function applyOtherPresence(online: OnlineStatus | null | undefined) {
-  if (online === null || online === undefined) {
-    otherOnline.value = null;
-    otherLastSeenAt.value = null;
-    return;
-  }
-  otherOnline.value = !!online.online;
-  otherLastSeenAt.value = online.last_seen_at;
-}
-
-const otherPresenceLabel = computed(() => {
-  if (otherOnline.value) return "онлайн";
-  if (otherLastSeenAt.value) return formatLastSeen(otherLastSeenAt.value);
-  return "";
-});
-
-function chatPresenceLabel(c: ChatThread) {
-  if (c.other_online) return "";
-  if (!c.other_last_seen_at) return "";
-  return formatLastSeen(c.other_last_seen_at);
-}
 const messages = ref<ChatMessage[]>([]);
 const draft = ref("");
 const sending = ref(false);
@@ -616,7 +591,6 @@ async function loadMessages(scrollEnd = true) {
     groupInfo.value = data.group ?? null;
     otherNickname.value = data.other?.nickname ?? "";
     otherAvatar.value = data.other?.avatar_url ?? "";
-    applyOtherPresence(data.other?.online);
     if (scrollEnd) {
       await nextTick();
       messagesEnd.value?.scrollIntoView({ block: "end" });
@@ -654,7 +628,6 @@ async function pollMessages() {
     const data = await listMessages(chatId, auth.token, last);
     if (chatId !== activeId.value) return;
     if (data.group) groupInfo.value = data.group;
-    if (data.other) applyOtherPresence(data.other.online);
     if (data.items.length) {
       messages.value = [...messages.value, ...data.items];
       await nextTick();
@@ -876,8 +849,6 @@ watch(
       activeId.value = id;
       messages.value = [];
       groupInfo.value = null;
-      otherOnline.value = null;
-      otherLastSeenAt.value = null;
       replyTarget.value = null;
       if (id) await loadMessages();
     }
@@ -956,14 +927,11 @@ onUnmounted(() => {
         @keydown="(e) => onChatRowKey(e, c.id)"
       >
         <div class="chat-row">
-          <span class="avatar" :class="{ 'has-online': c.other_online === true }">
+          <span class="avatar">
             <img v-if="c.kind === 'group' && c.other_avatar" :src="c.other_avatar" alt="" />
             <AppIcon v-else-if="c.kind === 'group'" name="users" :size="16" />
             <img v-else-if="c.other_avatar" :src="c.other_avatar" alt="" />
             <span v-else>{{ c.other_nickname.slice(0, 2) }}</span>
-            <span v-if="c.other_online === true" class="online-star" title="онлайн">
-              <AppIcon name="spark" :size="9" />
-            </span>
           </span>
           <span class="row-text">
             <span class="row-line">
@@ -972,7 +940,6 @@ onUnmounted(() => {
             </span>
             <span class="last muted small">
               <span v-if="c.last_from_me" class="muted">вы: </span>{{ c.last_body || "—" }}
-              <span v-if="chatPresenceLabel(c)" class="chat-last-seen"> · {{ chatPresenceLabel(c) }}</span>
             </span>
           </span>
         </div>
@@ -1006,18 +973,12 @@ onUnmounted(() => {
             </span>
           </button>
           <RouterLink v-else-if="otherNickname" :to="`/u/${otherNickname}`" class="who">
-            <span class="avatar small" :class="{ 'has-online': otherOnline === true }">
+            <span class="avatar small">
               <img v-if="otherAvatar" :src="otherAvatar" alt="" />
               <span v-else>{{ otherNickname.slice(0, 2) }}</span>
-              <span v-if="otherOnline === true" class="online-star" title="онлайн">
-                <AppIcon name="spark" :size="8" />
-              </span>
             </span>
             <span class="who-text">
               <span>{{ otherNickname }}</span>
-              <span v-if="otherPresenceLabel" class="presence-label" :class="{ online: otherOnline === true }">
-                {{ otherPresenceLabel }}
-              </span>
             </span>
           </RouterLink>
           <span v-if="otherNickname || groupInfo" class="thread-head-actions">
@@ -1929,14 +1890,6 @@ onUnmounted(() => {
   height: 28px;
   font-size: 0.7rem;
 }
-.avatar .online-star {
-  position: absolute;
-  right: -2px;
-  bottom: -2px;
-  display: inline-flex;
-  color: var(--gold);
-  z-index: 1;
-}
 .who-text {
   display: flex;
   flex-direction: column;
@@ -1947,12 +1900,6 @@ onUnmounted(() => {
   color: var(--muted);
   font-size: 0.72rem;
   line-height: 1.2;
-}
-.presence-label.online {
-  color: var(--gold);
-}
-.chat-last-seen {
-  opacity: 0.85;
 }
 .avatar img {
   width: 100%;

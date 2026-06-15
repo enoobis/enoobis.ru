@@ -1,7 +1,5 @@
 import { api } from "./http";
 
-export type OnlineStatus = { online: boolean; last_seen_at: string | null } | null;
-
 export type ChatThread = {
   id: string;
   kind?: "dm" | "group";
@@ -10,9 +8,6 @@ export type ChatThread = {
   member_count?: number;
   other_nickname: string;
   other_avatar: string;
-  /** true = онлайн, false = не в сети (но статус виден), null = скрыто */
-  other_online: boolean | null;
-  other_last_seen_at: string | null;
   last_body: string;
   last_from_me: boolean;
   last_at: string | null;
@@ -51,7 +46,7 @@ export type ChatGroupInfo = {
 
 export type ChatMessages = {
   items: ChatMessage[];
-  other: { id: string; nickname: string; avatar_url: string; online: OnlineStatus } | null;
+  other: { id: string; nickname: string; avatar_url: string } | null;
   group?: ChatGroupInfo | null;
 };
 

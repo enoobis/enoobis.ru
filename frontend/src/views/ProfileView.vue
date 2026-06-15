@@ -10,7 +10,6 @@ import PostMetaStats from "../components/PostMetaStats.vue";
 import type { Achievement } from "../api/profile";
 import { useAuthStore } from "../stores/auth";
 import { renderMarkdown } from "../utils/markdown";
-import { formatLastSeen } from "../utils/lastSeen";
 import { useProfileOwnerThemeFromValue } from "../composables/useProfileOwnerTheme";
 type Profile = {
   nickname: string;
@@ -26,7 +25,6 @@ type Profile = {
   social_links: { name: string; url: string }[];
   readme_md: string;
   created_at: string;
-  online?: { online: boolean; last_seen_at: string | null } | null;
   followers_count: number;
   following_count: number;
   coins?: number;
@@ -59,16 +57,6 @@ const renderedReadme = computed(() => renderMarkdown(profile.value?.readme_md ??
 const socialPublic = computed(() =>
   (profile.value?.social_links ?? []).filter((s) => String(s?.url ?? "").trim().length > 0),
 );
-const isOnline = computed(
-  () => !isMe.value && profile.value?.online?.online === true,
-);
-const presenceLabel = computed(() => {
-  const o = profile.value?.online;
-  if (!o || isMe.value) return "";
-  if (o.online) return "онлайн";
-  if (o.last_seen_at) return formatLastSeen(o.last_seen_at);
-  return "";
-});
 
 function isWallpaperVideoUrl(url: string) {
   return /\.(mp4|webm)(\?|#|$)/i.test(url);
@@ -266,32 +254,14 @@ const earnedAchievements = computed(() =>
 
 const moderationNotices = computed(() => profile.value?.moderation_notices ?? []);
 
-async function refreshPresence() {
-  if (document.visibilityState === "hidden" || !nick.value || !profile.value) return;
-  try {
-    const p = await api<Profile>(`/api/profile/${nick.value}`);
-    profile.value = { ...profile.value, online: p.online, avatar_url: p.avatar_url };
-    avatarBroken.value = false;
-    avatarHealTried.value = false;
-  } catch {
-    /* ignore */
-  }
-}
-
-function onProfileVisibility() {
-  if (document.visibilityState === "visible") void refreshPresence();
-}
-
 onMounted(() => {
   syncWallpaperLayout();
   void load();
   window.addEventListener("resize", syncWallpaperLayout);
-  document.addEventListener("visibilitychange", onProfileVisibility);
 });
 
 onUnmounted(() => {
   window.removeEventListener("resize", syncWallpaperLayout);
-  document.removeEventListener("visibilitychange", onProfileVisibility);
   clearWallpaperDocumentVars();
 });
 
@@ -357,7 +327,7 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
       <div class="avatar-cell">
         <div
           class="avatar-stack"
-          :class="{ framed: showFrame, online: isOnline }"
+          :class="{ framed: showFrame }"
         >
           <img
             v-if="profile.avatar_url && !avatarBroken"
@@ -374,9 +344,6 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
             alt=""
             @error="onFrameError"
           />
-          <span v-if="isOnline" class="online-star" title="онлайн">
-            <AppIcon name="spark" :size="11" />
-          </span>
         </div>
       </div>
 
@@ -384,9 +351,6 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
         <h1>{{ displayName }}</h1>
         <p class="muted nick-line">
           @{{ profile.nickname }}
-          <span v-if="presenceLabel" class="presence-label" :class="{ online: isOnline }">
-            · {{ presenceLabel }}
-          </span>
         </p>
         <p v-if="profile.bio" class="bio">{{ profile.bio }}</p>
         <p class="meta muted">
@@ -683,21 +647,6 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   height: calc(100% + 16px);
   object-fit: contain;
   pointer-events: none;
-}
-.online-star {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  display: inline-flex;
-  color: var(--gold);
-  z-index: 2;
-}
-.presence-label {
-  color: var(--muted);
-  font-size: 0.82rem;
-}
-.presence-label.online {
-  color: var(--gold);
 }
 .nick-line {
   margin: 0;

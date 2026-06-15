@@ -271,7 +271,7 @@ function closeProfileMenu() {
 
 function logoutFromMenu() {
   profileMenuOpen.value = false;
-  void session.clearOnlinePresence().finally(() => auth.logout());
+  auth.logout();
 }
 
 function onProfileAvatarError() {
@@ -280,10 +280,6 @@ function onProfileAvatarError() {
 
 function onProfileCosmeticsUpdated() {
   void session.ensureMe(true);
-}
-
-function onOnlinePreferenceUpdated() {
-  void session.flushActivity(true, true);
 }
 
 function onVisibilityChange() {
@@ -300,7 +296,6 @@ function syncShell() {
 
 onMounted(() => {
   window.addEventListener("enoobis:profile-cosmetics-updated", onProfileCosmeticsUpdated);
-  window.addEventListener("enoobis:online-preference-updated", onOnlinePreferenceUpdated);
   window.addEventListener("enoobis:nav-start", startNavProgress);
   window.addEventListener("enoobis:nav-done", finishNavProgress);
   window.addEventListener("online", syncOnlineStatus);
@@ -318,7 +313,6 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener("enoobis:profile-cosmetics-updated", onProfileCosmeticsUpdated);
-  window.removeEventListener("enoobis:online-preference-updated", onOnlinePreferenceUpdated);
   window.removeEventListener("enoobis:nav-start", startNavProgress);
   window.removeEventListener("enoobis:nav-done", finishNavProgress);
   window.removeEventListener("online", syncOnlineStatus);

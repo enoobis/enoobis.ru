@@ -17,10 +17,7 @@ export type PrivacySettings = {
   media_visibility: "public" | "followers" | "private";
   show_birthday: boolean;
   show_country: boolean;
-  show_online_status: boolean;
 };
-
-export type OnlineStatus = { online: boolean; last_seen_at: string | null } | null;
 
 export type NotificationSettings = {
   email_enabled: boolean;

@@ -139,7 +139,7 @@ export const useSessionStore = defineStore("session", () => {
     if (!me.value?.avatar_url) avatarBroken.value = true;
   }
 
-  async function flushActivity(force = false, visible = !document.hidden) {
+  async function flushActivity(force = false) {
     const auth = useAuthStore();
     if (!auth.token || !shellActive.value) return;
     const now = Date.now();
@@ -147,29 +147,15 @@ export const useSessionStore = defineStore("session", () => {
     if (!force && elapsed < 10) return;
     if (!force && document.hidden) return;
     activityTickStart = now;
-    const seconds = visible && elapsed > 0 ? Math.min(elapsed, 600) : 0;
-    if (!visible && seconds <= 0 && !force) return;
+    const seconds = !document.hidden && elapsed > 0 ? Math.min(elapsed, 600) : 0;
+    if (seconds <= 0 && !force) return;
     try {
       const data = await api<{ ok?: boolean; coins?: number }>("/api/me/activity", {
         method: "POST",
         token: auth.token,
-        body: JSON.stringify({ seconds, visible: !!visible }),
+        body: JSON.stringify({ seconds }),
       });
       if (typeof data.coins === "number") setCoins(data.coins);
-    } catch {
-      /* ignore */
-    }
-  }
-
-  async function clearOnlinePresence() {
-    const auth = useAuthStore();
-    if (!auth.token) return;
-    try {
-      await api("/api/me/activity", {
-        method: "POST",
-        token: auth.token,
-        body: JSON.stringify({ seconds: 0, visible: false }),
-      });
     } catch {
       /* ignore */
     }
@@ -194,9 +180,9 @@ export const useSessionStore = defineStore("session", () => {
     activityTickStart = Date.now();
     const auth = useAuthStore();
     if (!auth.token || !shellActive.value) return;
-    void flushActivity(true, true);
+    void flushActivity(true);
     activityInterval = setInterval(() => {
-      void flushActivity(false, !document.hidden);
+      void flushActivity(false);
     }, 30000);
   }
 
@@ -226,10 +212,9 @@ export const useSessionStore = defineStore("session", () => {
   function onVisibilityChange() {
     if (!shellActive.value) return;
     if (document.hidden) {
-      void flushActivity(true, false);
+      void flushActivity(true);
     } else {
       activityTickStart = Date.now();
-      void flushActivity(true, true);
     }
   }
 
@@ -246,7 +231,6 @@ export const useSessionStore = defineStore("session", () => {
     startShell,
     stopShell,
     flushActivity,
-    clearOnlinePresence,
     onVisibilityChange,
     reset,
   };

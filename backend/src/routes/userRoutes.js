@@ -15,7 +15,6 @@ import {
   checkFollowerMilestones,
 } from "../utils/achievements.js";
 import { buildModerationNotices, parseContentLimits } from "../utils/contentLimits.js";
-import { onlinePayload } from "../utils/onlineStatus.js";
 import { regenerateUserAvatar, sanitizeUserCosmetics } from "../utils/profileCosmetics.js";
 import { isValidNickname } from "../utils/nickname.js";
 import { isStaffRole } from "../utils/roles.js";
@@ -60,7 +59,6 @@ function buildMe(row) {
     country: row.country ?? "",
     readme_md: row.readme_md ?? "",
     created_at: row.created_at ?? "",
-    last_seen_at: row.last_seen_at ?? "",
     favorite_course_ids: favIds,
     nickname_change_count: Number(row.nickname_change_count ?? 0),
     pinned_post_id: row.pinned_post_id ?? null,
@@ -93,7 +91,7 @@ router.get("/me", authRequired, (req, res) => {
   const row = get(
     `SELECT id, email, nickname, role, status, bio, wallpaper_url, avatar_url, avatar_frame_url, profile_cover_url,
             profile_wallpaper_style, theme_preference, language_preference, font_preference, full_name, website_url,
-            social_links_json, birthday, country, readme_md, created_at, last_seen_at,
+            social_links_json, birthday, country, readme_md, created_at,
             nickname_change_count, pinned_post_id, pinned_post_type, content_limits_json, coins
      FROM users WHERE id = ?`,
     req.user.id,
@@ -313,14 +311,6 @@ router.post("/me/activity", authRequired, (req, res) => {
     );
   }
 
-  if (userShowsOnlineStatus(userId)) {
-    if (req.body?.visible === false) {
-      run("UPDATE users SET last_seen_at = NULL WHERE id = ?", userId);
-    } else if (req.body?.visible === true || seconds > 0) {
-      run("UPDATE users SET last_seen_at = ? WHERE id = ?", now, userId);
-    }
-  }
-
   if (seconds > 0) {
     const rowAfter = get(
       "SELECT seconds_spent FROM user_daily_activity WHERE user_id = ? AND day = ?",
@@ -444,16 +434,10 @@ function ensurePrivacyRow(userId) {
   );
 }
 
-function userShowsOnlineStatus(userId) {
-  ensurePrivacyRow(userId);
-  const row = get("SELECT show_online_status FROM user_privacy_settings WHERE user_id = ?", userId);
-  return !!row?.show_online_status;
-}
-
 function privacySettingsFor(userId) {
   ensurePrivacyRow(userId);
   const row = get(
-    `SELECT profile_visibility, activity_visibility, media_visibility, show_birthday, show_country, show_online_status
+    `SELECT profile_visibility, activity_visibility, media_visibility, show_birthday, show_country
      FROM user_privacy_settings WHERE user_id = ?`,
     userId,
   );
@@ -463,7 +447,6 @@ function privacySettingsFor(userId) {
     media_visibility: row?.media_visibility ?? "public",
     show_birthday: !!row?.show_birthday,
     show_country: !!row?.show_country,
-    show_online_status: !!row?.show_online_status,
   };
 }
 
@@ -486,20 +469,7 @@ function visibilityAllows(viewerId, targetUserId, visibility) {
 }
 
 router.get("/me/privacy", authRequired, (req, res) => {
-  ensurePrivacyRow(req.user.id);
-  const row = get(
-    `SELECT profile_visibility, activity_visibility, media_visibility, show_birthday, show_country, show_online_status
-     FROM user_privacy_settings WHERE user_id = ?`,
-    req.user.id,
-  );
-  return res.json({
-    profile_visibility: row?.profile_visibility ?? "public",
-    activity_visibility: row?.activity_visibility ?? "public",
-    media_visibility: row?.media_visibility ?? "public",
-    show_birthday: !!row?.show_birthday,
-    show_country: !!row?.show_country,
-    show_online_status: !!row?.show_online_status,
-  });
+  return res.json(privacySettingsFor(req.user.id));
 });
 
 router.patch("/me/privacy", authRequired, (req, res) => {
@@ -511,36 +481,16 @@ router.patch("/me/privacy", authRequired, (req, res) => {
     media_visibility: body.media_visibility,
     show_birthday: body.show_birthday,
     show_country: body.show_country,
-    show_online_status: body.show_online_status,
   };
   for (const [k, v] of Object.entries(fields)) {
     if (v === undefined) continue;
     if (k.startsWith("show_")) {
       run(`UPDATE user_privacy_settings SET ${k} = ?, updated_at = ? WHERE user_id = ?`, v ? 1 : 0, nowIso(), req.user.id);
-      if (k === "show_online_status") {
-        if (!v) {
-          run("UPDATE users SET last_seen_at = NULL WHERE id = ?", req.user.id);
-        } else {
-          run("UPDATE users SET last_seen_at = ? WHERE id = ?", nowIso(), req.user.id);
-        }
-      }
     } else if (typeof v === "string" && ["public", "followers", "private"].includes(v)) {
       run(`UPDATE user_privacy_settings SET ${k} = ?, updated_at = ? WHERE user_id = ?`, v, nowIso(), req.user.id);
     }
   }
-  const updated = get(
-    `SELECT profile_visibility, activity_visibility, media_visibility, show_birthday, show_country, show_online_status
-     FROM user_privacy_settings WHERE user_id = ?`,
-    req.user.id,
-  );
-  return res.json({
-    profile_visibility: updated.profile_visibility,
-    activity_visibility: updated.activity_visibility,
-    media_visibility: updated.media_visibility,
-    show_birthday: !!updated.show_birthday,
-    show_country: !!updated.show_country,
-    show_online_status: !!updated.show_online_status,
-  });
+  return res.json(privacySettingsFor(req.user.id));
 });
 
 function ensureNotificationsRow(userId) {
@@ -727,7 +677,7 @@ router.get("/profile/:nickname", (req, res) => {
   const p = get(
     `SELECT id, nickname, role, bio, wallpaper_url, avatar_url, avatar_frame_url, profile_cover_url,
             profile_wallpaper_style, theme_preference, language_preference, font_preference, full_name, website_url,
-            social_links_json, birthday, country, readme_md, created_at, last_seen_at, content_limits_json
+            social_links_json, birthday, country, readme_md, created_at, content_limits_json
      FROM users WHERE nickname = ?`,
     req.params.nickname,
   );
@@ -779,7 +729,6 @@ router.get("/profile/:nickname", (req, res) => {
     country: isSelf || privacy.show_country ? (p.country ?? "") : "",
     readme_md: p.readme_md ?? "",
     created_at: p.created_at ?? "",
-    online: onlinePayload(p.last_seen_at, isSelf || userShowsOnlineStatus(p.id)),
     favorite_courses,
     achievements,
     followers_count,
