@@ -985,7 +985,7 @@ async function approveBlog(id: string) {
     <template v-else-if="tab === 'users' && isFullAdmin">
       <FilterSearch v-model="usersQuery" class="admin-users-search" />
       <p v-if="!filteredUsers.length" class="muted">не найдено</p>
-      <ul v-else class="list user-list">
+      <ul v-else v-auto-animate class="list user-list">
         <li v-for="u in filteredUsers" :key="u.id" class="user-row">
           <span class="user-ava">
             <img v-if="u.avatar_url" :src="u.avatar_url" alt="" loading="lazy" />

@@ -7,6 +7,7 @@ import { useReaderStore } from "./stores/reader";
 import { useSessionStore } from "./stores/session";
 import AppIcon from "./components/AppIcon.vue";
 import AppToast from "./components/AppToast.vue";
+import MotionCoinCount from "./components/MotionCoinCount.vue";
 import SearchPanel from "./components/SearchPanel.vue";
 
 const router = useRouter();
@@ -559,7 +560,7 @@ watch(
                   class="profile-coin-img"
                   loading="lazy"
                 />
-                <span>{{ profileCoins }}</span>
+                <span><MotionCoinCount :value="profileCoins" /></span>
               </div>
             </div>
           </div>
@@ -702,7 +703,7 @@ watch(
                       class="profile-coin-img"
                       loading="lazy"
                     />
-                    <span>{{ profileCoins }}</span>
+                    <span><MotionCoinCount :value="profileCoins" /></span>
                   </div>
                 </div>
               </div>

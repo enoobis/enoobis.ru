@@ -30,12 +30,15 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="toast-stack" aria-live="polite">
+  <div v-auto-animate class="toast-stack" aria-live="polite">
     <div
       v-for="t in toasts"
       :key="t.id"
+      v-motion
       class="toast"
       :class="`toast-${t.type}`"
+      :initial="{ opacity: 0, x: 16 }"
+      :enter="{ opacity: 1, x: 0, transition: { duration: 0.2, ease: [0.22, 1, 0.36, 1] } }"
     >
       {{ t.text }}
     </div>
@@ -58,8 +61,7 @@ onUnmounted(() => {
   color: var(--text);
   border: 1px solid var(--border);
   padding: 0.7rem 0.95rem;
-  border-radius: 12px;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+  border-radius: var(--radius);
   min-width: 200px;
   max-width: 360px;
   pointer-events: auto;
