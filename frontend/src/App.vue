@@ -746,10 +746,10 @@ watch(
       </Transition>
     </Teleport>
     <RouterView v-slot="{ Component, route: rv }">
-      <component v-if="motionLite" :is="Component" :key="rv.fullPath" class="page-motion-root" />
+      <component v-if="motionLite" :is="Component" :key="rv.path" class="page-motion-root" />
       <AnimatePresence v-else mode="wait">
         <motion.div
-          :key="rv.fullPath"
+          :key="rv.path"
           class="page-motion-root"
           :initial="pageEnter"
           :animate="pageActive"
