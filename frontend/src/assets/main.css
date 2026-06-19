@@ -785,18 +785,23 @@ html.profile-wallpaper-desktop #app {
   position: relative;
   z-index: 1;
 }
-html.profile-wallpaper-desktop .nav,
-html.profile-wallpaper-desktop .nav-dropdown {
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-  background: var(--surface);
-}
 html.profile-wallpaper-desktop .nav {
-  background: var(--bg);
+  position: sticky;
+  z-index: 100;
   width: var(--profile-wallpaper-panel);
   margin-left: var(--profile-wallpaper-margin);
   margin-right: auto;
   box-sizing: border-box;
+}
+html.profile-wallpaper-desktop .nav.nav--sheet-open {
+  z-index: 110;
+  overflow: visible;
+}
+html.profile-wallpaper-desktop #nav-drawer {
+  z-index: 5;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: var(--surface);
 }
 html.profile-wallpaper-desktop .nav-bar {
   width: 100%;
@@ -826,6 +831,7 @@ html.profile-wallpaper-desktop .nav-bar {
   position: sticky;
   top: 0;
   z-index: 100;
+  overflow: visible;
 }
 html[data-theme="contrast"] .nav,
 html[data-theme="contrast-white"] .nav {

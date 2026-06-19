@@ -506,7 +506,7 @@ watch(
         <div
           v-if="navDrawerOpen && !sheetMobile"
           id="nav-drawer"
-          class="nav-dropdown"
+          class="nav-dropdown nav-drawer-sheet"
           role="dialog"
           aria-modal="true"
           aria-label="разделы"
@@ -896,6 +896,10 @@ watch(
 
 .nav-dropdown.profile-menu-sheet {
   padding: 0.35rem 0.6rem 0.65rem;
+}
+
+.nav-dropdown.nav-drawer-sheet {
+  z-index: 5;
 }
 
 .nav-dropdown:not(.search-menu-sheet) {
