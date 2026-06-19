@@ -113,18 +113,24 @@ router.get("/admin/users/:id", adminOnly, (req, res) => {
   });
 });
 
-const ADMIN_COIN_GRANT_MIN = 1;
-const ADMIN_COIN_GRANT_MAX = 100_000;
+const ADMIN_COIN_DELTA_MIN = -100_000;
+const ADMIN_COIN_DELTA_MAX = 100_000;
 
 router.post("/admin/users/:id/coins", adminOnly, (req, res) => {
   const id = req.params.id;
   const target = get("SELECT id FROM users WHERE id = ?", id);
   if (!target) return res.status(404).json({ error: "not found" });
   const n = Number(req.body?.amount);
-  if (!Number.isFinite(n) || !Number.isInteger(n) || n < ADMIN_COIN_GRANT_MIN || n > ADMIN_COIN_GRANT_MAX) {
+  if (
+    !Number.isFinite(n) ||
+    !Number.isInteger(n) ||
+    n === 0 ||
+    n < ADMIN_COIN_DELTA_MIN ||
+    n > ADMIN_COIN_DELTA_MAX
+  ) {
     return res.status(400).json({ error: "bad amount" });
   }
-  run("UPDATE users SET coins = coins + ? WHERE id = ?", n, id);
+  run("UPDATE users SET coins = MAX(0, coins + ?) WHERE id = ?", n, id);
   const after = get("SELECT coins FROM users WHERE id = ?", id);
   const coins = Math.max(0, Math.floor(Number(after?.coins ?? 0)));
   logAdminAction(req.user.id, "user_coins", id, { amount: n });

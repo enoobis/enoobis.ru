@@ -714,36 +714,6 @@ function roleRu(r: string) {
   return "ученик";
 }
 
-const coinsRowId = ref<string | null>(null);
-const coinsRowInput = ref("");
-const coinsRowBusy = ref(false);
-
-function toggleCoinsRow(id: string) {
-  coinsRowId.value = coinsRowId.value === id ? null : id;
-  coinsRowInput.value = "";
-}
-
-async function giveCoinsRow(u: AdminUser) {
-  if (!auth.token || coinsRowBusy.value) return;
-  const n = Math.floor(Number(coinsRowInput.value.trim()));
-  if (!Number.isFinite(n) || n < 1 || n > 100_000) {
-    err.value = "монеты: число от 1 до 100000";
-    return;
-  }
-  coinsRowBusy.value = true;
-  err.value = "";
-  try {
-    const r = await postAdminUserCoins(auth.token, u.id, n);
-    u.coins = r.coins;
-    coinsRowId.value = null;
-    coinsRowInput.value = "";
-  } catch (e) {
-    err.value = e instanceof Error ? e.message : "ошибка";
-  } finally {
-    coinsRowBusy.value = false;
-  }
-}
-
 async function setModerateRole(role: "student" | "teacher" | "master" | "moderator") {
   if (!moderateUserId.value || modBusy.value) return;
   modBusy.value = true;
@@ -765,22 +735,24 @@ async function removeModerateUser() {
   if (!users.value.some((x) => x.id === u.id)) closeModerate();
 }
 
-async function giveModerateGems() {
+async function applyModerateCoins(mode: "add" | "remove") {
   const id = moderateUserId.value;
-  if (!auth.token || !id || !moderateDetail.value) return;
+  if (!auth.token || !id || !moderateDetail.value || modBusy.value) return;
   const n = Math.floor(Number(String(moderateGemInput.value).trim()));
   if (!Number.isFinite(n) || n < 1 || n > 100_000) {
     modMsg.value = "число от 1 до 100000";
     return;
   }
+  const amount = mode === "add" ? n : -n;
   modBusy.value = true;
   modMsg.value = "";
   try {
-    const r = await postAdminUserCoins(auth.token, id, n);
+    const r = await postAdminUserCoins(auth.token, id, amount);
     moderateDetail.value.coins = r.coins;
+    const row = users.value.find((x) => x.id === id);
+    if (row) row.coins = r.coins;
     moderateGemInput.value = "";
-    await load();
-    modMsg.value = "начислено";
+    modMsg.value = mode === "add" ? "начислено" : "убрано";
   } catch (e) {
     modMsg.value = e instanceof Error ? e.message : "ошибка";
   } finally {
@@ -1023,30 +995,11 @@ async function approveBlog(id: string) {
             <span class="muted small">{{ roleRu(u.role) }} · {{ u.status }} · {{ u.email }}</span>
           </div>
           <div class="user-side">
-            <template v-if="coinsRowId === u.id">
-              <input
-                v-model="coinsRowInput"
-                class="gem-in"
-                type="number"
-                min="1"
-                max="100000"
-                step="1"
-                placeholder="сколько"
-                @keydown.enter.prevent="giveCoinsRow(u)"
-              />
-              <button type="button" :disabled="coinsRowBusy" @click="giveCoinsRow(u)">выдать</button>
-              <button class="secondary user-coins-cancel" type="button" aria-label="отмена" @click="toggleCoinsRow(u.id)">
-                <AppIcon name="close" :size="14" />
-              </button>
-            </template>
-            <template v-else>
-              <button class="user-coins" type="button" title="начислить монеты" @click="toggleCoinsRow(u.id)">
-                <img src="/coin-gem.png" alt="" width="16" height="16" />
-                <span>{{ u.coins ?? 0 }}</span>
-                <span class="user-coins-plus">+</span>
-              </button>
-              <button class="secondary" type="button" :disabled="modBusy" @click="openModerate(u)">открыть</button>
-            </template>
+            <span class="user-coins">
+              <img src="/coin-gem.png" alt="" width="16" height="16" />
+              <span>{{ u.coins ?? 0 }}</span>
+            </span>
+            <button class="secondary" type="button" :disabled="modBusy" @click="openModerate(u)">открыть</button>
           </div>
         </li>
       </ul>
@@ -1080,9 +1033,10 @@ async function approveBlog(id: string) {
               step="1"
               class="gem-in"
               placeholder="сколько"
-              @keydown.enter.prevent="giveModerateGems"
+              @keydown.enter.prevent="applyModerateCoins('add')"
             />
-            <button type="button" class="secondary" :disabled="modBusy" @click="giveModerateGems">начислить</button>
+            <button type="button" :disabled="modBusy" @click="applyModerateCoins('add')">начислить</button>
+            <button type="button" class="secondary" :disabled="modBusy" @click="applyModerateCoins('remove')">убрать</button>
           </div>
 
           <div
@@ -1664,26 +1618,10 @@ strong {
   align-items: center;
   gap: 0.3rem;
   padding: 0.3rem 0.55rem;
-  min-height: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: transparent;
   color: var(--text);
   font-size: 0.875rem;
-}
-.user-coins:hover {
-  background: var(--surface);
-  transform: none;
-}
-.user-coins-plus {
-  color: var(--muted);
-}
-.user-coins-cancel {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.3rem;
-  min-height: 0;
 }
 .shop-edit-dialog.mod-modal {
   width: min(100%, 32rem);
