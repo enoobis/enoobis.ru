@@ -51,6 +51,8 @@ import {
   type ShopStorage,
 } from "../api/shop";
 import { fmtBytes } from "../utils/bytes";
+import MotionStagger from "../components/MotionStagger.vue";
+import MotionStaggerItem from "../components/MotionStaggerItem.vue";
 
 const README_MAX = 4000;
 
@@ -985,8 +987,8 @@ async function approveBlog(id: string) {
     <template v-else-if="tab === 'users' && isFullAdmin">
       <FilterSearch v-model="usersQuery" class="admin-users-search" />
       <p v-if="!filteredUsers.length" class="muted">не найдено</p>
-      <ul v-else class="list user-list">
-        <li v-for="u in filteredUsers" :key="u.id" class="user-row">
+      <MotionStagger v-else :list-key="usersQuery" class="list user-list">
+        <MotionStaggerItem v-for="u in filteredUsers" :key="u.id" class="user-row" :interactive="false">
           <span class="user-ava">
             <img v-if="u.avatar_url" :src="u.avatar_url" alt="" loading="lazy" />
           </span>
@@ -1001,8 +1003,8 @@ async function approveBlog(id: string) {
             </span>
             <button class="secondary" type="button" :disabled="modBusy" @click="openModerate(u)">открыть</button>
           </div>
-        </li>
-      </ul>
+        </MotionStaggerItem>
+      </MotionStagger>
 
       <Teleport to="body">
       <div v-if="moderateUserId" class="shop-edit-root" role="presentation">
