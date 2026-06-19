@@ -7,8 +7,8 @@
   --mono: ui-monospace, "Cascadia Code", "Segoe UI Mono", monospace;
   --icon-size: 18px;
   --app-font-scale: 1;
-  --danger: #e07b8a;
-  --gold: #fbbf24;
+  --danger: var(--text);
+  --gold: var(--text);
   --glass-blur: 16px;
   --layout-pad: 1rem;
   --control-h: 44px;

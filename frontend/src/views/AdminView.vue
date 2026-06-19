@@ -1559,11 +1559,11 @@ async function approveBlog(id: string) {
   flex-wrap: wrap;
 }
 .row-actions .danger {
-  color: var(--danger, #c44);
-  border-color: var(--danger, #c44);
+  color: var(--danger);
+  border-color: var(--danger);
 }
 .row-actions .danger:hover {
-  background: var(--danger, #c44);
+  background: var(--danger);
   color: var(--bg);
 }
 .report-target {

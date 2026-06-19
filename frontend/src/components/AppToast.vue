@@ -72,18 +72,4 @@ onUnmounted(() => {
   max-width: 360px;
   pointer-events: auto;
 }
-
-.toast-success {
-  border-color: #2f7a4a;
-  background: #08210f;
-}
-
-.toast-error {
-  border-color: #8b2a2a;
-  background: #2a0c0c;
-}
-
-.toast-info {
-  border-color: var(--border);
-}
 </style>

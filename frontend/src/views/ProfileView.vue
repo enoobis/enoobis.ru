@@ -660,7 +660,7 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   list-style: none;
   padding: 0;
   margin: 0 0 1rem;
-  color: var(--danger, #c44);
+  color: var(--danger);
   font-size: 0.82rem;
   line-height: 1.35;
 }

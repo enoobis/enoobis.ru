@@ -23,7 +23,6 @@ defineProps<{ value: number }>();
 <style scoped>
 .motion-coin-count {
   display: inline-block;
-  color: var(--gold);
-  text-shadow: 0 0 12px color-mix(in srgb, var(--gold) 55%, transparent);
+  color: var(--text);
 }
 </style>
