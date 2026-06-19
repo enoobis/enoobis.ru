@@ -81,3 +81,50 @@ export const cardTap = {
   scale: 0.96,
   transition: { duration: 0.08 },
 };
+
+export const revealHidden = {
+  opacity: 0,
+  y: 14,
+  filter: "blur(8px)",
+};
+
+export const revealVisible = {
+  opacity: 1,
+  y: 0,
+  filter: "blur(0px)",
+  transition: springSoft,
+};
+
+export const pressHover = {
+  scale: 1.02,
+  y: -2,
+  transition: springSnappy,
+};
+
+export const pressTap = {
+  scale: 0.98,
+  transition: { duration: 0.08 },
+};
+
+export const menuPanelEnter = {
+  opacity: 0,
+  y: -10,
+  scale: 0.98,
+  filter: "blur(6px)",
+};
+
+export const menuPanelActive = {
+  opacity: 1,
+  y: 0,
+  scale: 1,
+  filter: "blur(0px)",
+  transition: springSnappy,
+};
+
+export const menuPanelExit = {
+  opacity: 0,
+  y: -8,
+  scale: 0.99,
+  filter: "blur(4px)",
+  transition: { duration: 0.16 },
+};

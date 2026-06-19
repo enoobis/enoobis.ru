@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import MotionReveal from "./MotionReveal.vue";
+
 defineProps<{
   title: string;
   meta?: string;
@@ -10,8 +12,8 @@ defineProps<{
     <div class="page-head-lead">
       <slot name="back" />
       <div class="page-head-main">
-        <h1>{{ title }}</h1>
-        <p v-if="meta" class="page-head-meta">{{ meta }}</p>
+        <MotionReveal as="h1">{{ title }}</MotionReveal>
+        <MotionReveal v-if="meta" as="p" class="page-head-meta" :delay="0.06">{{ meta }}</MotionReveal>
       </div>
     </div>
     <div v-if="$slots.actions" class="page-head-actions">

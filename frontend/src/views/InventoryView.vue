@@ -15,6 +15,10 @@ import { useSessionStore } from "../stores/session";
 import { toastError, toastSuccess } from "../utils/toast";
 import PageHeader from "../components/PageHeader.vue";
 import AppIcon from "../components/AppIcon.vue";
+import MotionCoinCount from "../components/MotionCoinCount.vue";
+import MotionStagger from "../components/MotionStagger.vue";
+import MotionStaggerItem from "../components/MotionStaggerItem.vue";
+import DisplacementImage from "../components/DisplacementImage.vue";
 
 const auth = useAuthStore();
 const session = useSessionStore();
@@ -154,7 +158,7 @@ onMounted(load);
       <template #actions>
         <div class="coins-badge" title="монеты">
           <img src="/coin-gem.png" alt="" width="18" height="18" loading="lazy" />
-          <span>{{ profileCoins }}</span>
+          <MotionCoinCount :value="profileCoins" />
         </div>
       </template>
     </PageHeader>
@@ -163,20 +167,30 @@ onMounted(load);
       <p>пусто</p>
       <RouterLink to="/shop" class="to-shop">магазин →</RouterLink>
     </div>
-    <ul v-if="items.length" class="grid">
-      <li v-for="a in sortedItems" :key="a.id" class="item-card">
+    <MotionStagger v-if="items.length" :list-key="String(items.length)" class="grid">
+      <MotionStaggerItem v-for="a in sortedItems" :key="a.id" class="item-card">
         <span class="kind muted small">{{ kindLabel(a.kind) }}</span>
         <div class="preview">
           <template v-if="a.kind === 'avatar'">
             <div class="avatar-wrap">
-              <img :src="a.url" :alt="a.name" class="avatar-img" loading="lazy" />
+              <DisplacementImage
+                :src="a.url"
+                :alt="a.name"
+                :enabled="!a.is_animated"
+                class="avatar-img displacement-host"
+              />
               <span v-if="a.is_animated" class="anim-badge">gif</span>
             </div>
           </template>
           <template v-else-if="a.kind === 'frame'">
             <div class="frame-demo">
               <span class="frame-inner" />
-              <img :src="a.url" alt="" class="frame-layer" loading="lazy" />
+              <DisplacementImage
+                :src="a.url"
+                alt=""
+                :enabled="!a.is_animated"
+                class="frame-layer displacement-host"
+              />
               <span v-if="a.is_animated" class="anim-badge">anim</span>
             </div>
           </template>
@@ -224,8 +238,8 @@ onMounted(load);
             <AppIcon name="delete" :size="15" />
           </button>
         </div>
-      </li>
-    </ul>
+      </MotionStaggerItem>
+    </MotionStagger>
   </section>
 </template>
 
@@ -263,11 +277,11 @@ onMounted(load);
 .avatar-wrap {
   position: relative;
 }
-.avatar-img {
+.avatar-img,
+.displacement-host.avatar-img {
   width: 80px;
   height: 80px;
   border-radius: var(--avatar-radius);
-  object-fit: cover;
   border: 1px solid var(--border);
   display: block;
 }
@@ -296,13 +310,13 @@ onMounted(load);
   background: var(--surface2);
   border: 1px solid var(--border);
 }
-.frame-layer {
+.frame-layer,
+.displacement-host.frame-layer {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-  object-fit: contain;
-  pointer-events: none;
+  pointer-events: auto;
 }
 .wide-thumb {
   width: 100%;
