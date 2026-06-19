@@ -496,6 +496,10 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   display: flex;
   justify-content: center;
 }
+.profile-wrap {
+  position: relative;
+  z-index: 1;
+}
 .profile-bg-stage {
   position: relative;
   flex: 0 0 auto;

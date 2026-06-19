@@ -781,6 +781,10 @@ html.profile-wallpaper-desktop .layout {
   padding-left: 0;
   padding-right: 0;
 }
+html.profile-wallpaper-desktop #app {
+  position: relative;
+  z-index: 1;
+}
 html.profile-wallpaper-desktop .nav {
   width: var(--profile-wallpaper-panel);
   margin-left: var(--profile-wallpaper-margin);
