@@ -207,8 +207,6 @@ async function share() {
           :src="post.image_url"
           alt=""
           class="image"
-          width="640"
-          height="480"
           loading="lazy"
           decoding="async"
         />
@@ -348,9 +346,8 @@ header {
 
 .image {
   width: 100%;
-  max-height: 320px;
-  aspect-ratio: 4 / 3;
-  object-fit: cover;
+  max-width: 100%;
+  height: auto;
   border-radius: var(--radius);
   border: 1px solid var(--border);
   margin: 0.4rem 0 0.5rem;
