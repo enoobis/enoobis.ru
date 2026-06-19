@@ -1,8 +1,6 @@
 <script setup lang="ts">
-import { nextTick, onUnmounted, ref, watch } from "vue";
-import { AnimatePresence, motion } from "motion-v";
+import { computed, nextTick, onUnmounted, ref, watch } from "vue";
 import AppIcon from "./AppIcon.vue";
-import { searchTween, springSnappy } from "../utils/motionPresets";
 import { prefersReducedMotion } from "../utils/reducedMotion";
 
 const open = defineModel<boolean>("open", { default: false });
@@ -17,9 +15,16 @@ const inputEl = ref<HTMLInputElement | null>(null);
 const fieldWidth = ref(44);
 const fieldTop = ref(0);
 const fieldRight = ref(0);
+const fieldExpanded = ref(false);
 const reduced = prefersReducedMotion();
 
 const collapsedWidth = 44;
+
+const fieldStyle = computed(() => ({
+  top: `${fieldTop.value}px`,
+  right: `${fieldRight.value}px`,
+  width: `${fieldExpanded.value ? fieldWidth.value : collapsedWidth}px`,
+}));
 
 function syncLayout() {
   if (typeof window === "undefined") return;
@@ -50,18 +55,30 @@ function focusInput() {
   void nextTick(() => inputEl.value?.focus());
 }
 
-function openSearch() {
+async function openSearch() {
   syncLayout();
   open.value = true;
+  fieldExpanded.value = reduced;
+  if (reduced) {
+    fieldExpanded.value = true;
+    focusInput();
+    return;
+  }
+  await nextTick();
+  requestAnimationFrame(() => {
+    fieldExpanded.value = true;
+    focusInput();
+  });
 }
 
 function closeSearch() {
+  fieldExpanded.value = reduced;
   open.value = false;
 }
 
 function toggleSearch() {
   if (open.value) closeSearch();
-  else openSearch();
+  else void openSearch();
 }
 
 function onResize() {
@@ -70,11 +87,10 @@ function onResize() {
 
 watch(open, (v) => {
   if (v) {
-    syncLayout();
-    focusInput();
     window.addEventListener("resize", onResize);
     return;
   }
+  fieldExpanded.value = false;
   window.removeEventListener("resize", onResize);
 });
 
@@ -88,29 +104,23 @@ defineExpose({ focus: focusInput });
 <template>
   <div class="nav-search-expand">
     <Teleport to="body">
-      <AnimatePresence>
-        <motion.div
-          v-if="open"
-          key="field"
-          class="nav-search-expand__field"
-          :style="{ top: `${fieldTop}px`, right: `${fieldRight}px` }"
-          :initial="reduced ? false : { width: collapsedWidth, opacity: 0.7 }"
-          :animate="{ width: fieldWidth, opacity: 1 }"
-          :exit="reduced ? undefined : { width: collapsedWidth, opacity: 0, transition: { duration: 0.14 } }"
-          :transition="reduced ? searchTween : springSnappy"
-        >
-          <input
-            ref="inputEl"
-            v-model="query"
-            type="search"
-            class="nav-search-expand__input"
-            :placeholder="placeholder"
-            autocomplete="off"
-            @keydown.esc.stop="closeSearch"
-          />
-          <AppIcon name="search" :size="18" class="nav-search-expand__icon" />
-        </motion.div>
-      </AnimatePresence>
+      <div
+        v-if="open"
+        class="nav-search-expand__field"
+        :class="{ 'nav-search-expand__field--expanded': fieldExpanded }"
+        :style="fieldStyle"
+      >
+        <input
+          ref="inputEl"
+          v-model="query"
+          type="search"
+          class="nav-search-expand__input"
+          :placeholder="placeholder"
+          autocomplete="off"
+          @keydown.esc.stop="closeSearch"
+        />
+        <AppIcon name="search" :size="18" class="nav-search-expand__icon" />
+      </div>
     </Teleport>
     <button
       ref="triggerEl"
@@ -150,6 +160,21 @@ defineExpose({ focus: focusInput });
   background: var(--surface);
   color: var(--muted);
   transform-origin: right center;
+  opacity: 0.85;
+  transition:
+    width 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.15s ease;
+}
+
+.nav-search-expand__field--expanded {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-search-expand__field {
+    transition: none;
+    opacity: 1;
+  }
 }
 
 .nav-search-expand__input {

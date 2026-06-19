@@ -63,8 +63,7 @@ function pushQuery() {
 async function load() {
   const seq = ++loadSeq;
   err.value = "";
-  const showLoading = !posts.value.length;
-  if (showLoading) loading.value = true;
+  loading.value = true;
   try {
     const data = await listMicro(
       {
@@ -107,6 +106,8 @@ watch(
   () => route.query,
   () => {
     syncFromRoute();
+    posts.value = [];
+    loading.value = true;
     void load();
   },
   { deep: true },

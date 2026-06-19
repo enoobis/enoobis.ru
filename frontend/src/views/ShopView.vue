@@ -104,8 +104,7 @@ async function load() {
     return;
   }
 
-  const showLoading = !items.value.length;
-  if (showLoading) loading.value = true;
+  loading.value = true;
   try {
     await loadCoins();
     if (seq !== shopLoadSeq) return;
@@ -178,11 +177,15 @@ watch(tab, () => {
   categoryFilter.value = "";
   categoryOpen.value = false;
   page.value = 1;
+  items.value = [];
+  loading.value = true;
   void load();
 });
 
 watch(categoryFilter, () => {
   page.value = 1;
+  items.value = [];
+  loading.value = true;
   void load();
 });
 watch(

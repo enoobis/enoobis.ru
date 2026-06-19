@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
-import { MotionConfig } from "motion-v";
 import { useAuthStore } from "./stores/auth";
 import { useChatStore } from "./stores/chat";
 import { useReaderStore } from "./stores/reader";
@@ -367,7 +366,6 @@ watch(
 </script>
 
 <template>
-  <MotionConfig reduced-motion="user">
   <div class="layout">
     <header ref="navEl" class="nav" :class="{ 'nav--sheet-open': navFullSheetOpen }">
       <div class="nav-bar">
@@ -735,7 +733,7 @@ watch(
         </div>
       </Transition>
     </Teleport>
-    <RouterView />
+    <RouterView :key="route.fullPath" />
     <AppToast />
     <Teleport to="body">
       <div
@@ -753,7 +751,6 @@ watch(
       </div>
     </div>
   </div>
-  </MotionConfig>
 </template>
 
 <style scoped>

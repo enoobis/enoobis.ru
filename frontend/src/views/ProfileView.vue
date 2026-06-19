@@ -220,7 +220,11 @@ async function load() {
       await router.push({ name: "login", query: { next: route.fullPath } });
       return;
     }
-    err.value = msg.toLowerCase().includes("forbidden") || msg.includes("403") ? "профиль скрыт" : msg;
+    err.value = msg.toLowerCase().includes("forbidden") || msg.includes("403")
+      ? "профиль скрыт"
+      : msg.toLowerCase().includes("not found") || msg.includes("404")
+        ? "профиль не найден"
+        : msg;
   }
 }
 
@@ -270,7 +274,10 @@ onUnmounted(() => {
   clearWallpaperDocumentVars();
 });
 
-watch(nick, load);
+watch(nick, (next, prev) => {
+  if (next !== prev) tab.value = "blog";
+  void load();
+});
 
 watch(showDesktopWallpaper, () => {
   syncWallpaperLayout();
