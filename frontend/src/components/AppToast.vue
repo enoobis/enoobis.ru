@@ -1,13 +1,9 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from "vue";
-import { AnimatePresence, motion } from "motion-v";
-import { springSnappy, toastActiveLite, toastEnterLite, toastExitLite } from "../utils/motionPresets";
-import { useLiteMotion } from "../utils/reducedMotion";
 
 type Toast = { id: number; type: "success" | "error" | "info"; text: string };
 
 const toasts = ref<Toast[]>([]);
-const motionLite = useLiteMotion();
 let counter = 0;
 
 function show(text: string, type: Toast["type"] = "info") {
@@ -35,21 +31,11 @@ onUnmounted(() => {
 
 <template>
   <div class="toast-stack" aria-live="polite">
-    <AnimatePresence>
-      <motion.div
-        v-for="t in toasts"
-        :key="t.id"
-        class="toast"
-        :class="`toast-${t.type}`"
-        :layout="!motionLite"
-        :initial="motionLite ? toastEnterLite : { opacity: 0, x: 120, y: 24, scale: 0.7, rotate: 6, filter: 'blur(8px)' }"
-        :animate="motionLite ? toastActiveLite : { opacity: 1, x: 0, y: 0, scale: 1, rotate: 0, filter: 'blur(0px)' }"
-        :exit="motionLite ? toastExitLite : { opacity: 0, x: 140, scale: 0.75, rotate: -4, transition: { duration: 0.22 } }"
-        :transition="motionLite ? toastActiveLite.transition : springSnappy"
-      >
+    <TransitionGroup name="toast">
+      <div v-for="t in toasts" :key="t.id" class="toast" :class="`toast-${t.type}`">
         {{ t.text }}
-      </motion.div>
-    </AnimatePresence>
+      </div>
+    </TransitionGroup>
   </div>
 </template>
 
@@ -73,5 +59,22 @@ onUnmounted(() => {
   min-width: 200px;
   max-width: 360px;
   pointer-events: auto;
+}
+
+.toast-enter-active {
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.toast-leave-active {
+  transition: opacity 0.12s ease;
+}
+
+.toast-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.toast-leave-to {
+  opacity: 0;
 }
 </style>

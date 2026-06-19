@@ -1,23 +1,19 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
-import { AnimatePresence, MotionConfig, motion } from "motion-v";
-import { pageActive, pageEnter, pageExit, springSoft } from "./utils/motionPresets";
-import { syncLiteMotion, useLiteMotion } from "./utils/reducedMotion";
+import { MotionConfig } from "motion-v";
 import { useAuthStore } from "./stores/auth";
 import { useChatStore } from "./stores/chat";
 import { useReaderStore } from "./stores/reader";
 import { useSessionStore } from "./stores/session";
 import AppIcon from "./components/AppIcon.vue";
 import AppToast from "./components/AppToast.vue";
-import MotionCoinCount from "./components/MotionCoinCount.vue";
 import SearchPanel from "./components/SearchPanel.vue";
 import NavExpandSearch from "./components/NavExpandSearch.vue";
 
 const router = useRouter();
 const route = useRoute();
 const onHome = computed(() => route.path === "/");
-const motionLite = useLiteMotion();
 
 const auth = useAuthStore();
 const chatStore = useChatStore();
@@ -185,7 +181,6 @@ function syncReaderTop() {
 
 function syncSheetLayout() {
   sheetMobile.value = isSheetMobile();
-  syncLiteMotion();
   const nav = resolveNavEl();
   if (!nav) return;
   syncReaderTop();
@@ -551,7 +546,7 @@ watch(
                   class="profile-coin-img"
                   loading="lazy"
                 />
-                <span><MotionCoinCount :value="profileCoins" /></span>
+                <span>{{ profileCoins }}</span>
               </div>
             </div>
           </div>
@@ -694,7 +689,7 @@ watch(
                       class="profile-coin-img"
                       loading="lazy"
                     />
-                    <span><MotionCoinCount :value="profileCoins" /></span>
+                    <span>{{ profileCoins }}</span>
                   </div>
                 </div>
               </div>
@@ -740,21 +735,7 @@ watch(
         </div>
       </Transition>
     </Teleport>
-    <RouterView v-slot="{ Component, route: rv }">
-      <component v-if="motionLite" :is="Component" :key="rv.fullPath" class="page-motion-root" />
-      <AnimatePresence v-else mode="wait">
-        <motion.div
-          :key="rv.fullPath"
-          class="page-motion-root"
-          :initial="pageEnter"
-          :animate="pageActive"
-          :exit="pageExit"
-          :transition="springSoft"
-        >
-          <component :is="Component" />
-        </motion.div>
-      </AnimatePresence>
-    </RouterView>
+    <RouterView />
     <AppToast />
     <Teleport to="body">
       <div
@@ -776,11 +757,6 @@ watch(
 </template>
 
 <style scoped>
-.page-motion-root {
-  width: 100%;
-  min-height: 0;
-}
-
 .offline-overlay {
   position: fixed;
   inset: 0;

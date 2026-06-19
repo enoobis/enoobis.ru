@@ -2,7 +2,7 @@
 import { nextTick, onUnmounted, ref, watch } from "vue";
 import { AnimatePresence, motion } from "motion-v";
 import AppIcon from "./AppIcon.vue";
-import { springSnappy } from "../utils/motionPresets";
+import { searchTween, springSnappy } from "../utils/motionPresets";
 import { prefersReducedMotion } from "../utils/reducedMotion";
 
 const open = defineModel<boolean>("open", { default: false });
@@ -94,23 +94,10 @@ defineExpose({ focus: focusInput });
           key="field"
           class="nav-search-expand__field"
           :style="{ top: `${fieldTop}px`, right: `${fieldRight}px` }"
-          :initial="
-            reduced
-              ? false
-              : { width: collapsedWidth, opacity: 0.65, filter: 'blur(8px)' }
-          "
-          :animate="{ width: fieldWidth, opacity: 1, filter: 'blur(0px)' }"
-          :exit="
-            reduced
-              ? undefined
-              : {
-                  width: collapsedWidth,
-                  opacity: 0,
-                  filter: 'blur(6px)',
-                  transition: { duration: 0.18 },
-                }
-          "
-          :transition="springSnappy"
+          :initial="reduced ? false : { width: collapsedWidth, opacity: 0.7 }"
+          :animate="{ width: fieldWidth, opacity: 1 }"
+          :exit="reduced ? undefined : { width: collapsedWidth, opacity: 0, transition: { duration: 0.14 } }"
+          :transition="reduced ? searchTween : springSnappy"
         >
           <input
             ref="inputEl"

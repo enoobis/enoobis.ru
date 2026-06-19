@@ -13,10 +13,6 @@ import { useAuthStore } from "../stores/auth";
 import { useSessionStore } from "../stores/session";
 import { toastError, toastSuccess } from "../utils/toast";
 import PageHeader from "../components/PageHeader.vue";
-import MotionCoinCount from "../components/MotionCoinCount.vue";
-import MotionStagger from "../components/MotionStagger.vue";
-import MotionStaggerItem from "../components/MotionStaggerItem.vue";
-import DisplacementImage from "../components/DisplacementImage.vue";
 
 const auth = useAuthStore();
 const session = useSessionStore();
@@ -209,7 +205,7 @@ watch(
       <template #actions>
         <div class="coins-badge" title="монеты">
           <img src="/coin-gem.png" alt="" width="18" height="18" loading="lazy" />
-          <MotionCoinCount :value="profileCoins" />
+          <span>{{ profileCoins }}</span>
         </div>
       </template>
     </PageHeader>
@@ -271,20 +267,16 @@ watch(
 
     <div v-if="loading && !items.length" class="page-empty muted">загрузка</div>
     <div v-else-if="!loading && !items.length" class="page-empty muted">пусто</div>
-    <MotionStagger
-      v-if="items.length"
-      :list-key="`${tab}-${page}-${categoryFilter}`"
-      class="grid"
-    >
-      <MotionStaggerItem v-for="item in items" :key="item.id" class="item-card">
+    <ul v-if="items.length" class="grid">
+      <li v-for="item in items" :key="item.id" class="item-card">
         <div class="preview">
           <template v-if="item.kind === 'avatar'">
             <div class="avatar-wrap">
-              <DisplacementImage
+              <img
                 :src="item.url"
                 :alt="item.name"
-                :enabled="!item.is_animated"
-                class="avatar-img displacement-host"
+                class="avatar-img"
+                loading="lazy"
               />
               <span v-if="item.is_animated" class="anim-badge">gif</span>
             </div>
@@ -292,11 +284,11 @@ watch(
           <template v-else-if="item.kind === 'frame'">
             <div class="frame-demo">
               <span class="frame-inner" />
-              <DisplacementImage
+              <img
                 :src="item.url"
                 alt=""
-                :enabled="!item.is_animated"
-                class="frame-layer displacement-host"
+                class="frame-layer"
+                loading="lazy"
               />
               <span v-if="item.is_animated" class="anim-badge">anim</span>
             </div>
@@ -339,8 +331,8 @@ watch(
             купить
           </button>
         </div>
-      </MotionStaggerItem>
-    </MotionStagger>
+      </li>
+    </ul>
 
     <nav v-if="!loading && totalPages > 1" class="shop-pages" aria-label="страницы">
       <button type="button" class="shop-page-btn secondary" :disabled="page <= 1" @click="goPage(page - 1)">
@@ -437,8 +429,7 @@ watch(
 .avatar-wrap {
   position: relative;
 }
-.avatar-img,
-.displacement-host.avatar-img {
+.avatar-img {
   width: 80px;
   height: 80px;
   border-radius: var(--avatar-radius);
@@ -471,13 +462,12 @@ watch(
   background: var(--surface2);
   border: 1px solid var(--border);
 }
-.frame-layer,
-.displacement-host.frame-layer {
+.frame-layer {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-  pointer-events: auto;
+  object-fit: contain;
 }
 .wide-thumb {
   width: 100%;
