@@ -11,6 +11,7 @@ import AppIcon from "./components/AppIcon.vue";
 import AppToast from "./components/AppToast.vue";
 import MotionCoinCount from "./components/MotionCoinCount.vue";
 import SearchPanel from "./components/SearchPanel.vue";
+import NavExpandSearch from "./components/NavExpandSearch.vue";
 
 const router = useRouter();
 const route = useRoute();
@@ -26,7 +27,6 @@ const navDrawerOpen = ref(false);
 const searchOpen = ref(false);
 const searchQuery = ref("");
 const navEl = ref<HTMLElement | null>(null);
-const navSearchEl = ref<HTMLInputElement | null>(null);
 
 const navProgress = ref(0);
 const navProgressOn = ref(false);
@@ -118,7 +118,7 @@ function onDocumentClick(event: MouseEvent) {
   }
   if (searchOpen.value) {
     if (target?.closest?.(".search-menu-sheet")) return;
-    if (target?.closest?.(".nav-inline-search")) return;
+    if (target?.closest?.(".nav-search-expand")) return;
     searchOpen.value = false;
   }
 }
@@ -229,12 +229,8 @@ function toggleSearch() {
     searchOpen.value = false;
     return;
   }
-  closeNavDrawer();
-  closeProfileMenu();
-  prepareSheetOpen();
   searchQuery.value = typeof route.query.q === "string" ? route.query.q : "";
   searchOpen.value = true;
-  void nextTick().then(() => navSearchEl.value?.focus());
 }
 
 function overlayStyle() {
@@ -332,6 +328,13 @@ onUnmounted(() => {
   session.stopShell();
 });
 
+watch(searchOpen, (open) => {
+  if (!open) return;
+  closeNavDrawer();
+  closeProfileMenu();
+  prepareSheetOpen();
+});
+
 watch(
   () => route.path,
   () => {
@@ -402,20 +405,7 @@ watch(
       <div v-if="reader.active" class="nav-reader-center">
         <span class="nav-reader-title">{{ reader.title }}</span>
       </div>
-      <div v-else class="nav-spacer">
-        <Transition name="nav-inline">
-          <div v-if="searchOpen && auth.token && !sheetMobile" class="nav-inline-search">
-            <AppIcon name="search" :size="18" />
-            <input
-              ref="navSearchEl"
-              v-model="searchQuery"
-              type="search"
-              :placeholder="searchPlaceholder"
-              @keydown.esc.stop
-            />
-          </div>
-        </Transition>
-      </div>
+      <div v-else class="nav-spacer" />
       <template v-if="auth.token">
         <div v-if="reader.active" class="nav-reader-controls">
           <span v-if="reader.pageCount > 0" class="nav-reader-page">
@@ -429,17 +419,12 @@ watch(
           </button>
         </div>
         <div v-else class="nav-actions">
-          <button
+          <NavExpandSearch
             v-if="!sheetMobile"
-            type="button"
-            class="icon-btn nav-search-trigger"
-            aria-label="поиск"
-            title="поиск"
-            :aria-expanded="searchOpen"
-            @click.stop="toggleSearch"
-          >
-            <AppIcon name="search" :size="20" />
-          </button>
+            v-model:open="searchOpen"
+            v-model:query="searchQuery"
+            :placeholder="searchPlaceholder"
+          />
           <RouterLink
             v-else
             :to="mobileSearchTo"
@@ -1116,48 +1101,9 @@ watch(
 .nav-spacer {
   display: flex;
   align-items: center;
-  min-width: 0;
-  padding: 0 0.5rem;
-}
-
-.nav-inline-search {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  width: 100%;
-  min-width: 0;
-  padding: 0.3rem 0.8rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  background: var(--surface);
-  color: var(--muted);
-}
-
-.nav-inline-search input {
   flex: 1;
   min-width: 0;
-  border: none;
-  background: transparent;
-  padding: 0.15rem 0;
-  min-height: 0;
-  color: var(--text);
-  font-size: 0.92rem;
-}
-
-.nav-inline-search input:focus {
-  outline: none;
-}
-
-.nav-inline-enter-active {
-  transition: opacity 0.18s var(--ease-out), transform 0.18s var(--ease-out);
-}
-.nav-inline-leave-active {
-  transition: opacity 0.12s ease, transform 0.12s ease;
-}
-.nav-inline-enter-from,
-.nav-inline-leave-to {
-  opacity: 0;
-  transform: translateY(-8px);
+  padding: 0 0.5rem;
 }
 
 .nav-actions {
