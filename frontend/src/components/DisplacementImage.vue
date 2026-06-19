@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { displacementMapDataUrl } from "../utils/displacementMap";
-import { prefersReducedMotion } from "../utils/reducedMotion";
+import { prefersReducedMotion, useLiteMotion } from "../utils/reducedMotion";
 
 const props = withDefaults(
   defineProps<{
@@ -23,7 +23,8 @@ const webglFailed = ref(false);
 let instance: { destroy?: () => void } | null = null;
 let loading = false;
 
-const reduced = computed(() => prefersReducedMotion());
+const motionLite = useLiteMotion();
+const reduced = computed(() => prefersReducedMotion() || motionLite.value);
 const showFallback = computed(() => !props.enabled || reduced.value || webglFailed.value);
 
 async function mountEffect() {

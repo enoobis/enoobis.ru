@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { AnimatePresence, motion } from "motion-v";
 import { springPop } from "../utils/motionPresets";
+import { useLiteMotion } from "../utils/reducedMotion";
 
 defineProps<{ value: number }>();
+
+const motionLite = useLiteMotion();
 </script>
 
 <template>
-  <AnimatePresence mode="popLayout">
+  <AnimatePresence v-if="!motionLite" mode="popLayout">
     <motion.span
       :key="value"
       class="motion-coin-count"
@@ -18,6 +21,7 @@ defineProps<{ value: number }>();
       {{ value }}
     </motion.span>
   </AnimatePresence>
+  <span v-else class="motion-coin-count">{{ value }}</span>
 </template>
 
 <style scoped>

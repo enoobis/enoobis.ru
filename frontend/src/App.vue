@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
 import { AnimatePresence, MotionConfig, motion } from "motion-v";
 import { pageActive, pageEnter, pageExit, springSoft } from "./utils/motionPresets";
+import { syncLiteMotion, useLiteMotion } from "./utils/reducedMotion";
 import { useAuthStore } from "./stores/auth";
 import { useChatStore } from "./stores/chat";
 import { useReaderStore } from "./stores/reader";
@@ -16,6 +17,7 @@ import NavExpandSearch from "./components/NavExpandSearch.vue";
 const router = useRouter();
 const route = useRoute();
 const onHome = computed(() => route.path === "/");
+const motionLite = useLiteMotion();
 
 const auth = useAuthStore();
 const chatStore = useChatStore();
@@ -183,6 +185,7 @@ function syncReaderTop() {
 
 function syncSheetLayout() {
   sheetMobile.value = isSheetMobile();
+  syncLiteMotion();
   const nav = resolveNavEl();
   if (!nav) return;
   syncReaderTop();
@@ -738,7 +741,8 @@ watch(
       </Transition>
     </Teleport>
     <RouterView v-slot="{ Component, route: rv }">
-      <AnimatePresence mode="wait">
+      <component v-if="motionLite" :is="Component" :key="rv.fullPath" class="page-motion-root" />
+      <AnimatePresence v-else mode="wait">
         <motion.div
           :key="rv.fullPath"
           class="page-motion-root"
@@ -1391,6 +1395,22 @@ html[data-theme="contrast-white"] .offline-overlay {
   }
   .offline-overlay {
     background: rgba(0, 0, 0, 0.95);
+  }
+}
+
+@media (max-width: 640px), (hover: none) and (pointer: coarse) {
+  .nav-menu-root--backdrop,
+  .nav-dropdown,
+  .nav-menu-sheet,
+  .nav-menu-sheet--full,
+  .offline-overlay {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: var(--surface);
+  }
+
+  .offline-overlay {
+    background: rgba(0, 0, 0, 0.92);
   }
 }
 </style>

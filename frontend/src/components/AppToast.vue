@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from "vue";
 import { AnimatePresence, motion } from "motion-v";
-import { springSnappy } from "../utils/motionPresets";
+import { springSnappy, toastActiveLite, toastEnterLite, toastExitLite } from "../utils/motionPresets";
+import { useLiteMotion } from "../utils/reducedMotion";
 
 type Toast = { id: number; type: "success" | "error" | "info"; text: string };
 
 const toasts = ref<Toast[]>([]);
+const motionLite = useLiteMotion();
 let counter = 0;
 
 function show(text: string, type: Toast["type"] = "info") {
@@ -37,13 +39,13 @@ onUnmounted(() => {
       <motion.div
         v-for="t in toasts"
         :key="t.id"
-        layout
         class="toast"
         :class="`toast-${t.type}`"
-        :initial="{ opacity: 0, x: 120, y: 24, scale: 0.7, rotate: 6, filter: 'blur(8px)' }"
-        :animate="{ opacity: 1, x: 0, y: 0, scale: 1, rotate: 0, filter: 'blur(0px)' }"
-        :exit="{ opacity: 0, x: 140, scale: 0.75, rotate: -4, transition: { duration: 0.22 } }"
-        :transition="springSnappy"
+        :layout="!motionLite"
+        :initial="motionLite ? toastEnterLite : { opacity: 0, x: 120, y: 24, scale: 0.7, rotate: 6, filter: 'blur(8px)' }"
+        :animate="motionLite ? toastActiveLite : { opacity: 1, x: 0, y: 0, scale: 1, rotate: 0, filter: 'blur(0px)' }"
+        :exit="motionLite ? toastExitLite : { opacity: 0, x: 140, scale: 0.75, rotate: -4, transition: { duration: 0.22 } }"
+        :transition="motionLite ? toastActiveLite.transition : springSnappy"
       >
         {{ t.text }}
       </motion.div>

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { motion } from "motion-v";
-import { revealHidden, revealVisible } from "../utils/motionPresets";
-import { prefersReducedMotion } from "../utils/reducedMotion";
+import { revealHidden, revealHiddenLite, revealVisible, revealVisibleLite } from "../utils/motionPresets";
+import { useLiteMotion } from "../utils/reducedMotion";
 
 const props = withDefaults(
   defineProps<{
@@ -14,19 +14,21 @@ const props = withDefaults(
 
 defineOptions({ inheritAttrs: false });
 
-const reduced = computed(() => prefersReducedMotion());
-const transition = computed(() => ({ ...revealVisible.transition, delay: props.delay }));
+const motionLite = useLiteMotion();
+const hidden = computed(() => (motionLite.value ? revealHiddenLite : revealHidden));
+const visible = computed(() => (motionLite.value ? revealVisibleLite : revealVisible));
+const transition = computed(() => ({ ...visible.value.transition, delay: props.delay }));
 </script>
 
 <template>
-  <component v-if="reduced" :is="as" v-bind="$attrs">
+  <component v-if="motionLite" :is="as" v-bind="$attrs">
     <slot />
   </component>
   <motion.h1
     v-else-if="as === 'h1'"
     v-bind="$attrs"
-    :initial="revealHidden"
-    :while-in-view="revealVisible"
+    :initial="hidden"
+    :while-in-view="visible"
     :viewport="{ once: true, margin: '-48px 0px' }"
     :transition="transition"
   >
@@ -35,8 +37,8 @@ const transition = computed(() => ({ ...revealVisible.transition, delay: props.d
   <motion.h2
     v-else-if="as === 'h2'"
     v-bind="$attrs"
-    :initial="revealHidden"
-    :while-in-view="revealVisible"
+    :initial="hidden"
+    :while-in-view="visible"
     :viewport="{ once: true, margin: '-48px 0px' }"
     :transition="transition"
   >
@@ -45,8 +47,8 @@ const transition = computed(() => ({ ...revealVisible.transition, delay: props.d
   <motion.p
     v-else-if="as === 'p'"
     v-bind="$attrs"
-    :initial="revealHidden"
-    :while-in-view="revealVisible"
+    :initial="hidden"
+    :while-in-view="visible"
     :viewport="{ once: true, margin: '-48px 0px' }"
     :transition="transition"
   >
@@ -55,8 +57,8 @@ const transition = computed(() => ({ ...revealVisible.transition, delay: props.d
   <motion.span
     v-else-if="as === 'span'"
     v-bind="$attrs"
-    :initial="revealHidden"
-    :while-in-view="revealVisible"
+    :initial="hidden"
+    :while-in-view="visible"
     :viewport="{ once: true, margin: '-48px 0px' }"
     :transition="transition"
   >
@@ -65,8 +67,8 @@ const transition = computed(() => ({ ...revealVisible.transition, delay: props.d
   <motion.div
     v-else
     v-bind="$attrs"
-    :initial="revealHidden"
-    :while-in-view="revealVisible"
+    :initial="hidden"
+    :while-in-view="visible"
     :viewport="{ once: true, margin: '-48px 0px' }"
     :transition="transition"
   >

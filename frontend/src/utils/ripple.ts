@@ -3,6 +3,8 @@
  * respects prefers-reduced-motion and skips elements opted out via data-no-ripple.
  */
 
+import { prefersLiteMotion } from "./reducedMotion";
+
 const REDUCED_MOTION =
   typeof window !== "undefined" && window.matchMedia
     ? window.matchMedia("(prefers-reduced-motion: reduce)")
@@ -23,7 +25,7 @@ function spawnRipple(target: HTMLElement, x: number, y: number) {
 }
 
 function onPointerDown(event: PointerEvent) {
-  if (REDUCED_MOTION?.matches) return;
+  if (REDUCED_MOTION?.matches || prefersLiteMotion()) return;
   const path = event.composedPath();
   const target = path.find(
     (n) =>
