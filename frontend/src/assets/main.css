@@ -785,7 +785,14 @@ html.profile-wallpaper-desktop #app {
   position: relative;
   z-index: 1;
 }
+html.profile-wallpaper-desktop .nav,
+html.profile-wallpaper-desktop .nav-dropdown {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: var(--surface);
+}
 html.profile-wallpaper-desktop .nav {
+  background: var(--bg);
   width: var(--profile-wallpaper-panel);
   margin-left: var(--profile-wallpaper-margin);
   margin-right: auto;
