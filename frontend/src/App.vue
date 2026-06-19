@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
+import { AnimatePresence, MotionConfig, motion } from "motion-v";
+import { pageActive, pageEnter, pageExit, springSoft } from "./utils/motionPresets";
 import { useAuthStore } from "./stores/auth";
 import { useChatStore } from "./stores/chat";
 import { useReaderStore } from "./stores/reader";
@@ -364,6 +366,7 @@ watch(
 </script>
 
 <template>
+  <MotionConfig reduced-motion="user">
   <div class="layout">
     <header ref="navEl" class="nav" :class="{ 'nav--sheet-open': navFullSheetOpen }">
       <div class="nav-bar">
@@ -750,9 +753,18 @@ watch(
       </Transition>
     </Teleport>
     <RouterView v-slot="{ Component, route: rv }">
-      <Transition name="page" mode="out-in">
-        <component :is="Component" :key="rv.fullPath" />
-      </Transition>
+      <AnimatePresence mode="wait">
+        <motion.div
+          :key="rv.fullPath"
+          class="page-motion-root"
+          :initial="pageEnter"
+          :animate="pageActive"
+          :exit="pageExit"
+          :transition="springSoft"
+        >
+          <component :is="Component" />
+        </motion.div>
+      </AnimatePresence>
     </RouterView>
     <AppToast />
     <Teleport to="body">
@@ -771,9 +783,15 @@ watch(
       </div>
     </div>
   </div>
+  </MotionConfig>
 </template>
 
 <style scoped>
+.page-motion-root {
+  width: 100%;
+  min-height: 0;
+}
+
 .offline-overlay {
   position: fixed;
   inset: 0;

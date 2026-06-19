@@ -13,6 +13,9 @@ import { useAuthStore } from "../stores/auth";
 import { useSessionStore } from "../stores/session";
 import { toastError, toastSuccess } from "../utils/toast";
 import PageHeader from "../components/PageHeader.vue";
+import MotionCoinCount from "../components/MotionCoinCount.vue";
+import { motion } from "motion-v";
+import { cardHover, cardTap, listContainer, listItem } from "../utils/motionPresets";
 
 const auth = useAuthStore();
 const session = useSessionStore();
@@ -205,7 +208,7 @@ watch(
       <template #actions>
         <div class="coins-badge" title="монеты">
           <img src="/coin-gem.png" alt="" width="18" height="18" loading="lazy" />
-          <span>{{ profileCoins }}</span>
+          <MotionCoinCount :value="profileCoins" />
         </div>
       </template>
     </PageHeader>
@@ -267,8 +270,22 @@ watch(
 
     <div v-if="loading && !items.length" class="page-empty muted">загрузка</div>
     <div v-else-if="!loading && !items.length" class="page-empty muted">пусто</div>
-    <ul v-if="items.length" class="grid">
-      <li v-for="item in items" :key="item.id" class="item-card">
+    <motion.ul
+      v-if="items.length"
+      :key="`${tab}-${page}-${categoryFilter}`"
+      class="grid"
+      initial="hidden"
+      animate="visible"
+      :variants="listContainer"
+    >
+      <motion.li
+        v-for="item in items"
+        :key="item.id"
+        class="item-card"
+        :variants="listItem"
+        :while-hover="cardHover"
+        :while-tap="cardTap"
+      >
         <div class="preview">
           <template v-if="item.kind === 'avatar'">
             <div class="avatar-wrap">
@@ -321,8 +338,8 @@ watch(
             купить
           </button>
         </div>
-      </li>
-    </ul>
+      </motion.li>
+    </motion.ul>
 
     <nav v-if="!loading && totalPages > 1" class="shop-pages" aria-label="страницы">
       <button type="button" class="shop-page-btn secondary" :disabled="page <= 1" @click="goPage(page - 1)">

@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from "vue";
+import { AnimatePresence, motion } from "motion-v";
+import { springSnappy } from "../utils/motionPresets";
 
 type Toast = { id: number; type: "success" | "error" | "info"; text: string };
 
@@ -30,18 +32,22 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div v-auto-animate class="toast-stack" aria-live="polite">
-    <div
-      v-for="t in toasts"
-      :key="t.id"
-      v-motion
-      class="toast"
-      :class="`toast-${t.type}`"
-      :initial="{ opacity: 0, x: 16 }"
-      :enter="{ opacity: 1, x: 0, transition: { duration: 0.2, ease: [0.22, 1, 0.36, 1] } }"
-    >
-      {{ t.text }}
-    </div>
+  <div class="toast-stack" aria-live="polite">
+    <AnimatePresence>
+      <motion.div
+        v-for="t in toasts"
+        :key="t.id"
+        layout
+        class="toast"
+        :class="`toast-${t.type}`"
+        :initial="{ opacity: 0, x: 120, y: 24, scale: 0.7, rotate: 6, filter: 'blur(8px)' }"
+        :animate="{ opacity: 1, x: 0, y: 0, scale: 1, rotate: 0, filter: 'blur(0px)' }"
+        :exit="{ opacity: 0, x: 140, scale: 0.75, rotate: -4, transition: { duration: 0.22 } }"
+        :transition="springSnappy"
+      >
+        {{ t.text }}
+      </motion.div>
+    </AnimatePresence>
   </div>
 </template>
 

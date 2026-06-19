@@ -11,14 +11,13 @@
     "preview": "node ./node_modules/vite/bin/vite.js preview"
   },
   "dependencies": {
-    "@formkit/auto-animate": "^0.9.0",
     "@lucide/vue": "^1.17.0",
-    "@vueuse/motion": "^3.0.3",
     "dompurify": "^3.4.0",
     "highlight.js": "^11.11.1",
     "jsqr": "^1.4.0",
     "leaflet": "^1.9.4",
     "marked": "^18.0.0",
+    "motion-v": "^2.3.0",
     "pdfjs-dist": "^6.0.227",
     "pinia": "^2.2.6",
     "qrcode": "^1.5.4",

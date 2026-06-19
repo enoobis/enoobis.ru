@@ -51,6 +51,8 @@ import {
   type ShopStorage,
 } from "../api/shop";
 import { fmtBytes } from "../utils/bytes";
+import { motion } from "motion-v";
+import { listContainer, listItem } from "../utils/motionPresets";
 
 const README_MAX = 4000;
 
@@ -985,8 +987,15 @@ async function approveBlog(id: string) {
     <template v-else-if="tab === 'users' && isFullAdmin">
       <FilterSearch v-model="usersQuery" class="admin-users-search" />
       <p v-if="!filteredUsers.length" class="muted">не найдено</p>
-      <ul v-else v-auto-animate class="list user-list">
-        <li v-for="u in filteredUsers" :key="u.id" class="user-row">
+      <motion.ul
+        v-else
+        :key="usersQuery"
+        class="list user-list"
+        initial="hidden"
+        animate="visible"
+        :variants="listContainer"
+      >
+        <motion.li v-for="u in filteredUsers" :key="u.id" class="user-row" :variants="listItem">
           <span class="user-ava">
             <img v-if="u.avatar_url" :src="u.avatar_url" alt="" loading="lazy" />
           </span>
@@ -1001,8 +1010,8 @@ async function approveBlog(id: string) {
             </span>
             <button class="secondary" type="button" :disabled="modBusy" @click="openModerate(u)">открыть</button>
           </div>
-        </li>
-      </ul>
+        </motion.li>
+      </motion.ul>
 
       <Teleport to="body">
       <div v-if="moderateUserId" class="shop-edit-root" role="presentation">
