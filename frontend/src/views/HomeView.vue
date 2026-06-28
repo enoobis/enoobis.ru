@@ -5,9 +5,17 @@ import { SITE_TAGLINE } from "../config/site";
 
 <template>
   <section class="home" data-reveal>
-    <img src="/logo.png" alt="enoobis" class="logo" width="120" height="120" decoding="async" />
+    <img
+      src="/logo-mark.png"
+      alt="enoobis"
+      class="logo"
+      width="132"
+      height="132"
+      decoding="async"
+      fetchpriority="high"
+    />
     <p class="tag">{{ SITE_TAGLINE }}</p>
-    <RouterLink to="/login" class="cta">зайти</RouterLink>
+    <RouterLink to="/login" class="cta">войти</RouterLink>
     <nav class="alt-nav">
       <RouterLink to="/microblogs" class="alt-link"><span>лента</span></RouterLink>
       <span class="alt-sep" aria-hidden="true">·</span>
@@ -32,9 +40,22 @@ import { SITE_TAGLINE } from "../config/site";
 .logo {
   margin: 0 0 0.6rem;
   width: clamp(88px, 22vw, 132px);
-  height: auto;
+  height: clamp(88px, 22vw, 132px);
   display: block;
   border-radius: 16px;
+  object-fit: contain;
+  animation: home-logo-spin 14s linear infinite;
+  transform-origin: center center;
+}
+@keyframes home-logo-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .logo {
+    animation: none;
+  }
 }
 .tag {
   margin: 0 0 2.2rem;
