@@ -428,7 +428,8 @@ function shopStockToInput(limit: number | null) {
 function openShopEdit(item: ShopItem) {
   shopEditTarget.value = item;
   shopEditKind.value = item.kind;
-  shopEditCategoryIds.value = (item.categories ?? []).map((c) => c.id);
+  shopEditCategoryIds.value =
+    item.kind === "special" ? [] : (item.categories ?? []).map((c) => c.id);
   shopEditName.value = item.name;
   shopEditPrice.value = item.price;
   shopEditStock.value = shopStockToInput(item.stock_limit);
@@ -466,7 +467,7 @@ async function saveShopEdit() {
   try {
     await adminPatchShopItem(auth.token, item.id, {
       kind: shopEditKind.value,
-      categories: [...shopEditCategoryIds.value],
+      categories: shopEditKind.value === "special" ? [] : [...shopEditCategoryIds.value],
       name,
       price: Math.max(0, Math.floor(Number(shopEditPrice.value) || 0)),
       stock_limit: stock,
@@ -554,7 +555,7 @@ async function confirmShopUpload() {
       name,
       price,
       stockLimit,
-      [...shopUploadCategoryIds.value],
+      shopUploadKind.value === "special" ? [] : [...shopUploadCategoryIds.value],
     );
     shopUploadName.value = "";
     shopUploadPrice.value = 0;
@@ -606,6 +607,14 @@ async function load() {
 
 watch(tab, (t) => {
   if (!isFullAdmin.value && (t === "users" || t === "work")) tab.value = "reports";
+});
+
+watch(shopUploadKind, (kind) => {
+  if (kind === "special") shopUploadCategoryIds.value = [];
+});
+
+watch(shopEditKind, (kind) => {
+  if (kind === "special") shopEditCategoryIds.value = [];
 });
 
 onMounted(() => {
@@ -1351,7 +1360,7 @@ async function approveBlog(id: string) {
           <span class="shop-avatar-meta">
             <span>{{ a.name }}</span>
             <span class="muted small">
-              {{ shopKindRu(a.kind) }}<template v-if="shopItemCatsLine(a)"> · {{ shopItemCatsLine(a) }}</template> ·
+              {{ shopKindRu(a.kind) }}<template v-if="a.kind !== 'special' && shopItemCatsLine(a)"> · {{ shopItemCatsLine(a) }}</template> ·
               {{ a.price }}{{ a.is_animated ? " · gif" : "" }}{{ shopStockLine(a) }}<template v-if="a.size_bytes"> · {{ fmtBytes(a.size_bytes) }}</template>
             </span>
           </span>
@@ -1405,7 +1414,7 @@ async function approveBlog(id: string) {
                   />
                 </label>
               </div>
-              <div v-if="shopCategories.length" class="shop-edit-field">
+              <div v-if="shopCategories.length && shopEditKind !== 'special'" class="shop-edit-field">
                 <span class="muted small">категории</span>
                 <div class="cat-chips" role="group">
                   <button
@@ -1489,7 +1498,7 @@ async function approveBlog(id: string) {
                   <input v-model="shopUploadStock" inputmode="numeric" class="shop-input" placeholder="пусто" />
                 </label>
               </div>
-              <div v-if="shopCategories.length" class="shop-edit-field">
+              <div v-if="shopCategories.length && shopUploadKind !== 'special'" class="shop-edit-field">
                 <span class="muted small">категории</span>
                 <div class="cat-chips" role="group">
                   <button
@@ -1507,7 +1516,9 @@ async function approveBlog(id: string) {
               </div>
             </div>
             <div class="shop-edit-actions">
-              <button type="button" class="secondary" :disabled="shopUploadBusy" @click="closeShopAdd">отмена</button>
+              <button type="button" class="secondary" :disabled="shopUploadBusy" @click="closeShopAdd">
+                отмена
+              </button>
               <button type="button" :disabled="shopUploadBusy" @click="confirmShopUpload">
                 {{ shopUploadBusy ? "загрузка…" : "загрузить" }}
               </button>

@@ -233,7 +233,7 @@ watch(
         </button>
       </div>
       <div
-        v-if="shopCategories.length"
+        v-if="shopCategories.length && tab !== 'special'"
         ref="categoryMenuRoot"
         class="shop-cat-picker filter-menu-wrap"
       >
@@ -325,7 +325,7 @@ watch(
           </template>
         </div>
         <p class="item-name" :class="{ 'item-name-special': item.kind === 'special' }">{{ item.name }}</p>
-        <p v-if="itemCategoryLine(item)" class="item-category muted small">{{ itemCategoryLine(item) }}</p>
+        <p v-if="item.kind !== 'special' && itemCategoryLine(item)" class="item-category muted small">{{ itemCategoryLine(item) }}</p>
         <p v-if="shopStockCap(item) !== null" class="stock-line muted">
           {{ shopSoldOut(item) ? "распродано" : `ещё ${shopStockLeft(item)}` }}
         </p>
