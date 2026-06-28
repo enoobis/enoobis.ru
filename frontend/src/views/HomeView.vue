@@ -11,7 +11,7 @@ import AppSiteFooter from "../components/AppSiteFooter.vue";
       <div class="logo-spin-wrap" aria-hidden="true">
         <HomeLogoMark />
       </div>
-      <p class="tag">{{ SITE_TAGLINE }}</p>
+      <h1 class="tag">{{ SITE_TAGLINE }}</h1>
       <RouterLink to="/login" class="cta">войти</RouterLink>
       <nav class="alt-nav">
         <RouterLink to="/microblogs" class="alt-link"><span>лента</span></RouterLink>
@@ -68,6 +68,7 @@ import AppSiteFooter from "../components/AppSiteFooter.vue";
   font-size: 1.05rem;
   letter-spacing: -0.01em;
   font-weight: 500;
+  line-height: 1.55;
 }
 .cta {
   display: inline-flex;

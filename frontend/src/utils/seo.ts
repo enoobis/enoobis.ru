@@ -1,6 +1,24 @@
-import { SITE_TITLE } from "../config/site";
+import { SITE_DESCRIPTION, SITE_TAGLINE, SITE_TITLE } from "../config/site";
 
-export function applyDocumentSeo(title = SITE_TITLE) {
+const DOC_TITLE = `${SITE_TITLE} — ${SITE_TAGLINE}`;
+
+function setMeta(name: string, content: string, attr: "name" | "property" = "name") {
+  let el = document.querySelector<HTMLMetaElement>(`meta[${attr}="${name}"]`);
+  if (!el) {
+    el = document.createElement("meta");
+    el.setAttribute(attr, name);
+    document.head.appendChild(el);
+  }
+  el.content = content;
+}
+
+export function applyDocumentSeo(
+  title = DOC_TITLE,
+  description = SITE_DESCRIPTION,
+) {
   if (typeof document === "undefined") return;
   document.title = title;
+  setMeta("description", description);
+  setMeta("og:title", title, "property");
+  setMeta("og:description", description, "property");
 }
