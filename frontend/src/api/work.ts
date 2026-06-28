@@ -120,7 +120,7 @@ export function extractWorkCode(raw: string): string {
     const c = u.searchParams.get("c");
     if (c) return c.trim();
   } catch {
-    /* не url — значит сам код */
+    /* не url - значит сам код */
   }
   return s;
 }

@@ -195,7 +195,7 @@ const coTeacherIds = computed(
   () => new Set((classroom.value?.co_teachers ?? []).map((c) => c.id)),
 );
 
-/** участники курса без владельца и соучителей — кто сдаёт работы (не по users.role). */
+/** участники курса без владельца и соучителей - кто сдаёт работы (не по users.role). */
 const classroomLearners = computed(() => {
   if (!classroom.value) return [];
   const tid = classroom.value.course.teacher_id;
@@ -1802,7 +1802,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
                           <textarea
                             v-model="submissionBody[a.id]"
                             rows="2"
-                            placeholder="ответ — текст или ссылка"
+                            placeholder="ответ - текст или ссылка"
                           />
                           <ul v-if="attachmentsFor(a).length" class="files">
                             <li v-for="(f, i) in attachmentsFor(a)" :key="'kept-' + a.id + '-' + i">
@@ -2030,7 +2030,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
                 <textarea
                   v-model="submissionBody[selectedAssignment.id]"
                   rows="3"
-                  placeholder="ответ — текст или ссылка"
+                  placeholder="ответ - текст или ссылка"
                 />
                 <ul v-if="attachmentsFor(selectedAssignment).length" class="files">
                   <li
@@ -2261,7 +2261,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
                     v-for="cell in row.cells"
                     :key="row.student.id + '-' + cell.assignment.id"
                   >
-                    <span v-if="!cell.submission" class="muted">—</span>
+                    <span v-if="!cell.submission" class="muted">-</span>
                     <span
                       v-else-if="cell.submission.grade_points !== null"
                       class="grade-chip ok"
@@ -2360,7 +2360,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
                   <strong>{{ row.student.nickname }}</strong>
                 </span>
                 <span class="g-status">
-                  <span v-if="!row.submission" class="muted small">—</span>
+                  <span v-if="!row.submission" class="muted small">-</span>
                   <span
                     v-else-if="row.submission.grade_points !== null"
                     class="grade-chip ok"

@@ -217,7 +217,7 @@ async function removePoint(p: WorkPoint) {
 
 async function changeRadius(p: WorkPoint) {
   if (!auth.token) return;
-  const raw = window.prompt("радиус, м (50–2000)", String(p.radius_m));
+  const raw = window.prompt("радиус, м (50-2000)", String(p.radius_m));
   if (raw === null) return;
   const radius = Number(raw);
   if (!Number.isFinite(radius)) return;
@@ -296,7 +296,7 @@ const rangeLabel = computed(() => {
     const end = new Date(to);
     end.setDate(end.getDate() - 1);
     const fmt = (d: Date) => d.toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
-    return `${fmt(from)} — ${fmt(end)}`;
+    return `${fmt(from)} - ${fmt(end)}`;
   }
   return from.toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
 });
@@ -408,7 +408,7 @@ onBeforeUnmount(() => {
     <div v-if="mapOpen" class="work-map-wrap">
       <div class="work-map-head">
         <span class="work-map-label muted small">
-          {{ createMode ? "новая точка — кликните на карту" : "просмотр на карте" }}
+          {{ createMode ? "новая точка - кликните на карту" : "просмотр на карте" }}
         </span>
         <button class="secondary work-map-close" type="button" @click="closeMap">закрыть</button>
       </div>

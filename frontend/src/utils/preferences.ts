@@ -78,7 +78,7 @@ export function setViewerPreferences(prefs: UserPreferences) {
   applyUserPreferences(viewerPrefs);
 }
 
-/** тема владельца профиля — только data-theme, язык и шрифт зрителя не меняются */
+/** тема владельца профиля - только data-theme, язык и шрифт зрителя не меняются */
 export function applyProfileOwnerTheme(themePreference?: string | null) {
   profileThemeActive = true;
   applyThemeToDocument(normalizeThemeId(themePreference));

@@ -47,9 +47,9 @@ function getPosition(): Promise<GeolocationPosition> {
 
 function geoErrText(e: unknown) {
   if (e instanceof GeolocationPositionError) {
-    if (e.code === e.PERMISSION_DENIED) return "доступ к геолокации запрещён — разрешите в настройках браузера";
+    if (e.code === e.PERMISSION_DENIED) return "доступ к геолокации запрещён - разрешите в настройках браузера";
     if (e.code === e.POSITION_UNAVAILABLE) return "не удалось определить местоположение";
-    if (e.code === e.TIMEOUT) return "геолокация не ответила — попробуйте ещё раз";
+    if (e.code === e.TIMEOUT) return "геолокация не ответила - попробуйте ещё раз";
   }
   return e instanceof Error ? e.message : "ошибка геолокации";
 }
@@ -136,7 +136,7 @@ async function startCamera() {
     }, 400);
   } catch (e) {
     const name = e instanceof DOMException ? e.name : "";
-    if (name === "NotAllowedError") err.value = "доступ к камере запрещён — разрешите в настройках браузера";
+    if (name === "NotAllowedError") err.value = "доступ к камере запрещён - разрешите в настройках браузера";
     else if (name === "NotFoundError") err.value = "камера не найдена";
     else err.value = "не удалось открыть камеру";
   }
@@ -155,7 +155,7 @@ onBeforeUnmount(stopCamera);
 <template>
   <section class="work-page card">
     <h1>работа</h1>
-    <p class="muted lead">отсканируйте qr на рабочей точке — отметка сработает только рядом с ней.</p>
+    <p class="muted lead">отсканируйте qr на рабочей точке - отметка сработает только рядом с ней.</p>
 
     <div class="scan-pane">
       <video v-show="scanning" ref="videoEl" class="scan-video" playsinline muted />

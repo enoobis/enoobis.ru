@@ -26,7 +26,7 @@ export function useProfileOwnerThemeFromApi(nickname: WatchSource<string>) {
         );
         applyProfileOwnerTheme(p.theme_preference);
       } catch {
-        // профиль недоступен — оставляем текущую тему
+        // профиль недоступен - оставляем текущую тему
       }
     },
     { immediate: true },

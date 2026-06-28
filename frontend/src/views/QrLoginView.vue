@@ -36,7 +36,7 @@ const videoEl = ref<HTMLVideoElement | null>(null);
 const approveCode = ref("");
 const approving = ref(false);
 
-const leadText = "покажите qr на одном устройстве — отсканируйте на другом. работает в обе стороны.";
+const leadText = "покажите qr на одном устройстве - отсканируйте на другом. работает в обе стороны.";
 
 let expireTimer: ReturnType<typeof setInterval> | null = null;
 let refreshTimer: ReturnType<typeof setTimeout> | null = null;
@@ -74,7 +74,7 @@ function stopCamera() {
 
 function describeErr(code: string) {
   if (code === "invalid_code") return "неверный или устаревший код";
-  if (code === "code_expired") return "код истёк — обновите qr на другом устройстве";
+  if (code === "code_expired") return "код истёк - обновите qr на другом устройстве";
   if (code === "code_used") return "код уже использован";
   if (code === "forbidden") return "аккаунт недоступен";
   return code || "ошибка";
@@ -111,7 +111,7 @@ async function refreshQr() {
             await router.push("/microblogs");
           }
         } catch {
-          /* истёк — обновится по таймеру */
+          /* истёк - обновится по таймеру */
         }
       }, 2000);
     }
@@ -194,7 +194,7 @@ async function startCamera() {
     return;
   }
   if (!navigator.mediaDevices?.getUserMedia) {
-    err.value = "браузер не поддерживает камеру — вставьте ссылку вручную";
+    err.value = "браузер не поддерживает камеру - вставьте ссылку вручную";
     showManual.value = true;
     return;
   }
@@ -230,9 +230,9 @@ async function startCamera() {
     }, 400);
   } catch (e) {
     const name = e instanceof DOMException ? e.name : "";
-    if (name === "NotAllowedError") err.value = "доступ к камере запрещён — разрешите в настройках браузера";
+    if (name === "NotAllowedError") err.value = "доступ к камере запрещён - разрешите в настройках браузера";
     else if (name === "NotFoundError") err.value = "камера не найдена";
-    else err.value = "не удалось открыть камеру — вставьте ссылку вручную";
+    else err.value = "не удалось открыть камеру - вставьте ссылку вручную";
     showManual.value = true;
   }
 }

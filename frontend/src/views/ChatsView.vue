@@ -939,7 +939,7 @@ onUnmounted(() => {
               <span class="time muted">{{ timeAgo(c.last_at) }}</span>
             </span>
             <span class="last muted small">
-              <span v-if="c.last_from_me" class="muted">вы: </span>{{ c.last_body || "—" }}
+              <span v-if="c.last_from_me" class="muted">вы: </span>{{ c.last_body || "-" }}
             </span>
           </span>
         </div>
@@ -1407,7 +1407,7 @@ onUnmounted(() => {
   grid-template-columns: 320px 1fr;
   gap: 0;
   border: 1px solid var(--border);
-  /* сначала vh — старые браузеры; dvh — мобильный chrome без «обрезания» композера */
+  /* сначала vh - старые браузеры; dvh - мобильный chrome без «обрезания» композера */
   height: calc(100vh - 8.75rem);
   max-height: calc(100vh - 8.75rem);
   height: calc(100dvh - 8.75rem);

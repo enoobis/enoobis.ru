@@ -105,7 +105,7 @@ async function copy(text: string) {
           {{ creating ? "…" : "создать" }}
         </button>
       </div>
-      <p class="muted small">мест: 1–100</p>
+      <p class="muted small">мест: 1-100</p>
     </form>
 
     <p v-if="!links.length" class="muted">пусто</p>

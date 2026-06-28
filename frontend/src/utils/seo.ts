@@ -1,6 +1,6 @@
 import { SITE_DESCRIPTION, SITE_TAGLINE, SITE_TITLE } from "../config/site";
 
-const DOC_TITLE = `${SITE_TITLE} — ${SITE_TAGLINE}`;
+const DOC_TITLE = `${SITE_TITLE} - ${SITE_TAGLINE}`;
 
 function setMeta(name: string, content: string, attr: "name" | "property" = "name") {
   let el = document.querySelector<HTMLMetaElement>(`meta[${attr}="${name}"]`);

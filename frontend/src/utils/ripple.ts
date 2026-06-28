@@ -1,5 +1,5 @@
 /**
- * global ripple effect — adds a circular wave to any clicked <button> / .btn.
+ * global ripple effect - adds a circular wave to any clicked <button> / .btn.
  * respects prefers-reduced-motion and skips elements opted out via data-no-ripple.
  */
 

@@ -72,7 +72,7 @@ const isWallpaperVideo = computed(
 );
 
 const WALLPAPER_STAGE_REF = 1920;
-/** рамка обоев — чуть шире layout, по внутренним краям крыльев на фоне */
+/** рамка обоев - чуть шире layout, по внутренним краям крыльев на фоне */
 const WALLPAPER_PANEL_REF = 948;
 const WALLPAPER_DESKTOP_MIN = 761;
 

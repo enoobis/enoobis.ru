@@ -8,7 +8,7 @@ import { rateLimit } from "../utils/security.js";
 
 const router = express.Router();
 
-/* запас к радиусу — погрешность gps */
+/* запас к радиусу - погрешность gps */
 const GPS_SLACK_M = 60;
 /* не чаще одной отметки на точку за этот интервал */
 const CHECKIN_COOLDOWN_MS = 10 * 60 * 1000;

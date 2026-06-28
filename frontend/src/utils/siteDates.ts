@@ -21,7 +21,7 @@ export function formatSiteDate(iso: string | Date): string {
   return `${day} ${month} ${year}`;
 }
 
-/** first day of the current month — rolls over automatically each month */
+/** first day of the current month - rolls over automatically each month */
 export function lastBackupDateLabel(): string {
   const now = new Date();
   return formatSiteDate(new Date(now.getFullYear(), now.getMonth(), 1));
