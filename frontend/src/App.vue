@@ -881,6 +881,9 @@ watch(
 
 .nav.nav--sheet-open {
   border-bottom-color: transparent;
+  background: var(--bg);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 .nav-dropdown {
@@ -903,6 +906,9 @@ watch(
 
 .nav-dropdown.nav-header-sheet {
   padding: 0.35rem 0.6rem 0.65rem;
+  background: var(--bg);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 .nav-dropdown.search-menu-sheet {
@@ -995,6 +1001,13 @@ watch(
   display: flex;
   flex-direction: column;
   min-width: 0;
+}
+
+.nav-menu-sheet.nav-header-sheet,
+.nav-menu-root:not(.nav-menu-root--mobile) .nav-menu-sheet--full.nav-header-sheet {
+  background: var(--bg);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 .nav-menu-root:not(.nav-menu-root--mobile) .nav-menu-sheet-body {
