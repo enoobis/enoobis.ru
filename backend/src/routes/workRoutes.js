@@ -118,17 +118,22 @@ router.delete("/admin/work/points/:id", authRequired, adminOnly, (req, res) => {
 
 /* ---------- админ: отметки ---------- */
 
-function checkinsBetween(fromIso, toIso) {
+function checkinsBetween(fromIso, toIso, pointId = null) {
+  const params = [fromIso, toIso];
+  let pointSql = "";
+  if (pointId) {
+    pointSql = " AND c.point_id = ?";
+    params.push(pointId);
+  }
   return all(
-    `SELECT c.id, c.created_at, c.distance_m,
-       u.nickname, p.name AS point_name
+    `SELECT c.id, c.created_at, c.distance_m, c.point_id,
+       u.nickname, u.full_name, p.name AS point_name
      FROM work_checkins c
      JOIN users u ON u.id = c.user_id
      JOIN work_points p ON p.id = c.point_id
-     WHERE c.created_at >= ? AND c.created_at < ?
+     WHERE c.created_at >= ? AND c.created_at < ?${pointSql}
      ORDER BY c.created_at DESC`,
-    fromIso,
-    toIso,
+    ...params,
   );
 }
 
@@ -147,7 +152,11 @@ function parseRange(req) {
 router.get("/admin/work/checkins", authRequired, adminOnly, (req, res) => {
   const range = parseRange(req);
   if (!range) return res.status(400).json({ error: "bad range" });
-  return res.json({ items: checkinsBetween(range.fromIso, range.toIso) });
+  const pointId = String(req.query?.point_id ?? "").trim() || null;
+  if (pointId && !get("SELECT id FROM work_points WHERE id = ?", pointId)) {
+    return res.status(400).json({ error: "bad point" });
+  }
+  return res.json({ items: checkinsBetween(range.fromIso, range.toIso, pointId) });
 });
 
 router.get("/admin/work/export", authRequired, adminOnly, async (req, res) => {
@@ -158,7 +167,8 @@ router.get("/admin/work/export", authRequired, adminOnly, async (req, res) => {
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet("отметки");
   ws.columns = [
-    { header: "ник", key: "nickname", width: 24 },
+    { header: "имя", key: "full_name", width: 28 },
+    { header: "ник", key: "nickname", width: 20 },
     { header: "дата", key: "date", width: 14 },
     { header: "время", key: "time", width: 10 },
     { header: "точка", key: "point", width: 28 },
@@ -168,6 +178,7 @@ router.get("/admin/work/export", authRequired, adminOnly, async (req, res) => {
   for (const r of rows.slice().reverse()) {
     const d = new Date(r.created_at);
     ws.addRow({
+      full_name: String(r.full_name ?? "").trim() || r.nickname,
       nickname: r.nickname,
       date: d.toLocaleDateString("ru-RU"),
       time: d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" }),

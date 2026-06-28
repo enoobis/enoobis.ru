@@ -15,7 +15,9 @@ export type WorkCheckin = {
   id: string;
   created_at: string;
   distance_m: number;
+  point_id: string;
   nickname: string;
+  full_name: string;
   point_name: string;
 };
 
@@ -60,8 +62,14 @@ export function deleteWorkPoint(token: string, id: string) {
   });
 }
 
-export function listWorkCheckins(token: string, fromIso: string, toIso: string) {
+export function listWorkCheckins(
+  token: string,
+  fromIso: string,
+  toIso: string,
+  pointId?: string,
+) {
   const qs = new URLSearchParams({ from: fromIso, to: toIso });
+  if (pointId) qs.set("point_id", pointId);
   return api<{ items: WorkCheckin[] }>(`/api/admin/work/checkins?${qs}`, { token });
 }
 

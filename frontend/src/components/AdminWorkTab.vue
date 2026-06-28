@@ -255,9 +255,26 @@ function downloadQr() {
 type Period = "week" | "month";
 const period = ref<Period>("week");
 const periodOffset = ref(0);
+const pointFilter = ref("");
 const checkins = ref<WorkCheckin[]>([]);
 const loadingCheckins = ref(false);
 const exporting = ref(false);
+
+const checkinsCountLabel = computed(() => {
+  const n = checkins.value.length;
+  if (n === 0) return "0 отметок";
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  let word = "отметок";
+  if (mod10 === 1 && mod100 !== 11) word = "отметка";
+  else if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) word = "отметки";
+  return `${n} ${word}`;
+});
+
+const pointFilterLabel = computed(() => {
+  if (!pointFilter.value) return "все точки";
+  return points.value.find((p) => p.id === pointFilter.value)?.name ?? "точка";
+});
 
 function rangeFor(p: Period, offset: number): { from: Date; to: Date } {
   const now = new Date();
@@ -290,7 +307,12 @@ async function loadCheckins() {
   err.value = "";
   try {
     const { from, to } = rangeFor(period.value, periodOffset.value);
-    const r = await listWorkCheckins(auth.token, from.toISOString(), to.toISOString());
+    const r = await listWorkCheckins(
+      auth.token,
+      from.toISOString(),
+      to.toISOString(),
+      pointFilter.value || undefined,
+    );
     checkins.value = r.items;
   } catch (e) {
     err.value = e instanceof Error ? e.message : "ошибка";
@@ -299,7 +321,11 @@ async function loadCheckins() {
   }
 }
 
-watch([period, periodOffset], loadCheckins);
+watch([period, periodOffset, pointFilter], loadCheckins);
+
+function filterByPoint(p: WorkPoint) {
+  pointFilter.value = p.id;
+}
 
 function setPeriod(p: Period) {
   period.value = p;
@@ -319,11 +345,25 @@ async function exportXlsx() {
   }
 }
 
-function fmtCheckin(iso: string) {
-  const d = new Date(iso);
-  return d.toLocaleString("ru-RU", {
+function checkinFullName(c: WorkCheckin): string {
+  const name = c.full_name?.trim();
+  return name || "—";
+}
+
+function checkinNick(c: WorkCheckin): string {
+  return c.nickname ? `@${c.nickname}` : "—";
+}
+
+function fmtCheckinDate(iso: string) {
+  return new Date(iso).toLocaleDateString("ru-RU", {
     day: "numeric",
     month: "short",
+    year: "numeric",
+  });
+}
+
+function fmtCheckinTime(iso: string) {
+  return new Date(iso).toLocaleTimeString("ru-RU", {
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -394,7 +434,10 @@ onBeforeUnmount(() => {
       <li v-for="p in points" :key="p.id">
         <div>
           <strong>{{ p.name }}</strong>
-          <span class="muted small"> · {{ p.radius_m }} м · {{ p.checkin_count ?? 0 }} отметок</span>
+          <span class="muted small"> · {{ p.radius_m }} м · </span>
+          <button type="button" class="checkins-link muted small" @click="filterByPoint(p)">
+            {{ p.checkin_count ?? 0 }} отметок
+          </button>
         </div>
         <div class="row-actions">
           <button class="secondary" type="button" @click="openMapView(p)">на карте</button>
@@ -417,45 +460,78 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <div class="checkins-head">
-      <div class="filter-tabs">
-        <button class="filter-tab" :class="{ on: period === 'week' }" type="button" @click="setPeriod('week')">
-          неделя
-        </button>
-        <button class="filter-tab" :class="{ on: period === 'month' }" type="button" @click="setPeriod('month')">
-          месяц
-        </button>
-      </div>
-      <div class="range-nav">
-        <button class="secondary" type="button" aria-label="назад" @click="periodOffset--">
-          <AppIcon name="back" :size="16" />
-        </button>
-        <span class="range-label">{{ rangeLabel }}</span>
-        <button
-          class="secondary range-next"
-          type="button"
-          aria-label="вперёд"
-          :disabled="periodOffset >= 0"
-          @click="periodOffset++"
-        >
-          <AppIcon name="back" :size="16" />
-        </button>
-      </div>
-      <button class="secondary" type="button" :disabled="exporting || !checkins.length" @click="exportXlsx">
-        {{ exporting ? "скачиваем…" : "excel" }}
-      </button>
-    </div>
-
-    <p v-if="loadingCheckins" class="muted">загрузка…</p>
-    <p v-else-if="!checkins.length" class="muted">отметок нет</p>
-    <ul v-else class="list">
-      <li v-for="c in checkins" :key="c.id">
-        <div>
-          <strong>{{ c.nickname }}</strong>
-          <span class="muted small"> · {{ c.point_name }} · {{ fmtCheckin(c.created_at) }} · {{ c.distance_m }} м</span>
+    <section class="checkins-panel">
+      <div class="checkins-head">
+        <div class="filter-tabs">
+          <button class="filter-tab" :class="{ on: period === 'week' }" type="button" @click="setPeriod('week')">
+            неделя
+          </button>
+          <button class="filter-tab" :class="{ on: period === 'month' }" type="button" @click="setPeriod('month')">
+            месяц
+          </button>
         </div>
-      </li>
-    </ul>
+        <label v-if="points.length" class="point-filter">
+          <span class="sr-only">точка</span>
+          <select v-model="pointFilter">
+            <option value="">все точки</option>
+            <option v-for="p in points" :key="p.id" :value="p.id">{{ p.name }}</option>
+          </select>
+        </label>
+        <div class="range-nav">
+          <button class="secondary" type="button" aria-label="назад" @click="periodOffset--">
+            <AppIcon name="back" :size="16" />
+          </button>
+          <span class="range-label">{{ rangeLabel }}</span>
+          <button
+            class="secondary range-next"
+            type="button"
+            aria-label="вперёд"
+            :disabled="periodOffset >= 0"
+            @click="periodOffset++"
+          >
+            <AppIcon name="back" :size="16" />
+          </button>
+        </div>
+        <button class="secondary" type="button" :disabled="exporting || !checkins.length" @click="exportXlsx">
+          {{ exporting ? "скачиваем…" : "excel" }}
+        </button>
+      </div>
+
+      <p class="checkins-meta muted small">
+        {{ checkinsCountLabel }} · {{ pointFilterLabel }} · {{ rangeLabel }}
+      </p>
+
+      <div class="checkins-table-wrap">
+        <table class="checkins-table">
+          <thead>
+            <tr>
+              <th>имя</th>
+              <th>ник</th>
+              <th>точка</th>
+              <th>дата</th>
+              <th>время</th>
+              <th class="num">м</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="loadingCheckins">
+              <td colspan="6" class="empty-cell muted">загрузка…</td>
+            </tr>
+            <tr v-else-if="!checkins.length">
+              <td colspan="6" class="empty-cell muted">отметок нет за этот период</td>
+            </tr>
+            <tr v-for="c in checkins" v-else :key="c.id">
+              <td>{{ checkinFullName(c) }}</td>
+              <td class="muted">{{ checkinNick(c) }}</td>
+              <td>{{ c.point_name }}</td>
+              <td class="muted">{{ fmtCheckinDate(c.created_at) }}</td>
+              <td class="muted">{{ fmtCheckinTime(c.created_at) }}</td>
+              <td class="num muted">{{ c.distance_m }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
   </div>
 </template>
 
@@ -606,6 +682,103 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 0.75rem;
   flex-wrap: wrap;
+}
+
+.checkins-panel {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 0.25rem;
+}
+
+.checkins-meta {
+  margin: 0;
+}
+
+.point-filter select {
+  min-height: var(--control-h);
+  padding: 0.35rem 0.75rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.8125rem;
+  max-width: 12rem;
+}
+
+.checkins-link {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.checkins-link:hover {
+  color: var(--text);
+}
+
+.checkins-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.checkins-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.checkins-table th,
+.checkins-table td {
+  padding: 0.65rem 0.85rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.checkins-table th {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: lowercase;
+  background: var(--bg);
+}
+
+.checkins-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.checkins-table tbody tr:hover td {
+  background: var(--hover-surface);
+}
+
+.checkins-table .num {
+  text-align: right;
+  white-space: nowrap;
+  width: 4rem;
+}
+
+.empty-cell {
+  text-align: center;
+  padding: 2rem 0.85rem;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .range-nav {
