@@ -2,32 +2,42 @@
 import { RouterLink } from "vue-router";
 import { SITE_TAGLINE } from "../config/site";
 import HomeLogoMark from "../components/HomeLogoMark.vue";
+import AppSiteFooter from "../components/AppSiteFooter.vue";
 </script>
 
 <template>
-  <section class="home">
-    <div class="logo-spin-wrap" aria-hidden="true">
-      <HomeLogoMark />
-    </div>
-    <p class="tag">{{ SITE_TAGLINE }}</p>
-    <RouterLink to="/login" class="cta">войти</RouterLink>
-    <nav class="alt-nav">
-      <RouterLink to="/microblogs" class="alt-link"><span>лента</span></RouterLink>
-      <span class="alt-sep" aria-hidden="true">·</span>
-      <RouterLink to="/blogs" class="alt-link"><span>блоги</span></RouterLink>
-      <span class="alt-sep" aria-hidden="true">·</span>
-      <RouterLink to="/register" class="alt-link"><span>регистрация</span></RouterLink>
-    </nav>
-  </section>
+  <div class="home-shell">
+    <section class="home">
+      <div class="logo-spin-wrap" aria-hidden="true">
+        <HomeLogoMark />
+      </div>
+      <p class="tag">{{ SITE_TAGLINE }}</p>
+      <RouterLink to="/login" class="cta">войти</RouterLink>
+      <nav class="alt-nav">
+        <RouterLink to="/microblogs" class="alt-link"><span>лента</span></RouterLink>
+        <span class="alt-sep" aria-hidden="true">·</span>
+        <RouterLink to="/blogs" class="alt-link"><span>блоги</span></RouterLink>
+        <span class="alt-sep" aria-hidden="true">·</span>
+        <RouterLink to="/register" class="alt-link"><span>регистрация</span></RouterLink>
+      </nav>
+    </section>
+    <AppSiteFooter />
+  </div>
 </template>
 
 <style scoped>
+.home-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100dvh - 5.5rem);
+  width: 100%;
+}
 .home {
   flex: 1;
   max-width: 640px;
   width: 100%;
   margin: 0 auto;
-  padding: 1.5rem 1rem 2rem;
+  padding: 1.5rem 1rem 0;
   text-align: center;
   display: flex;
   flex-direction: column;

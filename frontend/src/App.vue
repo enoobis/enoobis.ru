@@ -18,8 +18,6 @@ import AppToast from "./components/AppToast.vue";
 import MotionCoinCount from "./components/MotionCoinCount.vue";
 import SearchPanel from "./components/SearchPanel.vue";
 import NavExpandSearch from "./components/NavExpandSearch.vue";
-import AppSiteFooter from "./components/AppSiteFooter.vue";
-
 const router = useRouter();
 const route = useRoute();
 const onHome = computed(() => route.path === "/");
@@ -779,7 +777,6 @@ watch(
         </motion.div>
       </AnimatePresence>
     </RouterView>
-    <AppSiteFooter v-if="!reader.active" />
     <AppToast />
     <Teleport to="body">
       <div
