@@ -1,7 +1,7 @@
 import { api } from "./http";
 import { fmtBytes } from "../utils/bytes";
 
-export type ShopItemKind = "avatar" | "frame" | "wallpaper" | "cover";
+export type ShopItemKind = "avatar" | "frame" | "wallpaper" | "special";
 
 export type ShopCategory = {
   id: string;
@@ -60,14 +60,18 @@ const SHOP_KIND_LABELS: Record<ShopItemKind, string> = {
   avatar: "аватар",
   frame: "рамка",
   wallpaper: "фон",
-  cover: "обложка",
+  special: "особое",
 };
+
+export function shopKindLabel(kind: ShopItemKind): string {
+  return SHOP_KIND_LABELS[kind];
+}
 
 export function shopStorageMeta(stats: ShopStorage | null, kind?: ShopItemKind): string {
   if (!stats) return "";
   const kinds = kind
     ? [kind]
-    : (["avatar", "frame", "wallpaper", "cover"] as ShopItemKind[]);
+    : (["avatar", "frame", "wallpaper", "special"] as ShopItemKind[]);
   const parts = kinds
     .filter((k) => (stats.counts[k] ?? 0) > 0)
     .map((k) => `${SHOP_KIND_LABELS[k]} ${stats.counts[k]} · ${fmtBytes(stats.by_kind[k] ?? 0)}`);

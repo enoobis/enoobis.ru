@@ -9,6 +9,7 @@ import {
   type EquipResult,
   type OwnedShopItem,
   type ShopItemKind,
+  shopKindLabel,
 } from "../api/shop";
 import { useAuthStore } from "../stores/auth";
 import { useSessionStore } from "../stores/session";
@@ -27,7 +28,7 @@ const loading = ref(true);
 const busy = ref<string | null>(null);
 const profileCoins = computed(() => session.coins);
 
-const KIND_ORDER: ShopItemKind[] = ["frame", "cover", "wallpaper", "avatar"];
+const KIND_ORDER: ShopItemKind[] = ["frame", "special", "wallpaper", "avatar"];
 
 type Cosmetics = {
   avatar_url: string;
@@ -39,10 +40,7 @@ type Cosmetics = {
 const cosmetics = ref<Cosmetics | null>(null);
 
 function kindLabel(k: ShopItemKind): string {
-  if (k === "avatar") return "аватар";
-  if (k === "frame") return "рамка";
-  if (k === "wallpaper") return "фон";
-  return "обложка";
+  return shopKindLabel(k);
 }
 
 function kindSortKey(k: ShopItemKind): number {
@@ -73,7 +71,6 @@ function isEquipped(a: OwnedShopItem): boolean {
   if (a.kind === "avatar") return !!a.url && a.url !== "#" && a.url === c.avatar_url;
   if (a.kind === "frame") return !!a.url && a.url !== "#" && a.url === c.avatar_frame_url;
   if (a.kind === "wallpaper") return !!a.url && a.url !== "#" && a.url === c.wallpaper_url;
-  if (a.kind === "cover") return !!a.url && a.url !== "#" && a.url === c.profile_cover_url;
   return false;
 }
 
@@ -137,7 +134,6 @@ async function onCancel(a: OwnedShopItem) {
     if (a.kind === "avatar") body.avatar_url = "";
     else if (a.kind === "frame") body.avatar_frame_url = "";
     else if (a.kind === "wallpaper") body.wallpaper_url = "";
-    else if (a.kind === "cover") body.profile_cover_url = "";
     await api("/api/me", { method: "PATCH", token: auth.token, body: JSON.stringify(body) });
     toastSuccess("снято");
     window.dispatchEvent(new CustomEvent("enoobis:profile-cosmetics-updated"));
@@ -194,11 +190,10 @@ onMounted(load);
               <span v-if="a.is_animated" class="anim-badge">anim</span>
             </div>
           </template>
-          <template v-else-if="a.kind === 'wallpaper' || a.kind === 'cover'">
+          <template v-else-if="a.kind === 'wallpaper'">
             <video
-              v-if="a.kind === 'wallpaper' && /\.(mp4|webm)(\?|#|$)/i.test(a.url)"
-              class="wide-thumb wide-thumb-video"
-              :class="a.kind === 'wallpaper' ? 'wallpaper-strip-thumb' : ''"
+              v-if="/\.(mp4|webm)(\?|#|$)/i.test(a.url)"
+              class="wide-thumb wide-thumb-video wallpaper-strip-thumb"
               :src="a.url"
               autoplay
               loop
@@ -207,26 +202,33 @@ onMounted(load);
             />
             <div
               v-else
-              class="wide-thumb"
-              :class="a.kind === 'wallpaper' ? 'wallpaper-strip-thumb' : ''"
+              class="wide-thumb wallpaper-strip-thumb"
               :style="{ backgroundImage: `url(${a.url})` }"
             />
+          </template>
+          <template v-else-if="a.kind === 'special'">
+            <img :src="a.url" :alt="a.name" class="special-thumb" loading="lazy" decoding="async" />
           </template>
         </div>
         <p class="item-name">{{ a.name }}</p>
         <div class="item-footer">
-          <button
-            v-if="isEquipped(a)"
-            type="button"
-            class="btn-pill-sm btn-cancel"
-            :disabled="busy === a.id"
-            @click="onCancel(a)"
-          >
-            отменить
-          </button>
-          <button v-else type="button" class="btn-pill-sm btn-equip" :disabled="busy === a.id" @click="onApply(a)">
-            применить
-          </button>
+          <template v-if="a.kind === 'special'">
+            <span class="owned-label muted small">куплено</span>
+          </template>
+          <template v-else>
+            <button
+              v-if="isEquipped(a)"
+              type="button"
+              class="btn-pill-sm btn-cancel"
+              :disabled="busy === a.id"
+              @click="onCancel(a)"
+            >
+              отменить
+            </button>
+            <button v-else type="button" class="btn-pill-sm btn-equip" :disabled="busy === a.id" @click="onApply(a)">
+              применить
+            </button>
+          </template>
           <button
             type="button"
             class="btn-remove"
@@ -334,6 +336,19 @@ onMounted(load);
 }
 .wallpaper-strip-thumb {
   height: 56px;
+}
+.special-thumb {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: calc(var(--radius) - 2px);
+  border: 1px solid var(--border);
+  display: block;
+  background: var(--surface2);
+}
+.owned-label {
+  flex: 1;
+  text-align: center;
 }
 .item-name {
   margin: 0;

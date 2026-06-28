@@ -5,7 +5,7 @@ import fs from "node:fs";
 import { v4 as uuidv4 } from "uuid";
 import { nowIso, run, get } from "../db.js";
 import { authRequired } from "../auth.js";
-import { canBlogAndStorage, isPanelStaff } from "../utils/roles.js";
+import { canBlogAndStorage, isAdmin, isPanelStaff } from "../utils/roles.js";
 import { isRasterImageMimetype, optimizeUploadedFile } from "../utils/imageOptimize.js";
 import { SHOP_KINDS } from "../utils/shopPresets.js";
 import {
@@ -311,6 +311,7 @@ router.post("/admin/shop/items", authRequired, (req, res, next) => {
   if (!req.file) return res.status(400).json({ error: "no file" });
   const kind = String(req.body?.kind ?? "avatar").trim();
   if (!SHOP_KINDS.has(kind)) return res.status(400).json({ error: "bad kind" });
+  if (kind === "special" && !isAdmin(req.user.role)) return res.status(403).json({ error: "forbidden" });
   const isVideo = isShopWallpaperVideoMime(req.file.mimetype);
   if (isVideo) {
     if (kind !== "wallpaper") {
@@ -375,9 +376,9 @@ router.post("/admin/shop/items", authRequired, (req, res, next) => {
   let presetKey = "avatar";
   if (kind === "frame") presetKey = "shop_frame";
   else if (kind === "wallpaper") presetKey = "shop_wallpaper";
-  else if (kind === "cover") presetKey = "shop_cover";
+  else if (kind === "special") presetKey = "shop_special";
   if (!isVideo && isRasterImageMimetype(req.file.mimetype) && req.file.mimetype !== "image/gif") {
-    const r = await optimizeUploadedFile(req.file.path, /** @type {"avatar"|"shop_frame"|"shop_wallpaper"|"shop_cover"} */ (presetKey));
+    const r = await optimizeUploadedFile(req.file.path, /** @type {"avatar"|"shop_frame"|"shop_wallpaper"|"shop_special"} */ (presetKey));
     if (r.ok) req.file.filename = r.filename;
     if (kind === "frame" && r.animated) isAnimated = 1;
   }
@@ -446,8 +447,13 @@ router.delete("/admin/shop/categories/:id", authRequired, (req, res) => {
 
 router.patch("/admin/shop/items/:id", authRequired, (req, res) => {
   if (!isPanelStaff(req.user.role)) return res.status(403).json({ error: "forbidden" });
-  const row = get("SELECT id FROM shop_items WHERE id = ?", req.params.id);
+  const row = get("SELECT id, kind FROM shop_items WHERE id = ?", req.params.id);
   if (!row) return res.status(404).json({ error: "not found" });
+  const nextKind =
+    req.body?.kind !== undefined ? String(req.body.kind).trim() : String(row.kind ?? "");
+  if ((row.kind === "special" || nextKind === "special") && !isAdmin(req.user.role)) {
+    return res.status(403).json({ error: "forbidden" });
+  }
   const sets = [];
   const params = [];
   if (req.body?.kind !== undefined) {
@@ -513,6 +519,7 @@ router.delete("/admin/shop/items/:id", authRequired, (req, res) => {
   if (!isPanelStaff(req.user.role)) return res.status(403).json({ error: "forbidden" });
   const row = get("SELECT kind, url FROM shop_items WHERE id = ?", req.params.id);
   if (!row) return res.status(404).json({ error: "not found" });
+  if (row.kind === "special" && !isAdmin(req.user.role)) return res.status(403).json({ error: "forbidden" });
   detachShopItemFromUsers(row.kind, row.url);
   run("DELETE FROM user_owned_shop_items WHERE item_id = ?", req.params.id);
   run("DELETE FROM shop_item_categories WHERE item_id = ?", req.params.id);

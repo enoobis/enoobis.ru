@@ -44,6 +44,7 @@ import {
   getShopStorage,
   listShopItems,
   shopStorageMeta,
+  shopKindLabel,
   type ImageShopKind,
   type ShopCategory,
   type ShopItem,
@@ -112,12 +113,15 @@ const shopAddOpen = ref(false);
 const shopPendingFile = ref<File | null>(null);
 const shopUploadKind = ref<ImageShopKind>("avatar");
 const shopUploadBusy = ref(false);
-const shopKindOptions: { value: ImageShopKind; label: string }[] = [
-  { value: "avatar", label: "аватар" },
-  { value: "frame", label: "рамка" },
-  { value: "wallpaper", label: "фон" },
-  { value: "cover", label: "обложка" },
-];
+const shopKindOptions = computed(() => {
+  const all: { value: ImageShopKind; label: string }[] = [
+    { value: "avatar", label: "аватар" },
+    { value: "frame", label: "рамка" },
+    { value: "wallpaper", label: "фон" },
+    { value: "special", label: "особое" },
+  ];
+  return auth.isAdmin ? all : all.filter((k) => k.value !== "special");
+});
 const shopEditOpen = ref(false);
 const shopEditTarget = ref<ShopItem | null>(null);
 const shopEditKind = ref<ImageShopKind>("avatar");
@@ -491,10 +495,7 @@ function onShopEditEscape(e: KeyboardEvent) {
 }
 
 function shopKindRu(k: ShopItemKind): string {
-  if (k === "avatar") return "аватар";
-  if (k === "frame") return "рамка";
-  if (k === "wallpaper") return "фон";
-  return "обложка";
+  return shopKindLabel(k);
 }
 
 function shopStockLine(a: ShopItem): string {

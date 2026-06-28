@@ -25,7 +25,7 @@ const tabs: { key: ShopItemKind; label: string }[] = [
   { key: "avatar", label: "аватар" },
   { key: "frame", label: "рамка" },
   { key: "wallpaper", label: "фон" },
-  { key: "cover", label: "обложка" },
+  { key: "special", label: "особое" },
 ];
 
 const tab = ref<ShopItemKind>("avatar");
@@ -277,7 +277,7 @@ watch(
     <MotionStagger
       v-if="items.length"
       :list-key="`${tab}-${page}-${categoryFilter}`"
-      class="grid"
+      :class="['grid', { 'grid-special': tab === 'special' }]"
     >
       <MotionStaggerItem v-for="item in items" :key="item.id" class="item-card">
         <div class="preview">
@@ -304,11 +304,10 @@ watch(
               <span v-if="item.is_animated" class="anim-badge">anim</span>
             </div>
           </template>
-          <template v-else-if="item.kind === 'wallpaper' || item.kind === 'cover'">
+          <template v-else-if="item.kind === 'wallpaper'">
             <video
-              v-if="item.kind === 'wallpaper' && /\.(mp4|webm)(\?|#|$)/i.test(item.url)"
-              class="wide-thumb wide-thumb-video"
-              :class="item.kind === 'wallpaper' ? 'wallpaper-strip-thumb' : ''"
+              v-if="/\.(mp4|webm)(\?|#|$)/i.test(item.url)"
+              class="wide-thumb wide-thumb-video wallpaper-strip-thumb"
               :src="item.url"
               autoplay
               loop
@@ -317,13 +316,15 @@ watch(
             />
             <div
               v-else
-              class="wide-thumb"
-              :class="item.kind === 'wallpaper' ? 'wallpaper-strip-thumb' : ''"
+              class="wide-thumb wallpaper-strip-thumb"
               :style="{ backgroundImage: `url(${item.url})` }"
             />
           </template>
+          <template v-else-if="item.kind === 'special'">
+            <img :src="item.url" :alt="item.name" class="special-thumb" loading="lazy" decoding="async" />
+          </template>
         </div>
-        <p class="item-name">{{ item.name }}</p>
+        <p class="item-name" :class="{ 'item-name-special': item.kind === 'special' }">{{ item.name }}</p>
         <p v-if="itemCategoryLine(item)" class="item-category muted small">{{ itemCategoryLine(item) }}</p>
         <p v-if="shopStockCap(item) !== null" class="stock-line muted">
           {{ shopSoldOut(item) ? "распродано" : `ещё ${shopStockLeft(item)}` }}
@@ -421,6 +422,23 @@ watch(
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 1rem;
+}
+.grid-special {
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+}
+.special-thumb {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: calc(var(--radius) - 2px);
+  border: 1px solid var(--border);
+  display: block;
+  background: var(--surface2);
+}
+.item-name-special {
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: center;
 }
 .item-card {
   display: flex;

@@ -928,6 +928,12 @@ try {
 }
 
 try {
+  run("UPDATE shop_items SET kind = 'special' WHERE kind = 'cover'");
+} catch {
+  // ignore
+}
+
+try {
   db.prepare("SELECT icon_url FROM courses LIMIT 1").get();
 } catch {
   try {

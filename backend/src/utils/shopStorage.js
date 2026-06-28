@@ -6,7 +6,7 @@ const SHOP_UPLOAD_SUBDIRS = ["shop-items", "shop-avatars"];
 
 export const SHOP_STORAGE_QUOTA_BYTES = 2 * 1024 * 1024 * 1024;
 
-const KINDS = ["avatar", "frame", "wallpaper", "cover"];
+const KINDS = ["avatar", "frame", "wallpaper", "special"];
 
 /**
  * @param {string | null | undefined} url

@@ -9,11 +9,11 @@ import { isPanelStaff } from "../utils/roles.js";
 
 const router = express.Router();
 
-const DEFAULT_LIST_KINDS = ["avatar", "frame", "wallpaper", "cover"];
+const DEFAULT_LIST_KINDS = ["avatar", "frame", "wallpaper", "special"];
 const SHOP_PAGE_SIZE_DEFAULT = 24;
 const SHOP_PAGE_SIZE_MAX = 48;
 
-const IMAGE_KINDS_SQL = "('avatar','frame','wallpaper','cover')";
+const IMAGE_KINDS_SQL = "('avatar','frame','wallpaper','special')";
 
 function ownedIdsForUser(userId) {
   return new Set(
@@ -225,10 +225,6 @@ function applyEquip(userId, item) {
     run("UPDATE users SET wallpaper_url = ? WHERE id = ?", item.url, userId);
     return null;
   }
-  if (item.kind === "cover") {
-    run("UPDATE users SET profile_cover_url = ? WHERE id = ?", item.url, userId);
-    return null;
-  }
   return "bad kind";
 }
 
@@ -298,8 +294,6 @@ router.delete("/shop/my-items/:id", authRequired, (req, res) => {
     run("UPDATE users SET avatar_frame_url = '' WHERE id = ?", req.user.id);
   } else if (item.kind === "wallpaper" && me?.wallpaper_url === item.url) {
     run("UPDATE users SET wallpaper_url = '' WHERE id = ?", req.user.id);
-  } else if (item.kind === "cover" && me?.profile_cover_url === item.url) {
-    run("UPDATE users SET profile_cover_url = '' WHERE id = ?", req.user.id);
   }
 
   run(

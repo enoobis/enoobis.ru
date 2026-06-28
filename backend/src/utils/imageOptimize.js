@@ -12,7 +12,7 @@ const PRESETS = {
   submission: { maxWidth: 1600, maxHeight: 1600, quality: 80 },
   wallpaper: { maxWidth: 1920, maxHeight: 1080, quality: 82 },
   shop_wallpaper: { maxWidth: 1920, maxHeight: 1080, quality: 82 },
-  shop_cover: { maxWidth: 1200, maxHeight: 480, quality: 82 },
+  shop_special: { maxWidth: 800, maxHeight: 600, quality: 82 },
   shop_frame: { maxWidth: 512, maxHeight: 512, quality: 90, alphaQuality: 100 },
 };
 
