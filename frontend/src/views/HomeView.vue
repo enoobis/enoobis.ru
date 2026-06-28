@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { RouterLink } from "vue-router";
+import { SITE_TAGLINE } from "../config/site";
 </script>
 
 <template>
   <section class="home" data-reveal>
     <img src="/logo.png" alt="enoobis" class="logo" width="120" height="120" decoding="async" />
-    <p class="tag">читай. пиши. учись.</p>
+    <p class="tag">{{ SITE_TAGLINE }}</p>
     <RouterLink to="/login" class="cta">зайти</RouterLink>
     <nav class="alt-nav">
       <RouterLink to="/microblogs" class="alt-link"><span>лента</span></RouterLink>
