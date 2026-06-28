@@ -1405,7 +1405,7 @@ watch(
   border-bottom: none;
 }
 .brand-link:hover {
-  opacity: 0.88;
+  opacity: 1;
 }
 .brand-logo {
   display: block;
@@ -1413,6 +1413,20 @@ watch(
   height: 28px;
   object-fit: contain;
   border-radius: 6px;
+  transform-origin: center center;
+}
+.brand-link:hover .brand-logo {
+  animation: brand-logo-spin 0.9s linear infinite;
+}
+@keyframes brand-logo-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .brand-link:hover .brand-logo {
+    animation: none;
+  }
 }
 
 .offline-card h2 {
