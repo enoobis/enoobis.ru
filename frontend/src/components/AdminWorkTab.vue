@@ -22,13 +22,17 @@ const auth = useAuthStore();
 const err = ref("");
 const points = ref<WorkPoint[]>([]);
 
-/* ---------- карта ---------- */
+const mapOpen = ref(false);
+const mapMode = ref<"create" | "view">("create");
+const createMode = computed(() => mapMode.value === "create");
 
 const mapEl = ref<HTMLDivElement | null>(null);
 let map: L.Map | null = null;
+let tileLayer: L.TileLayer | null = null;
 let pickMarker: L.Marker | null = null;
 let pickCircle: L.Circle | null = null;
 const pointMarkers = new Map<string, L.Marker>();
+let themeObserver: MutationObserver | null = null;
 
 const newName = ref("");
 const newRadius = ref(250);
@@ -42,19 +46,59 @@ const markerIcon = L.divIcon({
   iconAnchor: [7, 7],
 });
 
+function mapUsesDarkTiles(): boolean {
+  const theme = document.documentElement.getAttribute("data-theme");
+  return !theme || theme === "black" || theme === "contrast";
+}
+
+function mapTileUrl(): string {
+  return mapUsesDarkTiles()
+    ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+    : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+}
+
+function mapStrokeColor(): string {
+  return getComputedStyle(document.documentElement).getPropertyValue("--text").trim() || "#ededed";
+}
+
+function circleStyle(): L.PathOptions {
+  const stroke = mapStrokeColor();
+  return {
+    weight: 1,
+    color: stroke,
+    fillColor: stroke,
+    fillOpacity: 0.1,
+  };
+}
+
+function applyMapTiles() {
+  if (!map) return;
+  tileLayer?.remove();
+  tileLayer = L.tileLayer(mapTileUrl(), {
+    maxZoom: 19,
+    attribution: "&copy; openstreetmap",
+  }).addTo(map);
+}
+
 function syncPick() {
   if (!map || !picked.value) return;
   const ll = L.latLng(picked.value.lat, picked.value.lng);
+  const style = circleStyle();
   if (!pickMarker) {
     pickMarker = L.marker(ll, { icon: markerIcon }).addTo(map);
   } else {
     pickMarker.setLatLng(ll);
   }
   if (!pickCircle) {
-    pickCircle = L.circle(ll, { radius: newRadius.value, weight: 1 }).addTo(map);
+    pickCircle = L.circle(ll, { ...circleStyle(), radius: newRadius.value }).addTo(map);
   } else {
     pickCircle.setLatLng(ll);
     pickCircle.setRadius(newRadius.value);
+    pickCircle.setStyle({
+      color: style.color,
+      fillColor: style.fillColor,
+      fillOpacity: style.fillOpacity,
+    });
   }
 }
 
@@ -70,23 +114,65 @@ function renderPoints() {
   }
 }
 
+function destroyMap() {
+  pickMarker?.remove();
+  pickMarker = null;
+  pickCircle?.remove();
+  pickCircle = null;
+  pointMarkers.clear();
+  map?.remove();
+  map = null;
+  tileLayer = null;
+}
+
 async function initMap() {
   await nextTick();
-  if (!mapEl.value || map) return;
+  if (!mapEl.value) return;
+  if (map) {
+    map.invalidateSize();
+    return;
+  }
   const first = points.value[0];
   map = L.map(mapEl.value, { zoomControl: true }).setView(
     first ? [first.lat, first.lng] : [55.751, 37.618],
     first ? 14 : 11,
   );
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19,
-    attribution: "&copy; openstreetmap",
-  }).addTo(map);
+  applyMapTiles();
   map.on("click", (e: L.LeafletMouseEvent) => {
+    if (!createMode.value) return;
     picked.value = { lat: e.latlng.lat, lng: e.latlng.lng };
     syncPick();
   });
   renderPoints();
+  requestAnimationFrame(() => map?.invalidateSize());
+}
+
+async function openCreateMap() {
+  mapMode.value = "create";
+  newName.value = "";
+  picked.value = null;
+  mapOpen.value = true;
+  await nextTick();
+  await initMap();
+}
+
+async function openMapView(p: WorkPoint) {
+  mapMode.value = "view";
+  picked.value = null;
+  pickMarker?.remove();
+  pickMarker = null;
+  pickCircle?.remove();
+  pickCircle = null;
+  mapOpen.value = true;
+  await nextTick();
+  await initMap();
+  focusPoint(p);
+}
+
+function closeMap() {
+  destroyMap();
+  picked.value = null;
+  mapOpen.value = false;
 }
 
 watch(newRadius, syncPick);
@@ -108,13 +194,7 @@ async function addPoint() {
       radius_m: newRadius.value,
     });
     points.value = [p, ...points.value];
-    newName.value = "";
-    picked.value = null;
-    pickMarker?.remove();
-    pickMarker = null;
-    pickCircle?.remove();
-    pickCircle = null;
-    renderPoints();
+    closeMap();
   } catch (e) {
     err.value = e instanceof Error ? e.message : "ошибка";
   } finally {
@@ -153,8 +233,6 @@ function focusPoint(p: WorkPoint) {
   map?.setView([p.lat, p.lng], 16);
 }
 
-/* ---------- qr ---------- */
-
 const qrPoint = ref<WorkPoint | null>(null);
 const qrDataUrl = ref("");
 
@@ -173,8 +251,6 @@ function downloadQr() {
   a.download = `qr-${qrPoint.value.name}.png`;
   a.click();
 }
-
-/* ---------- отметки ---------- */
 
 type Period = "week" | "month";
 const period = ref<Period>("week");
@@ -261,13 +337,21 @@ onMounted(async () => {
   } catch (e) {
     err.value = e instanceof Error ? e.message : "ошибка";
   }
-  await initMap();
   await loadCheckins();
+
+  themeObserver = new MutationObserver(() => {
+    if (map) applyMapTiles();
+  });
+  themeObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["data-theme"],
+  });
 });
 
 onBeforeUnmount(() => {
-  map?.remove();
-  map = null;
+  themeObserver?.disconnect();
+  themeObserver = null;
+  destroyMap();
 });
 </script>
 
@@ -275,16 +359,33 @@ onBeforeUnmount(() => {
   <div class="work-tab">
     <p v-if="err" class="error">{{ err }}</p>
 
-    <div class="work-map-wrap">
+    <div class="work-points-head">
+      <button type="button" @click="openCreateMap">создать точку</button>
+    </div>
+
+    <div v-if="mapOpen" class="work-map-wrap">
+      <div class="work-map-head">
+        <span class="work-map-label muted small">
+          {{ createMode ? "новая точка — кликните на карту" : "просмотр на карте" }}
+        </span>
+        <button class="secondary work-map-close" type="button" @click="closeMap">закрыть</button>
+      </div>
       <div ref="mapEl" class="work-map" />
-      <div class="work-new">
+      <div v-if="createMode" class="work-new">
         <input v-model="newName" type="text" placeholder="название точки" />
         <label class="radius-label">
-          радиус · {{ newRadius }} м
-          <input v-model.number="newRadius" type="range" min="50" max="1000" step="50" />
+          <span class="radius-label-text">радиус · {{ newRadius }} м</span>
+          <input
+            v-model.number="newRadius"
+            class="radius-range"
+            type="range"
+            min="50"
+            max="1000"
+            step="50"
+          />
         </label>
         <button type="button" :disabled="!picked || creating" @click="addPoint">
-          {{ picked ? "добавить точку" : "кликните на карту" }}
+          {{ creating ? "добавляем…" : picked ? "добавить точку" : "выберите место" }}
         </button>
       </div>
     </div>
@@ -296,14 +397,14 @@ onBeforeUnmount(() => {
           <span class="muted small"> · {{ p.radius_m }} м · {{ p.checkin_count ?? 0 }} отметок</span>
         </div>
         <div class="row-actions">
-          <button class="secondary" type="button" @click="focusPoint(p)">на карте</button>
+          <button class="secondary" type="button" @click="openMapView(p)">на карте</button>
           <button class="secondary" type="button" @click="changeRadius(p)">радиус</button>
           <button class="secondary" type="button" @click="showQr(p)">qr</button>
           <button class="secondary danger" type="button" @click="removePoint(p)">удалить</button>
         </div>
       </li>
     </ul>
-    <p v-else class="muted">точек пока нет — кликните на карту и добавьте первую</p>
+    <p v-else class="muted">точек пока нет</p>
 
     <div v-if="qrPoint" class="qr-modal" @click.self="qrPoint = null">
       <div class="qr-card">
@@ -364,9 +465,29 @@ onBeforeUnmount(() => {
   gap: 1rem;
 }
 
+.work-points-head {
+  display: flex;
+  justify-content: flex-start;
+}
+
 .work-map-wrap {
   display: grid;
-  gap: 0.6rem;
+  gap: 0.65rem;
+}
+
+.work-map-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.work-map-label {
+  margin: 0;
+}
+
+.work-map-close {
+  flex-shrink: 0;
 }
 
 .work-map {
@@ -375,6 +496,7 @@ onBeforeUnmount(() => {
   border: 1px solid var(--border);
   overflow: hidden;
   z-index: 0;
+  background: var(--bg);
 }
 
 .work-new {
@@ -390,12 +512,64 @@ onBeforeUnmount(() => {
 }
 
 .radius-label {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  display: grid;
+  gap: 0.35rem;
+  min-width: 11rem;
+}
+
+.radius-label-text {
   font-size: 0.8125rem;
   color: var(--muted);
-  white-space: nowrap;
+}
+
+.radius-range {
+  width: 100%;
+  height: 4px;
+  margin: 0;
+  appearance: none;
+  background: var(--border);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+}
+
+.radius-range:focus-visible {
+  outline: 2px solid var(--focus-border);
+  outline-offset: 4px;
+}
+
+.radius-range::-webkit-slider-runnable-track {
+  height: 4px;
+  background: var(--border);
+  border-radius: var(--radius-pill);
+}
+
+.radius-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -6px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--text);
+  transition: transform var(--dur-2) var(--ease-out);
+}
+
+.radius-range:hover::-webkit-slider-thumb {
+  transform: scale(1.06);
+}
+
+.radius-range::-moz-range-track {
+  height: 4px;
+  background: var(--border);
+  border-radius: var(--radius-pill);
+}
+
+.radius-range::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--text);
 }
 
 .qr-modal {
@@ -450,6 +624,21 @@ onBeforeUnmount(() => {
 
 .range-next :deep(.app-icon) {
   transform: rotate(180deg);
+}
+
+:deep(.leaflet-control-zoom a) {
+  background: var(--surface) !important;
+  color: var(--text) !important;
+  border-color: var(--border) !important;
+}
+
+:deep(.leaflet-control-attribution) {
+  background: var(--surface) !important;
+  color: var(--muted) !important;
+}
+
+:deep(.leaflet-control-attribution a) {
+  color: var(--muted) !important;
 }
 
 :deep(.work-marker-dot) {
