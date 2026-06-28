@@ -3,8 +3,8 @@
     src="/logo-mark.png"
     alt=""
     class="home-logo-mark"
-    width="150"
-    height="150"
+    width="512"
+    height="512"
     decoding="async"
     fetchpriority="high"
   />
