@@ -797,12 +797,6 @@ html.profile-wallpaper-desktop .nav.nav--sheet-open {
   z-index: 110;
   overflow: visible;
 }
-html.profile-wallpaper-desktop #nav-drawer {
-  z-index: 5;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-  background: var(--surface);
-}
 html.profile-wallpaper-desktop .nav-bar {
   width: 100%;
   max-width: none;
@@ -846,7 +840,8 @@ html[data-theme="contrast-white"] .nav {
 }
 
 .nav.nav--sheet-open {
-  z-index: 101;
+  z-index: 110;
+  overflow: visible;
   border-bottom-color: transparent;
 }
 @media (max-width: 640px) {

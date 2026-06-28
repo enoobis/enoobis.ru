@@ -502,7 +502,7 @@ watch(
         <RouterLink to="/register" class="nav-link"><span>регистрация</span></RouterLink>
       </template>
       </div>
-      <Transition name="nav-sheet">
+      <Transition name="nav-drawer">
         <div
           v-if="navDrawerOpen && !sheetMobile"
           id="nav-drawer"
@@ -868,6 +868,12 @@ watch(
   border-bottom-color: transparent;
 }
 
+.nav.nav--sheet-open:has(#nav-drawer) {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: var(--bg);
+}
+
 .nav-dropdown {
   position: absolute;
   left: 0;
@@ -881,10 +887,20 @@ watch(
   padding: 0.5rem 0.6rem 0.75rem;
   overflow: hidden;
   background: var(--glass-bg, var(--bg));
+  transform-origin: top center;
+}
+
+.nav-dropdown:not(.nav-drawer-sheet) {
   -webkit-backdrop-filter: blur(var(--glass-blur));
   backdrop-filter: blur(var(--glass-blur));
-  transform-origin: top center;
   will-change: transform, opacity;
+}
+
+.nav-dropdown.nav-drawer-sheet {
+  z-index: 5;
+  background: var(--surface);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 .nav-dropdown.search-menu-sheet {
@@ -898,13 +914,19 @@ watch(
   padding: 0.35rem 0.6rem 0.65rem;
 }
 
-.nav-dropdown.nav-drawer-sheet {
-  z-index: 5;
-}
-
 .nav-dropdown:not(.search-menu-sheet) {
   max-height: min(72vh, 28rem);
   overflow-y: auto;
+}
+
+.nav-drawer-enter-active,
+.nav-drawer-leave-active {
+  transition: opacity 0.16s ease;
+}
+
+.nav-drawer-enter-from,
+.nav-drawer-leave-to {
+  opacity: 0;
 }
 
 .nav-sheet-enter-active,
