@@ -77,12 +77,15 @@ const sheetMobile = ref(
 const sheetGeom = ref({ top: 0, left: 0, width: 0 });
 const SHEET_MOBILE_MAX = 640;
 const profileCoins = computed(() => session.coins);
+const searchPanelOpen = computed(
+  () => searchOpen.value && searchQuery.value.trim().length > 0,
+);
 const headerSheetOpen = computed(
-  () => navDrawerOpen.value || profileMenuOpen.value || searchOpen.value,
+  () => navDrawerOpen.value || profileMenuOpen.value || searchPanelOpen.value,
 );
 const navFullSheetOpen = computed(() => headerSheetOpen.value && !sheetMobile.value);
 const headerBackdropOpen = computed(
-  () => (profileMenuOpen.value || searchOpen.value) && !sheetMobile.value,
+  () => (profileMenuOpen.value || searchPanelOpen.value) && !sheetMobile.value,
 );
 
 function syncHeaderSheetDocumentClass() {
@@ -346,7 +349,7 @@ onUnmounted(() => {
   document.documentElement.classList.remove("nav-header-sheet-open");
 });
 
-watch(searchOpen, (open) => {
+watch(searchPanelOpen, (open) => {
   if (!open) return;
   closeNavDrawer();
   closeProfileMenu();
@@ -616,7 +619,7 @@ watch(
       </Transition>
       <Transition name="nav-sheet">
         <div
-          v-if="searchOpen && auth.token && !sheetMobile"
+          v-if="searchPanelOpen && auth.token && !sheetMobile"
           class="nav-dropdown search-menu-sheet"
           role="dialog"
           aria-modal="true"
