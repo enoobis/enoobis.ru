@@ -159,10 +159,24 @@ router.get("/admin/work/checkins", authRequired, adminOnly, (req, res) => {
   return res.json({ items: checkinsBetween(range.fromIso, range.toIso, pointId) });
 });
 
+function fmtWorkDate(d) {
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  return `${day}.${month}.${d.getFullYear()}`;
+}
+
+function fmtWorkTime(d) {
+  return d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+}
+
 router.get("/admin/work/export", authRequired, adminOnly, async (req, res) => {
   const range = parseRange(req);
   if (!range) return res.status(400).json({ error: "bad range" });
-  const rows = checkinsBetween(range.fromIso, range.toIso);
+  const pointId = String(req.query?.point_id ?? "").trim() || null;
+  if (pointId && !get("SELECT id FROM work_points WHERE id = ?", pointId)) {
+    return res.status(400).json({ error: "bad point" });
+  }
+  const rows = checkinsBetween(range.fromIso, range.toIso, pointId);
 
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet("отметки");
@@ -180,8 +194,8 @@ router.get("/admin/work/export", authRequired, adminOnly, async (req, res) => {
     ws.addRow({
       full_name: String(r.full_name ?? "").trim() || r.nickname,
       nickname: r.nickname,
-      date: d.toLocaleDateString("ru-RU"),
-      time: d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" }),
+      date: fmtWorkDate(d),
+      time: fmtWorkTime(d),
       point: r.point_name,
       distance: r.distance_m,
     });

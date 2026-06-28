@@ -253,7 +253,7 @@ function downloadQr() {
 }
 
 type Period = "week" | "month";
-const period = ref<Period>("week");
+const period = ref<Period>("month");
 const periodOffset = ref(0);
 const pointFilter = ref("");
 const checkins = ref<WorkCheckin[]>([]);
@@ -337,7 +337,12 @@ async function exportXlsx() {
   exporting.value = true;
   try {
     const { from, to } = rangeFor(period.value, periodOffset.value);
-    await downloadWorkExport(auth.token, from.toISOString(), to.toISOString());
+    await downloadWorkExport(
+      auth.token,
+      from.toISOString(),
+      to.toISOString(),
+      pointFilter.value || undefined,
+    );
   } catch (e) {
     err.value = e instanceof Error ? e.message : "ошибка";
   } finally {
@@ -345,28 +350,33 @@ async function exportXlsx() {
   }
 }
 
+function fmtWorkDate(iso: string | Date) {
+  const d = iso instanceof Date ? iso : new Date(iso);
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  return `${day}.${month}.${d.getFullYear()}`;
+}
+
+function fmtWorkTime(iso: string | Date) {
+  const d = iso instanceof Date ? iso : new Date(iso);
+  return d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+}
+
 function checkinFullName(c: WorkCheckin): string {
   const name = c.full_name?.trim();
-  return name || "—";
+  return name || c.nickname;
 }
 
 function checkinNick(c: WorkCheckin): string {
-  return c.nickname ? `@${c.nickname}` : "—";
+  return c.nickname;
 }
 
 function fmtCheckinDate(iso: string) {
-  return new Date(iso).toLocaleDateString("ru-RU", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  return fmtWorkDate(iso);
 }
 
 function fmtCheckinTime(iso: string) {
-  return new Date(iso).toLocaleTimeString("ru-RU", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return fmtWorkTime(iso);
 }
 
 onMounted(async () => {
@@ -507,10 +517,10 @@ onBeforeUnmount(() => {
             <tr>
               <th>имя</th>
               <th>ник</th>
+              <th class="num">дата</th>
+              <th class="num">время</th>
               <th>точка</th>
-              <th>дата</th>
-              <th>время</th>
-              <th class="num">м</th>
+              <th class="num">расстояние, м</th>
             </tr>
           </thead>
           <tbody>
@@ -522,10 +532,10 @@ onBeforeUnmount(() => {
             </tr>
             <tr v-for="c in checkins" v-else :key="c.id">
               <td>{{ checkinFullName(c) }}</td>
-              <td class="muted">{{ checkinNick(c) }}</td>
+              <td>{{ checkinNick(c) }}</td>
+              <td class="num muted">{{ fmtCheckinDate(c.created_at) }}</td>
+              <td class="num muted">{{ fmtCheckinTime(c.created_at) }}</td>
               <td>{{ c.point_name }}</td>
-              <td class="muted">{{ fmtCheckinDate(c.created_at) }}</td>
-              <td class="muted">{{ fmtCheckinTime(c.created_at) }}</td>
               <td class="num muted">{{ c.distance_m }}</td>
             </tr>
           </tbody>
@@ -758,10 +768,15 @@ onBeforeUnmount(() => {
   background: var(--hover-surface);
 }
 
-.checkins-table .num {
+.checkins-table th.num,
+.checkins-table td.num {
   text-align: right;
   white-space: nowrap;
-  width: 4rem;
+}
+
+.checkins-table th:nth-child(5),
+.checkins-table td:nth-child(5) {
+  min-width: 8rem;
 }
 
 .empty-cell {

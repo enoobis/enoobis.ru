@@ -73,13 +73,19 @@ export function listWorkCheckins(
   return api<{ items: WorkCheckin[] }>(`/api/admin/work/checkins?${qs}`, { token });
 }
 
-export function workExportUrl(fromIso: string, toIso: string) {
+export function workExportUrl(fromIso: string, toIso: string, pointId?: string) {
   const qs = new URLSearchParams({ from: fromIso, to: toIso });
+  if (pointId) qs.set("point_id", pointId);
   return `/api/admin/work/export?${qs}`;
 }
 
-export async function downloadWorkExport(token: string, fromIso: string, toIso: string) {
-  const res = await fetch(workExportUrl(fromIso, toIso), {
+export async function downloadWorkExport(
+  token: string,
+  fromIso: string,
+  toIso: string,
+  pointId?: string,
+) {
+  const res = await fetch(workExportUrl(fromIso, toIso, pointId), {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) throw new Error("не удалось скачать");
