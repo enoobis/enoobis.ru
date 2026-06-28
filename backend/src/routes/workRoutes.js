@@ -159,24 +159,42 @@ router.get("/admin/work/checkins", authRequired, adminOnly, (req, res) => {
   return res.json({ items: checkinsBetween(range.fromIso, range.toIso, pointId) });
 });
 
+const WORK_TZ = "Europe/Moscow";
+
+function workDateParts(d) {
+  const parts = new Intl.DateTimeFormat("ru-RU", {
+    timeZone: WORK_TZ,
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).formatToParts(d);
+  const pick = (type) => parts.find((p) => p.type === type)?.value ?? "";
+  return { day: pick("day"), month: pick("month"), year: pick("year") };
+}
+
 function fmtWorkDate(d) {
-  const day = String(d.getDate()).padStart(2, "0");
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  return `${day}.${month}.${d.getFullYear()}`;
+  const { day, month, year } = workDateParts(d);
+  return `${day}.${month}.${year}`;
 }
 
 function fmtWorkTime(d) {
-  return d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleTimeString("ru-RU", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: WORK_TZ,
+  });
 }
 
 function datesInRange(fromIso, toIso) {
   const dates = [];
-  const cur = new Date(fromIso);
   const end = new Date(toIso);
-  cur.setHours(0, 0, 0, 0);
-  while (cur < end) {
-    dates.push(fmtWorkDate(cur));
-    cur.setDate(cur.getDate() + 1);
+  const endLabel = fmtWorkDate(new Date(end.getTime() - 1));
+  let cur = new Date(fromIso);
+  while (true) {
+    const label = fmtWorkDate(cur);
+    dates.push(label);
+    if (label === endLabel) break;
+    cur = new Date(cur.getTime() + 24 * 60 * 60 * 1000);
   }
   return dates;
 }
@@ -184,9 +202,36 @@ function datesInRange(fromIso, toIso) {
 function personLabel(row) {
   const name = String(row.full_name ?? "").trim();
   if (name && name.toLowerCase() !== row.nickname.toLowerCase()) {
-    return `${name} · ${row.nickname}`;
+    return `${name} - ${row.nickname}`;
   }
   return name || row.nickname;
+}
+
+function styleExportSheet(ws, dateColCount) {
+  const thin = { style: "thin", color: { argb: "FFBFBFBF" } };
+  const border = { top: thin, left: thin, bottom: thin, right: thin };
+  ws.views = [{ state: "frozen", ySplit: 1, xSplit: 1 }];
+
+  ws.getRow(1).eachCell((cell, col) => {
+    cell.font = { bold: true };
+    cell.alignment = {
+      horizontal: col === 1 ? "left" : "center",
+      vertical: "middle",
+    };
+    cell.border = border;
+  });
+
+  for (let r = 2; r <= ws.rowCount; r += 1) {
+    const row = ws.getRow(r);
+    for (let c = 1; c <= dateColCount + 1; c += 1) {
+      const cell = row.getCell(c);
+      cell.border = border;
+      cell.alignment = {
+        horizontal: c === 1 ? "left" : "center",
+        vertical: "middle",
+      };
+    }
+  }
 }
 
 router.get("/admin/work/export", authRequired, adminOnly, async (req, res) => {
@@ -214,10 +259,9 @@ router.get("/admin/work/export", authRequired, adminOnly, async (req, res) => {
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet("отметки");
   ws.addRow(["имя", ...dateCols]);
-  ws.getRow(1).font = { bold: true };
-  ws.getColumn(1).width = 28;
+  ws.getColumn(1).width = 32;
   dateCols.forEach((_, i) => {
-    ws.getColumn(i + 2).width = 12;
+    ws.getColumn(i + 2).width = 11;
   });
 
   const users = [...byUser.values()].sort((a, b) => a.label.localeCompare(b.label, "ru"));
@@ -229,6 +273,8 @@ router.get("/admin/work/export", authRequired, adminOnly, async (req, res) => {
     }
     ws.addRow(line);
   }
+
+  styleExportSheet(ws, dateCols.length);
 
   res.setHeader(
     "Content-Type",

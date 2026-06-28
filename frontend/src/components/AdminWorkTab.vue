@@ -350,6 +350,14 @@ async function exportXlsx() {
   }
 }
 
+function checkinPersonLabel(c: WorkCheckin): string {
+  const name = c.full_name?.trim();
+  if (name && name.toLowerCase() !== c.nickname.toLowerCase()) {
+    return `${name} - ${c.nickname}`;
+  }
+  return name || c.nickname;
+}
+
 function fmtWorkDate(iso: string | Date) {
   const d = iso instanceof Date ? iso : new Date(iso);
   const day = String(d.getDate()).padStart(2, "0");
@@ -360,15 +368,6 @@ function fmtWorkDate(iso: string | Date) {
 function fmtWorkTime(iso: string | Date) {
   const d = iso instanceof Date ? iso : new Date(iso);
   return d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
-}
-
-function checkinFullName(c: WorkCheckin): string {
-  const name = c.full_name?.trim();
-  return name || c.nickname;
-}
-
-function checkinNick(c: WorkCheckin): string {
-  return c.nickname;
 }
 
 onMounted(async () => {
@@ -508,7 +507,6 @@ onBeforeUnmount(() => {
           <thead>
             <tr>
               <th>имя</th>
-              <th>ник</th>
               <th class="num">дата</th>
               <th class="num">время</th>
               <th>точка</th>
@@ -517,14 +515,13 @@ onBeforeUnmount(() => {
           </thead>
           <tbody>
             <tr v-if="loadingCheckins">
-              <td colspan="6" class="empty-cell muted">загрузка…</td>
+              <td colspan="5" class="empty-cell muted">загрузка…</td>
             </tr>
             <tr v-else-if="!checkins.length">
-              <td colspan="6" class="empty-cell muted">отметок нет за этот период</td>
+              <td colspan="5" class="empty-cell muted">отметок нет за этот период</td>
             </tr>
             <tr v-for="c in checkins" v-else :key="c.id">
-              <td class="person-cell">{{ checkinFullName(c) }}</td>
-              <td>{{ checkinNick(c) }}</td>
+              <td class="person-cell">{{ checkinPersonLabel(c) }}</td>
               <td class="num muted">{{ fmtWorkDate(c.created_at) }}</td>
               <td class="num muted">{{ fmtWorkTime(c.created_at) }}</td>
               <td>{{ c.point_name }}</td>
