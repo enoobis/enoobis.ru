@@ -39,8 +39,8 @@ const links = computed(() =>
 
 <style scoped>
 .site-end {
-  margin-top: 2.5rem;
-  padding: 1.25rem 0 2rem;
+  margin-top: auto;
+  padding: 1.25rem 0 1.5rem;
   text-align: center;
   display: grid;
   gap: 0.85rem;

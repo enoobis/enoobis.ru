@@ -1,19 +1,14 @@
 <script setup lang="ts">
 import { RouterLink } from "vue-router";
 import { SITE_TAGLINE } from "../config/site";
+import HomeLogoMark from "../components/HomeLogoMark.vue";
 </script>
 
 <template>
-  <section class="home" data-reveal>
-    <img
-      src="/logo-mark.png"
-      alt="enoobis"
-      class="logo"
-      width="132"
-      height="132"
-      decoding="async"
-      fetchpriority="high"
-    />
+  <section class="home">
+    <div class="logo-spin-wrap" aria-hidden="true">
+      <HomeLogoMark />
+    </div>
     <p class="tag">{{ SITE_TAGLINE }}</p>
     <RouterLink to="/login" class="cta">войти</RouterLink>
     <nav class="alt-nav">
@@ -28,22 +23,22 @@ import { SITE_TAGLINE } from "../config/site";
 
 <style scoped>
 .home {
+  flex: 1;
   max-width: 640px;
+  width: 100%;
   margin: 0 auto;
-  padding: 18vh 1rem 4rem;
+  padding: 1.5rem 1rem 2rem;
   text-align: center;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 0;
 }
-.logo {
-  margin: 0 0 0.6rem;
+.logo-spin-wrap {
   width: clamp(88px, 22vw, 132px);
   height: clamp(88px, 22vw, 132px);
-  display: block;
-  border-radius: 16px;
-  object-fit: contain;
+  margin: 0 0 0.6rem;
   animation: home-logo-spin 14s linear infinite;
   transform-origin: center center;
 }
@@ -53,7 +48,7 @@ import { SITE_TAGLINE } from "../config/site";
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .logo {
+  .logo-spin-wrap {
     animation: none;
   }
 }
@@ -133,7 +128,7 @@ import { SITE_TAGLINE } from "../config/site";
 }
 @media (max-width: 640px) {
   .home {
-    padding-top: 14vh;
+    padding: 1rem 1rem 1.5rem;
   }
   .tag {
     margin-bottom: 1.8rem;
