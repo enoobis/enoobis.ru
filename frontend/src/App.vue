@@ -81,6 +81,14 @@ const headerSheetOpen = computed(
   () => navDrawerOpen.value || profileMenuOpen.value || searchOpen.value,
 );
 const navFullSheetOpen = computed(() => headerSheetOpen.value && !sheetMobile.value);
+const headerBackdropOpen = computed(
+  () => (profileMenuOpen.value || searchOpen.value) && !sheetMobile.value,
+);
+
+function syncHeaderSheetDocumentClass() {
+  if (typeof document === "undefined") return;
+  document.documentElement.classList.toggle("nav-header-sheet-open", navFullSheetOpen.value);
+}
 const initials = computed(() => (auth.nickname || "U").slice(0, 2).toUpperCase());
 const chatBadge = computed(() => (chatStore.unread > 9 ? "9+" : String(chatStore.unread)));
 const mobileSearchTo = computed(() => {
@@ -116,11 +124,11 @@ function onDocumentClick(event: MouseEvent) {
   if (target?.closest?.(".profile-trigger")) return;
   if (target?.closest?.(".nav-search-trigger")) return;
   if (profileMenuOpen.value) {
-    if (target?.closest?.(".profile-menu-sheet")) return;
+    if (target?.closest?.(".nav-header-sheet")) return;
     profileMenuOpen.value = false;
   }
   if (navDrawerOpen.value) {
-    if (target?.closest?.(".nav-menu-sheet")) return;
+    if (target?.closest?.("#nav-drawer, #nav-drawer-mobile, .nav-header-sheet")) return;
     navDrawerOpen.value = false;
   }
   if (searchOpen.value) {
@@ -316,6 +324,7 @@ onMounted(() => {
   syncSheetLayout();
   syncReaderTop();
   syncShell();
+  syncHeaderSheetDocumentClass();
 });
 
 onUnmounted(() => {
@@ -334,6 +343,7 @@ onUnmounted(() => {
   if (navTrickleTimer) clearInterval(navTrickleTimer);
   if (navDoneTimer) clearTimeout(navDoneTimer);
   session.stopShell();
+  document.documentElement.classList.remove("nav-header-sheet-open");
 });
 
 watch(searchOpen, (open) => {
@@ -354,8 +364,13 @@ watch(
 
 watch(headerSheetOpen, async (open) => {
   if (!open) unlockPageScroll();
+  syncHeaderSheetDocumentClass();
   await nextTick();
   syncSheetLayout();
+});
+
+watch(navFullSheetOpen, () => {
+  syncHeaderSheetDocumentClass();
 });
 
 watch(
@@ -502,11 +517,11 @@ watch(
         <RouterLink to="/register" class="nav-link"><span>регистрация</span></RouterLink>
       </template>
       </div>
-      <Transition name="nav-drawer">
+      <Transition name="nav-sheet">
         <div
           v-if="navDrawerOpen && !sheetMobile"
           id="nav-drawer"
-          class="nav-dropdown nav-drawer-sheet"
+          class="nav-dropdown nav-header-sheet card"
           role="dialog"
           aria-modal="true"
           aria-label="разделы"
@@ -537,7 +552,7 @@ watch(
       <Transition name="nav-sheet">
         <div
           v-if="profileMenuOpen && auth.token && !sheetMobile"
-          class="nav-dropdown profile-menu-sheet card"
+          class="nav-dropdown nav-header-sheet card"
           role="dialog"
           aria-modal="true"
           aria-label="профиль"
@@ -619,7 +634,7 @@ watch(
     <Teleport to="body">
       <Transition name="nav-menu">
         <div
-          v-if="headerSheetOpen && !sheetMobile"
+          v-if="headerBackdropOpen"
           class="nav-menu-root nav-menu-root--backdrop"
           :style="overlayStyle()"
           @click="closeHeaderSheets"
@@ -635,7 +650,7 @@ watch(
           @click="closeNavDrawer"
         >
           <div
-            class="nav-menu-sheet nav-menu-sheet--full"
+            class="nav-menu-sheet nav-header-sheet nav-menu-sheet--full card"
             role="dialog"
             aria-modal="true"
             aria-label="разделы"
@@ -677,7 +692,7 @@ watch(
           @click="closeProfileMenu"
         >
           <div
-            class="nav-menu-sheet profile-menu-sheet nav-menu-sheet--full card"
+            class="nav-menu-sheet nav-header-sheet nav-menu-sheet--full card"
             role="dialog"
             aria-modal="true"
             aria-label="профиль"
@@ -868,12 +883,6 @@ watch(
   border-bottom-color: transparent;
 }
 
-.nav.nav--sheet-open:has(#nav-drawer) {
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-  background: var(--bg);
-}
-
 .nav-dropdown {
   position: absolute;
   left: 0;
@@ -887,20 +896,13 @@ watch(
   padding: 0.5rem 0.6rem 0.75rem;
   overflow: hidden;
   background: var(--glass-bg, var(--bg));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
   transform-origin: top center;
 }
 
-.nav-dropdown:not(.nav-drawer-sheet) {
-  -webkit-backdrop-filter: blur(var(--glass-blur));
-  backdrop-filter: blur(var(--glass-blur));
-  will-change: transform, opacity;
-}
-
-.nav-dropdown.nav-drawer-sheet {
-  z-index: 5;
-  background: var(--surface);
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
+.nav-dropdown.nav-header-sheet {
+  padding: 0.35rem 0.6rem 0.65rem;
 }
 
 .nav-dropdown.search-menu-sheet {
@@ -910,23 +912,9 @@ watch(
   background: color-mix(in srgb, var(--bg) 94%, transparent);
 }
 
-.nav-dropdown.profile-menu-sheet {
-  padding: 0.35rem 0.6rem 0.65rem;
-}
-
 .nav-dropdown:not(.search-menu-sheet) {
   max-height: min(72vh, 28rem);
   overflow-y: auto;
-}
-
-.nav-drawer-enter-active,
-.nav-drawer-leave-active {
-  transition: opacity 0.16s ease;
-}
-
-.nav-drawer-enter-from,
-.nav-drawer-leave-to {
-  opacity: 0;
 }
 
 .nav-sheet-enter-active,
@@ -1018,7 +1006,7 @@ watch(
   padding: 0.5rem 0.6rem 0.75rem;
 }
 
-.nav-menu-root:not(.nav-menu-root--mobile) .profile-menu-sheet .nav-menu-sheet-body {
+.nav-menu-root:not(.nav-menu-root--mobile) .nav-header-sheet .nav-menu-sheet-body {
   padding: 0.35rem 0.6rem 0.65rem;
 }
 
@@ -1047,11 +1035,11 @@ watch(
   flex: none;
 }
 
-.profile-menu-sheet {
+.nav-header-sheet {
   padding-bottom: 1rem;
 }
 
-.nav-menu-root--mobile .profile-menu-sheet {
+.nav-menu-root--mobile .nav-header-sheet {
   padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
 }
 

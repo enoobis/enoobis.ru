@@ -785,6 +785,9 @@ html.profile-wallpaper-desktop #app {
   position: relative;
   z-index: 1;
 }
+html.nav-header-sheet-open #app {
+  z-index: 100;
+}
 html.profile-wallpaper-desktop .nav {
   position: sticky;
   z-index: 100;
