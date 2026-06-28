@@ -12,8 +12,8 @@ import AppSiteFooter from "../components/AppSiteFooter.vue";
         <HomeLogoMark />
       </div>
       <h1 class="tag">{{ SITE_TAGLINE }}</h1>
-      <RouterLink to="/login" class="cta">войти</RouterLink>
-      <nav class="alt-nav">
+      <RouterLink to="/login" class="cta" data-nosnippet>войти</RouterLink>
+      <nav class="alt-nav" data-nosnippet aria-label="разделы">
         <RouterLink to="/microblogs" class="alt-link"><span>лента</span></RouterLink>
         <span class="alt-sep" aria-hidden="true">·</span>
         <RouterLink to="/blogs" class="alt-link"><span>блоги</span></RouterLink>

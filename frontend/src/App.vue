@@ -424,8 +424,10 @@ watch(
         <img src="/logo.png" alt="" class="brand-logo" width="28" height="28" decoding="async" />
       </RouterLink>
       <template v-if="!auth.token && !reader.active">
-        <RouterLink to="/blogs" class="nav-link"><span>блоги</span></RouterLink>
-        <RouterLink to="/microblogs" class="nav-link"><span>микроблоги</span></RouterLink>
+        <div class="nav-guest-links" data-nosnippet>
+          <RouterLink to="/blogs" class="nav-link"><span>блоги</span></RouterLink>
+          <RouterLink to="/microblogs" class="nav-link"><span>микроблоги</span></RouterLink>
+        </div>
       </template>
       <div v-if="reader.active" class="nav-reader-center">
         <span class="nav-reader-title">{{ reader.title }}</span>
@@ -515,8 +517,10 @@ watch(
         </div>
       </template>
       <template v-else>
-        <RouterLink to="/login" class="nav-link"><span>вход</span></RouterLink>
-        <RouterLink to="/register" class="nav-link"><span>регистрация</span></RouterLink>
+        <div class="nav-guest-auth" data-nosnippet>
+          <RouterLink to="/login" class="nav-link"><span>вход</span></RouterLink>
+          <RouterLink to="/register" class="nav-link"><span>регистрация</span></RouterLink>
+        </div>
       </template>
       </div>
       <Transition name="nav-sheet">
@@ -840,6 +844,13 @@ watch(
   flex-wrap: nowrap;
   padding: 0.4rem 0.6rem;
   position: relative;
+}
+
+.nav-guest-links,
+.nav-guest-auth {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 
 .nav-reader-center {

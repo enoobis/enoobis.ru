@@ -16,7 +16,7 @@ const links = computed(() =>
 </script>
 
 <template>
-  <div class="site-end">
+  <div class="site-end" data-nosnippet>
     <p class="site-end-line muted small">last backup · {{ backupLabel }}</p>
     <footer class="site-foot">
       <p class="site-foot-line muted small">last watered {{ wateredLabel }}</p>
