@@ -34,6 +34,7 @@ const links = computed(() =>
         </template>
       </nav>
     </footer>
+    <div class="footer" aria-hidden="true">BackDoor</div>
   </div>
 </template>
 
@@ -87,5 +88,14 @@ const links = computed(() =>
   color: var(--muted);
   opacity: 0.45;
   pointer-events: none;
+}
+
+.footer {
+  margin: 0;
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  opacity: 0.12;
+  user-select: none;
 }
 </style>
