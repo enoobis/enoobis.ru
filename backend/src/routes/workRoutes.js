@@ -169,6 +169,26 @@ function fmtWorkTime(d) {
   return d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
 }
 
+function datesInRange(fromIso, toIso) {
+  const dates = [];
+  const cur = new Date(fromIso);
+  const end = new Date(toIso);
+  cur.setHours(0, 0, 0, 0);
+  while (cur < end) {
+    dates.push(fmtWorkDate(cur));
+    cur.setDate(cur.getDate() + 1);
+  }
+  return dates;
+}
+
+function personLabel(row) {
+  const name = String(row.full_name ?? "").trim();
+  if (name && name.toLowerCase() !== row.nickname.toLowerCase()) {
+    return `${name} · ${row.nickname}`;
+  }
+  return name || row.nickname;
+}
+
 router.get("/admin/work/export", authRequired, adminOnly, async (req, res) => {
   const range = parseRange(req);
   if (!range) return res.status(400).json({ error: "bad range" });
@@ -177,28 +197,37 @@ router.get("/admin/work/export", authRequired, adminOnly, async (req, res) => {
     return res.status(400).json({ error: "bad point" });
   }
   const rows = checkinsBetween(range.fromIso, range.toIso, pointId);
+  const dateCols = datesInRange(range.fromIso, range.toIso);
+
+  const byUser = new Map();
+  for (const r of rows) {
+    const key = r.nickname;
+    if (!byUser.has(key)) {
+      byUser.set(key, { label: personLabel(r), byDate: {} });
+    }
+    const entry = byUser.get(key);
+    const dk = fmtWorkDate(new Date(r.created_at));
+    if (!entry.byDate[dk]) entry.byDate[dk] = [];
+    entry.byDate[dk].push(fmtWorkTime(new Date(r.created_at)));
+  }
 
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet("отметки");
-  ws.columns = [
-    { header: "имя", key: "full_name", width: 28 },
-    { header: "ник", key: "nickname", width: 20 },
-    { header: "дата", key: "date", width: 14 },
-    { header: "время", key: "time", width: 10 },
-    { header: "точка", key: "point", width: 28 },
-    { header: "расстояние, м", key: "distance", width: 14 },
-  ];
+  ws.addRow(["имя", ...dateCols]);
   ws.getRow(1).font = { bold: true };
-  for (const r of rows.slice().reverse()) {
-    const d = new Date(r.created_at);
-    ws.addRow({
-      full_name: String(r.full_name ?? "").trim() || r.nickname,
-      nickname: r.nickname,
-      date: fmtWorkDate(d),
-      time: fmtWorkTime(d),
-      point: r.point_name,
-      distance: r.distance_m,
-    });
+  ws.getColumn(1).width = 28;
+  dateCols.forEach((_, i) => {
+    ws.getColumn(i + 2).width = 12;
+  });
+
+  const users = [...byUser.values()].sort((a, b) => a.label.localeCompare(b.label, "ru"));
+  for (const u of users) {
+    const line = [u.label];
+    for (const d of dateCols) {
+      const times = u.byDate[d];
+      line.push(times?.length ? times.join(", ") : "");
+    }
+    ws.addRow(line);
   }
 
   res.setHeader(

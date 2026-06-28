@@ -362,53 +362,13 @@ function fmtWorkTime(iso: string | Date) {
   return d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
 }
 
-function checkinPersonLabel(c: WorkCheckin): string {
+function checkinFullName(c: WorkCheckin): string {
   const name = c.full_name?.trim();
-  if (name && name.toLowerCase() !== c.nickname.toLowerCase()) {
-    return `${name} · ${c.nickname}`;
-  }
   return name || c.nickname;
 }
 
-const gridDates = computed(() => {
-  const { from, to } = rangeFor(period.value, periodOffset.value);
-  const dates: string[] = [];
-  const cur = new Date(from.getFullYear(), from.getMonth(), from.getDate());
-  const end = new Date(to.getFullYear(), to.getMonth(), to.getDate());
-  while (cur < end) {
-    dates.push(fmtWorkDate(cur));
-    cur.setDate(cur.getDate() + 1);
-  }
-  return dates;
-});
-
-type CheckinGridRow = {
-  key: string;
-  label: string;
-  byDate: Record<string, string[]>;
-};
-
-const checkinGrid = computed<CheckinGridRow[]>(() => {
-  const rows = new Map<string, CheckinGridRow>();
-  for (const c of checkins.value) {
-    const key = c.nickname;
-    let row = rows.get(key);
-    if (!row) {
-      row = { key, label: checkinPersonLabel(c), byDate: {} };
-      rows.set(key, row);
-    }
-    const dk = fmtWorkDate(c.created_at);
-    if (!row.byDate[dk]) row.byDate[dk] = [];
-    row.byDate[dk].push(fmtWorkTime(c.created_at));
-  }
-  return [...rows.values()].sort((a, b) => a.label.localeCompare(b.label, "ru"));
-});
-
-const gridColspan = computed(() => Math.max(1, 1 + gridDates.value.length));
-
-function gridCell(row: CheckinGridRow, date: string): string {
-  const times = row.byDate[date];
-  return times?.length ? times.join(", ") : "";
+function checkinNick(c: WorkCheckin): string {
+  return c.nickname;
 }
 
 onMounted(async () => {
@@ -544,23 +504,31 @@ onBeforeUnmount(() => {
       </p>
 
       <div class="checkins-table-wrap">
-        <table class="checkins-table checkins-grid">
+        <table class="checkins-table">
           <thead>
             <tr>
-              <th class="sticky-col person-head">имя</th>
-              <th v-for="d in gridDates" :key="d" class="num day-col">{{ d }}</th>
+              <th>имя</th>
+              <th>ник</th>
+              <th class="num">дата</th>
+              <th class="num">время</th>
+              <th>точка</th>
+              <th class="num">расстояние, м</th>
             </tr>
           </thead>
           <tbody>
             <tr v-if="loadingCheckins">
-              <td :colspan="gridColspan" class="empty-cell muted">загрузка…</td>
+              <td colspan="6" class="empty-cell muted">загрузка…</td>
             </tr>
-            <tr v-else-if="!checkinGrid.length">
-              <td :colspan="gridColspan" class="empty-cell muted">отметок нет за этот период</td>
+            <tr v-else-if="!checkins.length">
+              <td colspan="6" class="empty-cell muted">отметок нет за этот период</td>
             </tr>
-            <tr v-for="row in checkinGrid" v-else :key="row.key">
-              <th scope="row" class="sticky-col person-col">{{ row.label }}</th>
-              <td v-for="d in gridDates" :key="d" class="num day-cell muted">{{ gridCell(row, d) }}</td>
+            <tr v-for="c in checkins" v-else :key="c.id">
+              <td class="person-cell">{{ checkinFullName(c) }}</td>
+              <td>{{ checkinNick(c) }}</td>
+              <td class="num muted">{{ fmtWorkDate(c.created_at) }}</td>
+              <td class="num muted">{{ fmtWorkTime(c.created_at) }}</td>
+              <td>{{ c.point_name }}</td>
+              <td class="num muted">{{ c.distance_m }}</td>
             </tr>
           </tbody>
         </table>
@@ -762,10 +730,6 @@ onBeforeUnmount(() => {
   background: var(--surface);
 }
 
-.checkins-grid {
-  min-width: max(100%, 36rem);
-}
-
 .checkins-table {
   width: 100%;
   border-collapse: collapse;
@@ -788,9 +752,12 @@ onBeforeUnmount(() => {
   background: var(--bg);
 }
 
-.checkins-table tbody tr:last-child th,
 .checkins-table tbody tr:last-child td {
   border-bottom: none;
+}
+
+.checkins-table tbody tr:hover td {
+  background: var(--hover-surface);
 }
 
 .checkins-table th.num,
@@ -799,50 +766,8 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
-.sticky-col {
-  position: sticky;
-  left: 0;
-  z-index: 1;
-  background: var(--surface);
-  box-shadow: 1px 0 0 var(--border);
-}
-
-.checkins-grid thead .sticky-col {
-  background: var(--bg);
-}
-
-.person-head {
-  min-width: 10rem;
-  text-align: left;
-}
-
-.person-col {
-  min-width: 10rem;
-  max-width: 16rem;
-  text-align: left;
-  font-weight: 500;
+.person-cell {
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.day-col {
-  min-width: 5.5rem;
-  font-size: 0.72rem;
-  font-weight: 600;
-}
-
-.day-cell {
-  min-width: 5.5rem;
-  font-size: 0.8125rem;
-}
-
-.checkins-grid tbody tr:hover .sticky-col {
-  background: var(--hover-surface);
-}
-
-.checkins-grid tbody tr:hover td {
-  background: var(--hover-surface);
 }
 
 .empty-cell {
