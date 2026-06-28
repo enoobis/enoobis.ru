@@ -1200,9 +1200,9 @@ html[data-theme="contrast-white"] .glass {
 .spinner {
   width: 16px;
   height: 16px;
-  border: 2px solid var(--border);
-  border-top-color: var(--text);
-  border-radius: 999px;
+  border: none;
+  border-radius: 0;
+  background: url("/favicon.png") center / contain no-repeat;
   display: inline-block;
   animation: spin 0.7s linear infinite;
   vertical-align: middle;
