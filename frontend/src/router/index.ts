@@ -11,6 +11,11 @@ import LoginView from "../views/LoginView.vue";
 const router = createRouter({
   history: createWebHistory(),
   routes: [
+    {
+      path: "/admin",
+      name: "admin-decoy",
+      component: () => import("../views/NotFoundView.vue"),
+    },
     { path: "/", name: "home", component: HomeView },
 
     { path: "/blogs", name: "blog", component: BlogListView },
@@ -123,11 +128,6 @@ const router = createRouter({
       meta: { requiresAuth: true, requiresWork: true },
     },
     {
-      path: "/admin",
-      name: "admin-decoy",
-      component: () => import("../views/NotFoundView.vue"),
-    },
-    {
       path: PANEL_PATH,
       name: "panel",
       component: () => import("../views/AdminGateView.vue"),
@@ -171,6 +171,13 @@ const router = createRouter({
 
 router.beforeEach((to, from) => {
   const auth = useAuthStore();
+  const path = to.path.toLowerCase();
+  if (path === "/admin" || path.startsWith("/admin/")) {
+    if (to.name !== "admin-decoy") {
+      return { name: "admin-decoy", replace: true };
+    }
+    return true;
+  }
   if (to.name === "login" && typeof to.query.next === "string") {
     return { name: "login", replace: true };
   }
