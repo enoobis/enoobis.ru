@@ -163,6 +163,11 @@ server {
     location / {
         try_files \$uri \$uri/ /index.html;
     }
+
+    location = /index.html {
+        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+        try_files \$uri =404;
+    }
 }
 
 server {
@@ -204,6 +209,11 @@ $ssl_lines
 
     location / {
         try_files \$uri \$uri/ /index.html;
+    }
+
+    location = /index.html {
+        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+        try_files \$uri =404;
     }
 }
 EOF
@@ -247,6 +257,11 @@ server {
 
     location / {
         try_files \$uri \$uri/ /index.html;
+    }
+
+    location = /index.html {
+        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+        try_files \$uri =404;
     }
 }
 EOF

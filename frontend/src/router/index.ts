@@ -179,7 +179,7 @@ router.beforeEach((to, from) => {
     return true;
   }
   if (to.name === "login" && typeof to.query.next === "string") {
-    return { name: "login", replace: true };
+    return { path: "/login", replace: true };
   }
   if (to.name === "home" && auth.token) {
     return { name: "micro", replace: true };
@@ -187,7 +187,9 @@ router.beforeEach((to, from) => {
   if ((to.name === "login" || to.name === "register") && auth.token) {
     return { name: "micro", replace: true };
   }
-  if (to.meta.requiresAuth && !auth.token) return { name: "login" };
+  if (to.meta.requiresAuth && !auth.token) {
+    return { path: "/login", replace: true };
+  }
   if (to.meta.requiresWork && auth.role !== "master" && auth.role !== "admin") {
     return { name: "home" };
   }
@@ -198,6 +200,9 @@ router.beforeEach((to, from) => {
 });
 
 router.afterEach((to) => {
+  if (to.name === "login" && typeof to.query.next === "string") {
+    void router.replace({ path: "/login" });
+  }
   applyDocumentSeo();
   if (!isProfileThemeRoute(to.path)) {
     clearProfileOwnerTheme();
