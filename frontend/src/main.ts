@@ -22,15 +22,12 @@ setUnauthorizedHandler(() => {
   if (!auth.token) return;
   const current = router.currentRoute.value;
   auth.logout();
-  if (current.meta.panel || current.name === "admin") {
-    void router.replace({ name: "admin" });
+  if (current.meta.panel || current.name === "panel") {
+    void router.replace({ path: current.path });
     return;
   }
   if (current.name !== "login") {
-    void router.replace({
-      name: "login",
-      query: { next: current.fullPath },
-    });
+    void router.replace({ name: "login" });
   }
 });
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import { RouterLink, useRoute, useRouter } from "vue-router";
+import { RouterLink, useRouter } from "vue-router";
 import { useAuthStore } from "../stores/auth";
 
 const email = ref("");
@@ -8,7 +8,6 @@ const password = ref("");
 const err = ref("");
 const loading = ref(false);
 const router = useRouter();
-const route = useRoute();
 const auth = useAuthStore();
 
 async function submit() {
@@ -16,9 +15,7 @@ async function submit() {
   loading.value = true;
   try {
     await auth.login(email.value, password.value);
-    const rawNext = (route.query.next as string) || "/courses";
-    const next = rawNext.startsWith("/admin") ? "/courses" : rawNext;
-    await router.push(next);
+    await router.push("/courses");
   } catch (e) {
     err.value = e instanceof Error ? e.message : "ошибка";
   } finally {

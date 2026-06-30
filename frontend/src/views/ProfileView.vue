@@ -217,7 +217,7 @@ async function load() {
     if (seq !== loadSeq) return;
     const msg = e instanceof Error ? e.message : "ошибка";
     if (!auth.token && msg.toLowerCase().includes("login required")) {
-      await router.push({ name: "login", query: { next: route.fullPath } });
+      await router.push({ name: "login" });
       return;
     }
     err.value = msg.toLowerCase().includes("forbidden") || msg.includes("403")

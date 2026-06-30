@@ -10,6 +10,7 @@ import {
 } from "./utils/motionPresets";
 import { syncLiteMotion, useLiteMotion } from "./utils/reducedMotion";
 import { useAuthStore } from "./stores/auth";
+import { PANEL_PATH } from "./config/panel";
 import { useChatStore } from "./stores/chat";
 import { useReaderStore } from "./stores/reader";
 import { useSessionStore } from "./stores/session";
@@ -546,7 +547,7 @@ watch(
             </RouterLink>
             <RouterLink
               v-if="auth.isPanelStaff"
-              to="/admin"
+              :to="PANEL_PATH"
               class="nav-menu-link"
               @click="closeNavDrawer"
             >
@@ -678,7 +679,7 @@ watch(
                 </RouterLink>
                 <RouterLink
                   v-if="auth.isPanelStaff"
-                  to="/admin"
+                  :to="PANEL_PATH"
                   class="nav-menu-link"
                   @click="closeNavDrawer"
                 >

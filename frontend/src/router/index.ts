@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from "vue-router";
 import { useAuthStore } from "../stores/auth";
 import { applyDocumentSeo } from "../utils/seo";
 import { clearProfileOwnerTheme, isProfileThemeRoute } from "../utils/preferences";
+import { PANEL_PATH } from "../config/panel";
 import HomeView from "../views/HomeView.vue";
 import MicroFeedView from "../views/MicroFeedView.vue";
 import BlogListView from "../views/BlogListView.vue";
@@ -123,7 +124,12 @@ const router = createRouter({
     },
     {
       path: "/admin",
-      name: "admin",
+      name: "admin-decoy",
+      component: () => import("../views/NotFoundView.vue"),
+    },
+    {
+      path: PANEL_PATH,
+      name: "panel",
       component: () => import("../views/AdminGateView.vue"),
       meta: { panel: true },
     },
@@ -165,13 +171,16 @@ const router = createRouter({
 
 router.beforeEach((to, from) => {
   const auth = useAuthStore();
+  if (to.name === "login" && typeof to.query.next === "string") {
+    return { name: "login", replace: true };
+  }
   if (to.name === "home" && auth.token) {
     return { name: "micro", replace: true };
   }
   if ((to.name === "login" || to.name === "register") && auth.token) {
     return { name: "micro", replace: true };
   }
-  if (to.meta.requiresAuth && !auth.token) return { name: "login", query: { next: to.fullPath } };
+  if (to.meta.requiresAuth && !auth.token) return { name: "login" };
   if (to.meta.requiresWork && auth.role !== "master" && auth.role !== "admin") {
     return { name: "home" };
   }
