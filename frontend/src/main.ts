@@ -22,9 +22,8 @@ setUnauthorizedHandler(() => {
   if (!auth.token) return;
   const current = router.currentRoute.value;
   auth.logout();
-  if (current.meta.requiresPanel) {
-    const pathMatch = current.path.split("/").filter(Boolean);
-    void router.replace({ name: "not-found", params: { pathMatch } });
+  if (current.meta.panel || current.name === "admin") {
+    void router.replace({ name: "admin" });
     return;
   }
   if (current.name !== "login") {
