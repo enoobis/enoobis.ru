@@ -163,6 +163,11 @@ const router = createRouter({
   ],
 });
 
+function hidePanelRoute(path: string) {
+  const pathMatch = path.split("/").filter(Boolean);
+  return { name: "not-found", params: { pathMatch }, replace: true as const };
+}
+
 router.beforeEach((to, from) => {
   const auth = useAuthStore();
   if (to.name === "home" && auth.token) {
@@ -171,8 +176,10 @@ router.beforeEach((to, from) => {
   if ((to.name === "login" || to.name === "register") && auth.token) {
     return { name: "micro", replace: true };
   }
+  if (to.meta.requiresPanel && (!auth.token || !auth.isPanelStaff)) {
+    return hidePanelRoute(to.path);
+  }
   if (to.meta.requiresAuth && !auth.token) return { name: "login", query: { next: to.fullPath } };
-  if (to.meta.requiresPanel && !auth.isPanelStaff) return { name: "home" };
   if (to.meta.requiresWork && auth.role !== "master" && auth.role !== "admin") {
     return { name: "home" };
   }

@@ -16,7 +16,8 @@ async function submit() {
   loading.value = true;
   try {
     await auth.login(email.value, password.value);
-    const next = (route.query.next as string) || "/courses";
+    const rawNext = (route.query.next as string) || "/courses";
+    const next = rawNext.startsWith("/admin") ? "/courses" : rawNext;
     await router.push(next);
   } catch (e) {
     err.value = e instanceof Error ? e.message : "ошибка";

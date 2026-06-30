@@ -20,11 +20,17 @@ app.use(router);
 setUnauthorizedHandler(() => {
   const auth = useAuthStore();
   if (!auth.token) return;
+  const current = router.currentRoute.value;
   auth.logout();
-  if (router.currentRoute.value.name !== "login") {
+  if (current.meta.requiresPanel) {
+    const pathMatch = current.path.split("/").filter(Boolean);
+    void router.replace({ name: "not-found", params: { pathMatch } });
+    return;
+  }
+  if (current.name !== "login") {
     void router.replace({
       name: "login",
-      query: { next: router.currentRoute.value.fullPath },
+      query: { next: current.fullPath },
     });
   }
 });
