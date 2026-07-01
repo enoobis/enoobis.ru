@@ -1,5 +1,5 @@
 /**
- * global ripple effect - adds a circular wave to any clicked <button> / .btn.
+ * global ripple effect - monochrome touch feedback on buttons and nav controls.
  * respects prefers-reduced-motion and skips elements opted out via data-no-ripple.
  */
 
@@ -10,10 +10,19 @@ const REDUCED_MOTION =
     ? window.matchMedia("(prefers-reduced-motion: reduce)")
     : null;
 
-const COARSE_POINTER =
-  typeof window !== "undefined" && window.matchMedia
-    ? window.matchMedia("(pointer: coarse)")
-    : null;
+function isRippleTarget(el: HTMLElement): boolean {
+  if (el.hasAttribute("data-no-ripple")) return false;
+  if (el instanceof HTMLButtonElement && el.disabled) return false;
+  if (el.tagName === "BUTTON") return true;
+  return (
+    el.classList.contains("btn") ||
+    el.classList.contains("icon-btn") ||
+    el.classList.contains("nav-link") ||
+    el.classList.contains("nav-menu-link") ||
+    el.classList.contains("filter-tab") ||
+    el.classList.contains("cta")
+  );
+}
 
 function spawnRipple(target: HTMLElement, x: number, y: number) {
   const rect = target.getBoundingClientRect();
@@ -30,14 +39,10 @@ function spawnRipple(target: HTMLElement, x: number, y: number) {
 }
 
 function onPointerDown(event: PointerEvent) {
-  if (REDUCED_MOTION?.matches || COARSE_POINTER?.matches || prefersLiteMotion()) return;
+  if (REDUCED_MOTION?.matches || prefersLiteMotion()) return;
   const path = event.composedPath();
   const target = path.find(
-    (n) =>
-      n instanceof HTMLElement &&
-      (n.tagName === "BUTTON" || n.classList.contains("btn")) &&
-      !n.hasAttribute("data-no-ripple") &&
-      !(n as HTMLButtonElement).disabled,
+    (n) => n instanceof HTMLElement && isRippleTarget(n),
   ) as HTMLElement | undefined;
   if (!target) return;
   const cs = window.getComputedStyle(target);

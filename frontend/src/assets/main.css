@@ -126,6 +126,46 @@ body {
 
 html {
   scrollbar-gutter: stable;
+  -webkit-tap-highlight-color: transparent;
+  tap-highlight-color: transparent;
+}
+
+a,
+button,
+input,
+select,
+textarea,
+label,
+summary,
+[role="button"],
+.nav-link,
+.nav-menu-link,
+.icon-btn,
+.filter-tab,
+.cta,
+.alt-link {
+  -webkit-tap-highlight-color: transparent;
+  tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+@media (pointer: coarse) {
+  .nav-link:active,
+  .nav a:active,
+  .nav-menu-link:active,
+  .icon-btn:active,
+  .filter-tab:active,
+  .cta:active,
+  .alt-link:active {
+    opacity: 0.78;
+    transition-duration: var(--dur-1);
+  }
+
+  .nav-link:active,
+  .nav a:active,
+  .nav-menu-link:active {
+    background: var(--hover-surface);
+  }
 }
 
 body {
