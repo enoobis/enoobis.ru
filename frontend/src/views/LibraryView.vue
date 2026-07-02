@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import {
   deleteBook,
@@ -104,7 +104,8 @@ const savingEdit = ref(false);
 
 async function load() {
   if (!auth.token) return;
-  loading.value = true;
+  const showLoading = !books.value.length;
+  if (showLoading) loading.value = true;
   err.value = "";
   try {
     const r = await listBooks(auth.token, {
@@ -119,6 +120,11 @@ async function load() {
   } finally {
     loading.value = false;
   }
+}
+
+function scrollToBook(id: string) {
+  const el = document.querySelector(`[data-book-id="${id}"]`);
+  el?.scrollIntoView({ block: "nearest" });
 }
 
 async function loadCategories() {
@@ -253,16 +259,21 @@ async function saveEdit() {
   }
   savingEdit.value = true;
   err.value = "";
+  const savedId = editingId.value;
   try {
-    await updateBookMetadata(auth.token, editingId.value, {
+    await updateBookMetadata(auth.token, savedId, {
       title: editTitle.value.trim(),
       author: editAuthor.value.trim(),
       description: editDescription.value.trim(),
       category: editCategory.value.trim(),
     });
     toastSuccess("сохранено");
+    const scrollY = window.scrollY;
     closeEdit();
     await Promise.all([load(), loadCategories()]);
+    await nextTick();
+    window.scrollTo(0, scrollY);
+    scrollToBook(savedId);
   } catch (e) {
     err.value = describe(e instanceof Error ? e.message : "ошибка");
     toastError(e);
@@ -424,7 +435,7 @@ onBeforeUnmount(() => {
         <AppLoading v-if="loading" class="list-panel-state" />
         <p v-else-if="!books.length" class="list-panel-state muted">{{ listEmptyLabel }}</p>
         <ul v-else class="list">
-          <li v-for="b in books" :key="b.id" class="list-row">
+          <li v-for="b in books" :key="b.id" class="list-row" :data-book-id="b.id">
             <div class="info">
               <span class="title">{{ b.title }}</span>
               <span v-if="b.author" class="muted small">{{ b.author }}</span>
