@@ -20,6 +20,19 @@ const fieldRight = ref(0);
 const reduced = prefersReducedMotion();
 
 const collapsedWidth = 44;
+const leftGap = 16;
+
+function leftNavRightEdge(bar: HTMLElement, fallbackLeft: number) {
+  const nodes = bar.querySelectorAll<HTMLElement>(
+    ".nav-menu-anchor, .brand-link, .nav-guest-links",
+  );
+  let right = fallbackLeft;
+  for (const node of nodes) {
+    const rect = node.getBoundingClientRect();
+    if (rect.width > 0) right = Math.max(right, rect.right);
+  }
+  return right + leftGap;
+}
 
 function syncLayout() {
   if (typeof window === "undefined") return;
@@ -32,13 +45,7 @@ function syncLayout() {
 
   const triggerRect = trigger.getBoundingClientRect();
   const barRect = bar.getBoundingClientRect();
-  const anchor =
-    bar.querySelector<HTMLElement>(".nav-menu-anchor") ??
-    bar.querySelector<HTMLElement>(".brand-link");
-
-  const leftEdge = anchor
-    ? anchor.getBoundingClientRect().right + 10
-    : barRect.left + 12;
+  const leftEdge = leftNavRightEdge(bar, barRect.left + 12);
   const width = Math.max(collapsedWidth, triggerRect.right - leftEdge);
 
   fieldTop.value = triggerRect.top + triggerRect.height / 2;
@@ -130,8 +137,8 @@ defineExpose({ focus: focusInput });
       type="button"
       class="icon-btn nav-search-trigger"
       :class="{ 'nav-search-trigger--ghost': open }"
-      aria-label="╨┐╨╛╨╕╤Б╨║"
-      title="╨┐╨╛╨╕╤Б╨║"
+      aria-label="поиск"
+      title="поиск"
       :aria-expanded="open"
       @click.stop="toggleSearch"
     >
