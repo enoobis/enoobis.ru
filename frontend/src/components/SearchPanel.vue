@@ -165,6 +165,19 @@ function onGlobalInput() {
 }
 
 function onInput() {
+  if (!q.value.trim()) {
+    if (timer) clearTimeout(timer);
+    timer = null;
+    if (scope.value === "global") {
+      if (!props.embedded) {
+        router.replace({ query: {} });
+      }
+      void runGlobal();
+      return;
+    }
+    applyFeedSearch();
+    return;
+  }
   if (scope.value === "global") onGlobalInput();
   else onFeedInput();
 }

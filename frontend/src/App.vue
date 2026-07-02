@@ -77,18 +77,14 @@ const sheetMobile = ref(
 const sheetGeom = ref({ top: 0, left: 0, width: 0 });
 const SHEET_MOBILE_MAX = 640;
 const profileCoins = computed(() => session.coins);
-const searchActive = computed(
-  () => searchOpen.value && searchQuery.value.trim().length > 0,
+const searchEngineMounted = computed(
+  () => searchOpen.value && auth.token && !sheetMobile.value,
 );
 const searchDropdownOpen = computed(() => {
-  if (!searchActive.value) return false;
+  if (!searchEngineMounted.value) return false;
+  if (!searchQuery.value.trim()) return false;
   const path = route.path;
   return !(path.startsWith("/library") || path.startsWith("/courses"));
-});
-const searchHiddenEngine = computed(() => {
-  if (!searchActive.value) return false;
-  const path = route.path;
-  return path.startsWith("/library") || path.startsWith("/courses");
 });
 const headerSheetOpen = computed(
   () => navDrawerOpen.value || profileMenuOpen.value || searchDropdownOpen.value,
@@ -631,31 +627,21 @@ watch(
           </div>
         </div>
       </Transition>
-      <SearchPanel
-        v-if="searchHiddenEngine && auth.token && !sheetMobile"
-        embedded
-        class="search-panel-host--hidden"
-        aria-hidden="true"
-        :query="searchQuery"
-        @update:query="searchQuery = $event"
-        @close="closeSearch"
-      />
-      <Transition name="nav-sheet">
-        <div
-          v-if="searchDropdownOpen && auth.token && !sheetMobile"
-          class="nav-dropdown search-menu-sheet"
-          role="dialog"
-          aria-modal="true"
-          aria-label="поиск"
-        >
-          <SearchPanel
-            embedded
-            :query="searchQuery"
-            @update:query="searchQuery = $event"
-            @close="closeSearch"
-          />
-        </div>
-      </Transition>
+      <div
+        v-if="searchEngineMounted"
+        :class="searchDropdownOpen ? 'nav-dropdown search-menu-sheet' : 'search-panel-host--hidden'"
+        :role="searchDropdownOpen ? 'dialog' : undefined"
+        :aria-modal="searchDropdownOpen ? 'true' : undefined"
+        :aria-label="searchDropdownOpen ? 'поиск' : undefined"
+        :aria-hidden="searchDropdownOpen ? undefined : 'true'"
+      >
+        <SearchPanel
+          embedded
+          :query="searchQuery"
+          @update:query="searchQuery = $event"
+          @close="closeSearch"
+        />
+      </div>
     </header>
     <Teleport to="body">
       <Transition name="nav-menu">
