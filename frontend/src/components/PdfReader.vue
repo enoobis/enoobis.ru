@@ -1,34 +1,45 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { getDocument, GlobalWorkerOptions, type PDFDocumentProxy } from "pdfjs-dist";
 import PdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?worker";
 import { useReaderStore } from "../stores/reader";
+import { useAuthStore } from "../stores/auth";
+import { getReaderProgress, setReaderProgress } from "../utils/readerProgress";
 
 GlobalWorkerOptions.workerPort = new PdfWorker();
 
 const props = defineProps<{
   url: string;
   title: string;
+  progressKey?: string;
 }>();
 
 const emit = defineEmits<{ close: [] }>();
 
 const reader = useReaderStore();
+const auth = useAuthStore();
 const loading = ref(true);
 const err = ref("");
 const pageCount = ref(0);
 const currentPage = ref(1);
 const zoom = ref(1);
-const scrollEl = ref<HTMLElement | null>(null);
-const pageEls = ref<(HTMLElement | null)[]>([]);
+const stageEl = ref<HTMLElement | null>(null);
+const canvasEl = ref<HTMLCanvasElement | null>(null);
+const pageLayouts = ref<{ width: number; height: number }[]>([]);
 
 let pdfDoc: PDFDocumentProxy | null = null;
-let baseRatio = 1.414;
-let observer: IntersectionObserver | null = null;
+let pageRawSizes: { w: number; h: number }[] = [];
 let reflowTimer: ReturnType<typeof setTimeout> | null = null;
-let scrollRaf = 0;
 let loadSeq = 0;
-const rendered = new Set<number>();
+let renderSeq = 0;
+
+function storageKey(): string | null {
+  if (!props.progressKey) return null;
+  const uid = auth.user?.id ?? "local";
+  return `${uid}:${props.progressKey}`;
+}
+
+const activeLayout = computed(() => pageLayouts.value[currentPage.value - 1] ?? null);
 
 function navOffset(): number {
   const v = getComputedStyle(document.documentElement).getPropertyValue("--reader-top");
@@ -39,7 +50,7 @@ function navOffset(): number {
 function viewportBox() {
   const padX = window.innerWidth <= 640 ? 12 : 24;
   const padY = window.innerWidth <= 640 ? 8 : 16;
-  const el = scrollEl.value;
+  const el = stageEl.value;
   const w = el ? el.clientWidth - padX * 2 : window.innerWidth - padX * 2;
   const h = window.innerHeight - navOffset() - padY * 2;
   return {
@@ -58,40 +69,63 @@ function pageCssSize(pageW: number, pageH: number) {
   };
 }
 
-function setPlaceholders() {
-  const box = viewportBox();
-  const fit = Math.min(box.width, box.height / baseRatio);
-  const cssWidth = fit * zoom.value;
-  for (const el of pageEls.value) {
-    if (!el) continue;
-    el.style.width = `${cssWidth}px`;
-    el.style.height = `${cssWidth * baseRatio}px`;
-  }
+function rebuildLayouts() {
+  pageLayouts.value = pageRawSizes.map(({ w, h }) => pageCssSize(w, h));
 }
 
-async function renderPageInto(num: number) {
-  if (!pdfDoc || rendered.has(num)) return;
-  const wrap = pageEls.value[num - 1];
-  if (!wrap) return;
-  const canvas = wrap.querySelector("canvas") as HTMLCanvasElement | null;
-  if (!canvas) return;
+function persistProgress() {
+  const key = storageKey();
+  if (!key || pageCount.value === 0) return;
+  setReaderProgress(key, currentPage.value);
+}
+
+function savedStartPage(): number {
+  const key = storageKey();
+  if (!key) return 1;
+  return getReaderProgress(key) ?? 1;
+}
+
+async function loadPageMetrics(doc: PDFDocumentProxy, seq: number) {
+  const raw: { w: number; h: number }[] = new Array(doc.numPages);
+  const batch = 20;
+  for (let start = 1; start <= doc.numPages; start += batch) {
+    if (seq !== loadSeq) return;
+    const end = Math.min(start + batch - 1, doc.numPages);
+    const nums = Array.from({ length: end - start + 1 }, (_, i) => start + i);
+    const pages = await Promise.all(nums.map((n) => doc.getPage(n)));
+    for (let i = 0; i < pages.length; i++) {
+      const v = pages[i].getViewport({ scale: 1 });
+      raw[start - 1 + i] = { w: v.width, h: v.height };
+    }
+  }
+  pageRawSizes = raw;
+  rebuildLayouts();
+}
+
+async function renderCurrentPage() {
+  const num = currentPage.value;
+  const canvas = canvasEl.value;
+  if (!pdfDoc || !canvas || num < 1 || num > pageCount.value) return;
+
+  const seq = ++renderSeq;
   const myDoc = pdfDoc;
-  const page = await myDoc.getPage(num);
-  if (pdfDoc !== myDoc) return;
-  const base = page.getViewport({ scale: 1 });
-  const { width: cssWidth, height: cssHeight } = pageCssSize(base.width, base.height);
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  const viewport = page.getViewport({ scale: (cssWidth / base.width) * dpr });
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
-  canvas.width = viewport.width;
-  canvas.height = viewport.height;
-  canvas.style.width = `${cssWidth}px`;
-  canvas.style.height = `${cssHeight}px`;
-  wrap.style.width = `${cssWidth}px`;
-  wrap.style.height = `${cssHeight}px`;
-  await page.render({ canvas, canvasContext: ctx, viewport }).promise;
-  rendered.add(num);
+  try {
+    const page = await myDoc.getPage(num);
+    if (pdfDoc !== myDoc || seq !== renderSeq) return;
+    const base = page.getViewport({ scale: 1 });
+    const { width: cssWidth, height: cssHeight } = pageCssSize(base.width, base.height);
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const viewport = page.getViewport({ scale: (cssWidth / base.width) * dpr });
+    const ctx = canvas.getContext("2d");
+    if (!ctx || seq !== renderSeq) return;
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    canvas.style.width = `${cssWidth}px`;
+    canvas.style.height = `${cssHeight}px`;
+    await page.render({ canvas, canvasContext: ctx, viewport }).promise;
+  } catch {
+    /* next navigation will retry */
+  }
 }
 
 async function waitForLayout() {
@@ -101,124 +135,49 @@ async function waitForLayout() {
   });
 }
 
-async function waitForPageRefs() {
-  for (let i = 0; i < 40; i++) {
-    await nextTick();
-    const last = pageCount.value - 1;
-    if (pageEls.value[0] && (last < 0 || pageEls.value[last])) return;
-  }
+function setPage(num: number, save = true) {
+  const next = Math.max(1, Math.min(num, pageCount.value || 1));
+  if (next === currentPage.value) return;
+  currentPage.value = next;
+  reader.setPage(next, pageCount.value);
+  if (save) persistProgress();
+  void renderCurrentPage();
 }
 
-function scrollToPage(num: number) {
-  const root = scrollEl.value;
-  const el = pageEls.value[num - 1];
-  if (!root || !el) return;
-  const padTop = parseFloat(getComputedStyle(root).paddingTop || "0");
-  const delta = el.getBoundingClientRect().top - root.getBoundingClientRect().top - padTop;
-  root.scrollTop += delta;
+function prevPage() {
+  if (currentPage.value <= 1) return;
+  setPage(currentPage.value - 1);
 }
 
-function updateVisiblePage() {
-  const root = scrollEl.value;
-  if (!root || pageCount.value === 0) return;
-
-  const rootRect = root.getBoundingClientRect();
-  const anchorY = rootRect.top + Math.min(root.clientHeight * 0.12, 48);
-  const viewTop = rootRect.top + 4;
-  const viewBottom = rootRect.bottom - 4;
-
-  let best = 0;
-  let bestDist = Infinity;
-
-  for (const el of pageEls.value) {
-    if (!el) continue;
-    const num = Number(el.dataset.page);
-    if (!Number.isFinite(num) || num < 1) continue;
-    const rect = el.getBoundingClientRect();
-    if (rect.height <= 1) continue;
-    if (rect.bottom <= viewTop || rect.top >= viewBottom) continue;
-    const dist = Math.abs(rect.top - anchorY);
-    if (dist < bestDist) {
-      bestDist = dist;
-      best = num;
-    }
-  }
-
-  if (best === 0) {
-    const gap = parseFloat(getComputedStyle(root).rowGap || getComputedStyle(root).gap || "12") || 12;
-    let offset = 0;
-    best = 1;
-    for (let i = 0; i < pageEls.value.length; i++) {
-      const el = pageEls.value[i];
-      if (!el) continue;
-      const h = el.getBoundingClientRect().height;
-      if (h <= 1) continue;
-      if (root.scrollTop < offset + h) {
-        best = i + 1;
-        break;
-      }
-      offset += h + gap;
-      best = i + 1;
-    }
-  }
-
-  if (currentPage.value !== best) {
-    currentPage.value = best;
-    reader.setPage(best, pageCount.value);
-  }
+function nextPage() {
+  if (currentPage.value >= pageCount.value) return;
+  setPage(currentPage.value + 1);
 }
 
-function onScroll() {
-  if (scrollRaf) cancelAnimationFrame(scrollRaf);
-  scrollRaf = requestAnimationFrame(() => {
-    scrollRaf = 0;
-    updateVisiblePage();
-  });
-}
-
-function setupObserver() {
-  observer?.disconnect();
-  observer = new IntersectionObserver(
-    (entries) => {
-      for (const e of entries) {
-        if (!e.isIntersecting) continue;
-        const num = Number((e.target as HTMLElement).dataset.page);
-        if (Number.isFinite(num) && num >= 1) void renderPageInto(num);
-      }
-    },
-    { root: scrollEl.value, rootMargin: "240px 0px", threshold: 0.01 },
-  );
-  for (const el of pageEls.value) if (el) observer.observe(el);
-}
-
-async function resetScrollAndShowFirstPage() {
-  await waitForPageRefs();
-  const root = scrollEl.value;
+function onTap(event: MouseEvent) {
+  if (loading.value || err.value) return;
+  const root = stageEl.value;
   if (!root) return;
+  const rect = root.getBoundingClientRect();
+  const x = event.clientX - rect.left;
+  if (x < rect.width * 0.38) prevPage();
+  else if (x > rect.width * 0.62) nextPage();
+}
 
-  setPlaceholders();
+async function openAtPage(num: number) {
   await waitForLayout();
-
-  root.scrollTop = 0;
-  await renderPageInto(1);
-  if (pageCount.value > 1) void renderPageInto(2);
-
-  await waitForLayout();
-  root.scrollTop = 0;
-  scrollToPage(1);
-
-  setupObserver();
-  updateVisiblePage();
+  const start = Math.max(1, Math.min(num, pageCount.value));
+  currentPage.value = start;
+  reader.setPage(start, pageCount.value);
+  await renderCurrentPage();
 }
 
 function reflow() {
-  const keepTop = scrollEl.value?.scrollTop ?? 0;
-  rendered.clear();
-  setPlaceholders();
-  setupObserver();
-  if (scrollEl.value) scrollEl.value.scrollTop = keepTop;
-  void renderPageInto(currentPage.value || 1);
-  updateVisiblePage();
+  rebuildLayouts();
+  void nextTick().then(async () => {
+    await waitForLayout();
+    await renderCurrentPage();
+  });
 }
 
 function scheduleReflow() {
@@ -237,6 +196,7 @@ function zoomOut() {
 }
 
 function close() {
+  persistProgress();
   emit("close");
 }
 
@@ -244,10 +204,10 @@ async function loadPdf() {
   const seq = ++loadSeq;
   loading.value = true;
   err.value = "";
-  rendered.clear();
   currentPage.value = 1;
   pageCount.value = 0;
-  pageEls.value = [];
+  pageLayouts.value = [];
+  pageRawSizes = [];
   pdfDoc?.cleanup();
   pdfDoc = null;
   reader.setPage(0, 0);
@@ -272,14 +232,12 @@ async function loadPdf() {
       return;
     }
     pdfDoc = doc;
-    const first = await pdfDoc.getPage(1);
-    const v = first.getViewport({ scale: 1 });
-    baseRatio = v.height / v.width;
-    pageCount.value = pdfDoc.numPages;
-    pageEls.value = Array.from({ length: pdfDoc.numPages }, () => null);
+    pageCount.value = doc.numPages;
+    await loadPageMetrics(doc, seq);
+    if (seq !== loadSeq) return;
     loading.value = false;
     if (seq !== loadSeq) return;
-    await resetScrollAndShowFirstPage();
+    await openAtPage(savedStartPage());
     if (seq !== loadSeq) return;
   } catch (e) {
     if (seq !== loadSeq) return;
@@ -290,6 +248,8 @@ async function loadPdf() {
 
 function onKey(event: KeyboardEvent) {
   if (event.key === "Escape") close();
+  if (event.key === "ArrowLeft" || event.key === "PageUp") prevPage();
+  if (event.key === "ArrowRight" || event.key === "PageDown") nextPage();
 }
 
 function onResize() {
@@ -308,11 +268,6 @@ watch(
   },
 );
 
-watch(scrollEl, (el, prev) => {
-  prev?.removeEventListener("scroll", onScroll);
-  el?.addEventListener("scroll", onScroll, { passive: true });
-});
-
 onMounted(() => {
   reader.register({
     title: props.title,
@@ -322,18 +277,15 @@ onMounted(() => {
   });
   window.addEventListener("keydown", onKey);
   window.addEventListener("resize", onResize);
-  scrollEl.value?.addEventListener("scroll", onScroll, { passive: true });
   void loadPdf();
 });
 
 onBeforeUnmount(() => {
+  persistProgress();
   reader.unregister();
   window.removeEventListener("keydown", onKey);
   window.removeEventListener("resize", onResize);
-  scrollEl.value?.removeEventListener("scroll", onScroll);
-  if (scrollRaf) cancelAnimationFrame(scrollRaf);
   if (reflowTimer) clearTimeout(reflowTimer);
-  observer?.disconnect();
   pdfDoc?.cleanup();
   pdfDoc = null;
 });
@@ -341,24 +293,25 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="pdf-reader" role="dialog" aria-modal="true" :aria-label="title">
-    <div ref="scrollEl" class="pdf-body">
+    <div
+      ref="stageEl"
+      class="pdf-stage"
+      @click="onTap"
+    >
       <p v-if="loading" class="pdf-state">
         <span class="spinner" aria-hidden="true" /> загрузка
       </p>
       <p v-else-if="err" class="pdf-state error">{{ err }}</p>
-      <template v-else>
-        <div
-          v-for="n in pageCount"
-          :key="n"
-          :ref="(el) => {
-            pageEls[n - 1] = (el as HTMLElement | null) ?? null;
-          }"
-          class="pdf-page-wrap"
-          :data-page="n"
-        >
-          <canvas class="pdf-canvas" />
-        </div>
-      </template>
+      <div
+        v-else-if="activeLayout"
+        class="pdf-page-wrap"
+        :style="{
+          width: `${activeLayout.width}px`,
+          height: `${activeLayout.height}px`,
+        }"
+      >
+        <canvas ref="canvasEl" class="pdf-canvas" />
+      </div>
     </div>
   </div>
 </template>
@@ -376,18 +329,16 @@ onBeforeUnmount(() => {
   background: var(--bg);
 }
 
-.pdf-body {
+.pdf-stage {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  overflow-anchor: none;
-  -webkit-overflow-scrolling: touch;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 0.75rem;
+  justify-content: center;
   padding: 0.75rem;
+  touch-action: manipulation;
+  user-select: none;
+  cursor: default;
 }
 
 .pdf-state {
@@ -400,7 +351,7 @@ onBeforeUnmount(() => {
 
 .pdf-page-wrap {
   flex-shrink: 0;
-  background: #fff;
+  background: var(--surface);
   border-radius: 2px;
   box-shadow: 0 0 0 1px var(--border);
   overflow: hidden;
@@ -408,14 +359,12 @@ onBeforeUnmount(() => {
 
 .pdf-canvas {
   display: block;
-  width: 100%;
-  height: 100%;
+  vertical-align: top;
 }
 
 @media (max-width: 640px) {
-  .pdf-body {
+  .pdf-stage {
     padding: 0.4rem;
-    gap: 0.5rem;
   }
 }
 </style>

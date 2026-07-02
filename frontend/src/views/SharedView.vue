@@ -136,6 +136,7 @@ onBeforeUnmount(() => {
       v-if="readerOpen && readerUrl"
       :url="readerUrl"
       :title="data?.kind === 'file' ? data.file.original_name : ''"
+      :progress-key="`share:${tokenStr}`"
       @close="closeReader"
     />
   </section>

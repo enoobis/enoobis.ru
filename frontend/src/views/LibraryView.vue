@@ -90,6 +90,7 @@ function isPdfBook(b: LibraryBook) {
 const readerOpen = ref(false);
 const readerUrl = ref<string | null>(null);
 const readerTitle = ref("");
+const readerProgressKey = ref<string | null>(null);
 
 const editOpen = ref(false);
 const editingId = ref<string | null>(null);
@@ -194,6 +195,7 @@ async function openReader(b: LibraryBook) {
   err.value = "";
   try {
     readerTitle.value = b.title;
+    readerProgressKey.value = b.id;
     readerUrl.value = await libraryReadUrl(b.id, auth.token);
     readerOpen.value = true;
   } catch (e) {
@@ -206,6 +208,7 @@ function closeReader() {
   readerOpen.value = false;
   readerUrl.value = null;
   readerTitle.value = "";
+  readerProgressKey.value = null;
 }
 
 function openEdit(b: LibraryBook) {
@@ -421,6 +424,7 @@ onBeforeUnmount(() => {
         v-if="readerOpen && readerUrl"
         :url="readerUrl"
         :title="readerTitle"
+        :progress-key="readerProgressKey ?? undefined"
         @close="closeReader"
       />
 

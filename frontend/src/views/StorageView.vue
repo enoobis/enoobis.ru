@@ -64,6 +64,7 @@ const err = ref("");
 const readerOpen = ref(false);
 const readerUrl = ref<string | null>(null);
 const readerTitle = ref("");
+const readerProgressKey = ref<string | null>(null);
 
 const mediaOpen = ref(false);
 const mediaUrl = ref("");
@@ -125,6 +126,7 @@ async function openPreview(f: StoredFile) {
     const { url, preview_kind } = await fileReadUrl(f.id, auth.token);
     if (preview_kind === "pdf") {
       readerTitle.value = f.original_name;
+      readerProgressKey.value = f.id;
       readerUrl.value = url;
       readerOpen.value = true;
       return;
@@ -142,6 +144,7 @@ function closeReader() {
   readerOpen.value = false;
   readerUrl.value = null;
   readerTitle.value = "";
+  readerProgressKey.value = null;
 }
 
 function closeMedia() {
@@ -579,6 +582,7 @@ onBeforeUnmount(() => {
     v-if="readerOpen && readerUrl"
     :url="readerUrl"
     :title="readerTitle"
+    :progress-key="readerProgressKey ?? undefined"
     @close="closeReader"
   />
 
