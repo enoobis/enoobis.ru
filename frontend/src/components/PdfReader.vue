@@ -94,26 +94,71 @@ async function renderPageInto(num: number) {
   rendered.add(num);
 }
 
+async function waitForLayout() {
+  await nextTick();
+  await new Promise<void>((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  });
+}
+
+async function waitForPageRefs() {
+  for (let i = 0; i < 40; i++) {
+    await nextTick();
+    const last = pageCount.value - 1;
+    if (pageEls.value[0] && (last < 0 || pageEls.value[last])) return;
+  }
+}
+
+function scrollToPage(num: number) {
+  const root = scrollEl.value;
+  const el = pageEls.value[num - 1];
+  if (!root || !el) return;
+  const padTop = parseFloat(getComputedStyle(root).paddingTop || "0");
+  const delta = el.getBoundingClientRect().top - root.getBoundingClientRect().top - padTop;
+  root.scrollTop += delta;
+}
+
 function updateVisiblePage() {
   const root = scrollEl.value;
   if (!root || pageCount.value === 0) return;
 
   const rootRect = root.getBoundingClientRect();
-  const viewTop = rootRect.top + 8;
-  const viewBottom = rootRect.bottom - 8;
+  const anchorY = rootRect.top + Math.min(root.clientHeight * 0.12, 48);
+  const viewTop = rootRect.top + 4;
+  const viewBottom = rootRect.bottom - 4;
 
-  let best = 1;
-  let bestTop = Infinity;
+  let best = 0;
+  let bestDist = Infinity;
 
   for (const el of pageEls.value) {
     if (!el) continue;
     const num = Number(el.dataset.page);
     if (!Number.isFinite(num) || num < 1) continue;
     const rect = el.getBoundingClientRect();
+    if (rect.height <= 1) continue;
     if (rect.bottom <= viewTop || rect.top >= viewBottom) continue;
-    if (rect.top < bestTop) {
-      bestTop = rect.top;
+    const dist = Math.abs(rect.top - anchorY);
+    if (dist < bestDist) {
+      bestDist = dist;
       best = num;
+    }
+  }
+
+  if (best === 0) {
+    const gap = parseFloat(getComputedStyle(root).rowGap || getComputedStyle(root).gap || "12") || 12;
+    let offset = 0;
+    best = 1;
+    for (let i = 0; i < pageEls.value.length; i++) {
+      const el = pageEls.value[i];
+      if (!el) continue;
+      const h = el.getBoundingClientRect().height;
+      if (h <= 1) continue;
+      if (root.scrollTop < offset + h) {
+        best = i + 1;
+        break;
+      }
+      offset += h + gap;
+      best = i + 1;
     }
   }
 
@@ -140,7 +185,6 @@ function setupObserver() {
         const num = Number((e.target as HTMLElement).dataset.page);
         if (Number.isFinite(num) && num >= 1) void renderPageInto(num);
       }
-      updateVisiblePage();
     },
     { root: scrollEl.value, rootMargin: "240px 0px", threshold: 0.01 },
   );
@@ -148,13 +192,21 @@ function setupObserver() {
 }
 
 async function resetScrollAndShowFirstPage() {
-  await nextTick();
+  await waitForPageRefs();
   const root = scrollEl.value;
   if (!root) return;
-  root.scrollTop = 0;
+
   setPlaceholders();
+  await waitForLayout();
+
+  root.scrollTop = 0;
   await renderPageInto(1);
   if (pageCount.value > 1) void renderPageInto(2);
+
+  await waitForLayout();
+  root.scrollTop = 0;
+  scrollToPage(1);
+
   setupObserver();
   updateVisiblePage();
 }
@@ -225,7 +277,6 @@ async function loadPdf() {
     baseRatio = v.height / v.width;
     pageCount.value = pdfDoc.numPages;
     pageEls.value = Array.from({ length: pdfDoc.numPages }, () => null);
-    reader.setPage(1, pageCount.value);
     loading.value = false;
     if (seq !== loadSeq) return;
     await resetScrollAndShowFirstPage();
@@ -300,7 +351,7 @@ onBeforeUnmount(() => {
           v-for="n in pageCount"
           :key="n"
           :ref="(el) => {
-            if (el) pageEls[n - 1] = el as HTMLElement;
+            pageEls[n - 1] = (el as HTMLElement | null) ?? null;
           }"
           class="pdf-page-wrap"
           :data-page="n"
@@ -330,6 +381,7 @@ onBeforeUnmount(() => {
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  overflow-anchor: none;
   -webkit-overflow-scrolling: touch;
   display: flex;
   flex-direction: column;
