@@ -506,40 +506,46 @@ onBeforeUnmount(() => {
         <ul v-else class="list">
           <li v-for="b in books" :key="b.id" class="list-row" :data-book-id="b.id">
             <div class="list-body">
-              <div class="list-head">
-                <div class="info">
-                  <span class="title">{{ b.title }}</span>
-                  <span v-if="b.author" class="muted small">{{ b.author }}</span>
-                </div>
-                <div class="row-actions">
-                  <button
-                    v-if="isPdfBook(b)"
-                    class="secondary"
-                    type="button"
-                    @click="openReader(b)"
-                  >
-                    читать
-                  </button>
-                  <button class="secondary" type="button" @click="onDownload(b)">скачать</button>
-                  <button v-if="canManageBook(b)" class="secondary" type="button" @click="openEdit(b)">
-                    изменить
-                  </button>
-                </div>
-              </div>
+              <span class="title">{{ b.title }}</span>
+              <span v-if="b.author" class="muted small">{{ b.author }}</span>
               <span v-if="b.description" class="muted small desc">{{ b.description }}</span>
               <span class="muted small meta">
                 <span v-if="b.category" class="cat-pill">{{ b.category }}</span>
                 @{{ b.uploader_nickname }}<template v-if="isStaff"> · {{ fmt(b.size_bytes) }}</template>
               </span>
             </div>
-            <img
-              v-if="b.cover_url"
-              :src="b.cover_url"
-              alt=""
-              class="book-cover"
-              loading="lazy"
-              decoding="async"
-            />
+            <aside class="list-aside">
+              <div class="row-actions">
+                <button
+                  v-if="isPdfBook(b)"
+                  class="secondary read-btn"
+                  type="button"
+                  @click="openReader(b)"
+                >
+                  читать
+                </button>
+                <button class="icon-btn-sm" type="button" aria-label="скачать" @click="onDownload(b)">
+                  <AppIcon name="download" :size="16" />
+                </button>
+                <button
+                  v-if="canManageBook(b)"
+                  class="icon-btn-sm"
+                  type="button"
+                  aria-label="изменить"
+                  @click="openEdit(b)"
+                >
+                  <AppIcon name="edit" :size="16" />
+                </button>
+              </div>
+              <img
+                v-if="b.cover_url"
+                :src="b.cover_url"
+                alt=""
+                class="book-cover"
+                loading="lazy"
+                decoding="async"
+              />
+            </aside>
           </li>
         </ul>
       </div>
@@ -682,18 +688,25 @@ onBeforeUnmount(() => {
   min-width: 0;
 }
 
+.list-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: start;
+}
+
 .list-body {
-  flex: 1;
   min-width: 0;
   display: grid;
   gap: 0.2rem;
 }
 
-.list-head {
+.list-aside {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.6rem;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  width: 72px;
 }
 
 .title {
@@ -727,11 +740,9 @@ onBeforeUnmount(() => {
 }
 
 .book-cover {
-  flex-shrink: 0;
-  align-self: center;
   display: block;
-  width: 56px;
-  height: 84px;
+  width: 72px;
+  height: 108px;
   object-fit: cover;
   border-radius: 3px;
 }
@@ -779,37 +790,31 @@ onBeforeUnmount(() => {
 
 .row-actions {
   display: flex;
-  gap: 0.4rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
   flex-wrap: wrap;
-  flex-shrink: 0;
+  width: 100%;
+}
+
+.read-btn {
+  min-height: 0;
+  padding: 0.3rem 0.55rem;
+  font-size: 0.78rem;
 }
 
 .row-actions button {
   min-height: 0;
-  padding: 0.35rem 0.7rem;
-  font-size: 0.82rem;
 }
 
 @media (max-width: 640px) {
-  .list .list-row {
-    align-items: flex-start;
-    gap: 0.55rem;
-  }
-
-  .list-head {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .row-actions {
-    width: 100%;
-    flex-wrap: wrap;
+  .list-aside {
+    width: 56px;
   }
 
   .book-cover {
-    align-self: flex-start;
-    width: 48px;
-    height: 72px;
+    width: 56px;
+    height: 84px;
   }
 
   .desc {

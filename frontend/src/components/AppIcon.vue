@@ -9,6 +9,7 @@ import {
   Code,
   Contrast,
   Copy,
+  Download,
   Eraser,
   Eye,
   FileText,
@@ -82,6 +83,7 @@ export type AppIconName =
   | "send"
   | "recall"
   | "delete"
+  | "download"
   | "edit"
   | "settings"
   | "menu"
@@ -144,6 +146,7 @@ const icons: Record<AppIconName, Component> = {
   send: Send,
   recall: Undo2,
   delete: Trash2,
+  download: Download,
   edit: Pencil,
   settings: Settings,
   menu: Menu,
