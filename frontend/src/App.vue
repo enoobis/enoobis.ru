@@ -18,7 +18,7 @@ import AppIcon from "./components/AppIcon.vue";
 import AppToast from "./components/AppToast.vue";
 import MotionCoinCount from "./components/MotionCoinCount.vue";
 import SearchPanel from "./components/SearchPanel.vue";
-import NavExpandSearch from "./components/NavExpandSearch.vue";
+import { pathUsesPageSearchFilter } from "./utils/searchScope";
 const router = useRouter();
 const route = useRoute();
 const onHome = computed(() => route.path === "/");
@@ -83,8 +83,7 @@ const searchEngineMounted = computed(
 const searchDropdownOpen = computed(() => {
   if (!searchEngineMounted.value) return false;
   if (!searchQuery.value.trim()) return false;
-  const path = route.path;
-  return !(path.startsWith("/library") || path.startsWith("/courses"));
+  return !pathUsesPageSearchFilter(route.path);
 });
 const headerSheetOpen = computed(
   () => navDrawerOpen.value || profileMenuOpen.value || searchDropdownOpen.value,
@@ -113,6 +112,9 @@ const mobileSearchTo = computed(() => {
   if (route.path.startsWith("/courses")) {
     return { path: "/search", query: { ...route.query, scope: "courses" } };
   }
+  if (route.path.startsWith("/leaderboard")) {
+    return { path: "/search", query: { ...route.query, scope: "leaderboard" } };
+  }
   return { path: "/search" };
 });
 const searchPlaceholder = computed(() => {
@@ -120,6 +122,7 @@ const searchPlaceholder = computed(() => {
   if (route.path.startsWith("/microblogs")) return "поиск в микроблогах";
   if (route.path.startsWith("/library")) return "поиск книги";
   if (route.path.startsWith("/courses")) return "поиск курса";
+  if (route.path.startsWith("/leaderboard")) return "поиск людей";
   return "поиск";
 });
 
@@ -361,6 +364,14 @@ watch(searchDropdownOpen, (open) => {
   closeProfileMenu();
   prepareSheetOpen();
 });
+
+watch(
+  () => [route.path, route.query.q] as const,
+  ([path, q]) => {
+    if (!pathUsesPageSearchFilter(path)) return;
+    searchQuery.value = typeof q === "string" ? q : "";
+  },
+);
 
 watch(
   () => route.path,

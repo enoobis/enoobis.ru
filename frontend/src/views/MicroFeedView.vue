@@ -32,18 +32,16 @@ const activeChips = computed(() => {
       },
     });
   }
-  if (feed.value === "following") {
-    chips.push({
-      key: "feed",
-      label: "подписки",
-      clear: () => {
-        feed.value = "all";
-        pushQuery();
-      },
-    });
-  }
   return chips;
 });
+
+function setFeed(next: Feed) {
+  if (feed.value === next) return;
+  feed.value = next;
+  pushQuery();
+}
+
+const listEmptyLabel = computed(() => (q.value.trim() ? "ничего не найдено" : "пусто"));
 
 function syncFromRoute() {
   q.value = typeof route.query.q === "string" ? route.query.q : "";
@@ -124,6 +122,27 @@ onMounted(() => {
   <section class="feed page-shell">
     <PageHeader title="лента" />
 
+    <div v-if="auth.token" class="filter-bar">
+      <div class="filter-tabs">
+        <button
+          type="button"
+          class="filter-tab"
+          :class="{ on: feed === 'all' }"
+          @click="setFeed('all')"
+        >
+          все
+        </button>
+        <button
+          type="button"
+          class="filter-tab"
+          :class="{ on: feed === 'following' }"
+          @click="setFeed('following')"
+        >
+          подписки
+        </button>
+      </div>
+    </div>
+
     <div v-if="activeChips.length" class="active-chips">
       <button v-for="c in activeChips" :key="c.key" class="active-chip" type="button" @click="c.clear">
         {{ c.label }} ×
@@ -138,7 +157,7 @@ onMounted(() => {
 
     <p v-if="err" class="error">{{ err }}</p>
     <AppLoading v-else-if="loading && !posts.length" class="page-empty" />
-    <p v-else-if="!loading && !posts.length" class="page-empty muted">пусто</p>
+    <p v-else-if="!loading && !posts.length" class="page-empty muted">{{ listEmptyLabel }}</p>
 
     <MicroItem
       v-for="p in posts"

@@ -7,7 +7,7 @@ import { listTags, type TaxonomyItem } from "../api/blog";
 import { search, type SearchResponse } from "../api/search";
 import { useAuthStore } from "../stores/auth";
 
-type SearchScope = "global" | "blog" | "micro" | "library" | "courses";
+type SearchScope = "global" | "blog" | "micro" | "library" | "courses" | "leaderboard";
 type BlogSort = "new" | "popular" | "discussed";
 type BlogMode = "all" | "bookmarks";
 type MicroFeed = "all" | "following";
@@ -33,6 +33,7 @@ const scope = computed<SearchScope>(() => {
   if (route.query.scope === "micro" || route.path.startsWith("/microblogs")) return "micro";
   if (route.query.scope === "library" || route.path.startsWith("/library")) return "library";
   if (route.query.scope === "courses" || route.path.startsWith("/courses")) return "courses";
+  if (route.query.scope === "leaderboard" || route.path.startsWith("/leaderboard")) return "leaderboard";
   return "global";
 });
 
@@ -42,6 +43,7 @@ const placeholder = computed(() => {
   if (scope.value === "micro") return "поиск в микроблогах";
   if (scope.value === "library") return "поиск книги";
   if (scope.value === "courses") return "поиск курса";
+  if (scope.value === "leaderboard") return "поиск людей";
   return "поиск";
 });
 const q = ref(props.query ?? "");
@@ -92,6 +94,7 @@ function feedPath() {
   if (scope.value === "blog") return "/blogs";
   if (scope.value === "micro") return "/microblogs";
   if (scope.value === "library") return "/library";
+  if (scope.value === "leaderboard") return "/leaderboard";
   return "/courses";
 }
 

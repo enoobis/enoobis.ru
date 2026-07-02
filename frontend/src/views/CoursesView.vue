@@ -83,6 +83,16 @@ const addingLecture = ref(false);
 const addingAssignment = ref(false);
 const courseQuery = ref(typeof route.query.q === "string" ? route.query.q : "");
 
+const courseSearchChip = computed(() => {
+  if (!courseQuery.value.trim()) return null;
+  return {
+    label: courseQuery.value.trim(),
+    clear: () => {
+      router.replace({ path: "/courses" });
+    },
+  };
+});
+
 const title = ref("");
 const description = ref("");
 const createIconFile = ref<File | null>(null);
@@ -1314,6 +1324,12 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
         </button>
       </div>
 
+      <div v-if="courseSearchChip" class="active-chips">
+        <button class="active-chip" type="button" @click="courseSearchChip.clear">
+          {{ courseSearchChip.label }} ×
+        </button>
+      </div>
+
       <div v-if="creatingCourse" class="form-card">
         <input v-model="title" placeholder="название" />
         <textarea v-model="description" rows="2" placeholder="описание" />
@@ -2445,6 +2461,22 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 .courses {
   display: grid;
   gap: 0.9rem;
+}
+.active-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+.active-chip {
+  padding: 0.3rem 0.75rem;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+.active-chip:hover {
+  color: var(--text);
 }
 .small {
   font-size: 0.8rem;

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import {
   deleteBook,
   downloadBook,
@@ -23,6 +23,7 @@ import PdfReader from "../components/PdfReader.vue";
 
 const auth = useAuthStore();
 const route = useRoute();
+const router = useRouter();
 
 const books = ref<LibraryBook[]>([]);
 const categories = ref<LibraryCategory[]>([]);
@@ -136,6 +137,20 @@ function selectCategory(cat: string) {
 }
 
 const categoryButtonLabel = computed(() => activeCategory.value || "все");
+
+const activeChips = computed(() => {
+  if (!search.value.trim()) return [];
+  return [
+    {
+      label: search.value.trim(),
+      clear: () => {
+        router.replace({ path: "/library" });
+      },
+    },
+  ];
+});
+
+const listEmptyLabel = computed(() => (search.value.trim() ? "ничего не найдено" : "пусто"));
 
 function onDocumentClick(event: MouseEvent) {
   if (!categoryOpen.value) return;
@@ -389,9 +404,21 @@ onBeforeUnmount(() => {
         </select>
       </div>
 
+      <div v-if="activeChips.length" class="active-chips">
+        <button
+          v-for="(c, i) in activeChips"
+          :key="i"
+          class="active-chip"
+          type="button"
+          @click="c.clear"
+        >
+          {{ c.label }} ×
+        </button>
+      </div>
+
       <div class="list-panel">
         <AppLoading v-if="loading" class="list-panel-state" />
-        <p v-else-if="!books.length" class="list-panel-state muted">пусто</p>
+        <p v-else-if="!books.length" class="list-panel-state muted">{{ listEmptyLabel }}</p>
         <ul v-else class="list">
           <li v-for="b in books" :key="b.id" class="list-row">
             <div class="info">
@@ -495,6 +522,26 @@ onBeforeUnmount(() => {
 .filter-menu-wrap .filter-tab {
   min-width: 7rem;
   white-space: nowrap;
+}
+
+.active-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-bottom: 0.35rem;
+}
+
+.active-chip {
+  padding: 0.3rem 0.75rem;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.active-chip:hover {
+  color: var(--text);
 }
 
 .info {

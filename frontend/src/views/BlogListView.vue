@@ -7,7 +7,9 @@ import PostMetaStats from "../components/PostMetaStats.vue";
 import {
   listMyBookmarks,
   listPosts,
+  listTags,
   type BlogListItem,
+  type TaxonomyItem,
 } from "../api/blog";
 import { useAuthStore } from "../stores/auth";
 
@@ -28,6 +30,7 @@ const q = ref("");
 const tag = ref("");
 const sort = ref<SortKey>("new");
 const mode = ref<Mode>("all");
+const blogTags = ref<TaxonomyItem[]>([]);
 
 const sortedPosts = computed(() => {
   const items = posts.value.slice();
@@ -48,38 +51,32 @@ const activeChips = computed(() => {
       },
     });
   }
-  if (sort.value !== "new") {
-    chips.push({
-      key: "sort",
-      label: sort.value === "popular" ? "по лайкам" : "по обсуждениям",
-      clear: () => {
-        sort.value = "new";
-        pushQuery();
-      },
-    });
-  }
-  if (tag.value) {
-    chips.push({
-      key: "tag",
-      label: `#${tag.value}`,
-      clear: () => {
-        tag.value = "";
-        pushQuery();
-      },
-    });
-  }
-  if (mode.value === "bookmarks") {
-    chips.push({
-      key: "bm",
-      label: "закладки",
-      clear: () => {
-        mode.value = "all";
-        pushQuery();
-      },
-    });
-  }
   return chips;
 });
+
+function setSort(next: SortKey) {
+  if (sort.value === next) return;
+  sort.value = next;
+  pushQuery();
+}
+
+function setMode(next: Mode) {
+  if (mode.value === next) return;
+  mode.value = next;
+  pushQuery();
+}
+
+function onTagChange() {
+  pushQuery();
+}
+
+async function loadBlogTags() {
+  try {
+    blogTags.value = await listTags();
+  } catch {
+    blogTags.value = [];
+  }
+}
 
 function syncFromRoute() {
   q.value = typeof route.query.q === "string" ? route.query.q : "";
@@ -141,6 +138,8 @@ function resetAll() {
   pushQuery();
 }
 
+const listEmptyLabel = computed(() => (q.value.trim() ? "ничего не найдено" : "пусто"));
+
 function prev() {
   if (page.value === 1) return;
   page.value -= 1;
@@ -164,6 +163,7 @@ watch(
 
 onMounted(() => {
   syncFromRoute();
+  void loadBlogTags();
   void load();
 });
 </script>
@@ -171,6 +171,65 @@ onMounted(() => {
 <template>
   <section class="blog page-shell">
     <PageHeader title="блоги" />
+
+    <div class="filter-bar">
+      <div class="filter-tabs">
+        <button
+          type="button"
+          class="filter-tab"
+          :class="{ on: sort === 'new' }"
+          @click="setSort('new')"
+        >
+          новые
+        </button>
+        <button
+          type="button"
+          class="filter-tab"
+          :class="{ on: sort === 'popular' }"
+          @click="setSort('popular')"
+        >
+          популярные
+        </button>
+        <button
+          type="button"
+          class="filter-tab"
+          :class="{ on: sort === 'discussed' }"
+          @click="setSort('discussed')"
+        >
+          обсуждаемые
+        </button>
+      </div>
+      <select
+        v-if="blogTags.length"
+        v-model="tag"
+        class="filter-select"
+        aria-label="тег"
+        @change="onTagChange"
+      >
+        <option value="">все теги</option>
+        <option v-for="t in blogTags" :key="t.slug" :value="t.slug">
+          {{ t.name }} · {{ t.post_count }}
+        </option>
+      </select>
+      <div v-if="auth.token" class="filter-tabs">
+        <button
+          type="button"
+          class="filter-tab"
+          :class="{ on: mode === 'all' }"
+          @click="setMode('all')"
+        >
+          все
+        </button>
+        <button
+          type="button"
+          class="filter-tab"
+          :class="{ on: mode === 'bookmarks' }"
+          @click="setMode('bookmarks')"
+        >
+          закладки
+        </button>
+      </div>
+    </div>
 
     <div v-if="activeChips.length" class="active-chips">
       <button v-for="c in activeChips" :key="c.key" class="active-chip" type="button" @click="c.clear">
@@ -201,7 +260,7 @@ onMounted(() => {
           </div>
         </li>
       </ul>
-      <p v-else class="page-empty muted">пусто</p>
+      <p v-else class="page-empty muted">{{ listEmptyLabel }}</p>
 
       <div v-if="total > pageSize" class="pager muted">
         <button class="link" type="button" :disabled="page === 1" @click="prev">←</button>
