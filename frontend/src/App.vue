@@ -77,15 +77,25 @@ const sheetMobile = ref(
 const sheetGeom = ref({ top: 0, left: 0, width: 0 });
 const SHEET_MOBILE_MAX = 640;
 const profileCoins = computed(() => session.coins);
-const searchPanelOpen = computed(
+const searchActive = computed(
   () => searchOpen.value && searchQuery.value.trim().length > 0,
 );
+const searchDropdownOpen = computed(() => {
+  if (!searchActive.value) return false;
+  const path = route.path;
+  return !(path.startsWith("/library") || path.startsWith("/courses"));
+});
+const searchHiddenEngine = computed(() => {
+  if (!searchActive.value) return false;
+  const path = route.path;
+  return path.startsWith("/library") || path.startsWith("/courses");
+});
 const headerSheetOpen = computed(
-  () => navDrawerOpen.value || profileMenuOpen.value || searchPanelOpen.value,
+  () => navDrawerOpen.value || profileMenuOpen.value || searchDropdownOpen.value,
 );
 const navFullSheetOpen = computed(() => headerSheetOpen.value && !sheetMobile.value);
 const headerBackdropOpen = computed(
-  () => (profileMenuOpen.value || searchPanelOpen.value) && !sheetMobile.value,
+  () => (profileMenuOpen.value || searchDropdownOpen.value) && !sheetMobile.value,
 );
 
 function syncHeaderSheetDocumentClass() {
@@ -136,7 +146,7 @@ function onDocumentClick(event: MouseEvent) {
   }
   if (searchOpen.value) {
     if (target?.closest?.(".search-menu-sheet")) return;
-    if (target?.closest?.(".nav-search-expand")) return;
+    if (target?.closest?.(".nav-search-expand, .nav-search-expand__field")) return;
     searchOpen.value = false;
   }
 }
@@ -349,7 +359,7 @@ onUnmounted(() => {
   document.documentElement.classList.remove("nav-header-sheet-open");
 });
 
-watch(searchPanelOpen, (open) => {
+watch(searchDropdownOpen, (open) => {
   if (!open) return;
   closeNavDrawer();
   closeProfileMenu();
@@ -621,9 +631,18 @@ watch(
           </div>
         </div>
       </Transition>
+      <SearchPanel
+        v-if="searchHiddenEngine && auth.token && !sheetMobile"
+        embedded
+        class="search-panel-host--hidden"
+        aria-hidden="true"
+        :query="searchQuery"
+        @update:query="searchQuery = $event"
+        @close="closeSearch"
+      />
       <Transition name="nav-sheet">
         <div
-          v-if="searchPanelOpen && auth.token && !sheetMobile"
+          v-if="searchDropdownOpen && auth.token && !sheetMobile"
           class="nav-dropdown search-menu-sheet"
           role="dialog"
           aria-modal="true"
@@ -930,6 +949,18 @@ watch(
   max-height: min(75vh, 36rem);
   overflow-y: auto;
   background: color-mix(in srgb, var(--bg) 94%, transparent);
+}
+
+.search-panel-host--hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .nav-dropdown:not(.search-menu-sheet) {

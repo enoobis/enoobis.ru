@@ -138,6 +138,7 @@ async function runGlobal() {
   err.value = "";
   if (!q.value.trim()) {
     runSeq++;
+    loading.value = false;
     data.value = { blog: [], micro: [], users: [] };
     return;
   }
