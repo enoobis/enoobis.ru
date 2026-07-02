@@ -70,7 +70,11 @@ function pageCssSize(pageW: number, pageH: number) {
 }
 
 function rebuildLayouts() {
-  pageLayouts.value = pageRawSizes.map(({ w, h }) => pageCssSize(w, h));
+  const fallback = pageRawSizes.find((s) => s && s.w > 0 && s.h > 0) ?? { w: 595, h: 842 };
+  pageLayouts.value = pageRawSizes.map((s) => {
+    const size = s && s.w > 0 && s.h > 0 ? s : fallback;
+    return pageCssSize(size.w, size.h);
+  });
 }
 
 function persistProgress() {
@@ -98,14 +102,32 @@ async function loadPageMetrics(doc: PDFDocumentProxy, seq: number) {
       raw[start - 1 + i] = { w: v.width, h: v.height };
     }
   }
+  if (seq !== loadSeq) return;
   pageRawSizes = raw;
   rebuildLayouts();
 }
 
+async function waitForLayout() {
+  await nextTick();
+  await new Promise<void>((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  });
+}
+
+async function waitForCanvas() {
+  for (let i = 0; i < 30; i++) {
+    await nextTick();
+    if (canvasEl.value) return;
+  }
+}
+
 async function renderCurrentPage() {
   const num = currentPage.value;
+  if (!pdfDoc || num < 1 || num > pageCount.value) return;
+
+  await waitForCanvas();
   const canvas = canvasEl.value;
-  if (!pdfDoc || !canvas || num < 1 || num > pageCount.value) return;
+  if (!canvas) return;
 
   const seq = ++renderSeq;
   const myDoc = pdfDoc;
@@ -122,26 +144,29 @@ async function renderCurrentPage() {
     canvas.height = viewport.height;
     canvas.style.width = `${cssWidth}px`;
     canvas.style.height = `${cssHeight}px`;
-    await page.render({ canvas, canvasContext: ctx, viewport }).promise;
-  } catch {
-    /* next navigation will retry */
+    await page.render({ canvasContext: ctx, viewport, canvas }).promise;
+  } catch (e) {
+    if (seq !== renderSeq) return;
+    err.value = e instanceof Error ? e.message : "ошибка отображения";
   }
 }
 
-async function waitForLayout() {
-  await nextTick();
-  await new Promise<void>((resolve) => {
-    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
-  });
+async function ensureRendered() {
+  rebuildLayouts();
+  await waitForLayout();
+  await renderCurrentPage();
 }
 
 function setPage(num: number, save = true) {
   const next = Math.max(1, Math.min(num, pageCount.value || 1));
-  if (next === currentPage.value) return;
+  if (next === currentPage.value) {
+    void ensureRendered();
+    return;
+  }
   currentPage.value = next;
   reader.setPage(next, pageCount.value);
   if (save) persistProgress();
-  void renderCurrentPage();
+  void ensureRendered();
 }
 
 function prevPage() {
@@ -165,19 +190,14 @@ function onTap(event: MouseEvent) {
 }
 
 async function openAtPage(num: number) {
-  await waitForLayout();
   const start = Math.max(1, Math.min(num, pageCount.value));
   currentPage.value = start;
   reader.setPage(start, pageCount.value);
-  await renderCurrentPage();
+  await ensureRendered();
 }
 
 function reflow() {
-  rebuildLayouts();
-  void nextTick().then(async () => {
-    await waitForLayout();
-    await renderCurrentPage();
-  });
+  void ensureRendered();
 }
 
 function scheduleReflow() {
@@ -236,6 +256,8 @@ async function loadPdf() {
     await loadPageMetrics(doc, seq);
     if (seq !== loadSeq) return;
     loading.value = false;
+    await nextTick();
+    rebuildLayouts();
     if (seq !== loadSeq) return;
     await openAtPage(savedStartPage());
     if (seq !== loadSeq) return;
@@ -255,6 +277,10 @@ function onKey(event: KeyboardEvent) {
 function onResize() {
   scheduleReflow();
 }
+
+watch(canvasEl, (el) => {
+  if (el && !loading.value && pdfDoc) void renderCurrentPage();
+});
 
 watch(
   () => props.url,
@@ -303,12 +329,13 @@ onBeforeUnmount(() => {
       </p>
       <p v-else-if="err" class="pdf-state error">{{ err }}</p>
       <div
-        v-else-if="activeLayout"
+        v-else-if="pageCount > 0"
+        :key="currentPage"
         class="pdf-page-wrap"
-        :style="{
+        :style="activeLayout ? {
           width: `${activeLayout.width}px`,
           height: `${activeLayout.height}px`,
-        }"
+        } : undefined"
       >
         <canvas ref="canvasEl" class="pdf-canvas" />
       </div>
@@ -351,7 +378,7 @@ onBeforeUnmount(() => {
 
 .pdf-page-wrap {
   flex-shrink: 0;
-  background: var(--surface);
+  background: #fff;
   border-radius: 2px;
   box-shadow: 0 0 0 1px var(--border);
   overflow: hidden;
