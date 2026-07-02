@@ -703,13 +703,26 @@ onBeforeUnmount(() => {
     "meta meta";
 }
 
-.list-row.has-cover {
-  grid-template-columns: minmax(0, 1fr) 72px;
-  grid-template-areas:
-    "title actions"
-    "author cover"
-    "desc cover"
-    "meta cover";
+.list-row.has-cover .desc,
+.list-row.has-cover .meta {
+  padding-right: 4.5rem;
+}
+
+.book-cover {
+  grid-column: 1;
+  grid-row: 2 / 5;
+  justify-self: end;
+  align-self: center;
+  margin-right: 1.75rem;
+  display: block;
+  width: 60px;
+  height: 90px;
+  object-fit: cover;
+  border-radius: 3px;
+}
+
+.list-row.has-cover:not(:has(.author)) .book-cover {
+  grid-row: 2 / 4;
 }
 
 .title {
@@ -740,29 +753,11 @@ onBeforeUnmount(() => {
   grid-area: actions;
 }
 
-.book-cover {
-  grid-area: cover;
-  justify-self: center;
-  align-self: center;
-  display: block;
-  width: 60px;
-  height: 90px;
-  object-fit: cover;
-  border-radius: 3px;
-}
-
 .list-row:not(:has(.author)) {
   grid-template-areas:
     "title actions"
     "desc desc"
     "meta meta";
-}
-
-.list-row.has-cover:not(:has(.author)) {
-  grid-template-areas:
-    "title actions"
-    "desc cover"
-    "meta cover";
 }
 
 .small {
@@ -840,13 +835,15 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 640px) {
-  .list-row.has-cover {
-    grid-template-columns: minmax(0, 1fr) 64px;
+  .list-row.has-cover .desc,
+  .list-row.has-cover .meta {
+    padding-right: 3.75rem;
   }
 
   .book-cover {
     width: 52px;
     height: 78px;
+    margin-right: 1.25rem;
   }
 
   .desc {
