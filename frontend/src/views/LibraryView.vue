@@ -704,10 +704,10 @@ onBeforeUnmount(() => {
 }
 
 .list-row.has-cover {
-  grid-template-columns: minmax(0, 1fr) 60px;
+  grid-template-columns: minmax(0, 1fr) 72px;
   grid-template-areas:
     "title actions"
-    "author actions"
+    "author cover"
     "desc cover"
     "meta cover";
 }
@@ -742,8 +742,8 @@ onBeforeUnmount(() => {
 
 .book-cover {
   grid-area: cover;
-  justify-self: end;
-  align-self: start;
+  justify-self: center;
+  align-self: center;
   display: block;
   width: 60px;
   height: 90px;
@@ -841,7 +841,7 @@ onBeforeUnmount(() => {
 
 @media (max-width: 640px) {
   .list-row.has-cover {
-    grid-template-columns: minmax(0, 1fr) 52px;
+    grid-template-columns: minmax(0, 1fr) 64px;
   }
 
   .book-cover {
