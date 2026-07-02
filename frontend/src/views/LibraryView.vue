@@ -424,7 +424,7 @@ onBeforeUnmount(() => {
             <div class="info">
               <span class="title">{{ b.title }}</span>
               <span v-if="b.author" class="muted small">{{ b.author }}</span>
-              <span v-if="b.description" class="muted small desc">{{ b.description }}</span>
+              <span v-if="b.description && !auth.isAdmin" class="muted small desc">{{ b.description }}</span>
               <span class="muted small meta">
                 <span v-if="b.category" class="cat-pill">{{ b.category }}</span>
                 @{{ b.uploader_nickname }}<template v-if="isStaff"> · {{ fmt(b.size_bytes) }}</template>
