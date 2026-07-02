@@ -202,14 +202,6 @@ async function applyCover(bookId: string, file: File) {
   }
 }
 
-async function onCoverPick(b: LibraryBook, ev: Event) {
-  const input = ev.target as HTMLInputElement;
-  const file = input.files?.[0];
-  if (!file) return;
-  await applyCover(b.id, file);
-  input.value = "";
-}
-
 async function onEditCoverPick(ev: Event) {
   if (!editingId.value) return;
   const input = ev.target as HTMLInputElement;
@@ -432,13 +424,14 @@ onBeforeUnmount(() => {
           </datalist>
         </div>
         <textarea v-model="newDescription" rows="3" placeholder="описание" maxlength="4000" />
-        <label class="cover-field muted small">
-          обложка
+        <label class="cover-add secondary">
           <input
             type="file"
             accept="image/jpeg,image/png,image/webp,image/gif"
             @change="onPickNewCover"
           />
+          <AppIcon name="image" :size="16" />
+          обложка
         </label>
         <input
           type="file"
@@ -512,52 +505,37 @@ onBeforeUnmount(() => {
         <p v-else-if="!books.length" class="list-panel-state muted">{{ listEmptyLabel }}</p>
         <ul v-else class="list">
           <li v-for="b in books" :key="b.id" class="list-row" :data-book-id="b.id">
-            <div class="list-row-main">
-              <div class="info">
-                <span class="title">{{ b.title }}</span>
-                <span v-if="b.author" class="muted small">{{ b.author }}</span>
-                <span v-if="b.description" class="muted small desc">{{ b.description }}</span>
-                <span class="muted small meta">
-                  <span v-if="b.category" class="cat-pill">{{ b.category }}</span>
-                  @{{ b.uploader_nickname }}<template v-if="isStaff"> · {{ fmt(b.size_bytes) }}</template>
-                </span>
-              </div>
-              <div class="row-actions">
-                <button
-                  v-if="isPdfBook(b)"
-                  class="secondary"
-                  type="button"
-                  @click="openReader(b)"
-                >
-                  читать
-                </button>
-                <button class="secondary" type="button" @click="onDownload(b)">скачать</button>
-                <button v-if="canManageBook(b)" class="secondary" type="button" @click="openEdit(b)">
-                  изменить
-                </button>
-              </div>
+            <img
+              v-if="b.cover_url"
+              :src="b.cover_url"
+              alt=""
+              class="book-cover"
+              loading="lazy"
+              decoding="async"
+            />
+            <div class="info">
+              <span class="title">{{ b.title }}</span>
+              <span v-if="b.author" class="muted small">{{ b.author }}</span>
+              <span v-if="b.description" class="muted small desc">{{ b.description }}</span>
+              <span class="muted small meta">
+                <span v-if="b.category" class="cat-pill">{{ b.category }}</span>
+                @{{ b.uploader_nickname }}<template v-if="isStaff"> · {{ fmt(b.size_bytes) }}</template>
+              </span>
             </div>
-            <figure class="book-cover">
-              <label v-if="canManageBook(b)" class="book-cover-pick">
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,image/gif"
-                  hidden
-                  :disabled="coverUploading"
-                  @change="onCoverPick(b, $event)"
-                />
-                <img v-if="b.cover_url" :src="b.cover_url" alt="" loading="lazy" decoding="async" />
-                <span v-else class="book-cover-empty">обложка</span>
-              </label>
-              <img
-                v-else-if="b.cover_url"
-                :src="b.cover_url"
-                alt=""
-                class="book-cover-img"
-                loading="lazy"
-                decoding="async"
-              />
-            </figure>
+            <div class="row-actions">
+              <button
+                v-if="isPdfBook(b)"
+                class="secondary"
+                type="button"
+                @click="openReader(b)"
+              >
+                читать
+              </button>
+              <button class="secondary" type="button" @click="onDownload(b)">скачать</button>
+              <button v-if="canManageBook(b)" class="secondary" type="button" @click="openEdit(b)">
+                изменить
+              </button>
+            </div>
           </li>
         </ul>
       </div>
@@ -590,9 +568,8 @@ onBeforeUnmount(() => {
               </div>
               <textarea v-model="editDescription" rows="3" placeholder="описание" maxlength="4000" />
               <div class="cover-edit">
-                <span class="muted small">обложка</span>
                 <div class="cover-edit-row">
-                  <label class="book-cover-pick book-cover-pick--edit">
+                  <label v-if="!editCoverUrl" class="cover-add secondary">
                     <input
                       type="file"
                       accept="image/jpeg,image/png,image/webp,image/gif"
@@ -600,8 +577,18 @@ onBeforeUnmount(() => {
                       :disabled="coverUploading"
                       @change="onEditCoverPick"
                     />
-                    <img v-if="editCoverUrl" :src="editCoverUrl" alt="" decoding="async" />
-                    <span v-else class="book-cover-empty">обложка</span>
+                    <AppIcon name="image" :size="16" />
+                    обложка
+                  </label>
+                  <label v-else class="book-cover-pick">
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif"
+                      hidden
+                      :disabled="coverUploading"
+                      @change="onEditCoverPick"
+                    />
+                    <img :src="editCoverUrl" alt="" decoding="async" />
                   </label>
                   <button
                     v-if="editCoverUrl"
@@ -722,53 +709,44 @@ onBeforeUnmount(() => {
   font-size: 0.74rem;
 }
 
-.list-row-main {
-  flex: 1;
-  min-width: 0;
-  display: grid;
-  gap: 0.5rem;
-}
-
 .book-cover {
   flex-shrink: 0;
-  margin: 0;
-}
-
-.book-cover-pick {
   display: block;
-  width: 72px;
-  height: 104px;
-  cursor: pointer;
-}
-
-.book-cover-pick img,
-.book-cover-img {
-  display: block;
-  width: 72px;
-  height: 104px;
+  width: 52px;
+  height: 74px;
   object-fit: cover;
   border-radius: var(--radius);
   border: 1px solid var(--border);
   background: var(--surface);
 }
 
-.book-cover-empty {
-  display: flex;
+.cover-add {
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 72px;
-  height: 104px;
-  border: 1px dashed var(--border);
-  border-radius: var(--radius);
-  color: var(--muted);
-  font-size: 0.72rem;
-  text-align: center;
-  padding: 0.35rem;
+  gap: 0.35rem;
+  cursor: pointer;
+  width: fit-content;
 }
 
-.cover-field {
-  display: grid;
-  gap: 0.25rem;
+.cover-add input {
+  display: none;
+}
+
+.book-cover-pick {
+  display: block;
+  width: 52px;
+  height: 74px;
+  cursor: pointer;
+}
+
+.book-cover-pick img {
+  display: block;
+  width: 52px;
+  height: 74px;
+  object-fit: cover;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
 }
 
 .cover-edit {
@@ -778,19 +756,9 @@ onBeforeUnmount(() => {
 
 .cover-edit-row {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 0.5rem;
-}
-
-.book-cover-pick--edit {
-  width: 64px;
-  height: 92px;
-}
-
-.book-cover-pick--edit img,
-.book-cover-pick--edit .book-cover-empty {
-  width: 64px;
-  height: 92px;
+  flex-wrap: wrap;
 }
 
 .row-actions {
@@ -808,13 +776,8 @@ onBeforeUnmount(() => {
 
 @media (max-width: 640px) {
   .list .list-row {
-    flex-direction: row;
-    align-items: flex-start;
+    flex-wrap: wrap;
     gap: 0.55rem;
-  }
-
-  .list-row-main {
-    min-width: 0;
   }
 
   .row-actions {
