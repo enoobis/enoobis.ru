@@ -704,7 +704,7 @@ onBeforeUnmount(() => {
 .list-aside {
   display: flex;
   flex-direction: column;
-  align-items: stretch;
+  align-items: flex-end;
   gap: 0.45rem;
   min-width: max-content;
 }
@@ -741,8 +741,8 @@ onBeforeUnmount(() => {
 
 .book-cover {
   display: block;
-  width: 100%;
-  aspect-ratio: 2 / 3;
+  width: 56px;
+  height: 84px;
   object-fit: cover;
   border-radius: 3px;
 }
@@ -808,8 +808,9 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 640px) {
-  .list-aside {
-    max-width: 108px;
+  .book-cover {
+    width: 48px;
+    height: 72px;
   }
 
   .desc {
