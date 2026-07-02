@@ -504,48 +504,50 @@ onBeforeUnmount(() => {
         <AppLoading v-if="loading" class="list-panel-state" />
         <p v-else-if="!books.length" class="list-panel-state muted">{{ listEmptyLabel }}</p>
         <ul v-else class="list">
-          <li v-for="b in books" :key="b.id" class="list-row" :data-book-id="b.id">
-            <div class="list-body">
-              <span class="title">{{ b.title }}</span>
-              <span v-if="b.author" class="muted small">{{ b.author }}</span>
-              <span v-if="b.description" class="muted small desc">{{ b.description }}</span>
-              <span class="muted small meta">
-                <span v-if="b.category" class="cat-pill">{{ b.category }}</span>
-                @{{ b.uploader_nickname }}<template v-if="isStaff"> · {{ fmt(b.size_bytes) }}</template>
-              </span>
+          <li
+            v-for="b in books"
+            :key="b.id"
+            class="list-row"
+            :class="{ 'has-cover': !!b.cover_url }"
+            :data-book-id="b.id"
+          >
+            <span class="title">{{ b.title }}</span>
+            <span v-if="b.author" class="muted small author">{{ b.author }}</span>
+            <span v-if="b.description" class="muted small desc">{{ b.description }}</span>
+            <span class="muted small meta">
+              <span v-if="b.category" class="cat-pill">{{ b.category }}</span>
+              @{{ b.uploader_nickname }}<template v-if="isStaff"> · {{ fmt(b.size_bytes) }}</template>
+            </span>
+            <div class="row-actions">
+              <button
+                v-if="isPdfBook(b)"
+                class="secondary read-btn"
+                type="button"
+                @click="openReader(b)"
+              >
+                читать
+              </button>
+              <button class="icon-btn-sm" type="button" aria-label="скачать" @click="onDownload(b)">
+                <AppIcon name="download" :size="16" />
+              </button>
+              <button
+                v-if="canManageBook(b)"
+                class="icon-btn-sm"
+                type="button"
+                aria-label="изменить"
+                @click="openEdit(b)"
+              >
+                <AppIcon name="edit" :size="16" />
+              </button>
             </div>
-            <aside class="list-aside">
-              <div class="row-actions">
-                <button
-                  v-if="isPdfBook(b)"
-                  class="secondary read-btn"
-                  type="button"
-                  @click="openReader(b)"
-                >
-                  читать
-                </button>
-                <button class="icon-btn-sm" type="button" aria-label="скачать" @click="onDownload(b)">
-                  <AppIcon name="download" :size="16" />
-                </button>
-                <button
-                  v-if="canManageBook(b)"
-                  class="icon-btn-sm"
-                  type="button"
-                  aria-label="изменить"
-                  @click="openEdit(b)"
-                >
-                  <AppIcon name="edit" :size="16" />
-                </button>
-              </div>
-              <img
-                v-if="b.cover_url"
-                :src="b.cover_url"
-                alt=""
-                class="book-cover"
-                loading="lazy"
-                decoding="async"
-              />
-            </aside>
+            <img
+              v-if="b.cover_url"
+              :src="b.cover_url"
+              alt=""
+              class="book-cover"
+              loading="lazy"
+              decoding="async"
+            />
           </li>
         </ul>
       </div>
@@ -690,44 +692,81 @@ onBeforeUnmount(() => {
 
 .list-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.75rem;
+  column-gap: 0.75rem;
+  row-gap: 0.2rem;
   align-items: start;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "title actions"
+    "author actions"
+    "desc desc"
+    "meta meta";
 }
 
-.list-body {
-  min-width: 0;
-  display: grid;
-  gap: 0.2rem;
-}
-
-.list-aside {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.45rem;
-  min-width: max-content;
+.list-row.has-cover {
+  grid-template-columns: minmax(0, 1fr) 60px;
+  grid-template-areas:
+    "title actions"
+    "author actions"
+    "desc cover"
+    "meta cover";
 }
 
 .title {
+  grid-area: title;
   font-size: 0.95rem;
   text-transform: none;
 }
 
-.small {
-  font-size: 0.8rem;
+.author {
+  grid-area: author;
 }
 
 .desc {
+  grid-area: desc;
   white-space: pre-wrap;
 }
 
 .meta {
+  grid-area: meta;
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
   flex-wrap: wrap;
   margin-top: 0.15rem;
+}
+
+.row-actions {
+  grid-area: actions;
+}
+
+.book-cover {
+  grid-area: cover;
+  justify-self: end;
+  align-self: start;
+  display: block;
+  width: 60px;
+  height: 90px;
+  object-fit: cover;
+  border-radius: 3px;
+}
+
+.list-row:not(:has(.author)) {
+  grid-template-areas:
+    "title actions"
+    "desc desc"
+    "meta meta";
+}
+
+.list-row.has-cover:not(:has(.author)) {
+  grid-template-areas:
+    "title actions"
+    "desc cover"
+    "meta cover";
+}
+
+.small {
+  font-size: 0.8rem;
 }
 
 .cat-pill {
@@ -737,14 +776,6 @@ onBeforeUnmount(() => {
   background: var(--surface2);
   color: var(--text);
   font-size: 0.74rem;
-}
-
-.book-cover {
-  display: block;
-  width: 56px;
-  height: 84px;
-  object-fit: cover;
-  border-radius: 3px;
 }
 
 .cover-add {
@@ -792,6 +823,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  justify-self: end;
   gap: 0.15rem;
   flex-wrap: nowrap;
   flex-shrink: 0;
@@ -808,9 +840,13 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 640px) {
+  .list-row.has-cover {
+    grid-template-columns: minmax(0, 1fr) 52px;
+  }
+
   .book-cover {
-    width: 48px;
-    height: 72px;
+    width: 52px;
+    height: 78px;
   }
 
   .desc {
