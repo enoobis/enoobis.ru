@@ -90,21 +90,35 @@ function savedStartPage(): number {
 }
 
 async function loadPageMetrics(doc: PDFDocumentProxy, seq: number) {
-  const raw: { w: number; h: number }[] = new Array(doc.numPages);
-  const batch = 20;
-  for (let start = 1; start <= doc.numPages; start += batch) {
-    if (seq !== loadSeq) return;
-    const end = Math.min(start + batch - 1, doc.numPages);
-    const nums = Array.from({ length: end - start + 1 }, (_, i) => start + i);
-    const pages = await Promise.all(nums.map((n) => doc.getPage(n)));
-    for (let i = 0; i < pages.length; i++) {
-      const v = pages[i].getViewport({ scale: 1 });
-      raw[start - 1 + i] = { w: v.width, h: v.height };
-    }
-  }
+  const total = doc.numPages;
+  const raw: { w: number; h: number }[] = new Array(total);
+  const first = await doc.getPage(1);
   if (seq !== loadSeq) return;
+  const v1 = first.getViewport({ scale: 1 });
+  const fallback = { w: v1.width, h: v1.height };
+  raw[0] = fallback;
+  for (let i = 1; i < total; i++) raw[i] = fallback;
   pageRawSizes = raw;
   rebuildLayouts();
+
+  void (async () => {
+    const batch = 24;
+    for (let start = 1; start <= total; start += batch) {
+      if (seq !== loadSeq) return;
+      const end = Math.min(start + batch - 1, total);
+      const nums = Array.from({ length: end - start + 1 }, (_, i) => start + i);
+      const pages = await Promise.all(nums.map((n) => doc.getPage(n)));
+      if (seq !== loadSeq) return;
+      for (let i = 0; i < pages.length; i++) {
+        const v = pages[i].getViewport({ scale: 1 });
+        raw[start - 1 + i] = { w: v.width, h: v.height };
+      }
+      pageRawSizes = raw;
+      if (seq !== loadSeq) return;
+      rebuildLayouts();
+      if (!loading.value) void renderCurrentPage();
+    }
+  })();
 }
 
 async function waitForLayout() {
@@ -144,6 +158,8 @@ async function renderCurrentPage() {
     canvas.height = viewport.height;
     canvas.style.width = `${cssWidth}px`;
     canvas.style.height = `${cssHeight}px`;
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
     await page.render({ canvasContext: ctx, viewport, canvas }).promise;
   } catch (e) {
     if (seq !== renderSeq) return;
@@ -318,41 +334,40 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="pdf-reader" role="dialog" aria-modal="true" :aria-label="title">
-    <div
-      ref="stageEl"
-      class="pdf-stage"
-      @click="onTap"
-    >
-      <p v-if="loading" class="pdf-state">
-        <span class="spinner" aria-hidden="true" /> загрузка
-      </p>
-      <p v-else-if="err" class="pdf-state error">{{ err }}</p>
+  <Teleport to="body">
+    <div class="pdf-reader" role="dialog" aria-modal="true" :aria-label="title">
       <div
-        v-else-if="pageCount > 0"
-        :key="currentPage"
-        class="pdf-page-wrap"
-        :style="activeLayout ? {
-          width: `${activeLayout.width}px`,
-          height: `${activeLayout.height}px`,
-        } : undefined"
+        ref="stageEl"
+        class="pdf-stage"
+        @click="onTap"
       >
-        <canvas ref="canvasEl" class="pdf-canvas" />
+        <p v-if="loading" class="pdf-state">
+          <span class="spinner" aria-hidden="true" /> загрузка
+        </p>
+        <p v-else-if="err" class="pdf-state error">{{ err }}</p>
+        <div
+          v-else-if="pageCount > 0"
+          class="pdf-page-wrap"
+          :style="activeLayout ? {
+            width: `${activeLayout.width}px`,
+            height: `${activeLayout.height}px`,
+          } : undefined"
+        >
+          <canvas ref="canvasEl" class="pdf-canvas" />
+        </div>
       </div>
     </div>
-  </div>
+  </Teleport>
 </template>
 
 <style scoped>
 .pdf-reader {
   position: fixed;
-  top: var(--reader-top, 52px);
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 90;
+  inset: 0;
+  z-index: 99;
   display: flex;
   flex-direction: column;
+  padding-top: var(--reader-top, 52px);
   background: var(--bg);
 }
 
