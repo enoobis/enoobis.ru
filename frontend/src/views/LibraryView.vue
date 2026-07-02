@@ -840,8 +840,45 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 640px) {
+  .list-row {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "title"
+      "actions"
+      "author"
+      "desc"
+      "meta";
+  }
+
+  .list-row:not(:has(.author)) {
+    grid-template-areas:
+      "title"
+      "actions"
+      "desc"
+      "meta";
+  }
+
   .list-row.has-cover {
     grid-template-columns: minmax(0, 1fr) 60px;
+    grid-template-areas:
+      "title title"
+      "actions actions"
+      "author author"
+      "desc cover"
+      "meta cover";
+  }
+
+  .list-row.has-cover:not(:has(.author)) {
+    grid-template-areas:
+      "title title"
+      "actions actions"
+      "desc cover"
+      "meta cover";
+  }
+
+  .row-actions {
+    justify-self: start;
+    justify-content: flex-start;
   }
 
   .book-cover {
