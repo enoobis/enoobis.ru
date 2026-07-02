@@ -37,7 +37,7 @@ function leftNavRightEdge(bar: HTMLElement, fallbackLeft: number) {
 function syncLayout() {
   if (typeof window === "undefined") return;
   const trigger = triggerEl.value;
-  const bar = trigger?.closest(".nav-bar");
+  const bar = trigger?.closest(".nav-bar") as HTMLElement | null;
   if (!trigger || !bar) {
     fieldWidth.value = 280;
     return;

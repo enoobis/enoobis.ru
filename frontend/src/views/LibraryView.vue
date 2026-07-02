@@ -3,12 +3,14 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router";
 import {
   deleteBook,
+  deleteBookCover,
   downloadBook,
   libraryReadUrl,
   listBooks,
   listCategories,
   updateBookMetadata,
   uploadBook,
+  uploadBookCover,
   type LibraryBook,
   type LibraryCategory,
 } from "../api/library";
@@ -44,7 +46,9 @@ const newAuthor = ref("");
 const newDescription = ref("");
 const newCategory = ref("");
 const newFile = ref<File | null>(null);
+const newCoverFile = ref<File | null>(null);
 const uploading = ref(false);
+const coverUploading = ref(false);
 
 const totalCount = computed(() => books.value.length);
 const storageBytesUsed = ref(0);
@@ -79,6 +83,8 @@ function describe(code: string) {
   if (code === "no_file") return "нужен файл";
   if (code === "read_only_pdf") return "чтение в браузере только для pdf";
   if (code === "invalid_file") return "файл не похож на pdf или epub";
+  if (code === "invalid image") return "файл не похож на изображение";
+  if (code === "only jpeg, png, gif, webp") return "только jpeg, png, gif, webp";
   if (code === "only pdf or epub") return "только pdf или epub";
   return code || "ошибка";
 }
@@ -100,6 +106,7 @@ const editTitle = ref("");
 const editAuthor = ref("");
 const editDescription = ref("");
 const editCategory = ref("");
+const editCoverUrl = ref("");
 const savingEdit = ref(false);
 
 async function load() {
@@ -171,12 +178,68 @@ function onPickFile(ev: Event) {
   newFile.value = input.files?.[0] ?? null;
 }
 
+function onPickNewCover(ev: Event) {
+  const input = ev.target as HTMLInputElement;
+  newCoverFile.value = input.files?.[0] ?? null;
+}
+
+function patchBookCover(bookId: string, coverUrl: string) {
+  books.value = books.value.map((b) => (b.id === bookId ? { ...b, cover_url: coverUrl } : b));
+  if (editingId.value === bookId) editCoverUrl.value = coverUrl;
+}
+
+async function applyCover(bookId: string, file: File) {
+  if (!auth.token || coverUploading.value) return;
+  coverUploading.value = true;
+  try {
+    const r = await uploadBookCover(auth.token, bookId, file);
+    patchBookCover(bookId, r.cover_url);
+    toastSuccess("обложка сохранена");
+  } catch (e) {
+    toastError(e);
+  } finally {
+    coverUploading.value = false;
+  }
+}
+
+async function onCoverPick(b: LibraryBook, ev: Event) {
+  const input = ev.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+  await applyCover(b.id, file);
+  input.value = "";
+}
+
+async function onEditCoverPick(ev: Event) {
+  if (!editingId.value) return;
+  const input = ev.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+  await applyCover(editingId.value, file);
+  input.value = "";
+}
+
+async function removeCover(bookId: string) {
+  if (!auth.token || coverUploading.value) return;
+  coverUploading.value = true;
+  try {
+    await deleteBookCover(auth.token, bookId);
+    patchBookCover(bookId, "");
+    toastSuccess("обложка убрана");
+  } catch (e) {
+    toastError(e);
+  } finally {
+    coverUploading.value = false;
+  }
+}
+
 function resetForm() {
   newTitle.value = "";
   newAuthor.value = "";
   newDescription.value = "";
   newCategory.value = "";
   newFile.value = null;
+  newCoverFile.value = null;
   showForm.value = false;
 }
 
@@ -185,13 +248,16 @@ async function submit() {
   uploading.value = true;
   err.value = "";
   try {
-    await uploadBook(auth.token, {
+    const created = await uploadBook(auth.token, {
       title: newTitle.value.trim(),
       author: newAuthor.value.trim(),
       description: newDescription.value.trim(),
       category: newCategory.value.trim(),
       file: newFile.value,
     });
+    if (newCoverFile.value) {
+      await uploadBookCover(auth.token, created.id, newCoverFile.value);
+    }
     toastSuccess("книга добавлена");
     resetForm();
     await Promise.all([load(), loadCategories()]);
@@ -239,6 +305,7 @@ function openEdit(b: LibraryBook) {
   editAuthor.value = b.author;
   editDescription.value = b.description;
   editCategory.value = b.category;
+  editCoverUrl.value = b.cover_url ?? "";
   editOpen.value = true;
 }
 
@@ -249,6 +316,7 @@ function closeEdit() {
   editAuthor.value = "";
   editDescription.value = "";
   editCategory.value = "";
+  editCoverUrl.value = "";
 }
 
 async function saveEdit() {
@@ -364,6 +432,14 @@ onBeforeUnmount(() => {
           </datalist>
         </div>
         <textarea v-model="newDescription" rows="3" placeholder="описание" maxlength="4000" />
+        <label class="cover-field muted small">
+          обложка
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            @change="onPickNewCover"
+          />
+        </label>
         <input
           type="file"
           accept=".pdf,.epub,application/pdf,application/epub+zip"
@@ -436,29 +512,52 @@ onBeforeUnmount(() => {
         <p v-else-if="!books.length" class="list-panel-state muted">{{ listEmptyLabel }}</p>
         <ul v-else class="list">
           <li v-for="b in books" :key="b.id" class="list-row" :data-book-id="b.id">
-            <div class="info">
-              <span class="title">{{ b.title }}</span>
-              <span v-if="b.author" class="muted small">{{ b.author }}</span>
-              <span v-if="b.description" class="muted small desc">{{ b.description }}</span>
-              <span class="muted small meta">
-                <span v-if="b.category" class="cat-pill">{{ b.category }}</span>
-                @{{ b.uploader_nickname }}<template v-if="isStaff"> · {{ fmt(b.size_bytes) }}</template>
-              </span>
+            <div class="list-row-main">
+              <div class="info">
+                <span class="title">{{ b.title }}</span>
+                <span v-if="b.author" class="muted small">{{ b.author }}</span>
+                <span v-if="b.description" class="muted small desc">{{ b.description }}</span>
+                <span class="muted small meta">
+                  <span v-if="b.category" class="cat-pill">{{ b.category }}</span>
+                  @{{ b.uploader_nickname }}<template v-if="isStaff"> · {{ fmt(b.size_bytes) }}</template>
+                </span>
+              </div>
+              <div class="row-actions">
+                <button
+                  v-if="isPdfBook(b)"
+                  class="secondary"
+                  type="button"
+                  @click="openReader(b)"
+                >
+                  читать
+                </button>
+                <button class="secondary" type="button" @click="onDownload(b)">скачать</button>
+                <button v-if="canManageBook(b)" class="secondary" type="button" @click="openEdit(b)">
+                  изменить
+                </button>
+              </div>
             </div>
-            <div class="row-actions">
-              <button
-                v-if="isPdfBook(b)"
-                class="secondary"
-                type="button"
-                @click="openReader(b)"
-              >
-                читать
-              </button>
-              <button class="secondary" type="button" @click="onDownload(b)">скачать</button>
-              <button v-if="canManageBook(b)" class="secondary" type="button" @click="openEdit(b)">
-                изменить
-              </button>
-            </div>
+            <figure class="book-cover">
+              <label v-if="canManageBook(b)" class="book-cover-pick">
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  hidden
+                  :disabled="coverUploading"
+                  @change="onCoverPick(b, $event)"
+                />
+                <img v-if="b.cover_url" :src="b.cover_url" alt="" loading="lazy" decoding="async" />
+                <span v-else class="book-cover-empty">обложка</span>
+              </label>
+              <img
+                v-else-if="b.cover_url"
+                :src="b.cover_url"
+                alt=""
+                class="book-cover-img"
+                loading="lazy"
+                decoding="async"
+              />
+            </figure>
           </li>
         </ul>
       </div>
@@ -490,6 +589,31 @@ onBeforeUnmount(() => {
                 </datalist>
               </div>
               <textarea v-model="editDescription" rows="3" placeholder="описание" maxlength="4000" />
+              <div class="cover-edit">
+                <span class="muted small">обложка</span>
+                <div class="cover-edit-row">
+                  <label class="book-cover-pick book-cover-pick--edit">
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif"
+                      hidden
+                      :disabled="coverUploading"
+                      @change="onEditCoverPick"
+                    />
+                    <img v-if="editCoverUrl" :src="editCoverUrl" alt="" decoding="async" />
+                    <span v-else class="book-cover-empty">обложка</span>
+                  </label>
+                  <button
+                    v-if="editCoverUrl"
+                    type="button"
+                    class="secondary"
+                    :disabled="coverUploading"
+                    @click="editingId && removeCover(editingId)"
+                  >
+                    убрать
+                  </button>
+                </div>
+              </div>
               <div class="edit-actions">
                 <button class="secondary" type="button" @click="closeEdit">отмена</button>
                 <button type="submit" :disabled="savingEdit">
@@ -598,6 +722,77 @@ onBeforeUnmount(() => {
   font-size: 0.74rem;
 }
 
+.list-row-main {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.book-cover {
+  flex-shrink: 0;
+  margin: 0;
+}
+
+.book-cover-pick {
+  display: block;
+  width: 72px;
+  height: 104px;
+  cursor: pointer;
+}
+
+.book-cover-pick img,
+.book-cover-img {
+  display: block;
+  width: 72px;
+  height: 104px;
+  object-fit: cover;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.book-cover-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 104px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  color: var(--muted);
+  font-size: 0.72rem;
+  text-align: center;
+  padding: 0.35rem;
+}
+
+.cover-field {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.cover-edit {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.cover-edit-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.book-cover-pick--edit {
+  width: 64px;
+  height: 92px;
+}
+
+.book-cover-pick--edit img,
+.book-cover-pick--edit .book-cover-empty {
+  width: 64px;
+  height: 92px;
+}
+
 .row-actions {
   display: flex;
   gap: 0.4rem;
@@ -613,9 +808,13 @@ onBeforeUnmount(() => {
 
 @media (max-width: 640px) {
   .list .list-row {
-    flex-direction: column;
-    align-items: stretch;
+    flex-direction: row;
+    align-items: flex-start;
     gap: 0.55rem;
+  }
+
+  .list-row-main {
+    min-width: 0;
   }
 
   .row-actions {

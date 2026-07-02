@@ -355,6 +355,16 @@ try {
 }
 
 try {
+  db.prepare("SELECT cover_url FROM library_books LIMIT 1").get();
+} catch {
+  try {
+    db.exec("ALTER TABLE library_books ADD COLUMN cover_url TEXT NOT NULL DEFAULT ''");
+  } catch {
+    // ignore
+  }
+}
+
+try {
   db.prepare("SELECT image_url FROM chat_messages LIMIT 1").get();
 } catch {
   try {

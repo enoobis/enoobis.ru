@@ -10,16 +10,62 @@ import {
   verifyScopedAccessToken,
 } from "../auth.js";
 import { rateLimit, safePathUnder } from "../utils/security.js";
-import { LIBRARY_ALLOWED_MIMES, verifyLibraryBook } from "../utils/mimeVerify.js";
+import { LIBRARY_ALLOWED_MIMES, verifyLibraryBook, verifyRasterImage } from "../utils/mimeVerify.js";
+import { isRasterImageMimetype, optimizeUploadedFile } from "../utils/imageOptimize.js";
 import { contentDispositionAttachment, contentDispositionInline } from "../utils/contentDisposition.js";
 import { isStaffRole } from "../utils/roles.js";
+import { unlinkUploadUrl, UPLOAD_ROOT } from "../utils/uploadSafe.js";
 
 const router = express.Router();
 
 const LIBRARY_ROOT = path.resolve(process.env.LIBRARY_DIR ?? "./data/library");
+const COVER_SUBDIR = "library-covers";
 fs.mkdirSync(LIBRARY_ROOT, { recursive: true });
+fs.mkdirSync(path.join(UPLOAD_ROOT, COVER_SUBDIR), { recursive: true });
 
 const BOOK_MAX_BYTES = 150 * 1024 * 1024;
+const COVER_MIMES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
+
+const BOOK_SELECT = `b.id, b.title, b.author, b.description, b.category, b.cover_url, b.original_name,
+            b.mime_type, b.size_bytes, b.uploaded_by, b.created_at,
+            u.nickname AS uploader_nickname`;
+
+function canManageLibraryBook(user, book) {
+  if (!book) return false;
+  if (user.role === "admin") return true;
+  if (user.role === "teacher" && book.uploaded_by === user.id) return true;
+  return false;
+}
+
+function unlinkBookCover(url) {
+  if (!url?.startsWith(`/uploads/${COVER_SUBDIR}/`)) return;
+  unlinkUploadUrl(url, [COVER_SUBDIR]);
+}
+
+function libraryBookRow(id) {
+  return get(
+    `SELECT ${BOOK_SELECT}
+     FROM library_books b
+     LEFT JOIN users u ON u.id = b.uploaded_by
+     WHERE b.id = ?`,
+    id,
+  );
+}
+
+const coverUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, path.join(UPLOAD_ROOT, COVER_SUBDIR)),
+    filename: (req, file, cb) => {
+      const ext = (path.extname(file.originalname) || ".bin").toLowerCase();
+      cb(null, `${req.user.id}-${uuidv4().replace(/-/g, "")}${ext}`);
+    },
+  }),
+  limits: { fileSize: 3 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (COVER_MIMES.has(file.mimetype)) cb(null, true);
+    else cb(new Error("only jpeg, png, gif, webp"));
+  },
+});
 
 function staffOnly(req, res, next) {
   if (!isStaffRole(req.user?.role)) {
@@ -80,9 +126,7 @@ router.get("/library", authRequired, (req, res) => {
   const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
   const orderSql = sort === "title" ? "ORDER BY b.title COLLATE NOCASE" : "ORDER BY b.created_at DESC";
   const rows = all(
-    `SELECT b.id, b.title, b.author, b.description, b.category, b.original_name,
-            b.mime_type, b.size_bytes, b.uploaded_by, b.created_at,
-            u.nickname AS uploader_nickname
+    `SELECT ${BOOK_SELECT}
      FROM library_books b
      LEFT JOIN users u ON u.id = b.uploaded_by
      ${whereSql}
@@ -154,6 +198,7 @@ router.post("/library", authRequired, staffOnly, (req, res, next) => {
       author,
       description,
       category,
+      cover_url: "",
       original_name: req.file.originalname,
       mime_type: req.file.mimetype,
       size_bytes: req.file.size,
@@ -214,16 +259,49 @@ router.patch("/library/:id", authRequired, staffOnly, (req, res) => {
       req.params.id,
     );
   }
-  const updated = get(
-    `SELECT b.id, b.title, b.author, b.description, b.category, b.original_name,
-            b.mime_type, b.size_bytes, b.uploaded_by, b.created_at,
-            u.nickname AS uploader_nickname
-     FROM library_books b
-     LEFT JOIN users u ON u.id = b.uploaded_by
-     WHERE b.id = ?`,
-    req.params.id,
-  );
+  const updated = libraryBookRow(req.params.id);
   res.json(updated);
+});
+
+router.post("/library/:id/cover", authRequired, staffOnly, (req, res) => {
+  const book = get("SELECT id, uploaded_by FROM library_books WHERE id = ?", req.params.id);
+  if (!book) return res.status(404).json({ error: "not_found" });
+  if (!canManageLibraryBook(req.user, book)) {
+    return res.status(403).json({ error: "forbidden" });
+  }
+  coverUpload.single("file")(req, res, async (err) => {
+    if (err) return res.status(400).json({ error: err.message ?? "upload_error" });
+    if (!req.file) return res.status(400).json({ error: "no_file" });
+    const probe = await verifyRasterImage(req.file.path);
+    if (!probe.ok) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch {
+        /* ignore */
+      }
+      return res.status(400).json({ error: "invalid image" });
+    }
+    if (isRasterImageMimetype(req.file.mimetype)) {
+      const r = await optimizeUploadedFile(req.file.path, "book_cover");
+      if (r.ok) req.file.filename = r.filename;
+    }
+    const url = `/uploads/${COVER_SUBDIR}/${req.file.filename}`;
+    const prev = get("SELECT cover_url FROM library_books WHERE id = ?", req.params.id);
+    unlinkBookCover(prev?.cover_url ?? "");
+    run("UPDATE library_books SET cover_url = ? WHERE id = ?", url, req.params.id);
+    return res.json({ cover_url: url });
+  });
+});
+
+router.delete("/library/:id/cover", authRequired, staffOnly, (req, res) => {
+  const book = get("SELECT id, uploaded_by, cover_url FROM library_books WHERE id = ?", req.params.id);
+  if (!book) return res.status(404).json({ error: "not_found" });
+  if (!canManageLibraryBook(req.user, book)) {
+    return res.status(403).json({ error: "forbidden" });
+  }
+  unlinkBookCover(book.cover_url ?? "");
+  run("UPDATE library_books SET cover_url = '' WHERE id = ?", req.params.id);
+  return res.json({ cover_url: "" });
 });
 
 const shareReadLimit = rateLimit({ windowMs: 60_000, max: 120, keyPrefix: "lib-read" });
@@ -289,13 +367,14 @@ router.get("/library/:id/download", authRequired, (req, res) => {
 
 router.delete("/library/:id", authRequired, staffOnly, (req, res) => {
   const book = get(
-    "SELECT id, uploaded_by, storage_path FROM library_books WHERE id = ?",
+    "SELECT id, uploaded_by, storage_path, cover_url FROM library_books WHERE id = ?",
     req.params.id,
   );
   if (!book) return res.status(404).json({ error: "not_found" });
   if (book.uploaded_by !== req.user.id && req.user.role !== "admin") {
     return res.status(403).json({ error: "forbidden" });
   }
+  unlinkBookCover(book.cover_url ?? "");
   const abs = safePathUnder(LIBRARY_ROOT, book.storage_path);
   if (abs) {
     try {

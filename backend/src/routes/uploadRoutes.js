@@ -34,6 +34,7 @@ const SUBDIRS = [
   "blog",
   "course-lectures",
   "course-icons",
+  "library-covers",
   "wallpapers",
   "shop-avatars",
   "shop-items",

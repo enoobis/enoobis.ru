@@ -6,6 +6,7 @@ export type LibraryBook = {
   author: string;
   description: string;
   category: string;
+  cover_url: string;
   original_name: string;
   mime_type: string;
   size_bytes: number;
@@ -83,6 +84,36 @@ export function updateBookMetadata(
     method: "PATCH",
     token,
     body: JSON.stringify(payload),
+  });
+}
+
+export async function uploadBookCover(token: string, bookId: string, file: File) {
+  const fd = new FormData();
+  fd.append("file", file);
+  const res = await fetch(`/api/library/${bookId}/cover`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: fd,
+  });
+  const text = await res.text();
+  let data: unknown = null;
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = { error: text };
+    }
+  }
+  if (!res.ok) {
+    throw new Error((data as { error?: string })?.error ?? res.statusText);
+  }
+  return data as { cover_url: string };
+}
+
+export function deleteBookCover(token: string, bookId: string) {
+  return api<{ cover_url: string }>(`/api/library/${bookId}/cover`, {
+    method: "DELETE",
+    token,
   });
 }
 

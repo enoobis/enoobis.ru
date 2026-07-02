@@ -466,7 +466,7 @@ function _deleteUserFullyBody(userId) {
   run("DELETE FROM user_daily_activity WHERE user_id = ?", userId);
 
   const fileRows = all("SELECT storage_path FROM user_files WHERE owner_id = ?", userId);
-  const bookRows = all("SELECT storage_path FROM library_books WHERE uploaded_by = ?", userId);
+  const bookRows = all("SELECT storage_path, cover_url FROM library_books WHERE uploaded_by = ?", userId);
 
   run("DELETE FROM user_files WHERE owner_id = ?", userId);
   run("DELETE FROM user_notes WHERE owner_id = ?", userId);
@@ -497,6 +497,7 @@ function removeDeletedUserFiles(fileRows, bookRows, avatarUrl) {
     } catch {
       /* ignore */
     }
+    if (b.cover_url) unlinkUploadUrl(String(b.cover_url), ["library-covers"]);
   }
 }
 

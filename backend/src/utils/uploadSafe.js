@@ -10,6 +10,7 @@ export const UPLOAD_SUBDIRS = [
   "chat",
   "course-lectures",
   "course-icons",
+  "library-covers",
   "wallpapers",
   "shop-avatars",
   "shop-items",

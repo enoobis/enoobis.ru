@@ -9,6 +9,7 @@ const PRESETS = {
   avatar: { maxWidth: 512, maxHeight: 512, quality: 82 },
   lecture: { maxWidth: 1920, maxHeight: 1920, quality: 82 },
   course_icon: { maxWidth: 256, maxHeight: 256, quality: 82 },
+  book_cover: { maxWidth: 400, maxHeight: 600, quality: 82 },
   submission: { maxWidth: 1600, maxHeight: 1600, quality: 80 },
   wallpaper: { maxWidth: 1920, maxHeight: 1080, quality: 82 },
   shop_wallpaper: { maxWidth: 1920, maxHeight: 1080, quality: 82 },
