@@ -692,7 +692,7 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 0.75rem;
-  align-items: start;
+  align-items: stretch;
 }
 
 .list-body {
@@ -704,9 +704,10 @@ onBeforeUnmount(() => {
 .list-aside {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-end;
+  justify-content: space-between;
   gap: 0.5rem;
-  width: 72px;
+  min-width: max-content;
 }
 
 .title {
@@ -745,6 +746,7 @@ onBeforeUnmount(() => {
   height: 108px;
   object-fit: cover;
   border-radius: 3px;
+  margin-top: auto;
 }
 
 .cover-add {
@@ -791,10 +793,10 @@ onBeforeUnmount(() => {
 .row-actions {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 0.2rem;
-  flex-wrap: wrap;
-  width: 100%;
+  justify-content: flex-end;
+  gap: 0.15rem;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
 }
 
 .read-btn {
@@ -808,10 +810,6 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 640px) {
-  .list-aside {
-    width: 56px;
-  }
-
   .book-cover {
     width: 56px;
     height: 84px;
