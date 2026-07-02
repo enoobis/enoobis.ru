@@ -18,6 +18,7 @@ import AppIcon from "./components/AppIcon.vue";
 import AppToast from "./components/AppToast.vue";
 import MotionCoinCount from "./components/MotionCoinCount.vue";
 import SearchPanel from "./components/SearchPanel.vue";
+import NavExpandSearch from "./components/NavExpandSearch.vue";
 import { pathUsesPageSearchFilter } from "./utils/searchScope";
 const router = useRouter();
 const route = useRoute();
