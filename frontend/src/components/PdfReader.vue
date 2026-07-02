@@ -26,6 +26,7 @@ let pdfDoc: PDFDocumentProxy | null = null;
 let baseRatio = 1.414;
 let observer: IntersectionObserver | null = null;
 let reflowTimer: ReturnType<typeof setTimeout> | null = null;
+let scrollRaf = 0;
 let loadSeq = 0;
 const rendered = new Set<number>();
 
@@ -93,28 +94,79 @@ async function renderPageInto(num: number) {
   rendered.add(num);
 }
 
+function updateVisiblePage() {
+  const root = scrollEl.value;
+  if (!root || pageCount.value === 0) return;
+
+  const rootRect = root.getBoundingClientRect();
+  const viewTop = rootRect.top + 8;
+  const viewBottom = rootRect.bottom - 8;
+
+  let best = 1;
+  let bestTop = Infinity;
+
+  for (const el of pageEls.value) {
+    if (!el) continue;
+    const num = Number(el.dataset.page);
+    if (!Number.isFinite(num) || num < 1) continue;
+    const rect = el.getBoundingClientRect();
+    if (rect.bottom <= viewTop || rect.top >= viewBottom) continue;
+    if (rect.top < bestTop) {
+      bestTop = rect.top;
+      best = num;
+    }
+  }
+
+  if (currentPage.value !== best) {
+    currentPage.value = best;
+    reader.setPage(best, pageCount.value);
+  }
+}
+
+function onScroll() {
+  if (scrollRaf) cancelAnimationFrame(scrollRaf);
+  scrollRaf = requestAnimationFrame(() => {
+    scrollRaf = 0;
+    updateVisiblePage();
+  });
+}
+
 function setupObserver() {
   observer?.disconnect();
   observer = new IntersectionObserver(
     (entries) => {
       for (const e of entries) {
+        if (!e.isIntersecting) continue;
         const num = Number((e.target as HTMLElement).dataset.page);
-        if (e.isIntersecting) {
-          void renderPageInto(num);
-          currentPage.value = num;
-          reader.setPage(num, pageCount.value);
-        }
+        if (Number.isFinite(num) && num >= 1) void renderPageInto(num);
       }
+      updateVisiblePage();
     },
-    { root: scrollEl.value, rootMargin: "400px 0px", threshold: 0.35 },
+    { root: scrollEl.value, rootMargin: "240px 0px", threshold: 0.01 },
   );
   for (const el of pageEls.value) if (el) observer.observe(el);
 }
 
+async function resetScrollAndShowFirstPage() {
+  await nextTick();
+  const root = scrollEl.value;
+  if (!root) return;
+  root.scrollTop = 0;
+  setPlaceholders();
+  await renderPageInto(1);
+  if (pageCount.value > 1) void renderPageInto(2);
+  setupObserver();
+  updateVisiblePage();
+}
+
 function reflow() {
+  const keepTop = scrollEl.value?.scrollTop ?? 0;
   rendered.clear();
   setPlaceholders();
   setupObserver();
+  if (scrollEl.value) scrollEl.value.scrollTop = keepTop;
+  void renderPageInto(currentPage.value || 1);
+  updateVisiblePage();
 }
 
 function scheduleReflow() {
@@ -172,12 +224,12 @@ async function loadPdf() {
     const v = first.getViewport({ scale: 1 });
     baseRatio = v.height / v.width;
     pageCount.value = pdfDoc.numPages;
+    pageEls.value = Array.from({ length: pdfDoc.numPages }, () => null);
     reader.setPage(1, pageCount.value);
     loading.value = false;
-    await nextTick();
     if (seq !== loadSeq) return;
-    setPlaceholders();
-    setupObserver();
+    await resetScrollAndShowFirstPage();
+    if (seq !== loadSeq) return;
   } catch (e) {
     if (seq !== loadSeq) return;
     err.value = e instanceof Error ? e.message : "ошибка";
@@ -205,6 +257,11 @@ watch(
   },
 );
 
+watch(scrollEl, (el, prev) => {
+  prev?.removeEventListener("scroll", onScroll);
+  el?.addEventListener("scroll", onScroll, { passive: true });
+});
+
 onMounted(() => {
   reader.register({
     title: props.title,
@@ -214,6 +271,7 @@ onMounted(() => {
   });
   window.addEventListener("keydown", onKey);
   window.addEventListener("resize", onResize);
+  scrollEl.value?.addEventListener("scroll", onScroll, { passive: true });
   void loadPdf();
 });
 
@@ -221,6 +279,8 @@ onBeforeUnmount(() => {
   reader.unregister();
   window.removeEventListener("keydown", onKey);
   window.removeEventListener("resize", onResize);
+  scrollEl.value?.removeEventListener("scroll", onScroll);
+  if (scrollRaf) cancelAnimationFrame(scrollRaf);
   if (reflowTimer) clearTimeout(reflowTimer);
   observer?.disconnect();
   pdfDoc?.cleanup();
@@ -239,7 +299,9 @@ onBeforeUnmount(() => {
         <div
           v-for="n in pageCount"
           :key="n"
-          :ref="(el) => (pageEls[n - 1] = el as HTMLElement | null)"
+          :ref="(el) => {
+            if (el) pageEls[n - 1] = el as HTMLElement;
+          }"
           class="pdf-page-wrap"
           :data-page="n"
         >
