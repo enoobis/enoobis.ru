@@ -311,9 +311,13 @@ watch(
   },
 );
 
-watch(readerOpen, (open) => {
-  document.documentElement.style.overflow = open ? "hidden" : "";
-});
+function syncPageScrollLock() {
+  document.documentElement.style.overflow =
+    readerOpen.value || editOpen.value ? "hidden" : "";
+}
+
+watch(readerOpen, syncPageScrollLock);
+watch(editOpen, syncPageScrollLock);
 
 onBeforeUnmount(() => {
   document.removeEventListener("click", onDocumentClick);
@@ -424,7 +428,7 @@ onBeforeUnmount(() => {
             <div class="info">
               <span class="title">{{ b.title }}</span>
               <span v-if="b.author" class="muted small">{{ b.author }}</span>
-              <span v-if="b.description && !auth.isAdmin" class="muted small desc">{{ b.description }}</span>
+              <span v-if="b.description" class="muted small desc">{{ b.description }}</span>
               <span class="muted small meta">
                 <span v-if="b.category" class="cat-pill">{{ b.category }}</span>
                 @{{ b.uploader_nickname }}<template v-if="isStaff"> · {{ fmt(b.size_bytes) }}</template>
@@ -456,36 +460,38 @@ onBeforeUnmount(() => {
         @close="closeReader"
       />
 
-      <div v-if="editOpen" class="edit-overlay" role="dialog" aria-modal="true" @click.self="closeEdit">
-        <div class="edit-panel card" @click.stop>
-          <header class="edit-head">
-            <span class="muted">изменить</span>
-            <button class="icon-btn" type="button" aria-label="закрыть" @click="closeEdit">
-              <AppIcon name="close" :size="18" />
-            </button>
-          </header>
-          <form class="edit-form" @submit.prevent="saveEdit">
-            <input v-model="editTitle" placeholder="название" maxlength="200" required />
-            <div class="form-row">
-              <input v-model="editAuthor" placeholder="автор" maxlength="200" />
-              <input v-model="editCategory" placeholder="категория" maxlength="80" list="cat-suggest-edit" />
-              <datalist id="cat-suggest-edit">
-                <option v-for="c in categories" :key="c.category" :value="c.category" />
-              </datalist>
-            </div>
-            <textarea v-model="editDescription" rows="3" placeholder="описание" maxlength="4000" />
-            <div class="edit-actions">
-              <button class="secondary" type="button" @click="closeEdit">отмена</button>
-              <button type="submit" :disabled="savingEdit">
-                {{ savingEdit ? "…" : "сохранить" }}
+      <Teleport to="body">
+        <div v-if="editOpen" class="edit-overlay" role="dialog" aria-modal="true" @click.self="closeEdit">
+          <div class="edit-panel card" @click.stop>
+            <header class="edit-head">
+              <span class="muted">изменить</span>
+              <button class="icon-btn" type="button" aria-label="закрыть" @click="closeEdit">
+                <AppIcon name="close" :size="18" />
               </button>
+            </header>
+            <form class="edit-form" @submit.prevent="saveEdit">
+              <input v-model="editTitle" placeholder="название" maxlength="200" required />
+              <div class="form-row">
+                <input v-model="editAuthor" placeholder="автор" maxlength="200" />
+                <input v-model="editCategory" placeholder="категория" maxlength="80" list="cat-suggest-edit" />
+                <datalist id="cat-suggest-edit">
+                  <option v-for="c in categories" :key="c.category" :value="c.category" />
+                </datalist>
+              </div>
+              <textarea v-model="editDescription" rows="3" placeholder="описание" maxlength="4000" />
+              <div class="edit-actions">
+                <button class="secondary" type="button" @click="closeEdit">отмена</button>
+                <button type="submit" :disabled="savingEdit">
+                  {{ savingEdit ? "…" : "сохранить" }}
+                </button>
+              </div>
+            </form>
+            <div class="edit-foot">
+              <button class="edit-delete" type="button" @click="removeFromEdit">удалить</button>
             </div>
-          </form>
-          <div class="edit-foot">
-            <button class="edit-delete" type="button" @click="removeFromEdit">удалить</button>
           </div>
         </div>
-      </div>
+      </Teleport>
     </template>
   </section>
 </template>
@@ -618,10 +624,11 @@ onBeforeUnmount(() => {
 .edit-overlay {
   position: fixed;
   inset: 0;
-  z-index: 100;
+  z-index: 130;
   background: rgba(0, 0, 0, 0.6);
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 1rem;
 }
 

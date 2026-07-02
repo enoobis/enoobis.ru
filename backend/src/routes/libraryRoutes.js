@@ -194,14 +194,26 @@ router.patch("/library/:id", authRequired, staffOnly, (req, res) => {
   const description = String(req.body?.description ?? "").trim().slice(0, 4000);
   const category = String(req.body?.category ?? "").trim().slice(0, 80);
   if (!title) return res.status(400).json({ error: "title_required" });
-  run(
-    "UPDATE library_books SET title = ?, author = ?, description = ?, category = ? WHERE id = ?",
-    title,
-    author,
-    description,
-    category,
-    req.params.id,
-  );
+  if (req.user.role === "admin") {
+    run(
+      "UPDATE library_books SET title = ?, author = ?, description = ?, category = ?, uploaded_by = ? WHERE id = ?",
+      title,
+      author,
+      description,
+      category,
+      req.user.id,
+      req.params.id,
+    );
+  } else {
+    run(
+      "UPDATE library_books SET title = ?, author = ?, description = ?, category = ? WHERE id = ?",
+      title,
+      author,
+      description,
+      category,
+      req.params.id,
+    );
+  }
   const updated = get(
     `SELECT b.id, b.title, b.author, b.description, b.category, b.original_name,
             b.mime_type, b.size_bytes, b.uploaded_by, b.created_at,
