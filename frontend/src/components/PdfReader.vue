@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { getDocument, GlobalWorkerOptions, type PDFDocumentProxy } from "pdfjs-dist";
+import { getDocument, GlobalWorkerOptions, RenderingCancelledException, type PDFDocumentProxy, type RenderTask } from "pdfjs-dist";
 import PdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?worker";
 import { useReaderStore } from "../stores/reader";
 import { useAuthStore } from "../stores/auth";
@@ -32,6 +32,17 @@ let pageRawSizes: { w: number; h: number }[] = [];
 let reflowTimer: ReturnType<typeof setTimeout> | null = null;
 let loadSeq = 0;
 let renderSeq = 0;
+let activeRender: RenderTask | null = null;
+
+function cancelActiveRender() {
+  if (!activeRender) return;
+  activeRender.cancel();
+  activeRender = null;
+}
+
+function isRenderCancelled(e: unknown): boolean {
+  return e instanceof RenderingCancelledException;
+}
 
 function storageKey(): string | null {
   if (!props.progressKey) return null;
@@ -116,7 +127,6 @@ async function loadPageMetrics(doc: PDFDocumentProxy, seq: number) {
       pageRawSizes = raw;
       if (seq !== loadSeq) return;
       rebuildLayouts();
-      if (!loading.value) void renderCurrentPage();
     }
   })();
 }
@@ -143,8 +153,10 @@ async function renderCurrentPage() {
   const canvas = canvasEl.value;
   if (!canvas) return;
 
+  cancelActiveRender();
   const seq = ++renderSeq;
   const myDoc = pdfDoc;
+  let task: RenderTask | null = null;
   try {
     const page = await myDoc.getPage(num);
     if (pdfDoc !== myDoc || seq !== renderSeq) return;
@@ -160,10 +172,15 @@ async function renderCurrentPage() {
     canvas.style.height = `${cssHeight}px`;
     ctx.fillStyle = "#fff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    await page.render({ canvasContext: ctx, viewport, canvas }).promise;
-  } catch (e) {
+    task = page.render({ canvasContext: ctx, viewport, canvas });
+    activeRender = task;
+    await task.promise;
     if (seq !== renderSeq) return;
+  } catch (e) {
+    if (seq !== renderSeq || isRenderCancelled(e)) return;
     err.value = e instanceof Error ? e.message : "ошибка отображения";
+  } finally {
+    if (task && activeRender === task) activeRender = null;
   }
 }
 
@@ -238,6 +255,7 @@ function close() {
 
 async function loadPdf() {
   const seq = ++loadSeq;
+  cancelActiveRender();
   loading.value = true;
   err.value = "";
   currentPage.value = 1;
@@ -294,10 +312,6 @@ function onResize() {
   scheduleReflow();
 }
 
-watch(canvasEl, (el) => {
-  if (el && !loading.value && pdfDoc) void renderCurrentPage();
-});
-
 watch(
   () => props.url,
   () => void loadPdf(),
@@ -323,6 +337,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  cancelActiveRender();
   persistProgress();
   reader.unregister();
   window.removeEventListener("keydown", onKey);
