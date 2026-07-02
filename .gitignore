@@ -9,6 +9,7 @@ frontend/node_modules/
 **/node_modules/
 *.node
 frontend/dist/
+frontend/public/pdfjs/
 frontend/tsconfig.tsbuildinfo
 backend/node_modules/
 node_modules/

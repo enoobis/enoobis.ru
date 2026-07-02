@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import AppIcon from "../components/AppIcon.vue";
+import AppLoading from "../components/AppLoading.vue";
 import PageHeader from "../components/PageHeader.vue";
 import { api } from "../api/http";
 import { useAuthStore } from "../stores/auth";
@@ -123,7 +124,7 @@ useProfileOwnerThemeFromApi(nick);
     </nav>
 
     <p v-if="err" class="error">{{ err }}</p>
-    <p v-else-if="loading" class="page-empty muted">загрузка</p>
+    <AppLoading v-else-if="loading" class="page-empty" />
     <p v-else-if="!list.length" class="page-empty muted">пусто</p>
     <ul v-else class="list">
       <li v-for="u in list" :key="u.id" class="row">

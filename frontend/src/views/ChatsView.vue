@@ -25,6 +25,7 @@ import {
 } from "../api/chat";
 import { search, type SearchUser } from "../api/search";
 import AppIcon from "../components/AppIcon.vue";
+import AppLoading from "../components/AppLoading.vue";
 import { useAuthStore } from "../stores/auth";
 import { useChatStore } from "../stores/chat";
 import { toastError } from "../utils/toast";
@@ -914,7 +915,7 @@ onUnmounted(() => {
           <AppIcon name="plus" :size="18" />
         </button>
       </div>
-      <p v-if="loadingChats && !chats.length" class="page-empty muted">загрузка</p>
+      <AppLoading v-if="loadingChats && !chats.length" class="page-empty" />
       <p v-else-if="!chats.length" class="page-empty muted">пусто</p>
       <div
         v-for="c in chats"
@@ -1015,7 +1016,7 @@ onUnmounted(() => {
         </header>
 
         <div class="messages">
-          <p v-if="loadingMessages && !messages.length" class="page-empty muted">загрузка</p>
+          <AppLoading v-if="loadingMessages && !messages.length" class="page-empty" />
           <p v-else-if="!messages.length" class="page-empty muted">напишите первое сообщение</p>
           <template v-for="row in messageRows" :key="row.id">
             <div v-if="row.kind === 'day'" class="day-mark muted small">

@@ -5,6 +5,7 @@ import { getShare, shareDownloadUrl, shareReadUrl, type SharePayload } from "../
 import { renderMarkdown } from "../utils/markdown";
 import { filePreviewKind } from "../utils/filePreview";
 import PdfReader from "../components/PdfReader.vue";
+import AppLoading from "../components/AppLoading.vue";
 
 const route = useRoute();
 
@@ -85,7 +86,7 @@ onBeforeUnmount(() => {
 
 <template>
   <section class="shared">
-    <p v-if="loading" class="muted">загрузка</p>
+    <AppLoading v-if="loading" />
 
     <template v-else-if="errCode">
       <h1>ссылка недоступна</h1>

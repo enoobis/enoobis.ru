@@ -5,6 +5,7 @@ import { api } from "../api/http";
 import { uploadAvatar } from "../api/uploadAvatar";
 import { changeMyPassword } from "../api/profile";
 import AppIcon from "../components/AppIcon.vue";
+import AppLoading from "../components/AppLoading.vue";
 import { useAuthStore } from "../stores/auth";
 import { useSessionStore } from "../stores/session";
 import { setViewerPreferences } from "../utils/preferences";
@@ -599,7 +600,7 @@ function closeSettings() {
 
       <template v-else-if="tab === 'invites'">
         <h1>инвайты</h1>
-        <p v-if="invitesLoading" class="muted">загрузка</p>
+        <AppLoading v-if="invitesLoading" />
         <p v-else-if="!invites.length" class="muted">пусто</p>
         <div v-else class="invite-list">
           <div v-for="l in invites" :key="l.id" class="invite-card">
@@ -620,7 +621,7 @@ function closeSettings() {
     </div>
   </section>
   <p v-else-if="err" class="error">{{ err }}</p>
-  <p v-else class="muted">загрузка</p>
+  <AppLoading v-else />
 </template>
 
 <style scoped>

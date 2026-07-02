@@ -15,6 +15,7 @@ import { useAuthStore } from "../stores/auth";
 import { useSessionStore } from "../stores/session";
 import { toastError, toastSuccess } from "../utils/toast";
 import PageHeader from "../components/PageHeader.vue";
+import AppLoading from "../components/AppLoading.vue";
 import AppIcon from "../components/AppIcon.vue";
 import MotionCoinCount from "../components/MotionCoinCount.vue";
 import MotionStagger from "../components/MotionStagger.vue";
@@ -158,7 +159,7 @@ onMounted(load);
         </div>
       </template>
     </PageHeader>
-    <div v-if="loading && !items.length" class="page-empty muted">загрузка</div>
+    <AppLoading v-if="loading && !items.length" class="page-empty" />
     <div v-else-if="!loading && !items.length" class="page-empty muted">
       <p>пусто</p>
       <RouterLink to="/shop" class="to-shop">магазин →</RouterLink>

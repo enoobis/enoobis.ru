@@ -1,12 +1,39 @@
+import { cpSync, existsSync, mkdirSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { defineConfig, loadEnv } from "vite";
 import vue from "@vitejs/plugin-vue";
+
+const viteDir = dirname(fileURLToPath(import.meta.url));
+
+function pdfJsPublicAssets() {
+  const srcRoot = join(viteDir, "node_modules/pdfjs-dist");
+  const destRoot = join(viteDir, "public/pdfjs");
+
+  function sync() {
+    mkdirSync(destRoot, { recursive: true });
+    for (const dir of ["cmaps", "standard_fonts", "wasm"] as const) {
+      const src = join(srcRoot, dir);
+      const dest = join(destRoot, dir);
+      if (existsSync(src)) cpSync(src, dest, { recursive: true });
+    }
+  }
+
+  return {
+    name: "pdfjs-public-assets",
+    buildStart: sync,
+    configureServer() {
+      sync();
+    },
+  };
+}
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   // В dev бэкенд часто на :3000; если слушаете API на 80 - задайте VITE_API_PORT=80 в .env.development
   const apiPort = env.VITE_API_PORT || "3000";
   return {
-    plugins: [vue()],
+    plugins: [vue(), pdfJsPublicAssets()],
     worker: {
       format: "es",
     },

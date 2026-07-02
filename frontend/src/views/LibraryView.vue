@@ -17,6 +17,7 @@ const LIBRARY_QUOTA_BYTES = 5 * 1024 * 1024 * 1024;
 import { useAuthStore } from "../stores/auth";
 import { toastError, toastSuccess } from "../utils/toast";
 import AppIcon from "../components/AppIcon.vue";
+import AppLoading from "../components/AppLoading.vue";
 import PageHeader from "../components/PageHeader.vue";
 import PdfReader from "../components/PdfReader.vue";
 
@@ -389,7 +390,7 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="list-panel">
-        <p v-if="loading" class="list-panel-state muted">загрузка</p>
+        <AppLoading v-if="loading" class="list-panel-state" />
         <p v-else-if="!books.length" class="list-panel-state muted">пусто</p>
         <ul v-else class="list">
           <li v-for="b in books" :key="b.id" class="list-row">

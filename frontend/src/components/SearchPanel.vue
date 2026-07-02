@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import FilterSearch from "./FilterSearch.vue";
+import AppLoading from "./AppLoading.vue";
 import { listTags, type TaxonomyItem } from "../api/blog";
 import { search, type SearchResponse } from "../api/search";
 import { useAuthStore } from "../stores/auth";
@@ -279,9 +280,7 @@ onUnmounted(() => {
 
     <template v-if="scope === 'global'">
       <p v-if="err" class="error">{{ err }}</p>
-      <p v-else-if="loading" class="muted search-status">
-        <span class="spinner" aria-hidden="true" /> загрузка
-      </p>
+      <AppLoading v-else-if="loading" inline class="search-status" />
       <p
         v-else-if="q && !data.blog.length && !data.micro.length && !data.users.length"
         class="muted search-status"

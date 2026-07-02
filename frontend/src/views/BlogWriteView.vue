@@ -12,6 +12,7 @@ import {
 import { useAuthStore } from "../stores/auth";
 import { renderMarkdown } from "../utils/markdown";
 import AppIcon from "../components/AppIcon.vue";
+import AppLoading from "../components/AppLoading.vue";
 
 type ViewMode = "edit" | "split" | "preview";
 type SaveTarget = "draft" | "submit";
@@ -401,7 +402,7 @@ onBeforeUnmount(() => {
     </header>
 
     <p v-if="err" class="error" style="margin: 0.5rem 0">{{ err }}</p>
-    <p v-if="loading" class="muted">загрузка</p>
+    <AppLoading v-if="loading" />
 
     <div v-if="showSettings" class="settings-panel card">
       <div class="form-grid">

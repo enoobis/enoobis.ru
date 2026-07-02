@@ -15,7 +15,8 @@ import {
   type WorkPoint,
 } from "../api/work";
 import { useAuthStore } from "../stores/auth";
-import AppIcon from "./AppIcon.vue";
+import AppIcon from "../components/AppIcon.vue";
+import AppLoading from "./AppLoading.vue";
 
 const auth = useAuthStore();
 
@@ -515,7 +516,9 @@ onBeforeUnmount(() => {
           </thead>
           <tbody>
             <tr v-if="loadingCheckins">
-              <td colspan="5" class="empty-cell muted">загрузка…</td>
+              <td colspan="5" class="empty-cell">
+                <AppLoading inline />
+              </td>
             </tr>
             <tr v-else-if="!checkins.length">
               <td colspan="5" class="empty-cell muted">отметок нет за этот период</td>

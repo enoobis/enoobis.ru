@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import MicroComposer from "../components/MicroComposer.vue";
+import AppLoading from "../components/AppLoading.vue";
 import MicroItem from "../components/MicroItem.vue";
 import { getMicro, type MicroPost } from "../api/micro";
 import { useAuthStore } from "../stores/auth";
@@ -75,7 +76,7 @@ watch(id, load);
     <RouterLink v-else to="/microblogs" class="back muted small">← лента</RouterLink>
 
     <p v-if="err" class="error">{{ err }}</p>
-    <p v-else-if="loading && !post" class="muted">загрузка</p>
+    <AppLoading v-else-if="loading && !post" />
 
     <template v-else-if="post">
       <MicroItem :post="post" @deleted="onPostDeleted" @updated="onPostUpdated" />

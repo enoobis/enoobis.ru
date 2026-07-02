@@ -5,6 +5,7 @@ import FilterSearch from "../components/FilterSearch.vue";
 import PageHeader from "../components/PageHeader.vue";
 import AdminWorkTab from "../components/AdminWorkTab.vue";
 import AppIcon from "../components/AppIcon.vue";
+import AppLoading from "../components/AppLoading.vue";
 import { api } from "../api/http";
 import {
   approveBlogPost,
@@ -1290,7 +1291,7 @@ async function approveBlog(id: string) {
             удалить пользователя
           </button>
         </template>
-        <p v-if="!moderateDetail" class="muted small">загрузка…</p>
+        <AppLoading v-if="!moderateDetail" class="small" />
         <p v-if="modMsg" class="muted small">{{ modMsg }}</p>
         </div>
       </div>
@@ -1353,7 +1354,7 @@ async function approveBlog(id: string) {
         <input type="file" accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/webm" :disabled="shopUploadBusy" @change="onShopItemFile" />
         {{ shopUploadBusy ? "загрузка…" : "загрузить" }}
       </label>
-      <p v-if="shopLoading" class="muted small">загрузка…</p>
+      <AppLoading v-if="shopLoading" class="small" />
       <ul v-else-if="shopItems.length" class="shop-grid">
         <li v-for="a in shopItems" :key="a.id" class="shop-item">
           <img v-if="a.url" :src="a.url" :alt="a.name" class="shop-avatar-img" loading="lazy" />

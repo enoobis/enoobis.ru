@@ -19,6 +19,7 @@ import {
   type CommentItem,
 } from "../api/blog";
 import AppIcon from "../components/AppIcon.vue";
+import AppLoading from "../components/AppLoading.vue";
 import { useAuthStore } from "../stores/auth";
 import { renderMarkdown } from "../utils/markdown";
 import { addRecentPost, updateRecentPostProgress } from "../utils/recentPosts";
@@ -402,7 +403,7 @@ watch(() => route.params.id, load);
     </section>
   </article>
   <p v-else-if="err" class="error">{{ err }}</p>
-  <p v-else class="muted">загрузка</p>
+  <AppLoading v-else />
 </template>
 
 <style scoped>

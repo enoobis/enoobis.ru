@@ -13,6 +13,7 @@ import { useAuthStore } from "../stores/auth";
 import { useSessionStore } from "../stores/session";
 import { toastError, toastSuccess } from "../utils/toast";
 import PageHeader from "../components/PageHeader.vue";
+import AppLoading from "../components/AppLoading.vue";
 import MotionCoinCount from "../components/MotionCoinCount.vue";
 import MotionStagger from "../components/MotionStagger.vue";
 import MotionStaggerItem from "../components/MotionStaggerItem.vue";
@@ -272,7 +273,7 @@ watch(
       </div>
     </div>
 
-    <div v-if="loading && !items.length" class="page-empty muted">загрузка</div>
+    <AppLoading v-if="loading && !items.length" class="page-empty" />
     <div v-else-if="!loading && !items.length" class="page-empty muted">пусто</div>
     <MotionStagger
       v-if="items.length"

@@ -2,6 +2,7 @@
 import { onMounted, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import AppIcon from "../components/AppIcon.vue";
+import AppLoading from "../components/AppLoading.vue";
 import PageHeader from "../components/PageHeader.vue";
 import { listLeaderboard, type LeaderboardEntry } from "../api/leaderboard";
 import { useAuthStore } from "../stores/auth";
@@ -44,7 +45,7 @@ onMounted(load);
     </PageHeader>
 
     <p v-if="err" class="error">{{ err }}</p>
-    <p v-else-if="loading" class="page-empty muted">загрузка</p>
+    <AppLoading v-else-if="loading" class="page-empty" />
     <p v-else-if="!list.length" class="page-empty muted">пусто</p>
     <ol v-else class="list">
       <li v-for="u in list" :key="u.id" class="row" :class="{ top: u.rank <= 3 }">

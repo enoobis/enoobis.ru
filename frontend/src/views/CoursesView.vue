@@ -34,6 +34,7 @@ import {
   type SubmissionAttachment,
 } from "../api/courses";
 import AppIcon from "../components/AppIcon.vue";
+import AppLoading from "../components/AppLoading.vue";
 import PageHeader from "../components/PageHeader.vue";
 import FilterSearch from "../components/FilterSearch.vue";
 import { useAuthStore } from "../stores/auth";
@@ -2236,7 +2237,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
       <template v-else-if="tab === 'grades'">
         <template v-if="isTeacherInCurrent">
           <p v-if="teacherGradebookError" class="error">{{ teacherGradebookError }}</p>
-          <p v-else-if="teacherGradebookLoading" class="muted">загрузка</p>
+          <AppLoading v-else-if="teacherGradebookLoading" />
           <div v-else-if="teacherGradebookRows.length" class="gradebook-wrap">
             <table class="gradebook-table">
               <thead>

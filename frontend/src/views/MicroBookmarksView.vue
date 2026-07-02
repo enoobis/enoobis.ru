@@ -2,6 +2,7 @@
 import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import AppIcon from "../components/AppIcon.vue";
+import AppLoading from "../components/AppLoading.vue";
 import MicroItem from "../components/MicroItem.vue";
 import PageHeader from "../components/PageHeader.vue";
 import { listMyMicroBookmarks, type MicroPost } from "../api/micro";
@@ -53,7 +54,7 @@ onMounted(load);
       </template>
     </PageHeader>
     <p v-if="err" class="error">{{ err }}</p>
-    <p v-else-if="loading && !posts.length" class="page-empty muted">загрузка</p>
+    <AppLoading v-else-if="loading && !posts.length" class="page-empty" />
     <p v-else-if="!loading && !posts.length" class="page-empty muted">пусто</p>
     <MicroItem
       v-for="p in posts"

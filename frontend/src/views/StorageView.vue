@@ -22,6 +22,7 @@ import {
   type ShareTtl,
 } from "../api/storage";
 import AppIcon from "../components/AppIcon.vue";
+import AppLoading from "../components/AppLoading.vue";
 import PageHeader from "../components/PageHeader.vue";
 import PdfReader from "../components/PdfReader.vue";
 import { useAuthStore } from "../stores/auth";
@@ -470,7 +471,7 @@ onBeforeUnmount(() => {
           <p>{{ uploading ? "загрузка…" : "перетащите файл или нажмите" }}</p>
         </div>
 
-        <p v-if="filesLoading" class="page-empty page-empty--tight muted">загрузка</p>
+        <AppLoading v-if="filesLoading" class="page-empty page-empty--tight" />
         <p v-else-if="!files.length" class="page-empty page-empty--tight muted">пусто</p>
         <ul v-else class="list">
           <li v-for="f in files" :key="f.id" class="list-row">
@@ -507,7 +508,7 @@ onBeforeUnmount(() => {
           <textarea v-model="noteBody" rows="3" placeholder="текст… markdown поддерживается" />
         </div>
 
-        <p v-if="notesLoading" class="page-empty page-empty--tight muted">загрузка</p>
+        <AppLoading v-if="notesLoading" class="page-empty page-empty--tight" />
         <p v-else-if="!notes.length" class="page-empty page-empty--tight muted">пусто</p>
         <ul v-else class="list">
           <li v-for="n in notes" :key="n.id" class="list-row">

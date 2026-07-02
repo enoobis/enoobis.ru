@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { getDocument, GlobalWorkerOptions, RenderingCancelledException, type PDFDocumentProxy, type RenderTask } from "pdfjs-dist";
-import PdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?worker";
+import { RenderingCancelledException, type PDFDocumentProxy, type RenderTask } from "pdfjs-dist";
 import { useReaderStore } from "../stores/reader";
 import { useAuthStore } from "../stores/auth";
 import { getReaderProgress, setReaderProgress } from "../utils/readerProgress";
-
-GlobalWorkerOptions.workerPort = new PdfWorker();
+import { loadPdfDocument, pdfOptionalContentForDisplay } from "../utils/pdfjsSetup";
+import AppLoading from "./AppLoading.vue";
 
 const props = defineProps<{
   url: string;
@@ -28,6 +27,7 @@ const canvasEl = ref<HTMLCanvasElement | null>(null);
 const pageLayouts = ref<{ width: number; height: number }[]>([]);
 
 let pdfDoc: PDFDocumentProxy | null = null;
+let ocConfig: Awaited<ReturnType<PDFDocumentProxy["getOptionalContentConfig"]>> | undefined;
 let pageRawSizes: { w: number; h: number }[] = [];
 let reflowTimer: ReturnType<typeof setTimeout> | null = null;
 let loadSeq = 0;
@@ -172,7 +172,16 @@ async function renderCurrentPage() {
     canvas.style.height = `${cssHeight}px`;
     ctx.fillStyle = "#fff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    task = page.render({ canvasContext: ctx, viewport, canvas });
+    const renderParams = {
+      canvasContext: ctx,
+      viewport,
+      canvas,
+    };
+    task = page.render(
+      ocConfig
+        ? { ...renderParams, optionalContentConfigPromise: Promise.resolve(ocConfig) }
+        : renderParams,
+    );
     activeRender = task;
     await task.promise;
     if (seq !== renderSeq) return;
@@ -262,6 +271,7 @@ async function loadPdf() {
   pageCount.value = 0;
   pageLayouts.value = [];
   pageRawSizes = [];
+  ocConfig = undefined;
   pdfDoc?.cleanup();
   pdfDoc = null;
   reader.setPage(0, 0);
@@ -280,12 +290,17 @@ async function loadPdf() {
     }
     const buf = await res.arrayBuffer();
     if (seq !== loadSeq) return;
-    const doc = await getDocument({ data: buf }).promise;
+    const doc = await loadPdfDocument(buf);
     if (seq !== loadSeq) {
       doc.cleanup();
       return;
     }
     pdfDoc = doc;
+    ocConfig = await pdfOptionalContentForDisplay(doc);
+    if (seq !== loadSeq) {
+      doc.cleanup();
+      return;
+    }
     pageCount.value = doc.numPages;
     await loadPageMetrics(doc, seq);
     if (seq !== loadSeq) return;
@@ -356,9 +371,7 @@ onBeforeUnmount(() => {
         class="pdf-stage"
         @click="onTap"
       >
-        <p v-if="loading" class="pdf-state">
-          <span class="spinner" aria-hidden="true" /> загрузка
-        </p>
+        <AppLoading v-if="loading" center />
         <p v-else-if="err" class="pdf-state error">{{ err }}</p>
         <div
           v-else-if="pageCount > 0"

@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import PageHeader from "../components/PageHeader.vue";
+import AppLoading from "../components/AppLoading.vue";
 import MicroComposer from "../components/MicroComposer.vue";
 import MicroItem from "../components/MicroItem.vue";
 import { listMicro, type MicroPost } from "../api/micro";
@@ -136,7 +137,7 @@ onMounted(() => {
     </p>
 
     <p v-if="err" class="error">{{ err }}</p>
-    <p v-else-if="loading && !posts.length" class="page-empty muted">загрузка</p>
+    <AppLoading v-else-if="loading && !posts.length" class="page-empty" />
     <p v-else-if="!loading && !posts.length" class="page-empty muted">пусто</p>
 
     <MicroItem

@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import PageHeader from "../components/PageHeader.vue";
+import AppLoading from "../components/AppLoading.vue";
 import PostMetaStats from "../components/PostMetaStats.vue";
 import {
   listMyBookmarks,
@@ -179,7 +180,7 @@ onMounted(() => {
     </div>
 
     <p v-if="err" class="error">{{ err }}</p>
-    <p v-else-if="loading && !sortedPosts.length" class="muted">загрузка</p>
+    <AppLoading v-else-if="loading && !sortedPosts.length" />
     <template v-else>
       <ul v-if="sortedPosts.length" class="post-list">
         <li v-for="p in sortedPosts" :key="p.id">
