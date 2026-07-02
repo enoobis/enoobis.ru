@@ -505,6 +505,33 @@ onBeforeUnmount(() => {
         <p v-else-if="!books.length" class="list-panel-state muted">{{ listEmptyLabel }}</p>
         <ul v-else class="list">
           <li v-for="b in books" :key="b.id" class="list-row" :data-book-id="b.id">
+            <div class="list-body">
+              <div class="list-head">
+                <div class="info">
+                  <span class="title">{{ b.title }}</span>
+                  <span v-if="b.author" class="muted small">{{ b.author }}</span>
+                </div>
+                <div class="row-actions">
+                  <button
+                    v-if="isPdfBook(b)"
+                    class="secondary"
+                    type="button"
+                    @click="openReader(b)"
+                  >
+                    читать
+                  </button>
+                  <button class="secondary" type="button" @click="onDownload(b)">скачать</button>
+                  <button v-if="canManageBook(b)" class="secondary" type="button" @click="openEdit(b)">
+                    изменить
+                  </button>
+                </div>
+              </div>
+              <span v-if="b.description" class="muted small desc">{{ b.description }}</span>
+              <span class="muted small meta">
+                <span v-if="b.category" class="cat-pill">{{ b.category }}</span>
+                @{{ b.uploader_nickname }}<template v-if="isStaff"> · {{ fmt(b.size_bytes) }}</template>
+              </span>
+            </div>
             <img
               v-if="b.cover_url"
               :src="b.cover_url"
@@ -513,29 +540,6 @@ onBeforeUnmount(() => {
               loading="lazy"
               decoding="async"
             />
-            <div class="info">
-              <span class="title">{{ b.title }}</span>
-              <span v-if="b.author" class="muted small">{{ b.author }}</span>
-              <span v-if="b.description" class="muted small desc">{{ b.description }}</span>
-              <span class="muted small meta">
-                <span v-if="b.category" class="cat-pill">{{ b.category }}</span>
-                @{{ b.uploader_nickname }}<template v-if="isStaff"> · {{ fmt(b.size_bytes) }}</template>
-              </span>
-            </div>
-            <div class="row-actions">
-              <button
-                v-if="isPdfBook(b)"
-                class="secondary"
-                type="button"
-                @click="openReader(b)"
-              >
-                читать
-              </button>
-              <button class="secondary" type="button" @click="onDownload(b)">скачать</button>
-              <button v-if="canManageBook(b)" class="secondary" type="button" @click="openEdit(b)">
-                изменить
-              </button>
-            </div>
           </li>
         </ul>
       </div>
@@ -675,8 +679,21 @@ onBeforeUnmount(() => {
 .info {
   display: grid;
   gap: 0.2rem;
+  min-width: 0;
+}
+
+.list-body {
   flex: 1;
   min-width: 0;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.list-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.6rem;
 }
 
 .title {
@@ -711,13 +728,12 @@ onBeforeUnmount(() => {
 
 .book-cover {
   flex-shrink: 0;
+  align-self: center;
   display: block;
-  width: 52px;
-  height: 74px;
+  width: 56px;
+  height: 84px;
   object-fit: cover;
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-  background: var(--surface);
+  border-radius: 3px;
 }
 
 .cover-add {
@@ -776,13 +792,24 @@ onBeforeUnmount(() => {
 
 @media (max-width: 640px) {
   .list .list-row {
-    flex-wrap: wrap;
+    align-items: flex-start;
     gap: 0.55rem;
+  }
+
+  .list-head {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .row-actions {
     width: 100%;
     flex-wrap: wrap;
+  }
+
+  .book-cover {
+    align-self: flex-start;
+    width: 48px;
+    height: 72px;
   }
 
   .desc {
