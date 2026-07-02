@@ -692,7 +692,7 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 0.75rem;
-  align-items: stretch;
+  align-items: start;
 }
 
 .list-body {
@@ -704,9 +704,8 @@ onBeforeUnmount(() => {
 .list-aside {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 0.5rem;
+  align-items: stretch;
+  gap: 0.45rem;
   min-width: max-content;
 }
 
@@ -742,11 +741,10 @@ onBeforeUnmount(() => {
 
 .book-cover {
   display: block;
-  width: 72px;
-  height: 108px;
+  width: 100%;
+  aspect-ratio: 2 / 3;
   object-fit: cover;
   border-radius: 3px;
-  margin-top: auto;
 }
 
 .cover-add {
@@ -810,9 +808,8 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 640px) {
-  .book-cover {
-    width: 56px;
-    height: 84px;
+  .list-aside {
+    max-width: 108px;
   }
 
   .desc {
