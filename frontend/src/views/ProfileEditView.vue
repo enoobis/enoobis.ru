@@ -426,72 +426,103 @@ function closeSettings() {
       <p v-if="avatarMsg" class="ok">{{ avatarMsg }}</p>
 
       <template v-if="tab === 'profile'">
-        <h1>профиль</h1>
-        <ul v-if="me.moderation_notices?.length" class="mod-notes">
-          <li v-for="(line, i) in me.moderation_notices" :key="i">{{ line }}</li>
-        </ul>
-        <div class="avatar-header">
-          <div v-if="me.avatar_url" class="avatar-preview-wrap">
-            <img :src="me.avatar_url" alt="" class="avatar-preview" />
-          </div>
-          <div v-else class="avatar-placeholder">{{ me.nickname.slice(0, 2) }}</div>
-          <div class="avatar-actions">
-            <label class="btn-file">
-              <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" :disabled="uploadingAvatar" @change="onAvatarFile" />
-              {{ uploadingAvatar ? "загрузка…" : "загрузить фото" }}
-            </label>
-            <button v-if="me.avatar_url" class="secondary" type="button" @click="clearAvatar">убрать</button>
-          </div>
-        </div>
+        <div class="profile-edit">
+          <ul v-if="me.moderation_notices?.length" class="mod-notes">
+            <li v-for="(line, i) in me.moderation_notices" :key="i">{{ line }}</li>
+          </ul>
 
-        <div class="form-grid">
-          <label>
-            <span>ник</span>
-            <input :value="`@${me.nickname}`" disabled />
-          </label>
-          <label>
-            <span>имя</span>
-            <input v-model="fullName" />
-          </label>
-          <label class="col-2">
-            <span>био</span>
-            <textarea v-model="bio" rows="3" maxlength="680" />
-          </label>
-          <label class="col-2">
-            <span>сайт</span>
-            <input v-model="websiteUrl" />
-          </label>
-          <label class="col-2">
-            <span>readme · markdown</span>
-            <textarea
-              v-model="readmeMd"
-              rows="10"
-              :maxlength="README_MAX"
-              placeholder="# привет&#10;![img](url.png)&#10;![video](url.mp4)"
-              class="readme-input"
-            />
-            <span class="readme-counter muted">{{ readmeMd.length }} / {{ README_MAX }}</span>
-            <details v-if="readmeMd.trim()" class="readme-preview-wrap">
-              <summary class="muted small">превью</summary>
-              <article class="readme-preview" v-html="readmePreview" />
-            </details>
-          </label>
-        </div>
-
-        <div class="socials">
-          <div class="socials-head">
-            <h2>соцсети</h2>
-            <button class="secondary" type="button" @click="addSocialLink">+ ссылка</button>
-          </div>
-          <div v-for="(s, i) in socialLinks" :key="`social-${i}`" class="social-row">
-            <input v-model="s.name" placeholder="название" />
-            <input v-model="s.url" placeholder="https://" />
-            <button class="secondary social-remove" type="button" @click="removeSocialLink(i)">
-              <AppIcon name="delete" />
+          <div class="profile-hero">
+            <div class="avatar-edit">
+              <img v-if="me.avatar_url" :src="me.avatar_url" alt="" class="avatar-edit-img" />
+              <div v-else class="avatar-edit-placeholder">{{ me.nickname.slice(0, 2) }}</div>
+              <label class="avatar-edit-btn" :class="{ busy: uploadingAvatar }">
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/gif,image/webp"
+                  :disabled="uploadingAvatar"
+                  @change="onAvatarFile"
+                />
+                <AppIcon name="edit" :size="16" />
+              </label>
+            </div>
+            <button
+              v-if="me.avatar_url"
+              class="avatar-clear"
+              type="button"
+              :disabled="uploadingAvatar"
+              @click="clearAvatar"
+            >
+              убрать фото
             </button>
           </div>
-        </div>
 
+          <div class="field-stack">
+            <label class="field">
+              <span class="field-label">ник</span>
+              <input class="field-input" :value="`@${me.nickname}`" disabled />
+            </label>
+
+            <label class="field">
+              <span class="field-label">имя</span>
+              <input v-model="fullName" class="field-input" maxlength="120" />
+            </label>
+
+            <label class="field">
+              <span class="field-head">
+                <span class="field-label">био</span>
+                <span class="field-count muted">{{ bio.length }} / 680</span>
+              </span>
+              <textarea
+                v-model="bio"
+                class="field-input field-textarea"
+                rows="3"
+                maxlength="680"
+                placeholder="расскажи о себе"
+              />
+            </label>
+
+            <label class="field">
+              <span class="field-label">сайт</span>
+              <span class="field-icon-wrap">
+                <AppIcon name="link" :size="16" class="field-icon" />
+                <input v-model="websiteUrl" class="field-input field-input--icon" placeholder="https://" />
+              </span>
+            </label>
+
+            <label class="field">
+              <span class="field-head">
+                <span class="field-label">readme · markdown</span>
+                <span class="field-count muted">{{ readmeMd.length }} / {{ README_MAX }}</span>
+              </span>
+              <textarea
+                v-model="readmeMd"
+                class="field-input field-textarea readme-input"
+                rows="8"
+                :maxlength="README_MAX"
+                placeholder="# привет&#10;![img](url.png)"
+              />
+              <details v-if="readmeMd.trim()" class="readme-preview-wrap">
+                <summary class="muted small">превью</summary>
+                <article class="readme-preview" v-html="readmePreview" />
+              </details>
+            </label>
+          </div>
+
+          <section class="socials-card">
+            <div class="socials-card-head">
+              <span class="field-label">соцсети</span>
+              <button class="secondary socials-add" type="button" @click="addSocialLink">+ ссылка</button>
+            </div>
+            <p v-if="!socialLinks.length" class="socials-empty muted small">пусто</p>
+            <div v-for="(s, i) in socialLinks" :key="`social-${i}`" class="socials-row">
+              <input v-model="s.name" class="field-input" placeholder="название" />
+              <input v-model="s.url" class="field-input" placeholder="https://" />
+              <button class="icon-btn-sm socials-remove" type="button" aria-label="удалить" @click="removeSocialLink(i)">
+                <AppIcon name="delete" :size="16" />
+              </button>
+            </div>
+          </section>
+        </div>
       </template>
 
       <template v-else-if="tab === 'account'">
@@ -614,7 +645,7 @@ function closeSettings() {
         </div>
       </template>
 
-      <div v-if="tab === 'profile' || tab === 'account'" class="actions">
+      <div v-if="tab === 'profile' || tab === 'account'" class="actions" :class="{ 'actions--profile': tab === 'profile' }">
         <button class="secondary" type="button" @click="closeSettings">отмена</button>
         <button type="button" :disabled="saving" @click="save">{{ saving ? "…" : "сохранить" }}</button>
       </div>
@@ -690,54 +721,206 @@ function closeSettings() {
 
 .settings-main {
   border-radius: 20px;
+  padding: 1.25rem;
 }
 
-.avatar-header {
-  display: flex;
-  gap: 0.9rem;
-  align-items: center;
-  margin-bottom: 0.95rem;
+.profile-edit {
+  max-width: 420px;
+  margin: 0 auto;
+  display: grid;
+  gap: 1.25rem;
 }
 
-.avatar-preview-wrap,
-.avatar-placeholder {
-  width: 78px;
-  height: 78px;
-  border-radius: var(--avatar-radius);
-  overflow: hidden;
+.profile-hero {
+  display: grid;
+  justify-items: center;
+  gap: 0.45rem;
+  padding-top: 0.25rem;
+}
+
+.avatar-edit {
+  position: relative;
+  width: 96px;
+  height: 96px;
+}
+
+.avatar-edit-img,
+.avatar-edit-placeholder {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
   border: 1px solid var(--border);
   background: var(--surface2);
 }
 
-.avatar-preview {
-  width: 100%;
-  height: 100%;
+.avatar-edit-img {
   object-fit: cover;
+  display: block;
 }
 
-.avatar-placeholder {
+.avatar-edit-placeholder {
   display: grid;
   place-items: center;
-  font-weight: 700;
+  font-weight: 600;
+  font-size: 1.1rem;
+  text-transform: lowercase;
 }
 
-.avatar-actions {
-  display: flex;
-  gap: 0.6rem;
-  flex-wrap: wrap;
-}
-
-.btn-file {
-  display: inline-block;
+.avatar-edit-btn {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  display: grid;
+  place-items: center;
   cursor: pointer;
+}
+
+.avatar-edit-btn.busy {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.avatar-edit-btn input {
+  display: none;
+}
+
+.avatar-clear {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+  padding: 0.15rem 0.35rem;
+}
+
+.avatar-clear:hover {
+  color: var(--text);
+}
+
+.field-stack {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.field-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.field-label {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.field-count {
+  font-size: 0.74rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.field-input {
+  width: 100%;
+  min-height: var(--control-h);
+  padding: var(--input-pad-y) var(--input-pad-x);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 0.55rem 1rem;
   background: var(--surface2);
+  color: var(--text);
+  font: inherit;
 }
 
-.btn-file input {
-  display: none;
+.field-input:focus {
+  outline: none;
+  border-color: var(--focus-border);
+}
+
+.field-input:disabled {
+  opacity: 0.7;
+}
+
+.field-textarea {
+  min-height: 0;
+  resize: vertical;
+  line-height: 1.45;
+}
+
+.field-icon-wrap {
+  position: relative;
+  display: block;
+}
+
+.field-icon {
+  position: absolute;
+  left: 0.85rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.field-input--icon {
+  padding-left: 2.35rem;
+}
+
+.socials-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface2);
+  padding: 0.75rem;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.socials-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.socials-add {
+  min-height: 0;
+  padding: 0.3rem 0.65rem;
+  font-size: 0.78rem;
+}
+
+.socials-empty {
+  margin: 0;
+}
+
+.socials-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.socials-row + .socials-row {
+  padding-top: 0.45rem;
+  border-top: 1px solid var(--border);
+}
+
+.socials-remove {
+  flex-shrink: 0;
+}
+
+.actions--profile {
+  max-width: 420px;
+  margin-left: auto;
+  margin-right: auto;
+  width: 100%;
 }
 
 .form-grid {
@@ -753,13 +936,8 @@ function closeSettings() {
 
 .readme-input {
   font-family: var(--mono, ui-monospace, monospace);
-  font-size: 0.88rem;
+  font-size: 0.86rem;
   line-height: 1.5;
-}
-
-.readme-counter {
-  font-size: 0.78rem;
-  text-align: right;
 }
 
 .readme-preview-wrap {
@@ -789,33 +967,6 @@ function closeSettings() {
 
 .col-2 {
   grid-column: span 2;
-}
-
-.socials {
-  margin-top: 1rem;
-}
-
-.socials-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 0.6rem;
-  margin-bottom: 0.5rem;
-}
-
-.social-row {
-  display: grid;
-  grid-template-columns: 180px minmax(0, 1fr) auto;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
-}
-
-.social-remove {
-  min-height: 0;
-  width: 40px;
-  padding: 0;
-  display: grid;
-  place-items: center;
 }
 
 .col-one {
@@ -944,7 +1095,7 @@ function closeSettings() {
     grid-column: span 1;
   }
 
-  .social-row {
+  .socials-row {
     grid-template-columns: 1fr;
   }
 }
