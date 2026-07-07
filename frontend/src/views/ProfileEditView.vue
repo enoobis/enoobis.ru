@@ -55,6 +55,13 @@ type InviteLink = {
 };
 type SettingsTab = "profile" | "account" | "security" | "invites";
 
+const SETTINGS_TABS: { id: SettingsTab; label: string }[] = [
+  { id: "profile", label: "профиль" },
+  { id: "account", label: "аккаунт" },
+  { id: "security", label: "безопасность" },
+  { id: "invites", label: "инвайты" },
+];
+
 const auth = useAuthStore();
 const session = useSessionStore();
 const router = useRouter();
@@ -403,25 +410,26 @@ function closeSettings() {
 
 <template>
   <section v-if="me" class="settings-shell">
-    <aside class="settings-nav card">
-      <button class="close-btn secondary" type="button" @click="closeSettings">
-        <AppIcon name="close" />
-      </button>
-      <button class="nav-item" :class="{ active: tab === 'profile' }" type="button" @click="tab = 'profile'">
-        <AppIcon name="profile" :size="18" /><span>профиль</span>
-      </button>
-      <button class="nav-item" :class="{ active: tab === 'account' }" type="button" @click="tab = 'account'">
-        <AppIcon name="settings" :size="18" /><span>аккаунт</span>
-      </button>
-      <button class="nav-item" :class="{ active: tab === 'security' }" type="button" @click="tab = 'security'">
-        <AppIcon name="admin" :size="18" /><span>безопасность</span>
-      </button>
-      <button class="nav-item" :class="{ active: tab === 'invites' }" type="button" @click="tab = 'invites'">
-        <AppIcon name="invites" :size="18" /><span>инвайты</span>
-      </button>
-    </aside>
+    <div class="settings card">
+      <header class="settings-head">
+        <nav class="settings-tabs" aria-label="разделы">
+          <button
+            v-for="item in SETTINGS_TABS"
+            :key="item.id"
+            class="settings-tab"
+            :class="{ active: tab === item.id }"
+            type="button"
+            @click="tab = item.id"
+          >
+            {{ item.label }}
+          </button>
+        </nav>
+        <button class="settings-close secondary" type="button" aria-label="закрыть" @click="closeSettings">
+          <AppIcon name="close" />
+        </button>
+      </header>
 
-    <div class="settings-main card">
+      <div class="settings-body">
       <p v-if="err" class="error">{{ err }}</p>
       <p v-if="avatarMsg" class="ok">{{ avatarMsg }}</p>
 
@@ -490,39 +498,43 @@ function closeSettings() {
               </span>
             </label>
 
-            <label class="field">
-              <span class="field-head">
+            <details class="field-details readme-details">
+              <summary class="field-details-summary">
                 <span class="field-label">readme · markdown</span>
                 <span class="field-count muted">{{ readmeMd.length }} / {{ README_MAX }}</span>
-              </span>
-              <textarea
-                v-model="readmeMd"
-                class="field-input field-textarea readme-input"
-                rows="8"
-                :maxlength="README_MAX"
-                placeholder="# привет&#10;![img](url.png)"
-              />
-              <details v-if="readmeMd.trim()" class="readme-preview-wrap">
-                <summary class="muted small">превью</summary>
-                <article class="readme-preview" v-html="readmePreview" />
-              </details>
-            </label>
+              </summary>
+              <div class="field-details-body">
+                <textarea
+                  v-model="readmeMd"
+                  class="field-input field-textarea readme-input"
+                  rows="6"
+                  :maxlength="README_MAX"
+                  placeholder="# привет&#10;![img](url.png)"
+                />
+                <details v-if="readmeMd.trim()" class="readme-preview-wrap">
+                  <summary class="muted small">превью</summary>
+                  <article class="readme-preview" v-html="readmePreview" />
+                </details>
+              </div>
+            </details>
           </div>
 
-          <section class="socials-card">
-            <div class="socials-card-head">
+          <details class="field-details socials-details">
+            <summary class="field-details-summary">
               <span class="field-label">соцсети</span>
+              <span class="field-count muted">{{ socialLinks.length || "пусто" }}</span>
+            </summary>
+            <div class="field-details-body socials-details-body">
               <button class="secondary socials-add" type="button" @click="addSocialLink">+ ссылка</button>
+              <div v-for="(s, i) in socialLinks" :key="`social-${i}`" class="socials-row">
+                <input v-model="s.name" class="field-input" placeholder="название" />
+                <input v-model="s.url" class="field-input" placeholder="https://" />
+                <button class="icon-btn-sm socials-remove" type="button" aria-label="удалить" @click="removeSocialLink(i)">
+                  <AppIcon name="delete" :size="16" />
+                </button>
+              </div>
             </div>
-            <p v-if="!socialLinks.length" class="socials-empty muted small">пусто</p>
-            <div v-for="(s, i) in socialLinks" :key="`social-${i}`" class="socials-row">
-              <input v-model="s.name" class="field-input" placeholder="название" />
-              <input v-model="s.url" class="field-input" placeholder="https://" />
-              <button class="icon-btn-sm socials-remove" type="button" aria-label="удалить" @click="removeSocialLink(i)">
-                <AppIcon name="delete" :size="16" />
-              </button>
-            </div>
-          </section>
+          </details>
         </div>
       </template>
 
@@ -650,6 +662,7 @@ function closeSettings() {
         <button class="secondary" type="button" @click="closeSettings">отмена</button>
         <button type="button" :disabled="saving" @click="save">{{ saving ? "…" : "сохранить" }}</button>
       </div>
+      </div>
     </div>
   </section>
   <p v-else-if="err" class="error">{{ err }}</p>
@@ -669,60 +682,73 @@ function closeSettings() {
   margin-top: 0.35rem;
 }
 .settings-shell {
-  display: grid;
-  grid-template-columns: 260px minmax(0, 1fr);
-  gap: 1rem;
-  min-height: calc(100vh - 140px);
-}
-
-.settings-nav {
-  padding: 0.75rem;
-  border-radius: 20px;
-  max-height: min(70vh, 520px);
-  overflow-y: auto;
-}
-
-.close-btn {
-  margin-bottom: 0.7rem;
-}
-
-.nav-item {
+  max-width: 640px;
+  margin: 0 auto;
   width: 100%;
+}
+
+.settings {
+  border-radius: 20px;
+  padding: 0.85rem 1rem 1.25rem;
+}
+
+.settings-head {
   display: flex;
   align-items: center;
-  gap: 0.55rem;
-  justify-content: flex-start;
-  margin-bottom: 0.45rem;
-  border-radius: 12px;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-tabs {
+  display: flex;
+  gap: 0.2rem;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.settings-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.settings-tab {
+  flex-shrink: 0;
+  border: 0;
   background: transparent;
   color: var(--muted);
-  border: 1px solid transparent;
-  padding: 0.65rem 0.75rem;
-  text-align: left;
+  font: inherit;
+  font-size: 0.82rem;
+  padding: 0.4rem 0.65rem;
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+  cursor: pointer;
 }
 
-.nav-item :deep(.app-icon) {
-  flex-shrink: 0;
-  opacity: 0.8;
-}
-
-.nav-item:hover {
+.settings-tab:hover {
   color: var(--text);
 }
 
-.nav-item.active {
+.settings-tab.active {
   background: var(--surface2);
-  border-color: var(--border);
   color: var(--text);
 }
 
-.nav-item.active :deep(.app-icon) {
-  opacity: 1;
+.settings-close {
+  flex-shrink: 0;
+  min-height: 0;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: grid;
+  place-items: center;
 }
 
-.settings-main {
-  border-radius: 20px;
-  padding: 1.25rem;
+.settings-body {
+  min-width: 0;
 }
 
 .profile-edit {
@@ -882,30 +908,61 @@ function closeSettings() {
   padding-left: 2.35rem;
 }
 
-.socials-card {
+.field-details {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface2);
-  padding: 0.75rem;
+}
+
+.field-details-summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.65rem 0.85rem;
+  cursor: pointer;
+  list-style: none;
+}
+
+.field-details-summary::before {
+  content: "+";
+  color: var(--muted);
+  margin-right: 0.35rem;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.field-details[open] .field-details-summary::before {
+  content: "−";
+}
+
+.field-details-summary::-webkit-details-marker {
+  display: none;
+}
+
+.field-details[open] .field-details-summary {
+  border-bottom: 1px solid var(--border);
+}
+
+.field-details-body {
   display: grid;
+  gap: 0.5rem;
+  padding: 0.65rem 0.85rem 0.85rem;
+}
+
+.readme-details .field-details-body {
+  padding-top: 0.75rem;
+}
+
+.socials-details-body {
   gap: 0.55rem;
 }
 
-.socials-card-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-}
-
 .socials-add {
+  justify-self: start;
   min-height: 0;
   padding: 0.3rem 0.65rem;
   font-size: 0.78rem;
-}
-
-.socials-empty {
-  margin: 0;
 }
 
 .socials-row {
@@ -1086,12 +1143,6 @@ function closeSettings() {
 .invite-url {
   margin-top: 0.35rem;
   word-break: break-all;
-}
-
-@media (max-width: 980px) {
-  .settings-shell {
-    grid-template-columns: 1fr;
-  }
 }
 
 @media (max-width: 760px) {
