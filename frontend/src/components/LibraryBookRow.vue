@@ -76,37 +76,33 @@ const emit = defineEmits<{
   column-gap: 0.75rem;
   row-gap: 0.2rem;
   align-items: start;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
   grid-template-areas:
-    "title"
-    "actions"
-    "author"
-    "desc"
-    "meta";
+    "title actions"
+    "author actions"
+    "desc desc"
+    "meta meta";
 }
 
 .list-row:not(:has(.author)) {
   grid-template-areas:
-    "title"
-    "actions"
-    "desc"
-    "meta";
+    "title actions"
+    "desc desc"
+    "meta meta";
 }
 
 .list-row.has-cover {
   grid-template-columns: minmax(0, 1fr) 68px;
   grid-template-areas:
-    "title title"
-    "actions actions"
-    "author author"
+    "title actions"
+    "author actions"
     "desc cover"
     "meta cover";
 }
 
 .list-row.has-cover:not(:has(.author)) {
   grid-template-areas:
-    "title title"
-    "actions actions"
+    "title actions"
     "desc cover"
     "meta cover";
 }
@@ -148,7 +144,8 @@ const emit = defineEmits<{
   grid-area: actions;
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: flex-end;
+  justify-self: end;
   gap: 0.15rem;
   flex-wrap: nowrap;
 }
@@ -184,8 +181,45 @@ const emit = defineEmits<{
 }
 
 @media (max-width: 640px) {
+  .list-row {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "title"
+      "actions"
+      "author"
+      "desc"
+      "meta";
+  }
+
+  .list-row:not(:has(.author)) {
+    grid-template-areas:
+      "title"
+      "actions"
+      "desc"
+      "meta";
+  }
+
   .list-row.has-cover {
     grid-template-columns: minmax(0, 1fr) 60px;
+    grid-template-areas:
+      "title title"
+      "actions actions"
+      "author author"
+      "desc cover"
+      "meta cover";
+  }
+
+  .list-row.has-cover:not(:has(.author)) {
+    grid-template-areas:
+      "title title"
+      "actions actions"
+      "desc cover"
+      "meta cover";
+  }
+
+  .row-actions {
+    justify-self: start;
+    justify-content: flex-start;
   }
 
   .book-cover {
