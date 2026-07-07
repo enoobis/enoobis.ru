@@ -19,6 +19,7 @@ import AppToast from "./components/AppToast.vue";
 import MotionCoinCount from "./components/MotionCoinCount.vue";
 import SearchPanel from "./components/SearchPanel.vue";
 import NavExpandSearch from "./components/NavExpandSearch.vue";
+import NavBurgerIcon from "./components/NavBurgerIcon.vue";
 import { pathUsesPageSearchFilter } from "./utils/searchScope";
 const router = useRouter();
 const route = useRoute();
@@ -447,10 +448,10 @@ function submitReaderPage() {
           class="icon-btn nav-burger"
           :aria-expanded="navDrawerOpen"
           aria-controls="nav-drawer"
-          aria-label="меню"
+          :aria-label="navDrawerOpen ? 'закрыть' : 'меню'"
           @click.stop="toggleNavDrawer"
         >
-          <AppIcon name="menu" :size="20" />
+          <NavBurgerIcon :open="navDrawerOpen" />
         </button>
       </div>
       <RouterLink v-if="onHome && !reader.active" to="/" class="nav-link brand-link" aria-label="enoobis">
