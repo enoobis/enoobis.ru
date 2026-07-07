@@ -10,12 +10,14 @@ export const useReaderStore = defineStore("reader", () => {
   let closeFn: (() => void) | null = null;
   let zoomInFn: (() => void) | null = null;
   let zoomOutFn: (() => void) | null = null;
+  let goToPageFn: ((page: number) => void) | null = null;
 
   function register(opts: {
     title: string;
     close: () => void;
     zoomIn: () => void;
     zoomOut: () => void;
+    goToPage: (page: number) => void;
   }) {
     active.value = true;
     title.value = opts.title;
@@ -24,6 +26,7 @@ export const useReaderStore = defineStore("reader", () => {
     closeFn = opts.close;
     zoomInFn = opts.zoomIn;
     zoomOutFn = opts.zoomOut;
+    goToPageFn = opts.goToPage;
   }
 
   function unregister() {
@@ -34,6 +37,7 @@ export const useReaderStore = defineStore("reader", () => {
     closeFn = null;
     zoomInFn = null;
     zoomOutFn = null;
+    goToPageFn = null;
   }
 
   function setPage(current: number, total: number) {
@@ -53,5 +57,9 @@ export const useReaderStore = defineStore("reader", () => {
     zoomOutFn?.();
   }
 
-  return { active, title, page, pageCount, register, unregister, setPage, close, zoomIn, zoomOut };
+  function goToPage(n: number) {
+    goToPageFn?.(n);
+  }
+
+  return { active, title, page, pageCount, register, unregister, setPage, close, zoomIn, zoomOut, goToPage };
 });

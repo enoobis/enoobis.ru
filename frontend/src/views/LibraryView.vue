@@ -16,6 +16,7 @@ import {
 } from "../api/library";
 
 const LIBRARY_QUOTA_BYTES = 5 * 1024 * 1024 * 1024;
+const LIBRARY_PAGE_SIZE = 20;
 import { useAuthStore } from "../stores/auth";
 import { toastError, toastSuccess } from "../utils/toast";
 import AppIcon from "../components/AppIcon.vue";
@@ -29,6 +30,10 @@ const route = useRoute();
 const router = useRouter();
 
 const books = ref<LibraryBook[]>([]);
+const booksOffset = ref(0);
+const booksTotal = ref(0);
+const hasMore = ref(false);
+const loadingMore = ref(false);
 const categories = ref<LibraryCategory[]>([]);
 const loading = ref(false);
 const err = ref("");
@@ -52,7 +57,7 @@ const newCoverPreview = ref<string | null>(null);
 const uploading = ref(false);
 const coverUploading = ref(false);
 
-const totalCount = computed(() => books.value.length);
+const totalCount = computed(() => booksTotal.value);
 const storageBytesUsed = ref(0);
 
 const libraryHeadMeta = computed(() => {
@@ -111,23 +116,41 @@ const editCategory = ref("");
 const editCoverUrl = ref("");
 const savingEdit = ref(false);
 
-async function load() {
+async function load(reset = true) {
   if (!auth.token) return;
-  const showLoading = !books.value.length;
-  if (showLoading) loading.value = true;
+  if (reset) {
+    booksOffset.value = 0;
+    if (!books.value.length) loading.value = true;
+  }
   err.value = "";
   try {
     const r = await listBooks(auth.token, {
       q: search.value.trim() || undefined,
       category: activeCategory.value || undefined,
       sort: sort.value,
+      limit: LIBRARY_PAGE_SIZE,
+      offset: booksOffset.value,
     });
-    books.value = r.items;
+    if (reset) books.value = r.items;
+    else books.value = [...books.value, ...r.items];
+    booksOffset.value += r.items.length;
+    booksTotal.value = Number(r.total) || 0;
+    hasMore.value = !!r.has_more;
     storageBytesUsed.value = Number(r.storage_bytes_used) || 0;
   } catch (e) {
     err.value = describe(e instanceof Error ? e.message : "ошибка");
   } finally {
     loading.value = false;
+  }
+}
+
+async function loadMore() {
+  if (!hasMore.value || loadingMore.value || loading.value) return;
+  loadingMore.value = true;
+  try {
+    await load(false);
+  } finally {
+    loadingMore.value = false;
   }
 }
 
@@ -536,6 +559,11 @@ onBeforeUnmount(() => {
             @edit="openEdit(b)"
           />
         </ul>
+        <div v-if="hasMore && books.length" class="list-more">
+          <button class="secondary" type="button" :disabled="loadingMore" @click="loadMore">
+            {{ loadingMore ? "…" : "ещё" }}
+          </button>
+        </div>
       </div>
 
       <PdfReader
@@ -668,6 +696,12 @@ onBeforeUnmount(() => {
 
 .active-chip:hover {
   color: var(--text);
+}
+
+.list-more {
+  display: flex;
+  justify-content: center;
+  padding: 0.5rem 0 0.25rem;
 }
 
 .cover-add {

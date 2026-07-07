@@ -21,11 +21,15 @@ export type ListBooksParams = {
   q?: string;
   category?: string;
   sort?: "new" | "title";
+  limit?: number;
+  offset?: number;
 };
 
 export type LibraryListResponse = {
   items: LibraryBook[];
   storage_bytes_used: number;
+  total: number;
+  has_more: boolean;
 };
 
 export function listBooks(token: string, params: ListBooksParams = {}) {
@@ -33,6 +37,8 @@ export function listBooks(token: string, params: ListBooksParams = {}) {
   if (params.q) qs.set("q", params.q);
   if (params.category) qs.set("category", params.category);
   if (params.sort) qs.set("sort", params.sort);
+  if (params.limit != null) qs.set("limit", String(params.limit));
+  if (params.offset != null) qs.set("offset", String(params.offset));
   const suffix = qs.toString() ? `?${qs.toString()}` : "";
   return api<LibraryListResponse>(`/api/library${suffix}`, { token });
 }

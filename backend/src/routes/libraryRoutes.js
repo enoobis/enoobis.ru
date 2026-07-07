@@ -110,6 +110,11 @@ router.get("/library", authRequired, (req, res) => {
   const q = String(req.query?.q ?? "").trim().toLowerCase();
   const category = String(req.query?.category ?? "").trim();
   const sort = String(req.query?.sort ?? "new");
+  let limit = parseInt(String(req.query?.limit ?? "20"), 10);
+  let offset = parseInt(String(req.query?.offset ?? "0"), 10);
+  if (!Number.isFinite(limit) || limit < 1) limit = 20;
+  if (limit > 50) limit = 50;
+  if (!Number.isFinite(offset) || offset < 0) offset = 0;
   const where = [];
   const params = [];
   if (q) {
@@ -125,17 +130,32 @@ router.get("/library", authRequired, (req, res) => {
   }
   const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
   const orderSql = sort === "title" ? "ORDER BY b.title COLLATE NOCASE" : "ORDER BY b.created_at DESC";
+  const countRow = get(
+    `SELECT COUNT(*) AS total
+     FROM library_books b
+     ${whereSql}`,
+    ...params,
+  );
+  const total = Number(countRow?.total ?? 0);
   const rows = all(
     `SELECT ${BOOK_SELECT}
      FROM library_books b
      LEFT JOIN users u ON u.id = b.uploaded_by
      ${whereSql}
-     ${orderSql}`,
+     ${orderSql}
+     LIMIT ? OFFSET ?`,
     ...params,
+    limit,
+    offset,
   );
   const usage = get("SELECT COALESCE(SUM(size_bytes), 0) AS total FROM library_books");
   const storageBytesUsed = Number(usage?.total ?? 0);
-  res.json({ items: rows, storage_bytes_used: storageBytesUsed });
+  res.json({
+    items: rows,
+    storage_bytes_used: storageBytesUsed,
+    total,
+    has_more: offset + rows.length < total,
+  });
 });
 
 router.get("/library/categories", authRequired, (_req, res) => {

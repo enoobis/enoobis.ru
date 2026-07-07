@@ -345,6 +345,7 @@ onMounted(() => {
     close,
     zoomIn,
     zoomOut,
+    goToPage: (n) => setPage(n),
   });
   window.addEventListener("keydown", onKey);
   window.addEventListener("resize", onResize);

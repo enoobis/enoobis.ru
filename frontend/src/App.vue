@@ -29,6 +29,7 @@ const auth = useAuthStore();
 const chatStore = useChatStore();
 const reader = useReaderStore();
 const session = useSessionStore();
+const readerPageDraft = ref("1");
 const isOnline = ref(typeof navigator !== "undefined" ? navigator.onLine : true);
 const profileMenuOpen = ref(false);
 const navDrawerOpen = ref(false);
@@ -410,6 +411,19 @@ watch(
     syncReaderTop();
   },
 );
+
+watch(
+  () => reader.page,
+  (p) => {
+    if (p > 0) readerPageDraft.value = String(p);
+  },
+);
+
+function submitReaderPage() {
+  const n = parseInt(readerPageDraft.value, 10);
+  if (!Number.isFinite(n)) return;
+  reader.goToPage(n);
+}
 </script>
 
 <template>
@@ -454,9 +468,23 @@ watch(
       <div v-else class="nav-spacer" />
       <template v-if="auth.token">
         <div v-if="reader.active" class="nav-reader-controls">
-          <span v-if="reader.pageCount > 0" class="nav-reader-page">
-            {{ reader.page }} / {{ reader.pageCount }}
-          </span>
+          <form
+            v-if="reader.pageCount > 0"
+            class="nav-reader-page-form"
+            @submit.prevent="submitReaderPage"
+          >
+            <input
+              v-model="readerPageDraft"
+              class="nav-reader-page-input"
+              type="number"
+              min="1"
+              :max="reader.pageCount"
+              inputmode="numeric"
+              aria-label="страница"
+              @change="submitReaderPage"
+            />
+            <span class="nav-reader-page-sep">/ {{ reader.pageCount }}</span>
+          </form>
           <button type="button" class="icon-btn" aria-label="уменьшить" @click.stop="reader.zoomOut()">
             <span class="nav-zoom-glyph">−</span>
           </button>
@@ -896,11 +924,43 @@ watch(
   flex-shrink: 0;
 }
 
-.nav-reader-page {
+.nav-reader-page-form {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  margin-right: 0.15rem;
+}
+
+.nav-reader-page-input {
+  width: 3.1rem;
+  min-height: 0;
+  padding: 0.2rem 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  -moz-appearance: textfield;
+}
+
+.nav-reader-page-input::-webkit-outer-spin-button,
+.nav-reader-page-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.nav-reader-page-input:focus {
+  outline: none;
+  border-color: var(--text);
+}
+
+.nav-reader-page-sep {
   font-size: 0.82rem;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
-  margin-right: 0.15rem;
   white-space: nowrap;
 }
 
