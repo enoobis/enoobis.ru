@@ -457,15 +457,16 @@ function closeSettings() {
           </div>
 
           <div class="field-stack">
-            <label class="field">
-              <span class="field-label">ник</span>
-              <input class="field-input" :value="`@${me.nickname}`" disabled />
-            </label>
-
-            <label class="field">
-              <span class="field-label">имя</span>
-              <input v-model="fullName" class="field-input" maxlength="120" />
-            </label>
+            <div class="field-row">
+              <label class="field">
+                <span class="field-label">ник</span>
+                <input class="field-input" :value="`@${me.nickname}`" disabled />
+              </label>
+              <label class="field">
+                <span class="field-label">имя</span>
+                <input v-model="fullName" class="field-input" maxlength="120" />
+              </label>
+            </div>
 
             <label class="field">
               <span class="field-head">
@@ -725,10 +726,11 @@ function closeSettings() {
 }
 
 .profile-edit {
-  max-width: 420px;
+  max-width: 560px;
   margin: 0 auto;
   display: grid;
   gap: 1.25rem;
+  width: 100%;
 }
 
 .profile-hero {
@@ -806,6 +808,12 @@ function closeSettings() {
 .field-stack {
   display: grid;
   gap: 0.85rem;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: 0.65rem;
 }
 
 .field {
@@ -917,7 +925,7 @@ function closeSettings() {
 }
 
 .actions--profile {
-  max-width: 420px;
+  max-width: 560px;
   margin-left: auto;
   margin-right: auto;
   width: 100%;
@@ -1087,6 +1095,10 @@ function closeSettings() {
 }
 
 @media (max-width: 760px) {
+  .field-row {
+    grid-template-columns: 1fr;
+  }
+
   .form-grid {
     grid-template-columns: 1fr;
   }
