@@ -20,6 +20,7 @@ import { useAuthStore } from "../stores/auth";
 import { toastError, toastSuccess } from "../utils/toast";
 import AppIcon from "../components/AppIcon.vue";
 import AppLoading from "../components/AppLoading.vue";
+import LibraryBookRow from "../components/LibraryBookRow.vue";
 import PageHeader from "../components/PageHeader.vue";
 import PdfReader from "../components/PdfReader.vue";
 
@@ -47,6 +48,7 @@ const newDescription = ref("");
 const newCategory = ref("");
 const newFile = ref<File | null>(null);
 const newCoverFile = ref<File | null>(null);
+const newCoverPreview = ref<string | null>(null);
 const uploading = ref(false);
 const coverUploading = ref(false);
 
@@ -178,9 +180,17 @@ function onPickFile(ev: Event) {
   newFile.value = input.files?.[0] ?? null;
 }
 
+function clearNewCoverPreview() {
+  if (newCoverPreview.value) URL.revokeObjectURL(newCoverPreview.value);
+  newCoverPreview.value = null;
+}
+
 function onPickNewCover(ev: Event) {
   const input = ev.target as HTMLInputElement;
-  newCoverFile.value = input.files?.[0] ?? null;
+  const file = input.files?.[0] ?? null;
+  newCoverFile.value = file;
+  clearNewCoverPreview();
+  if (file) newCoverPreview.value = URL.createObjectURL(file);
 }
 
 function patchBookCover(bookId: string, coverUrl: string) {
@@ -232,6 +242,7 @@ function resetForm() {
   newCategory.value = "";
   newFile.value = null;
   newCoverFile.value = null;
+  clearNewCoverPreview();
   showForm.value = false;
 }
 
@@ -393,6 +404,7 @@ watch(editOpen, syncPageScrollLock);
 onBeforeUnmount(() => {
   document.removeEventListener("click", onDocumentClick);
   document.documentElement.style.overflow = "";
+  clearNewCoverPreview();
   closeReader();
   closeEdit();
 });
@@ -433,6 +445,13 @@ onBeforeUnmount(() => {
           <AppIcon name="image" :size="16" />
           обложка
         </label>
+        <img
+          v-if="newCoverPreview"
+          :src="newCoverPreview"
+          alt=""
+          class="cover-preview"
+          decoding="async"
+        />
         <input
           type="file"
           accept=".pdf,.epub,application/pdf,application/epub+zip"
@@ -504,51 +523,18 @@ onBeforeUnmount(() => {
         <AppLoading v-if="loading" class="list-panel-state" />
         <p v-else-if="!books.length" class="list-panel-state muted">{{ listEmptyLabel }}</p>
         <ul v-else class="list">
-          <li
+          <LibraryBookRow
             v-for="b in books"
             :key="b.id"
-            class="list-row"
-            :class="{ 'has-cover': !!b.cover_url }"
-            :data-book-id="b.id"
-          >
-            <span class="title">{{ b.title }}</span>
-            <span v-if="b.author" class="muted small author">{{ b.author }}</span>
-            <span v-if="b.description" class="muted small desc">{{ b.description }}</span>
-            <span class="muted small meta">
-              <span v-if="b.category" class="cat-pill">{{ b.category }}</span>
-              @{{ b.uploader_nickname }}<template v-if="isStaff"> · {{ fmt(b.size_bytes) }}</template>
-            </span>
-            <div class="row-actions">
-              <button
-                v-if="isPdfBook(b)"
-                class="secondary read-btn"
-                type="button"
-                @click="openReader(b)"
-              >
-                читать
-              </button>
-              <button class="icon-btn-sm" type="button" aria-label="скачать" @click="onDownload(b)">
-                <AppIcon name="download" :size="16" />
-              </button>
-              <button
-                v-if="canManageBook(b)"
-                class="icon-btn-sm"
-                type="button"
-                aria-label="изменить"
-                @click="openEdit(b)"
-              >
-                <AppIcon name="edit" :size="16" />
-              </button>
-            </div>
-            <img
-              v-if="b.cover_url"
-              :src="b.cover_url"
-              alt=""
-              class="book-cover"
-              loading="lazy"
-              decoding="async"
-            />
-          </li>
+            :book="b"
+            :can-read="isPdfBook(b)"
+            :can-manage="canManageBook(b)"
+            :show-size="isStaff"
+            :size-label="fmt(b.size_bytes)"
+            @read="openReader(b)"
+            @download="onDownload(b)"
+            @edit="openEdit(b)"
+          />
         </ul>
       </div>
 
@@ -600,7 +586,7 @@ onBeforeUnmount(() => {
                       :disabled="coverUploading"
                       @change="onEditCoverPick"
                     />
-                    <img :src="editCoverUrl" alt="" decoding="async" />
+                    <img :src="editCoverUrl" :alt="editTitle" decoding="async" />
                   </label>
                   <button
                     v-if="editCoverUrl"
@@ -684,100 +670,6 @@ onBeforeUnmount(() => {
   color: var(--text);
 }
 
-.info {
-  display: grid;
-  gap: 0.2rem;
-  min-width: 0;
-}
-
-.list-row {
-  display: grid;
-  column-gap: 0.75rem;
-  row-gap: 0.2rem;
-  align-items: start;
-  grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-areas:
-    "title actions"
-    "author actions"
-    "desc desc"
-    "meta meta";
-}
-
-.list-row.has-cover {
-  grid-template-columns: minmax(0, 1fr) 68px;
-  grid-template-areas:
-    "title actions"
-    "author actions"
-    "desc cover"
-    "meta cover";
-}
-
-.list-row.has-cover:not(:has(.author)) {
-  grid-template-areas:
-    "title actions"
-    "desc cover"
-    "meta cover";
-}
-
-.book-cover {
-  grid-area: cover;
-  justify-self: center;
-  align-self: center;
-  display: block;
-  width: 60px;
-  height: 90px;
-  object-fit: cover;
-  border-radius: 3px;
-}
-
-.title {
-  grid-area: title;
-  font-size: 0.95rem;
-  text-transform: none;
-}
-
-.author {
-  grid-area: author;
-}
-
-.desc {
-  grid-area: desc;
-  white-space: pre-wrap;
-}
-
-.meta {
-  grid-area: meta;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-  margin-top: 0.15rem;
-}
-
-.row-actions {
-  grid-area: actions;
-}
-
-.list-row:not(:has(.author)) {
-  grid-template-areas:
-    "title actions"
-    "desc desc"
-    "meta meta";
-}
-
-.small {
-  font-size: 0.8rem;
-}
-
-.cat-pill {
-  display: inline-block;
-  padding: 0.05rem 0.45rem;
-  border-radius: var(--radius);
-  background: var(--surface2);
-  color: var(--text);
-  font-size: 0.74rem;
-}
-
 .cover-add {
   display: inline-flex;
   align-items: center;
@@ -788,6 +680,14 @@ onBeforeUnmount(() => {
 
 .cover-add input {
   display: none;
+}
+
+.cover-preview {
+  display: block;
+  width: 52px;
+  height: 78px;
+  object-fit: cover;
+  border-radius: 3px;
 }
 
 .book-cover-pick {
@@ -817,82 +717,6 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 0.5rem;
   flex-wrap: wrap;
-}
-
-.row-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  justify-self: end;
-  gap: 0.15rem;
-  flex-wrap: nowrap;
-  flex-shrink: 0;
-}
-
-.read-btn {
-  min-height: 0;
-  padding: 0.3rem 0.55rem;
-  font-size: 0.78rem;
-}
-
-.row-actions button {
-  min-height: 0;
-}
-
-@media (max-width: 640px) {
-  .list-row {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas:
-      "title"
-      "actions"
-      "author"
-      "desc"
-      "meta";
-  }
-
-  .list-row:not(:has(.author)) {
-    grid-template-areas:
-      "title"
-      "actions"
-      "desc"
-      "meta";
-  }
-
-  .list-row.has-cover {
-    grid-template-columns: minmax(0, 1fr) 60px;
-    grid-template-areas:
-      "title title"
-      "actions actions"
-      "author author"
-      "desc cover"
-      "meta cover";
-  }
-
-  .list-row.has-cover:not(:has(.author)) {
-    grid-template-areas:
-      "title title"
-      "actions actions"
-      "desc cover"
-      "meta cover";
-  }
-
-  .row-actions {
-    justify-self: start;
-    justify-content: flex-start;
-  }
-
-  .book-cover {
-    width: 52px;
-    height: 78px;
-  }
-
-  .desc {
-    line-height: 1.45;
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 4;
-    overflow: hidden;
-  }
 }
 
 .edit-overlay {
