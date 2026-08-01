@@ -715,6 +715,13 @@ function closeSettings() {
   display: none;
 }
 
+@media (max-width: 760px) {
+  .settings-tabs {
+    mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+  }
+}
+
 .settings-tab {
   flex-shrink: 0;
   border: 0;

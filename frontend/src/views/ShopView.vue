@@ -387,14 +387,11 @@ watch(
   margin-bottom: 0.15rem;
 }
 .shop-kind {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.35rem;
+  display: flex;
+  width: 100%;
 }
-@media (max-width: 480px) {
-  .shop-kind {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+.shop-kind .filter-tab {
+  flex: 1;
 }
 .shop-cat-picker {
   width: 100%;

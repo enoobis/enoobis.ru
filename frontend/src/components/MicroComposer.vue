@@ -154,14 +154,17 @@ function onKeydown(e: KeyboardEvent) {
 .composer {
   display: grid;
   gap: 0.5rem;
-  padding: 0.7rem 0;
-  border-bottom: 1px solid var(--border);
-  transition: background 0.15s ease;
+  padding: 0.6rem 0.85rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  transition: border-color var(--dur-2) var(--ease-out), background 0.15s ease;
+}
+.composer:focus-within {
+  border-color: var(--focus-border);
 }
 .composer.drag {
-  background: var(--surface);
-  border-radius: var(--radius);
-  border-bottom-color: transparent;
+  background: var(--surface2);
   outline: 1px dashed var(--text);
   outline-offset: -2px;
 }
@@ -169,7 +172,7 @@ textarea {
   resize: none;
   border: none;
   background: transparent;
-  padding: 0.5rem 0.85rem;
+  padding: 0.35rem 0;
   font-size: 1rem;
   line-height: 1.5;
   min-height: 2.75rem;

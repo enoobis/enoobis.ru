@@ -738,9 +738,16 @@ input[type="search"]::-webkit-search-cancel-button:hover {
   }
   .filter-tabs {
     display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .filter-tabs::-webkit-scrollbar {
+    display: none;
   }
   .filter-tab {
-    flex: 1;
+    flex: 1 0 auto;
     justify-content: center;
   }
 }
@@ -871,10 +878,10 @@ html.profile-wallpaper-desktop .nav-bar {
 }
 @media (max-width: 640px) {
   :root {
-    --layout-pad: 0.6rem;
+    --layout-pad: 1rem;
   }
   .layout {
-    padding: 0.6rem;
+    padding: 0.65rem var(--layout-pad) 1.25rem;
   }
 }
 
@@ -1034,6 +1041,39 @@ h3 {
   font-weight: 600;
   letter-spacing: -0.022em;
   line-height: 1.2;
+  overflow-wrap: break-word;
+}
+
+/* защита от выхода за экран: длинные слова, url, медиа */
+p,
+li,
+dd,
+figcaption {
+  overflow-wrap: break-word;
+}
+
+.card,
+.list-row,
+.page-shell {
+  min-width: 0;
+}
+
+.card img,
+.card video,
+.list-row img,
+.list-row video {
+  max-width: 100%;
+}
+
+pre,
+code {
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+pre {
+  max-width: 100%;
+  overflow-x: auto;
 }
 h1 {
   font-size: 1.5rem;

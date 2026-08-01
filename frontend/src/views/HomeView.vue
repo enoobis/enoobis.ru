@@ -3,6 +3,7 @@ import { RouterLink } from "vue-router";
 import { SITE_TAGLINE } from "../config/site";
 import HomeLogoMark from "../components/HomeLogoMark.vue";
 import AppSiteFooter from "../components/AppSiteFooter.vue";
+import KineticText from "../components/KineticText.vue";
 </script>
 
 <template>
@@ -11,7 +12,7 @@ import AppSiteFooter from "../components/AppSiteFooter.vue";
       <div class="logo-spin-wrap" aria-hidden="true">
         <HomeLogoMark />
       </div>
-      <h1 class="tag">{{ SITE_TAGLINE }}</h1>
+      <h1 class="tag"><KineticText :text="SITE_TAGLINE" /></h1>
       <RouterLink to="/login" class="cta" data-nosnippet>войти</RouterLink>
       <nav class="alt-nav" data-nosnippet aria-label="разделы">
         <RouterLink to="/microblogs" class="alt-link"><span>лента</span></RouterLink>
@@ -79,22 +80,19 @@ import AppSiteFooter from "../components/AppSiteFooter.vue";
   border-radius: var(--radius-pill);
   background: var(--text);
   color: var(--bg);
-  font-weight: 700;
-  font-size: 1.05rem;
+  font-weight: 600;
+  font-size: 1.02rem;
   text-transform: lowercase;
   border: 1px solid var(--text);
-  transition:
-    transform var(--dur-2) var(--ease-spring),
-    opacity var(--dur-2) var(--ease-out);
+  transition: opacity var(--dur-2) var(--ease-out);
   margin-bottom: 1.6rem;
 }
 .cta:hover {
   border-bottom-color: transparent;
-  transform: translateY(-2px);
-  opacity: 0.92;
+  opacity: 0.9;
 }
 .cta:active {
-  transform: translateY(0) scale(0.97);
+  opacity: 0.72;
 }
 .alt-nav {
   display: inline-flex;

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import KineticText from "./KineticText.vue";
+
 defineProps<{
   title: string;
   meta?: string;
@@ -10,7 +12,7 @@ defineProps<{
     <div class="page-head-lead">
       <slot name="back" />
       <div class="page-head-main">
-        <h1>{{ title }}</h1>
+        <h1><KineticText :text="title" /></h1>
         <p v-if="meta" class="page-head-meta">{{ meta }}</p>
       </div>
     </div>
