@@ -218,29 +218,43 @@ textarea:focus {
 .ghost {
   background: transparent;
   border: none;
-  color: var(--muted);
+  color: var(--text);
+  opacity: 0.72;
   padding: 0;
   min-height: 0;
-  font-size: 0.82rem;
+  font-size: 0.88rem;
 }
 .ghost:hover:not(:disabled) {
   background: transparent;
   color: var(--text);
+  opacity: 1;
 }
 .counter {
   margin-left: auto;
+  color: var(--muted);
 }
 .counter.over {
-  color: var(--danger);
+  color: var(--text);
+  opacity: 0.9;
 }
 .small {
-  font-size: 0.78rem;
+  font-size: 0.82rem;
 }
 button[type="button"]:not(.ghost):not(.remove) {
-  padding: 0.35rem 0.85rem;
-  min-height: 40px;
+  padding: 0.4rem 0.95rem;
+  min-height: 36px;
   border-radius: 999px;
-  font-size: 0.85rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  background: var(--text);
+  color: var(--bg);
+  border: 1px solid var(--text);
+}
+button[type="button"]:not(.ghost):not(.remove):disabled {
+  opacity: 0.35;
+  background: var(--surface2);
+  color: var(--muted);
+  border-color: var(--border);
 }
 @media (max-width: 640px) {
   textarea {

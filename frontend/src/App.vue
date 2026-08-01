@@ -575,7 +575,7 @@ function submitReaderPage() {
         <div
           v-if="navDrawerOpen && !sheetMobile"
           id="nav-drawer"
-          class="nav-dropdown nav-header-sheet card"
+          class="nav-dropdown nav-header-sheet nav-dropdown--menu"
           role="dialog"
           aria-modal="true"
           aria-label="разделы"
@@ -606,7 +606,7 @@ function submitReaderPage() {
       <Transition name="nav-sheet">
         <div
           v-if="profileMenuOpen && auth.token && !sheetMobile"
-          class="nav-dropdown nav-header-sheet card"
+          class="nav-dropdown nav-header-sheet nav-dropdown--profile"
           role="dialog"
           aria-modal="true"
           aria-label="профиль"
@@ -703,7 +703,7 @@ function submitReaderPage() {
           @click="closeNavDrawer"
         >
           <div
-            class="nav-menu-sheet nav-header-sheet nav-menu-sheet--full card"
+            class="nav-menu-sheet nav-header-sheet nav-menu-sheet--full"
             role="dialog"
             aria-modal="true"
             aria-label="разделы"
@@ -745,7 +745,7 @@ function submitReaderPage() {
           @click="closeProfileMenu"
         >
           <div
-            class="nav-menu-sheet nav-header-sheet nav-menu-sheet--full card"
+            class="nav-menu-sheet nav-header-sheet nav-menu-sheet--full"
             role="dialog"
             aria-modal="true"
             aria-label="профиль"
@@ -981,30 +981,41 @@ function submitReaderPage() {
 
 .nav-dropdown {
   position: absolute;
-  left: 0;
-  right: 0;
-  top: 100%;
-  margin-top: -1px;
+  top: calc(100% - 1px);
   z-index: 2;
   border: 1px solid var(--border);
-  border-top: 1px solid var(--border);
   border-radius: 0 0 var(--radius) var(--radius);
-  padding: 0.45rem var(--space-3) 0.75rem;
+  padding: 0.35rem;
   overflow: hidden;
   background: var(--bg);
-  transform-origin: top center;
+}
+
+.nav-dropdown--menu {
+  left: 0;
+  right: auto;
+  width: min(17.5rem, calc(100vw - 2 * var(--layout-pad)));
+  transform-origin: top left;
+}
+
+.nav-dropdown--profile {
+  left: auto;
+  right: 0;
+  width: min(18.5rem, calc(100vw - 2 * var(--layout-pad)));
+  transform-origin: top right;
 }
 
 .nav-dropdown.nav-header-sheet {
-  padding: 0.4rem var(--space-3) 0.7rem;
   background: var(--bg);
 }
 
 .nav-dropdown.search-menu-sheet {
+  left: 0;
+  right: 0;
   padding: 0.4rem var(--space-3) 0.7rem;
   max-height: min(75vh, 36rem);
   overflow-y: auto;
   background: var(--bg);
+  transform-origin: top center;
 }
 
 .search-panel-host--hidden {
@@ -1070,7 +1081,7 @@ function submitReaderPage() {
   width: 100%;
   max-width: 640px;
   margin: 0;
-  padding: 0.5rem var(--space-4) 0.85rem;
+  padding: 0.45rem 0.55rem 0.7rem;
   border-top: none;
   border-radius: 0 0 var(--radius) var(--radius);
   max-height: min(72vh, 28rem);
@@ -1127,14 +1138,15 @@ function submitReaderPage() {
 }
 
 .nav-menu-root--mobile .nav-menu-sheet {
-  padding: 0.5rem 0.85rem calc(0.85rem + env(safe-area-inset-bottom, 0px));
-  border-top: 1px solid var(--border);
-  border-left: 1px solid var(--border);
-  border-right: 1px solid var(--border);
+  width: min(100%, 28rem);
+  margin: 0 auto;
+  padding: 0.35rem 0.45rem calc(0.85rem + env(safe-area-inset-bottom, 0px));
+  border: 1px solid var(--border);
   border-bottom: none;
-  border-radius: var(--radius) var(--radius) 0 0;
+  border-radius: 18px 18px 0 0;
   transform-origin: bottom center;
   display: block;
+  background: var(--bg);
 }
 
 .nav-menu-root--mobile .nav-menu-sheet-body {
@@ -1167,43 +1179,49 @@ function submitReaderPage() {
 .nav-menu-inner {
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 0.1rem;
 }
 
 .nav-menu-link {
-  display: block;
+  display: flex;
+  align-items: center;
   width: 100%;
-  min-height: 48px;
-  padding: 0.75rem 0.85rem;
+  min-height: 44px;
+  padding: 0.7rem 0.9rem;
   color: var(--text);
   text-transform: lowercase;
-  font-size: 1rem;
+  font-size: 1.05rem;
   font-weight: 500;
-  line-height: 1.35;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
   border: none;
-  border-radius: var(--radius);
+  border-radius: 10px;
   background: transparent;
   text-align: left;
-  border-bottom: 1px solid var(--border);
 }
 
-.nav-menu-link:last-child {
-  border-bottom: none;
-}
-
-.nav-menu-link:hover {
+.nav-menu-link:hover,
+.nav-menu-link:focus-visible {
   background: var(--surface2);
   color: var(--text);
   text-decoration: none;
 }
 
-.nav-menu-root:not(.nav-menu-root--mobile) .nav-menu-link {
-  min-height: 44px;
-  padding: 0.55rem 0.65rem;
-  font-size: 0.94rem;
-  text-align: left;
-  border-radius: var(--radius);
-  border-bottom: none;
+.nav-menu-link.router-link-active {
+  background: var(--surface2);
+  font-weight: 600;
+}
+
+.nav-dropdown--menu .nav-menu-link {
+  min-height: 42px;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.98rem;
+}
+
+.nav-menu-root--mobile .nav-menu-link {
+  min-height: 48px;
+  font-size: 1.08rem;
+  padding: 0.8rem 1rem;
 }
 
 .nav-menu-enter-active .nav-menu-sheet,
@@ -1246,8 +1264,8 @@ function submitReaderPage() {
 .nav-actions {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  margin-right: 0.25rem;
+  gap: 0.2rem;
+  margin-right: 0.15rem;
 }
 
 .chat-btn {
@@ -1326,17 +1344,17 @@ function submitReaderPage() {
 
 .profile-menu-head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 0.65rem;
-  padding: 0.35rem 0.45rem 0.45rem;
+  padding: 0.45rem 0.7rem 0.55rem;
   border-bottom: 1px solid var(--border);
-  margin-bottom: 0.15rem;
+  margin-bottom: 0.2rem;
 }
 
 .nav-menu-root--mobile .profile-menu-head {
-  padding: 0.2rem 0.85rem 0.65rem;
-  margin-bottom: 0.35rem;
+  padding: 0.35rem 0.9rem 0.7rem;
+  margin-bottom: 0.25rem;
 }
 .profile-menu-head-main {
   display: flex;
@@ -1436,37 +1454,46 @@ function submitReaderPage() {
 .profile-menu-item {
   display: flex;
   align-items: center;
-  gap: 0.65rem;
+  gap: 0.7rem;
   width: 100%;
   min-width: 0;
   color: var(--text);
-  padding: 0.55rem 0.65rem;
-  border-radius: var(--radius);
+  padding: 0.55rem 0.75rem;
+  border-radius: 10px;
   border: none;
   background: transparent;
   text-align: left;
   text-transform: lowercase;
   font: inherit;
-  font-size: 0.94rem;
+  font-size: 0.98rem;
   font-weight: 500;
-  line-height: 1.35;
-  min-height: 44px;
+  letter-spacing: -0.015em;
+  line-height: 1.3;
+  min-height: 42px;
   cursor: pointer;
 }
 
 .nav-menu-root--mobile .profile-menu-item {
-  padding: 0.65rem 0.85rem;
+  padding: 0.75rem 1rem;
   min-height: 48px;
+  font-size: 1.05rem;
 }
 
 @media (max-width: 640px) {
   .nav-bar {
-    gap: 0.15rem;
-    padding: 0.3rem 0.2rem;
+    gap: 0.1rem;
+    padding: 0.25rem 0.1rem;
   }
 
   .nav-actions {
-    gap: 0.2rem;
+    gap: 0;
+    margin-right: 0;
+  }
+
+  .profile-trigger {
+    width: 40px;
+    height: 40px;
+    min-height: 40px;
   }
 }
 
