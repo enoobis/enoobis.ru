@@ -1,10 +1,9 @@
 export const SITE_TITLE = "enoobis";
 
-export const SITE_TAGLINE = "закрытая платформа с блогами, курсами и сообществом";
+export const SITE_TAGLINE = "по приглашению";
 
 /** snippet for search engines and social previews */
-export const SITE_DESCRIPTION =
-  "закрытая платформа с блогами, курсами и сообществом. вход по приглашению.";
+export const SITE_DESCRIPTION = "закрытое сообщество. вход по приглашению.";
 
 /** last manual content refresh - update when you ship meaningful changes */
 export const SITE_WATERED_AT = "2026-06-19";
