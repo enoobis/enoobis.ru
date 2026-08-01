@@ -887,10 +887,11 @@ function submitReaderPage() {
 .nav-bar {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.35rem;
   flex-wrap: nowrap;
-  padding: 0.4rem 0.6rem;
+  padding: 0.35rem var(--space-3);
   position: relative;
+  min-height: calc(var(--control-h) + 0.2rem);
 }
 
 .nav-guest-links,
@@ -988,26 +989,22 @@ function submitReaderPage() {
   border: 1px solid var(--border);
   border-top: 1px solid var(--border);
   border-radius: 0 0 var(--radius) var(--radius);
-  padding: 0.5rem 0.6rem 0.75rem;
+  padding: 0.45rem var(--space-3) 0.75rem;
   overflow: hidden;
-  background: var(--glass-bg, var(--bg));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
-  backdrop-filter: blur(var(--glass-blur));
+  background: var(--bg);
   transform-origin: top center;
 }
 
 .nav-dropdown.nav-header-sheet {
-  padding: 0.35rem 0.6rem 0.65rem;
+  padding: 0.4rem var(--space-3) 0.7rem;
   background: var(--bg);
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
 }
 
 .nav-dropdown.search-menu-sheet {
-  padding: 0.35rem 0.6rem 0.65rem;
+  padding: 0.4rem var(--space-3) 0.7rem;
   max-height: min(75vh, 36rem);
   overflow-y: auto;
-  background: color-mix(in srgb, var(--bg) 94%, transparent);
+  background: var(--bg);
 }
 
 .search-panel-host--hidden {
@@ -1048,9 +1045,7 @@ function submitReaderPage() {
 }
 
 .nav-menu-root--backdrop {
-  background: rgba(0, 0, 0, 0.45);
-  -webkit-backdrop-filter: blur(2px);
-  backdrop-filter: blur(2px);
+  background: rgba(0, 0, 0, 0.35);
   pointer-events: auto;
 }
 
@@ -1063,7 +1058,7 @@ function submitReaderPage() {
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.45);
+  background: rgba(0, 0, 0, 0.35);
 }
 
 .nav-menu-root--mobile {
@@ -1075,13 +1070,11 @@ function submitReaderPage() {
   width: 100%;
   max-width: 640px;
   margin: 0;
-  padding: 0.5rem 0.85rem 0.85rem;
+  padding: 0.5rem var(--space-4) 0.85rem;
   border-top: none;
   border-radius: 0 0 var(--radius) var(--radius);
   max-height: min(72vh, 28rem);
-  background: var(--glass-bg, var(--surface));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
-  backdrop-filter: blur(var(--glass-blur));
+  background: var(--bg);
   border: 1px solid var(--border);
   overflow-y: auto;
   transform-origin: top center;
@@ -1097,9 +1090,7 @@ function submitReaderPage() {
   border-right: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
   border-radius: 0 0 var(--radius) var(--radius);
-  background: var(--glass-bg, var(--bg));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
-  backdrop-filter: blur(var(--glass-blur));
+  background: var(--bg);
   z-index: 91;
   overflow: hidden;
   display: flex;
@@ -1176,23 +1167,28 @@ function submitReaderPage() {
 .nav-menu-inner {
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
+  gap: 0;
 }
 
 .nav-menu-link {
   display: block;
   width: 100%;
-  min-height: 52px;
-  padding: 0.9rem 0.75rem;
+  min-height: 48px;
+  padding: 0.75rem 0.85rem;
   color: var(--text);
   text-transform: lowercase;
-  font-size: 1.05rem;
+  font-size: 1rem;
   font-weight: 500;
   line-height: 1.35;
   border: none;
-  border-radius: 0;
+  border-radius: var(--radius);
   background: transparent;
-  text-align: center;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.nav-menu-link:last-child {
+  border-bottom: none;
 }
 
 .nav-menu-link:hover {
@@ -1202,11 +1198,12 @@ function submitReaderPage() {
 }
 
 .nav-menu-root:not(.nav-menu-root--mobile) .nav-menu-link {
-  min-height: 40px;
-  padding: 0.45rem 0.45rem;
-  font-size: 0.95rem;
+  min-height: 44px;
+  padding: 0.55rem 0.65rem;
+  font-size: 0.94rem;
   text-align: left;
-  border-radius: 6px;
+  border-radius: var(--radius);
+  border-bottom: none;
 }
 
 .nav-menu-enter-active .nav-menu-sheet,
@@ -1276,9 +1273,9 @@ function submitReaderPage() {
 
 .profile-trigger {
   border-radius: 999px;
-  min-height: 44px;
-  width: 44px;
-  height: 44px;
+  min-height: var(--control-h);
+  width: var(--control-h);
+  height: var(--control-h);
   padding: 0;
   overflow: hidden;
   background: var(--surface);
@@ -1287,10 +1284,10 @@ function submitReaderPage() {
   transition:
     background var(--dur-2) var(--ease-out),
     border-color var(--dur-2) var(--ease-out),
-    transform var(--dur-2) var(--ease-spring);
+    opacity var(--dur-1) var(--ease-out);
 }
 .profile-trigger:active {
-  transform: scale(0.94);
+  opacity: 0.72;
 }
 
 @media (max-width: 640px) {
@@ -1443,16 +1440,17 @@ function submitReaderPage() {
   width: 100%;
   min-width: 0;
   color: var(--text);
-  padding: 0.45rem 0.45rem;
-  border-radius: 6px;
+  padding: 0.55rem 0.65rem;
+  border-radius: var(--radius);
   border: none;
   background: transparent;
   text-align: left;
   text-transform: lowercase;
   font: inherit;
-  font-size: 0.95rem;
+  font-size: 0.94rem;
+  font-weight: 500;
   line-height: 1.35;
-  min-height: 40px;
+  min-height: 44px;
   cursor: pointer;
 }
 

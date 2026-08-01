@@ -1,13 +1,11 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from "vue";
 import { AnimatePresence, motion } from "motion-v";
-import { springSnappy, toastActiveLite, toastEnterLite, toastExitLite } from "../utils/motionPresets";
-import { useLiteMotion } from "../utils/reducedMotion";
+import { toastActiveLite, toastEnterLite, toastExitLite } from "../utils/motionPresets";
 
 type Toast = { id: number; type: "success" | "error" | "info"; text: string };
 
 const toasts = ref<Toast[]>([]);
-const motionLite = useLiteMotion();
 let counter = 0;
 
 function show(text: string, type: Toast["type"] = "info") {
@@ -41,11 +39,10 @@ onUnmounted(() => {
         :key="t.id"
         class="toast"
         :class="`toast-${t.type}`"
-        :layout="!motionLite"
-        :initial="motionLite ? toastEnterLite : { opacity: 0, x: 120, y: 24, scale: 0.7, rotate: 6, filter: 'blur(8px)' }"
-        :animate="motionLite ? toastActiveLite : { opacity: 1, x: 0, y: 0, scale: 1, rotate: 0, filter: 'blur(0px)' }"
-        :exit="motionLite ? toastExitLite : { opacity: 0, x: 140, scale: 0.75, rotate: -4, transition: { duration: 0.22 } }"
-        :transition="motionLite ? toastActiveLite.transition : springSnappy"
+        :layout="false"
+        :initial="toastEnterLite"
+        :animate="toastActiveLite"
+        :exit="toastExitLite"
       >
         {{ t.text }}
       </motion.div>
@@ -68,10 +65,13 @@ onUnmounted(() => {
   background: var(--surface);
   color: var(--text);
   border: 1px solid var(--border);
-  padding: 0.7rem 0.95rem;
+  padding: 0.75rem 1rem;
   border-radius: var(--radius);
   min-width: 200px;
   max-width: 360px;
   pointer-events: auto;
+  font-size: 0.9rem;
+  font-weight: 500;
+  line-height: 1.35;
 }
 </style>

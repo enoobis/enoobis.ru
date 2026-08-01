@@ -1,5 +1,5 @@
 :root {
-  --radius: 12px;
+  --radius: 14px;
   --radius-pill: 999px;
   --avatar-radius: 0;
   --profile-head-gap: 1.5rem;
@@ -10,10 +10,17 @@
   --danger: var(--text);
   --gold: var(--text);
   --glass-blur: 16px;
-  --layout-pad: 1rem;
-  --control-h: 44px;
-  --input-pad-y: 0.7rem;
-  --input-pad-x: 1.15rem;
+  --layout-pad: 1.25rem;
+  --control-h: 46px;
+  --input-pad-y: 0.72rem;
+  --input-pad-x: 1.1rem;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
 
   /* motion */
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
@@ -45,11 +52,11 @@
 html[data-theme="black"],
 html:not([data-theme]) {
   --bg: #0a0a0a;
-  --surface: #0f0f0f;
-  --surface2: #141414;
-  --border: #1f1f1f;
-  --text: #ededed;
-  --muted: #8a8a8a;
+  --surface: #111111;
+  --surface2: #171717;
+  --border: #262626;
+  --text: #f2f2f2;
+  --muted: #888888;
   --accent: #ffffff;
   --hover-surface: #181818;
   --hover-border: #2a2a2a;
@@ -170,7 +177,8 @@ summary,
 
 body {
   font-size: calc(16px * var(--app-font-scale));
-  letter-spacing: -0.005em;
+  font-weight: 400;
+  letter-spacing: -0.011em;
 }
 
 a {
@@ -198,31 +206,28 @@ button,
   cursor: pointer;
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
-  padding: 0.7rem 1.3rem;
+  padding: 0.72rem 1.35rem;
   min-height: var(--control-h);
-  font-weight: 600;
-  font-size: 0.95rem;
+  font-weight: 500;
+  font-size: 0.94rem;
   background: var(--surface);
   color: var(--text);
   text-transform: lowercase;
-  letter-spacing: -0.005em;
+  letter-spacing: -0.011em;
   transition:
     background var(--dur-2) var(--ease-out),
     border-color var(--dur-2) var(--ease-out),
     color var(--dur-2) var(--ease-out),
-    transform var(--dur-2) var(--ease-spring),
-    opacity var(--dur-2) var(--ease-out);
-  will-change: transform;
+    opacity var(--dur-1) var(--ease-out);
 }
 button:hover,
 .btn:hover {
   background: var(--surface2);
   border-color: var(--hover-border);
-  transform: translateY(-1px);
 }
 button:active,
 .btn:active {
-  transform: translateY(0) scale(0.96);
+  opacity: 0.72;
   transition-duration: var(--dur-1);
 }
 button.primary,
@@ -230,13 +235,13 @@ button.primary,
   background: var(--text);
   color: var(--bg);
   border-color: var(--text);
-  font-weight: 700;
+  font-weight: 600;
 }
 button.primary:hover,
 .btn.primary:hover {
   background: var(--text);
   border-color: var(--text);
-  opacity: 0.88;
+  opacity: 0.9;
 }
 button.secondary {
   background: transparent;
@@ -426,7 +431,7 @@ input[type="radio"]:focus-visible {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 1rem;
+  padding: var(--space-5);
   transition: border-color var(--dur-2) var(--ease-out), background var(--dur-2) var(--ease-out);
 }
 
@@ -451,12 +456,12 @@ a.card:hover {
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.55rem;
   min-height: var(--control-h);
-  padding: 0 1rem;
+  padding: 0 1.05rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
-  background: var(--surface);
+  background: var(--surface2);
   color: var(--muted);
   transition: border-color var(--dur-2) var(--ease-out), background var(--dur-2) var(--ease-out);
 }
@@ -472,6 +477,7 @@ a.card:hover {
 .filter-search:focus-within,
 .filter-search.active {
   border-color: var(--focus-border);
+  background: var(--surface);
   color: var(--text);
 }
 
@@ -510,34 +516,39 @@ input[type="search"]::-webkit-search-cancel-button:hover {
 
 .filter-tabs {
   display: inline-flex;
-  gap: 0.35rem;
+  gap: 0.2rem;
   flex: 0 0 auto;
   align-items: stretch;
+  padding: 0.2rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface2);
 }
 
 .filter-tab {
-  min-height: var(--control-h);
+  min-height: calc(var(--control-h) - 0.35rem);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.35rem 0.9rem;
-  border: 1px solid var(--border);
+  padding: 0.35rem 0.95rem;
+  border: 1px solid transparent;
   border-radius: var(--radius-pill);
   background: transparent;
   color: var(--muted);
-  font-size: 0.88rem;
+  font-size: 0.86rem;
+  font-weight: 500;
 }
 
 .filter-tab:hover {
   color: var(--text);
-  border-color: var(--hover-border);
-  background: var(--surface2);
+  background: transparent;
+  border-color: transparent;
 }
 
 .filter-tab.on {
   color: var(--text);
-  background: var(--surface2);
-  border-color: var(--text);
+  background: var(--surface);
+  border-color: var(--border);
 }
 
 /* контентные вкладки: underline, как в профиле */
@@ -706,10 +717,17 @@ input[type="search"]::-webkit-search-cancel-button:hover {
 .list-row {
   display: flex;
   align-items: flex-start;
-  gap: 0.6rem;
-  padding: 0.65rem 0.8rem;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  background: var(--surface);
+  transition: border-color var(--dur-2) var(--ease-out), background var(--dur-2) var(--ease-out);
+}
+
+.list-row:hover {
+  border-color: var(--hover-border);
+  background: var(--surface2);
 }
 
 @media (max-width: 760px) {
@@ -730,14 +748,16 @@ input[type="search"]::-webkit-search-cancel-button:hover {
 .page-shell {
   max-width: 640px;
   margin: 0 auto;
+  padding-bottom: var(--space-8);
 }
 
 .page-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: var(--space-3);
   min-height: var(--control-h);
+  margin-bottom: var(--space-4);
 }
 
 .page-head-actions {
@@ -754,10 +774,11 @@ input[type="search"]::-webkit-search-cancel-button:hover {
 .page-shell .page-head h1,
 .page-shell > h1 {
   margin: 0;
-  font-size: 1.25rem;
+  font-size: 1.35rem;
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.022em;
   text-transform: lowercase;
+  line-height: 1.2;
 }
 
 .page-head-meta {
@@ -775,8 +796,9 @@ input[type="search"]::-webkit-search-cancel-button:hover {
 }
 .page-empty {
   text-align: center;
-  padding: 2rem 0;
+  padding: var(--space-8) var(--space-4);
   margin: 0;
+  color: var(--muted);
 }
 .page-empty--tight {
   padding: 0.75rem 0;
@@ -813,7 +835,8 @@ input[type="search"]::-webkit-search-cancel-button:hover {
 .layout {
   max-width: 880px;
   margin: 0 auto;
-  padding: 1rem;
+  padding: var(--layout-pad);
+  min-height: 100vh;
 }
 
 html.profile-wallpaper-desktop .layout {
@@ -860,10 +883,8 @@ html.profile-wallpaper-desktop .nav-bar {
   padding: 0;
   border: 1px solid transparent;
   border-bottom-color: var(--border);
-  margin-bottom: 1.5rem;
-  background: var(--glass-bg, var(--bg));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
-  backdrop-filter: blur(var(--glass-blur));
+  margin-bottom: var(--space-6);
+  background: var(--bg);
   border-radius: 0;
   position: sticky;
   top: 0;
@@ -872,8 +893,6 @@ html.profile-wallpaper-desktop .nav-bar {
 }
 html[data-theme="contrast"] .nav,
 html[data-theme="contrast-white"] .nav {
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
   background: var(--bg);
 }
 @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
@@ -894,12 +913,12 @@ html[data-theme="contrast-white"] .nav {
 }
 .nav a {
   color: var(--muted);
-  font-weight: 600;
-  font-size: 0.95rem;
+  font-weight: 500;
+  font-size: 0.92rem;
   text-transform: lowercase;
-  letter-spacing: -0.005em;
+  letter-spacing: -0.011em;
   border: none;
-  padding: 0.35rem 0.7rem;
+  padding: 0.4rem 0.75rem;
   border-radius: var(--radius-pill);
   transition: color var(--dur-2) var(--ease-out), background var(--dur-2) var(--ease-out);
 }
@@ -927,27 +946,17 @@ html[data-theme="contrast-white"] .nav {
   width: var(--icon-size);
   height: var(--icon-size);
   flex: 0 0 var(--icon-size);
-  opacity: 0.85;
-  transition:
-    transform var(--dur-2) var(--ease-spring),
-    opacity var(--dur-2) var(--ease-out);
+  opacity: 0.82;
+  transition: opacity var(--dur-2) var(--ease-out);
 }
 
-/* живые иконки: кнопки-иконки слегка увеличивают глиф на hover */
 .icon-btn:hover .app-icon,
 .filter-icon-btn:hover .app-icon,
 .nav a:hover .app-icon {
-  transform: scale(1.12);
   opacity: 1;
 }
-.icon-btn:active .app-icon,
-.filter-icon-btn:active .app-icon {
-  transform: scale(0.92);
-}
-/* пункты меню: иконка чуть уезжает вправо за текстом */
 .profile-menu-item:hover .app-icon,
 .nav-menu-link:hover .app-icon {
-  transform: translateX(2px);
   opacity: 1;
 }
 .nav-spacer {
@@ -957,10 +966,6 @@ html[data-theme="contrast-white"] .nav {
 .nav-actions {
   min-height: var(--control-h);
   align-items: center;
-}
-
-.layout {
-  min-height: 100vh;
 }
 
 .icon-btn {
@@ -1026,18 +1031,18 @@ h1,
 h2,
 h3 {
   margin: 0 0 0.5rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  line-height: 1.15;
+  font-weight: 600;
+  letter-spacing: -0.022em;
+  line-height: 1.2;
 }
 h1 {
-  font-size: 1.6rem;
+  font-size: 1.5rem;
 }
 h2 {
-  font-size: 1.25rem;
+  font-size: 1.2rem;
 }
 h3 {
-  font-size: 1.05rem;
+  font-size: 1.02rem;
 }
 
 .muted {
@@ -1126,33 +1131,27 @@ h3 {
 /* page transitions */
 .page-enter-active {
   transition:
-    opacity var(--dur-4) var(--ease-out),
-    transform var(--dur-4) var(--ease-snap),
-    filter var(--dur-4) var(--ease-out);
+    opacity var(--dur-3) var(--ease-out),
+    transform var(--dur-3) var(--ease-out);
 }
 .page-leave-active {
   transition:
     opacity var(--dur-2) var(--ease-out),
-    transform var(--dur-2) var(--ease-out),
-    filter var(--dur-2) var(--ease-out);
+    transform var(--dur-2) var(--ease-out);
 }
 .page-enter-from {
   opacity: 0;
-  transform: translateY(14px);
-  filter: blur(2px);
+  transform: translateY(6px);
 }
 .page-leave-to {
   opacity: 0;
-  transform: translateY(-6px);
-  filter: blur(2px);
+  transform: translateY(-4px);
 }
 
-/* on-mount reveal: stagger child blocks
-   use via data-reveal on a container; direct children fade-up sequentially */
 [data-reveal] > * {
   opacity: 0;
-  transform: translateY(8px);
-  animation: reveal-in var(--dur-4) var(--ease-snap) forwards;
+  transform: translateY(4px);
+  animation: reveal-in var(--dur-3) var(--ease-out) forwards;
 }
 [data-reveal] > *:nth-child(1) { animation-delay: 0ms; }
 [data-reveal] > *:nth-child(2) { animation-delay: 40ms; }

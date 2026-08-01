@@ -53,19 +53,20 @@ async function submit() {
 <style scoped>
 .auth {
   max-width: 360px;
-  margin: 14vh auto 0;
-  padding: 0 1rem;
+  margin: 16vh auto 0;
+  padding: 0 var(--layout-pad);
 }
 .auth h1 {
-  font-size: 2rem;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  margin-bottom: 1.5rem;
+  font-size: 1.75rem;
+  font-weight: 600;
+  letter-spacing: -0.028em;
+  margin-bottom: 1.75rem;
   text-transform: lowercase;
+  line-height: 1.15;
 }
 form {
   display: grid;
-  gap: 0.6rem;
+  gap: 0.75rem;
 }
 form button {
   margin-top: 0.6rem;

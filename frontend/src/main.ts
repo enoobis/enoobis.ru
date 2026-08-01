@@ -5,7 +5,6 @@ import router from "./router";
 import "./assets/main.css";
 import { bootstrapStoredViewerPreferences } from "./utils/preferences";
 import { applyDocumentSeo } from "./utils/seo";
-import { installRipple } from "./utils/ripple";
 import { syncLiteMotion } from "./utils/reducedMotion";
 import { setUnauthorizedHandler } from "./api/http";
 import { useAuthStore } from "./stores/auth";
@@ -32,5 +31,4 @@ setUnauthorizedHandler(() => {
 });
 
 applyDocumentSeo();
-installRipple();
 app.mount("#app");
