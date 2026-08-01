@@ -575,7 +575,7 @@ function submitReaderPage() {
         <div
           v-if="navDrawerOpen && !sheetMobile"
           id="nav-drawer"
-          class="nav-dropdown nav-header-sheet nav-dropdown--menu"
+          class="nav-dropdown nav-header-sheet"
           role="dialog"
           aria-modal="true"
           aria-label="разделы"
@@ -606,7 +606,7 @@ function submitReaderPage() {
       <Transition name="nav-sheet">
         <div
           v-if="profileMenuOpen && auth.token && !sheetMobile"
-          class="nav-dropdown nav-header-sheet nav-dropdown--profile"
+          class="nav-dropdown nav-header-sheet"
           role="dialog"
           aria-modal="true"
           aria-label="профиль"
@@ -981,27 +981,17 @@ function submitReaderPage() {
 
 .nav-dropdown {
   position: absolute;
+  left: 0;
+  right: 0;
   top: calc(100% - 1px);
   z-index: 2;
+  width: 100%;
   border: 1px solid var(--border);
   border-radius: 0 0 var(--radius) var(--radius);
-  padding: 0.35rem;
+  padding: 0.4rem 0.5rem 0.55rem;
   overflow: hidden;
   background: var(--bg);
-}
-
-.nav-dropdown--menu {
-  left: 0;
-  right: auto;
-  width: min(17.5rem, calc(100vw - 2 * var(--layout-pad)));
-  transform-origin: top left;
-}
-
-.nav-dropdown--profile {
-  left: auto;
-  right: 0;
-  width: min(18.5rem, calc(100vw - 2 * var(--layout-pad)));
-  transform-origin: top right;
+  transform-origin: top center;
 }
 
 .nav-dropdown.nav-header-sheet {
@@ -1009,13 +999,9 @@ function submitReaderPage() {
 }
 
 .nav-dropdown.search-menu-sheet {
-  left: 0;
-  right: 0;
   padding: 0.4rem var(--space-3) 0.7rem;
   max-height: min(75vh, 36rem);
   overflow-y: auto;
-  background: var(--bg);
-  transform-origin: top center;
 }
 
 .search-panel-host--hidden {
@@ -1210,12 +1196,6 @@ function submitReaderPage() {
 .nav-menu-link.router-link-active {
   background: var(--surface2);
   font-weight: 600;
-}
-
-.nav-dropdown--menu .nav-menu-link {
-  min-height: 42px;
-  padding: 0.55rem 0.75rem;
-  font-size: 0.98rem;
 }
 
 .nav-menu-root--mobile .nav-menu-link {
