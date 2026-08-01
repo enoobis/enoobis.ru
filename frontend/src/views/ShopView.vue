@@ -248,7 +248,7 @@ watch(
         >
           {{ categoryButtonLabel }}
         </button>
-        <div v-if="categoryOpen" class="filter-menu card shop-cat-menu" role="listbox" aria-label="категории">
+        <div v-if="categoryOpen" class="filter-menu shop-cat-menu" role="listbox" aria-label="категории">
           <button
             type="button"
             class="filter-menu-opt"

@@ -45,6 +45,22 @@ const activeCategory = ref("");
 const sort = ref<"new" | "title">("new");
 const categoryOpen = ref(false);
 const categoryMenuRoot = ref<HTMLElement | null>(null);
+const sortOpen = ref(false);
+const sortMenuRoot = ref<HTMLElement | null>(null);
+
+const sortOptions = [
+  { value: "new" as const, label: "новые" },
+  { value: "title" as const, label: "по названию" },
+];
+
+const sortButtonLabel = computed(
+  () => sortOptions.find((o) => o.value === sort.value)?.label ?? "новые",
+);
+
+function selectSort(value: "new" | "title") {
+  sort.value = value;
+  sortOpen.value = false;
+}
 
 const showForm = ref(false);
 const newTitle = ref("");
@@ -191,11 +207,15 @@ const activeChips = computed(() => {
 const listEmptyLabel = computed(() => (search.value.trim() ? "ничего не найдено" : "пусто"));
 
 function onDocumentClick(event: MouseEvent) {
-  if (!categoryOpen.value) return;
   const target = event.target as HTMLElement | null;
-  const root = categoryMenuRoot.value;
-  if (root && target && root.contains(target)) return;
-  categoryOpen.value = false;
+  if (categoryOpen.value) {
+    const root = categoryMenuRoot.value;
+    if (!(root && target && root.contains(target))) categoryOpen.value = false;
+  }
+  if (sortOpen.value) {
+    const root = sortMenuRoot.value;
+    if (!(root && target && root.contains(target))) sortOpen.value = false;
+  }
 }
 
 function onPickFile(ev: Event) {
@@ -500,7 +520,7 @@ onBeforeUnmount(() => {
           >
             {{ categoryButtonLabel }}
           </button>
-          <div v-if="categoryOpen" class="filter-menu card" role="listbox">
+          <div v-if="categoryOpen" class="filter-menu" role="listbox">
             <button
               type="button"
               class="filter-menu-opt"
@@ -524,10 +544,32 @@ onBeforeUnmount(() => {
             </button>
           </div>
         </div>
-        <select v-model="sort" class="filter-select" aria-label="сортировка">
-          <option value="new">новые</option>
-          <option value="title">по названию</option>
-        </select>
+        <div ref="sortMenuRoot" class="filter-menu-wrap">
+          <button
+            type="button"
+            class="filter-tab"
+            :class="{ on: sortOpen || sort !== 'new' }"
+            aria-label="сортировка"
+            aria-haspopup="listbox"
+            :aria-expanded="sortOpen"
+            @click.stop="sortOpen = !sortOpen"
+          >
+            {{ sortButtonLabel }}
+          </button>
+          <div v-if="sortOpen" class="filter-menu" role="listbox">
+            <button
+              v-for="o in sortOptions"
+              :key="o.value"
+              type="button"
+              class="filter-menu-opt"
+              :class="{ on: sort === o.value }"
+              role="option"
+              @click="selectSort(o.value)"
+            >
+              {{ o.label }}
+            </button>
+          </div>
+        </div>
       </div>
 
       <div v-if="activeChips.length" class="active-chips">

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import PageHeader from "../components/PageHeader.vue";
 import AppLoading from "../components/AppLoading.vue";
@@ -31,6 +31,28 @@ const tag = ref("");
 const sort = ref<SortKey>("new");
 const mode = ref<Mode>("all");
 const blogTags = ref<TaxonomyItem[]>([]);
+const tagOpen = ref(false);
+const tagMenuRoot = ref<HTMLElement | null>(null);
+
+const tagButtonLabel = computed(() => {
+  if (!tag.value) return "все теги";
+  const t = blogTags.value.find((x) => x.slug === tag.value);
+  return t ? t.name : "все теги";
+});
+
+function selectTag(slug: string) {
+  tag.value = slug;
+  tagOpen.value = false;
+  onTagChange();
+}
+
+function onDocumentClick(event: MouseEvent) {
+  if (!tagOpen.value) return;
+  const target = event.target as HTMLElement | null;
+  const root = tagMenuRoot.value;
+  if (root && target && root.contains(target)) return;
+  tagOpen.value = false;
+}
 
 const sortedPosts = computed(() => {
   const items = posts.value.slice();
@@ -162,9 +184,14 @@ watch(
 );
 
 onMounted(() => {
+  document.addEventListener("click", onDocumentClick);
   syncFromRoute();
   void loadBlogTags();
   void load();
+});
+
+onBeforeUnmount(() => {
+  document.removeEventListener("click", onDocumentClick);
 });
 </script>
 
@@ -199,18 +226,42 @@ onMounted(() => {
           обсуждаемые
         </button>
       </div>
-      <select
-        v-if="blogTags.length"
-        v-model="tag"
-        class="filter-select"
-        aria-label="тег"
-        @change="onTagChange"
-      >
-        <option value="">все теги</option>
-        <option v-for="t in blogTags" :key="t.slug" :value="t.slug">
-          {{ t.name }} · {{ t.post_count }}
-        </option>
-      </select>
+      <div v-if="blogTags.length" ref="tagMenuRoot" class="filter-menu-wrap">
+        <button
+          type="button"
+          class="filter-tab"
+          :class="{ on: tagOpen || !!tag }"
+          aria-label="тег"
+          aria-haspopup="listbox"
+          :aria-expanded="tagOpen"
+          @click.stop="tagOpen = !tagOpen"
+        >
+          {{ tagButtonLabel }}
+        </button>
+        <div v-if="tagOpen" class="filter-menu" role="listbox">
+          <button
+            type="button"
+            class="filter-menu-opt"
+            :class="{ on: !tag }"
+            role="option"
+            @click="selectTag('')"
+          >
+            все теги
+          </button>
+          <button
+            v-for="t in blogTags"
+            :key="t.slug"
+            type="button"
+            class="filter-menu-opt"
+            :class="{ on: tag === t.slug }"
+            role="option"
+            @click="selectTag(t.slug)"
+          >
+            <span>{{ t.name }}</span>
+            <span class="muted small">{{ t.post_count }}</span>
+          </button>
+        </div>
+      </div>
       <div v-if="auth.token" class="filter-tabs">
         <button
           type="button"
