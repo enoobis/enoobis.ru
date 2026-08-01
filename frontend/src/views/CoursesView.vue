@@ -1292,35 +1292,40 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 
     <!-- список курсов -->
     <template v-if="!classroom">
-      <PageHeader title="курсы" />
+      <PageHeader title="курсы">
+        <template v-if="canTeach" #actions>
+          <button type="button" @click="creatingCourse = !creatingCourse">
+            {{ creatingCourse ? "отмена" : "+ курс" }}
+          </button>
+        </template>
+      </PageHeader>
 
-      <div class="board-tools filter-bar">
-        <input
-          v-model="joinCode"
-          class="board-code"
-          placeholder="код"
-          @keyup.enter="onJoinByCode"
-        />
-        <button v-if="joinCode.trim()" type="button" class="secondary" @click="onJoinByCode">
+      <div class="filter-bar">
+        <label class="filter-search">
+          <input
+            v-model="joinCode"
+            type="text"
+            placeholder="код"
+            autocomplete="off"
+            @keyup.enter="onJoinByCode"
+          />
+        </label>
+        <button
+          v-if="joinCode.trim()"
+          type="button"
+          class="secondary"
+          @click="onJoinByCode"
+        >
           вступить
         </button>
         <button
           v-if="hiddenCount > 0"
           type="button"
-          class="secondary board-show-hidden"
+          class="secondary"
           :class="{ active: showHiddenCourses }"
           @click="toggleShowHidden"
         >
           скрытые · {{ hiddenCount }}
-        </button>
-        <button
-          v-if="canTeach"
-          type="button"
-          class="secondary"
-          :class="{ active: creatingCourse }"
-          @click="creatingCourse = !creatingCourse"
-        >
-          {{ creatingCourse ? "отмена" : "+ курс" }}
         </button>
       </div>
 
@@ -2482,35 +2487,6 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   font-size: 0.8rem;
 }
 
-.board-tools {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto auto;
-  gap: 0.5rem;
-  align-items: stretch;
-}
-.board-search-wrap {
-  grid-column: 1 / -1;
-}
-@media (min-width: 600px) {
-  .board-search-wrap {
-    grid-column: auto;
-  }
-}
-.board-code {
-  width: 8rem;
-  font-size: 0.93rem;
-}
-@media (max-width: 600px) {
-  .board-tools {
-    grid-template-columns: 1fr 1fr;
-  }
-  .board-search-wrap {
-    grid-column: 1 / -1;
-  }
-  .board-code {
-    width: auto;
-  }
-}
 .course-tabs {
   margin: 0.65rem 0 0.85rem;
   flex-wrap: nowrap;

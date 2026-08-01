@@ -218,7 +218,7 @@ watch(
       </template>
     </PageHeader>
 
-    <div class="shop-filters">
+    <div class="filter-bar filter-bar--stack shop-filters">
       <div class="filter-tabs shop-kind" role="tablist" aria-label="разделы">
         <button
           v-for="t in tabs"
@@ -236,17 +236,17 @@ watch(
       <div
         v-if="shopCategories.length && tab !== 'special'"
         ref="categoryMenuRoot"
-        class="shop-cat-picker filter-menu-wrap"
+        class="filter-menu-wrap"
       >
         <button
           type="button"
-          class="filter-tab shop-cat-btn"
-          :class="{ on: categoryOpen || categoryFilter }"
+          class="filter-trigger"
+          :class="{ on: categoryOpen || !!categoryFilter }"
           aria-haspopup="listbox"
           :aria-expanded="categoryOpen"
           @click.stop="categoryOpen = !categoryOpen"
         >
-          {{ categoryButtonLabel }}
+          <span>{{ categoryButtonLabel }}</span>
         </button>
         <div v-if="categoryOpen" class="filter-menu shop-cat-menu" role="listbox" aria-label="категории">
           <button
@@ -380,26 +380,6 @@ watch(
 .shop {
   display: grid;
   gap: 0.5rem;
-}
-.shop-filters {
-  display: grid;
-  gap: 0.5rem;
-  margin-bottom: 0.15rem;
-}
-.shop-kind {
-  display: flex;
-  width: 100%;
-}
-.shop-kind .filter-tab {
-  flex: 1;
-}
-.shop-cat-picker {
-  width: 100%;
-}
-.shop-cat-btn {
-  width: 100%;
-  justify-content: flex-start;
-  text-align: left;
 }
 .shop-cat-menu {
   left: 0;

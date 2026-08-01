@@ -122,7 +122,7 @@ onMounted(() => {
   <section class="feed page-shell">
     <PageHeader title="лента" />
 
-    <div v-if="auth.token" class="filter-bar">
+    <div v-if="auth.token" class="filter-bar filter-bar--stack">
       <div class="filter-tabs">
         <button
           type="button"

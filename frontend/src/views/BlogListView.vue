@@ -199,7 +199,7 @@ onBeforeUnmount(() => {
   <section class="blog page-shell">
     <PageHeader title="блоги" />
 
-    <div class="filter-bar">
+    <div class="filter-bar filter-bar--stack">
       <div class="filter-tabs">
         <button
           type="button"
@@ -226,17 +226,35 @@ onBeforeUnmount(() => {
           обсуждаемые
         </button>
       </div>
-      <div v-if="blogTags.length" ref="tagMenuRoot" class="filter-menu-wrap">
+      <div v-if="auth.token" class="filter-tabs">
         <button
           type="button"
           class="filter-tab"
+          :class="{ on: mode === 'all' }"
+          @click="setMode('all')"
+        >
+          все
+        </button>
+        <button
+          type="button"
+          class="filter-tab"
+          :class="{ on: mode === 'bookmarks' }"
+          @click="setMode('bookmarks')"
+        >
+          закладки
+        </button>
+      </div>
+      <div v-if="blogTags.length" ref="tagMenuRoot" class="filter-menu-wrap">
+        <button
+          type="button"
+          class="filter-trigger"
           :class="{ on: tagOpen || !!tag }"
           aria-label="тег"
           aria-haspopup="listbox"
           :aria-expanded="tagOpen"
           @click.stop="tagOpen = !tagOpen"
         >
-          {{ tagButtonLabel }}
+          <span>{{ tagButtonLabel }}</span>
         </button>
         <div v-if="tagOpen" class="filter-menu" role="listbox">
           <button
@@ -261,24 +279,6 @@ onBeforeUnmount(() => {
             <span class="muted small">{{ t.post_count }}</span>
           </button>
         </div>
-      </div>
-      <div v-if="auth.token" class="filter-tabs">
-        <button
-          type="button"
-          class="filter-tab"
-          :class="{ on: mode === 'all' }"
-          @click="setMode('all')"
-        >
-          все
-        </button>
-        <button
-          type="button"
-          class="filter-tab"
-          :class="{ on: mode === 'bookmarks' }"
-          @click="setMode('bookmarks')"
-        >
-          закладки
-        </button>
       </div>
     </div>
 

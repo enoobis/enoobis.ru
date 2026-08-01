@@ -512,13 +512,13 @@ onBeforeUnmount(() => {
         <div ref="categoryMenuRoot" class="filter-menu-wrap">
           <button
             type="button"
-            class="filter-tab"
-            :class="{ on: categoryOpen || activeCategory }"
+            class="filter-trigger"
+            :class="{ on: categoryOpen || !!activeCategory }"
             aria-haspopup="listbox"
             :aria-expanded="categoryOpen"
             @click.stop="categoryOpen = !categoryOpen"
           >
-            {{ categoryButtonLabel }}
+            <span>{{ categoryButtonLabel }}</span>
           </button>
           <div v-if="categoryOpen" class="filter-menu" role="listbox">
             <button
@@ -547,14 +547,14 @@ onBeforeUnmount(() => {
         <div ref="sortMenuRoot" class="filter-menu-wrap">
           <button
             type="button"
-            class="filter-tab"
+            class="filter-trigger"
             :class="{ on: sortOpen || sort !== 'new' }"
             aria-label="сортировка"
             aria-haspopup="listbox"
             :aria-expanded="sortOpen"
             @click.stop="sortOpen = !sortOpen"
           >
-            {{ sortButtonLabel }}
+            <span>{{ sortButtonLabel }}</span>
           </button>
           <div v-if="sortOpen" class="filter-menu" role="listbox">
             <button
@@ -713,11 +713,6 @@ onBeforeUnmount(() => {
   .form-row {
     grid-template-columns: 1fr;
   }
-}
-
-.filter-menu-wrap .filter-tab {
-  min-width: 7rem;
-  white-space: nowrap;
 }
 
 .active-chips {

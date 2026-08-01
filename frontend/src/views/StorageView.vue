@@ -447,27 +447,29 @@ onBeforeUnmount(() => {
         <div class="quota-bar"><span :style="{ width: usedPercent + '%' }" /></div>
       </div>
 
-      <div class="filter-tabs storage-tabs" role="tablist" aria-label="разделы">
-        <button
-          class="filter-tab"
-          :class="{ on: section === 'files' }"
-          type="button"
-          role="tab"
-          :aria-selected="section === 'files'"
-          @click="section = 'files'"
-        >
-          файлы
-        </button>
-        <button
-          class="filter-tab"
-          :class="{ on: section === 'notes' }"
-          type="button"
-          role="tab"
-          :aria-selected="section === 'notes'"
-          @click="section = 'notes'"
-        >
-          заметки
-        </button>
+      <div class="filter-bar filter-bar--stack">
+        <div class="filter-tabs" role="tablist" aria-label="разделы">
+          <button
+            class="filter-tab"
+            :class="{ on: section === 'files' }"
+            type="button"
+            role="tab"
+            :aria-selected="section === 'files'"
+            @click="section = 'files'"
+          >
+            файлы
+          </button>
+          <button
+            class="filter-tab"
+            :class="{ on: section === 'notes' }"
+            type="button"
+            role="tab"
+            :aria-selected="section === 'notes'"
+            @click="section = 'notes'"
+          >
+            заметки
+          </button>
+        </div>
       </div>
 
       <p v-if="err" class="error">{{ err }}</p>
@@ -678,11 +680,6 @@ onBeforeUnmount(() => {
   height: 100%;
   background: var(--text);
   transition: width var(--dur-2) var(--ease-out);
-}
-
-.storage-tabs {
-  width: 100%;
-  margin: 0;
 }
 
 .dropzone {
