@@ -1065,7 +1065,7 @@ function submitReaderPage() {
 
 .nav-menu-sheet {
   width: 100%;
-  max-width: 640px;
+  max-width: none;
   margin: 0;
   padding: 0.45rem 0.55rem 0.7rem;
   border-top: none;

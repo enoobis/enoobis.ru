@@ -753,7 +753,8 @@ input[type="search"]::-webkit-search-cancel-button:hover {
 }
 
 .page-shell {
-  max-width: 640px;
+  max-width: none;
+  width: 100%;
   margin: 0 auto;
   padding-bottom: var(--space-8);
 }
@@ -840,7 +841,7 @@ input[type="search"]::-webkit-search-cancel-button:hover {
 }
 
 .layout {
-  max-width: 880px;
+  max-width: 720px;
   margin: 0 auto;
   padding: var(--layout-pad);
   min-height: 100vh;

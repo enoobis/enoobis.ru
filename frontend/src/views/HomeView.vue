@@ -35,7 +35,7 @@ import KineticText from "../components/KineticText.vue";
 }
 .home {
   flex: 1;
-  max-width: 640px;
+  max-width: none;
   width: 100%;
   margin: 0 auto;
   padding: 1.5rem 1rem 0;

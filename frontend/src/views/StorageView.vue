@@ -447,20 +447,35 @@ onBeforeUnmount(() => {
         <div class="quota-bar"><span :style="{ width: usedPercent + '%' }" /></div>
       </div>
 
-      <nav class="content-tabs">
-        <button class="content-tab" :class="{ on: section === 'files' }" type="button" @click="section = 'files'">
+      <div class="filter-tabs storage-tabs" role="tablist" aria-label="разделы">
+        <button
+          class="filter-tab"
+          :class="{ on: section === 'files' }"
+          type="button"
+          role="tab"
+          :aria-selected="section === 'files'"
+          @click="section = 'files'"
+        >
           файлы
         </button>
-        <button class="content-tab" :class="{ on: section === 'notes' }" type="button" @click="section = 'notes'">
+        <button
+          class="filter-tab"
+          :class="{ on: section === 'notes' }"
+          type="button"
+          role="tab"
+          :aria-selected="section === 'notes'"
+          @click="section = 'notes'"
+        >
           заметки
         </button>
-      </nav>
+      </div>
 
       <p v-if="err" class="error">{{ err }}</p>
 
       <template v-if="section === 'files'">
-        <div
-          class="storage-zone dropzone"
+        <button
+          type="button"
+          class="dropzone"
           :class="{ over: dragOver, busy: uploading }"
           @dragover.prevent="dragOver = true"
           @dragleave.prevent="dragOver = false"
@@ -468,34 +483,58 @@ onBeforeUnmount(() => {
           @click="fileInput?.click()"
         >
           <input ref="fileInput" type="file" multiple hidden @change="onFileInputChange" />
-          <p>{{ uploading ? "загрузка…" : "перетащите файл или нажмите" }}</p>
-        </div>
+          <AppIcon name="plus" :size="20" />
+          <span>{{ uploading ? "загрузка…" : "загрузить" }}</span>
+        </button>
 
         <AppLoading v-if="filesLoading" class="page-empty page-empty--tight" />
         <p v-else-if="!files.length" class="page-empty page-empty--tight muted">пусто</p>
         <ul v-else class="list">
-          <li v-for="f in files" :key="f.id" class="list-row">
+          <li v-for="f in files" :key="f.id" class="item">
             <div class="info">
-              <span class="name">{{ f.original_name }}</span>
+              <span class="name" :title="f.original_name">{{ f.original_name }}</span>
               <span class="muted small">{{ fmt(f.size_bytes) }}</span>
             </div>
             <div class="actions">
-              <button v-if="canDirectLink(f)" class="secondary" type="button" @click="copyDirectFileLink(f)">
-                прямая ссылка
+              <button
+                v-if="canPreview(f)"
+                class="icon-btn-sm"
+                type="button"
+                title="открыть"
+                @click="openPreview(f)"
+              >
+                <AppIcon name="play" :size="18" />
               </button>
-              <button v-if="canPreview(f)" class="secondary" type="button" @click="openPreview(f)">открыть</button>
-              <button class="secondary" type="button" @click="onDownload(f)">скачать</button>
-              <button class="secondary" type="button" @click="openShare('file', f.id)">
-                {{ shareFor("file", f.id) ? "ещё ссылка" : "поделиться" }}
+              <button class="icon-btn-sm" type="button" title="скачать" @click="onDownload(f)">
+                <AppIcon name="download" :size="18" />
               </button>
-              <button class="secondary" type="button" @click="onDeleteFile(f)">удалить</button>
+              <button
+                v-if="canDirectLink(f)"
+                class="icon-btn-sm"
+                type="button"
+                title="прямая ссылка"
+                @click="copyDirectFileLink(f)"
+              >
+                <AppIcon name="copy" :size="18" />
+              </button>
+              <button
+                class="icon-btn-sm"
+                type="button"
+                :title="shareFor('file', f.id) ? 'ещё ссылка' : 'поделиться'"
+                @click="openShare('file', f.id)"
+              >
+                <AppIcon name="link" :size="18" />
+              </button>
+              <button class="icon-btn-sm" type="button" title="удалить" @click="onDeleteFile(f)">
+                <AppIcon name="delete" :size="18" />
+              </button>
             </div>
           </li>
         </ul>
       </template>
 
       <template v-else-if="section === 'notes'">
-        <div class="storage-zone composer">
+        <div class="composer">
           <div class="composer-head">
             <input v-model="noteTitle" placeholder="название" maxlength="200" />
             <div class="composer-head-actions">
@@ -505,21 +544,27 @@ onBeforeUnmount(() => {
               </button>
             </div>
           </div>
-          <textarea v-model="noteBody" rows="3" placeholder="текст… markdown поддерживается" />
+          <textarea v-model="noteBody" rows="3" placeholder="текст" />
         </div>
 
         <AppLoading v-if="notesLoading" class="page-empty page-empty--tight" />
         <p v-else-if="!notes.length" class="page-empty page-empty--tight muted">пусто</p>
         <ul v-else class="list">
-          <li v-for="n in notes" :key="n.id" class="list-row">
+          <li v-for="n in notes" :key="n.id" class="item">
             <div class="info">
               <span class="name">{{ n.title || "без названия" }}</span>
               <span class="muted small">{{ n.body.slice(0, 80) }}</span>
             </div>
             <div class="actions">
-              <button class="secondary" type="button" @click="openEdit(n)">изменить</button>
-              <button class="secondary" type="button" @click="openShare('note', n.id)">поделиться</button>
-              <button class="secondary" type="button" @click="onDeleteNote(n)">удалить</button>
+              <button class="icon-btn-sm" type="button" title="изменить" @click="openEdit(n)">
+                <AppIcon name="edit" :size="18" />
+              </button>
+              <button class="icon-btn-sm" type="button" title="поделиться" @click="openShare('note', n.id)">
+                <AppIcon name="link" :size="18" />
+              </button>
+              <button class="icon-btn-sm" type="button" title="удалить" @click="onDeleteNote(n)">
+                <AppIcon name="delete" :size="18" />
+              </button>
             </div>
           </li>
         </ul>
@@ -528,15 +573,14 @@ onBeforeUnmount(() => {
       <section v-if="shares.length" class="shares">
         <h2>ссылки</h2>
         <ul class="list">
-          <li v-for="s in shares" :key="s.id" class="list-row">
+          <li v-for="s in shares" :key="s.id" class="item">
             <div class="info">
               <span class="name">{{ s.label || s.target_type }}</span>
-              <span class="muted small">{{ s.target_type }} · {{ ttlLabel(s.expires_at) }}</span>
+              <span class="muted small">{{ ttlLabel(s.expires_at) }}</span>
             </div>
-            <code class="token" :title="`/s/${s.token}`" @click="copyShare(s)">/s/{{ s.token }}</code>
             <div class="actions">
-              <button class="icon-btn-sm" type="button" title="страница" @click="copyShare(s)">
-                <AppIcon name="copy" :size="16" />
+              <button class="icon-btn-sm" type="button" title="скопировать" @click="copyShare(s)">
+                <AppIcon name="copy" :size="18" />
               </button>
               <button
                 v-if="shareCanDirect(s)"
@@ -545,10 +589,10 @@ onBeforeUnmount(() => {
                 title="прямая ссылка"
                 @click="copyDirectShare(s)"
               >
-                <AppIcon name="link" :size="16" />
+                <AppIcon name="link" :size="18" />
               </button>
               <button class="icon-btn-sm" type="button" title="отозвать" @click="revokeShare(s)">
-                <AppIcon name="delete" :size="16" />
+                <AppIcon name="delete" :size="18" />
               </button>
             </div>
           </li>
@@ -615,15 +659,15 @@ onBeforeUnmount(() => {
 <style scoped>
 .page {
   display: grid;
-  gap: 0.85rem;
+  gap: var(--space-4);
 }
 
 .quota-bar-wrap {
-  margin: 0 0 0.5rem;
+  margin: -0.35rem 0 0;
 }
 
 .quota-bar {
-  height: 4px;
+  height: 3px;
   border-radius: 999px;
   background: var(--surface2);
   overflow: hidden;
@@ -633,45 +677,66 @@ onBeforeUnmount(() => {
   display: block;
   height: 100%;
   background: var(--text);
-  transition: width 0.2s ease;
+  transition: width var(--dur-2) var(--ease-out);
 }
 
-.storage-zone {
-  border: 1px dashed var(--border);
-  border-radius: var(--radius);
-  padding: 1.1rem 1rem;
-  transition: border-color 0.15s ease, background 0.15s ease;
+.storage-tabs {
+  width: 100%;
+  margin: 0;
 }
 
 .dropzone {
-  text-align: center;
-  cursor: pointer;
-}
-
-.dropzone p {
-  margin: 0;
-  font-size: 0.88rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  min-height: 3.5rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
   color: var(--muted);
+  font: inherit;
+  font-size: 0.94rem;
+  font-weight: 500;
+  text-transform: lowercase;
+  cursor: pointer;
+  transition: border-color var(--dur-2) var(--ease-out), background var(--dur-2) var(--ease-out), color var(--dur-2) var(--ease-out);
 }
 
+.dropzone :deep(.app-icon) {
+  opacity: 0.7;
+}
+
+.dropzone:hover,
 .dropzone.over {
-  border-color: var(--text);
+  border-color: var(--hover-border);
   background: var(--surface2);
+  color: var(--text);
+}
+
+.dropzone:hover :deep(.app-icon),
+.dropzone.over :deep(.app-icon) {
+  opacity: 1;
 }
 
 .dropzone.busy {
   pointer-events: none;
-  opacity: 0.7;
+  opacity: 0.55;
 }
 
 .composer {
   display: grid;
-  gap: 0.5rem;
+  gap: 0.55rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
 }
 
 .composer:focus-within {
-  border-color: var(--text);
-  background: var(--surface2);
+  border-color: var(--focus-border);
 }
 
 .composer-head {
@@ -688,18 +753,17 @@ onBeforeUnmount(() => {
 }
 
 .composer-head-actions button {
-  min-height: 0;
-  padding: 0.35rem 0.7rem;
-  font-size: 0.82rem;
+  min-height: 36px;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.85rem;
 }
 
 .composer input,
 .composer textarea {
   border: none;
-  border-bottom: 1px solid var(--border);
   border-radius: 0;
   background: transparent;
-  padding: 0.5rem 0.85rem;
+  padding: 0;
   min-height: 0;
   width: 100%;
 }
@@ -707,27 +771,23 @@ onBeforeUnmount(() => {
 .composer-head input {
   flex: 1;
   min-width: 0;
-  border-bottom: none;
-  padding: 0.5rem 0.85rem;
+  font-size: 0.98rem;
+  font-weight: 500;
 }
 
 .composer textarea {
   resize: vertical;
-  min-height: 3.25rem;
+  min-height: 4rem;
   max-height: 12rem;
   line-height: 1.5;
-  font-size: 0.88rem;
+  font-size: 0.94rem;
+  color: var(--text);
 }
 
 .composer input:focus,
 .composer textarea:focus {
   outline: none;
-  border-bottom-color: var(--focus-border);
   background: transparent;
-}
-
-.composer-head input:focus {
-  border-bottom: none;
 }
 
 .list {
@@ -735,7 +795,18 @@ onBeforeUnmount(() => {
   padding: 0;
   margin: 0;
   display: grid;
-  gap: 0.4rem;
+  gap: 0.45rem;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
 }
 
 .info {
@@ -746,7 +817,9 @@ onBeforeUnmount(() => {
 }
 
 .name {
-  font-size: 0.92rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  letter-spacing: -0.015em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -758,43 +831,36 @@ onBeforeUnmount(() => {
 
 .actions {
   display: flex;
-  gap: 0.35rem;
+  align-items: center;
+  gap: 0.1rem;
   flex-shrink: 0;
 }
 
-.actions button {
-  min-height: 0;
-  padding: 0.35rem 0.7rem;
-  font-size: 0.82rem;
+.actions .icon-btn-sm {
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+  color: var(--muted);
+}
+
+.actions .icon-btn-sm:hover {
+  color: var(--text);
+  background: var(--surface2);
 }
 
 .shares {
-  margin-top: 0.85rem;
+  margin-top: 0.35rem;
   border-top: 1px solid var(--border);
-  padding-top: 0.85rem;
+  padding-top: var(--space-4);
+  display: grid;
+  gap: 0.65rem;
 }
 
 .shares h2 {
-  font-size: 1rem;
+  margin: 0;
+  font-size: 0.95rem;
   font-weight: 600;
-}
-
-.token {
-  font-family: var(--mono, ui-monospace, monospace);
-  font-size: 0.85rem;
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 0.25rem 0.5rem;
-  color: var(--text);
-  cursor: pointer;
-  letter-spacing: 0.02em;
-  user-select: all;
-  flex-shrink: 0;
-}
-
-.token:hover {
-  border-color: var(--hover-border);
+  letter-spacing: -0.015em;
 }
 
 .modal-backdrop {
@@ -808,7 +874,7 @@ onBeforeUnmount(() => {
 }
 
 .modal {
-  width: min(420px, 100%);
+  width: min(380px, 100%);
   display: grid;
   gap: 0.85rem;
 }
@@ -881,5 +947,31 @@ onBeforeUnmount(() => {
   justify-self: end;
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+
+@media (max-width: 520px) {
+  .item {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 0.55rem;
+  }
+
+  .info {
+    width: 100%;
+  }
+
+  .actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .composer-head {
+    flex-wrap: wrap;
+  }
+
+  .composer-head-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
 }
 </style>
