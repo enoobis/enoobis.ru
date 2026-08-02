@@ -949,7 +949,7 @@ async function approveBlog(id: string) {
     <p v-if="err" class="error">{{ err }}</p>
 
     <template v-if="tab === 'pending'">
-      <p v-if="!pending.length" class="muted">пусто</p>
+      <p v-if="!pending.length" class="page-empty">пусто</p>
       <ul v-else class="list">
         <li v-for="u in pending" :key="u.id">
           <div>
@@ -973,7 +973,7 @@ async function approveBlog(id: string) {
     </template>
 
     <template v-else-if="tab === 'blogs'">
-      <p v-if="!blogPending.length" class="muted">пусто</p>
+      <p v-if="!blogPending.length" class="page-empty">пусто</p>
       <ul v-else class="list">
         <li v-for="p in blogPending" :key="p.id">
           <div>
@@ -994,7 +994,7 @@ async function approveBlog(id: string) {
 
     <template v-else-if="tab === 'users' && isFullAdmin">
       <FilterSearch v-model="usersQuery" class="admin-users-search" />
-      <p v-if="!filteredUsers.length" class="muted">не найдено</p>
+      <p v-if="!filteredUsers.length" class="page-empty">не найдено</p>
       <ul v-else class="list user-list">
         <li v-for="u in filteredUsers" :key="u.id" class="user-row">
           <span class="user-ava">
@@ -1296,7 +1296,7 @@ async function approveBlog(id: string) {
     </template>
 
     <template v-else-if="tab === 'reports'">
-      <p v-if="!reports.length" class="muted">пусто</p>
+      <p v-if="!reports.length" class="page-empty">пусто</p>
       <ul v-else class="list">
         <li v-for="r in reports" :key="r.id">
           <div>
@@ -1368,7 +1368,7 @@ async function approveBlog(id: string) {
           </div>
         </li>
       </ul>
-      <p v-else class="muted small">пусто</p>
+      <p v-else class="page-empty">пусто</p>
 
       <Teleport to="body">
         <div
@@ -1532,13 +1532,13 @@ async function approveBlog(id: string) {
 
 <style scoped>
 .admin :deep(.page-head) {
-  margin-bottom: 0.8rem;
+  margin-bottom: var(--space-4);
 }
 .admin-tabs {
-  margin-bottom: 1rem;
+  margin-bottom: var(--space-6);
 }
 .admin-users-search {
-  margin-bottom: 1rem;
+  margin-bottom: var(--space-4);
 }
 .list {
   list-style: none;
