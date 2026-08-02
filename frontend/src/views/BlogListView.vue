@@ -5,18 +5,14 @@ import PageHeader from "../components/PageHeader.vue";
 import AppLoading from "../components/AppLoading.vue";
 import PostMetaStats from "../components/PostMetaStats.vue";
 import {
-  listMyBookmarks,
   listPosts,
   listTags,
   type BlogListItem,
   type TaxonomyItem,
 } from "../api/blog";
-import { useAuthStore } from "../stores/auth";
 
 type SortKey = "new" | "popular" | "discussed";
-type Mode = "all" | "bookmarks";
 
-const auth = useAuthStore();
 const route = useRoute();
 const router = useRouter();
 const posts = ref<BlogListItem[]>([]);
@@ -29,7 +25,6 @@ const pageSize = 20;
 const q = ref("");
 const tag = ref("");
 const sort = ref<SortKey>("new");
-const mode = ref<Mode>("all");
 const blogTags = ref<TaxonomyItem[]>([]);
 const tagOpen = ref(false);
 const tagMenuRoot = ref<HTMLElement | null>(null);
@@ -82,12 +77,6 @@ function setSort(next: SortKey) {
   pushQuery();
 }
 
-function setMode(next: Mode) {
-  if (mode.value === next) return;
-  mode.value = next;
-  pushQuery();
-}
-
 function onTagChange() {
   pushQuery();
 }
@@ -107,7 +96,6 @@ function syncFromRoute() {
     route.query.sort === "popular" || route.query.sort === "discussed"
       ? route.query.sort
       : "new";
-  mode.value = route.query.mode === "bookmarks" ? "bookmarks" : "all";
 }
 
 function buildQuery() {
@@ -115,7 +103,6 @@ function buildQuery() {
   if (q.value.trim()) query.q = q.value.trim();
   if (tag.value) query.tag = tag.value;
   if (sort.value !== "new") query.sort = sort.value;
-  if (mode.value === "bookmarks") query.mode = "bookmarks";
   return query;
 }
 
@@ -128,16 +115,12 @@ async function load() {
   const showLoading = !posts.value.length;
   if (showLoading) loading.value = true;
   try {
-    const query = {
+    const data = await listPosts({
       page: page.value,
       page_size: pageSize,
       q: q.value.trim() || undefined,
       tag: tag.value || undefined,
-    };
-    const data =
-      mode.value === "bookmarks" && auth.token
-        ? await listMyBookmarks(auth.token, query)
-        : await listPosts(query);
+    });
     posts.value = data.items;
     total.value = data.total;
   } catch (e) {
@@ -156,7 +139,6 @@ function resetAll() {
   q.value = "";
   tag.value = "";
   sort.value = "new";
-  mode.value = "all";
   pushQuery();
 }
 
@@ -177,6 +159,10 @@ function next() {
 watch(
   () => route.query,
   () => {
+    if (route.query.mode === "bookmarks") {
+      void router.replace("/blogs/saved");
+      return;
+    }
     syncFromRoute();
     reload();
   },
@@ -185,6 +171,10 @@ watch(
 
 onMounted(() => {
   document.addEventListener("click", onDocumentClick);
+  if (route.query.mode === "bookmarks") {
+    void router.replace("/blogs/saved");
+    return;
+  }
   syncFromRoute();
   void loadBlogTags();
   void load();
@@ -224,24 +214,6 @@ onBeforeUnmount(() => {
           @click="setSort('discussed')"
         >
           обсуждаемые
-        </button>
-      </div>
-      <div v-if="auth.token" class="filter-tabs">
-        <button
-          type="button"
-          class="filter-tab"
-          :class="{ on: mode === 'all' }"
-          @click="setMode('all')"
-        >
-          все
-        </button>
-        <button
-          type="button"
-          class="filter-tab"
-          :class="{ on: mode === 'bookmarks' }"
-          @click="setMode('bookmarks')"
-        >
-          закладки
         </button>
       </div>
       <div v-if="blogTags.length" ref="tagMenuRoot" class="filter-menu-wrap">

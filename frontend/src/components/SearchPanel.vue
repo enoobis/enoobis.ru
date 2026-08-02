@@ -9,7 +9,6 @@ import { useAuthStore } from "../stores/auth";
 
 type SearchScope = "global" | "blog" | "micro" | "library" | "courses" | "leaderboard";
 type BlogSort = "new" | "popular" | "discussed";
-type BlogMode = "all" | "bookmarks";
 type MicroFeed = "all" | "following";
 
 const props = defineProps<{
@@ -53,7 +52,6 @@ const err = ref("");
 
 const blogSort = ref<BlogSort>("new");
 const blogTag = ref("");
-const blogMode = ref<BlogMode>("all");
 const blogTags = ref<TaxonomyItem[]>([]);
 
 const microFeed = ref<MicroFeed>("all");
@@ -70,7 +68,6 @@ function readQuery() {
       ? route.query.sort
       : "new";
   blogTag.value = typeof route.query.tag === "string" ? route.query.tag : "";
-  blogMode.value = route.query.mode === "bookmarks" ? "bookmarks" : "all";
   microFeed.value = route.query.feed === "following" ? "following" : "all";
 }
 
@@ -79,7 +76,6 @@ function blogQuery() {
   if (q.value.trim()) query.q = q.value.trim();
   if (blogTag.value) query.tag = blogTag.value;
   if (blogSort.value !== "new") query.sort = blogSort.value;
-  if (blogMode.value === "bookmarks") query.mode = "bookmarks";
   return query;
 }
 
@@ -267,17 +263,6 @@ onUnmounted(() => {
           <option value="">все</option>
           <option v-for="t in blogTags" :key="t.slug" :value="t.slug">{{ t.name }} · {{ t.post_count }}</option>
         </select>
-      </div>
-      <div v-if="auth.token" class="row">
-        <span class="muted small">показать</span>
-        <div class="chips">
-          <button class="filter-chip" :class="{ on: blogMode === 'all' }" type="button" @click="blogMode = 'all'; applyFeedSearch()">
-            все
-          </button>
-          <button class="filter-chip" :class="{ on: blogMode === 'bookmarks' }" type="button" @click="blogMode = 'bookmarks'; applyFeedSearch()">
-            закладки
-          </button>
-        </div>
       </div>
     </div>
 

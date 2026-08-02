@@ -6,7 +6,7 @@ import PageHeader from "../components/PageHeader.vue";
   <section class="saved-hub page-shell">
     <PageHeader title="закладки" />
     <nav class="content-tabs">
-      <RouterLink to="/blogs?mode=bookmarks" class="content-tab">блоги</RouterLink>
+      <RouterLink to="/blogs/saved" class="content-tab">блоги</RouterLink>
       <RouterLink to="/microblogs/saved" class="content-tab">микроблоги</RouterLink>
     </nav>
   </section>
