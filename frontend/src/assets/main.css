@@ -561,6 +561,12 @@ input[type="search"]::-webkit-search-cancel-button:hover {
   justify-content: center;
 }
 
+@media (min-width: 761px) {
+  .admin-tabs.filter-tabs {
+    overflow: hidden;
+  }
+}
+
 .filter-tabs-thumb {
   position: absolute;
   top: 0;
@@ -867,33 +873,39 @@ input[type="search"]::-webkit-search-cancel-button:hover {
 @media (max-width: 760px) {
   .filter-menu-wrap,
   .filter-select,
-  .filter-bar .filter-tabs,
-  .admin-tabs.filter-tabs {
+  .filter-bar .filter-tabs {
     width: 100%;
     max-width: 100%;
   }
-  .filter-bar .filter-tabs,
-  .admin-tabs.filter-tabs {
+  .filter-bar .filter-tabs {
     overflow-x: auto;
     overscroll-behavior-x: contain;
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
   }
-  .filter-bar .filter-tabs::-webkit-scrollbar,
-  .admin-tabs.filter-tabs::-webkit-scrollbar {
+  .filter-bar .filter-tabs::-webkit-scrollbar {
     display: none;
   }
-  /* compact standalone toggles keep content width; bar/admin fill */
   .filter-bar .filter-tab {
     flex: 0 0 auto;
     justify-content: center;
   }
+  /* admin: 2×3 grid — no squashed labels, no hollow pill */
+  .admin-tabs.filter-tabs {
+    width: 100%;
+    max-width: 100%;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    gap: 2px;
+    overflow: visible;
+    border-radius: calc(var(--radius) + 4px);
+  }
   .admin-tabs .filter-tab {
-    flex: 1 1 0;
-    min-width: 0;
-    min-height: 2.25rem;
-    padding: 0.3rem 0.45rem;
-    font-size: 0.8rem;
+    flex: 1 1 calc(33.333% - 2px);
+    min-width: calc(33.333% - 2px);
+    min-height: 2.4rem;
+    padding: 0.4rem 0.5rem;
+    font-size: 0.84rem;
   }
 }
 
