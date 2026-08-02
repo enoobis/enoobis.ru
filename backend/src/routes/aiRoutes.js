@@ -275,25 +275,40 @@ router.post(
     const notes = String(req.body?.notes ?? "").trim().slice(0, 1000);
 
     const prompt = [
-      `напиши текст учебной темы «${topic}».`,
+      `напиши учебную тему «${topic}».`,
       courseTitle ? `курс: ${courseTitle}` : "",
       notes ? `пожелания преподавателя: ${notes}` : "",
-      "структура: короткое вступление, основная часть с подзаголовками, пример, короткий итог.",
-      "markdown, без картинок и без html. 400-700 слов.",
-      "в конце добавь блок «задание» — одно практическое задание по теме.",
+      'верни строго json: { "body": string, "task": { "title": string, "description": string, "max_points": number } }.',
+      "body — markdown темы: короткое вступление, основная часть с подзаголовками, пример, короткий итог. 400-700 слов, без картинок и html.",
+      "задание в body не включай — оно идёт отдельным полем task.",
+      "task.title — короткое название строчными буквами, task.description — что именно нужно сделать, task.max_points — целое от 10 до 100.",
     ]
       .filter(Boolean)
       .join("\n");
 
     try {
-      const body = await geminiGenerate({
-        system: "ты преподаватель. пишешь ясно, на русском, без воды.",
+      const raw = await geminiGenerate({
+        system: "ты преподаватель. пишешь ясно, на русском, без воды. отвечаешь только валидным json.",
         messages: [{ role: "user", text: prompt }],
-        maxTokens: 2600,
+        maxTokens: 4000,
+        json: true,
       });
+      const parsed = parseJsonLoose(raw);
+      const body = String(parsed?.body ?? "").trim();
+      if (!body) return res.status(502).json({ error: "ai_empty" });
+      const rawTask = parsed?.task;
+      const taskTitle = String(rawTask?.title ?? "").trim().slice(0, 200);
+      const task = taskTitle
+        ? {
+            title: taskTitle,
+            description: String(rawTask?.description ?? "").trim().slice(0, 2000),
+            max_points: Math.min(Math.max(Number(rawTask?.max_points) || 100, 10), 100),
+          }
+        : null;
       bumpUsage(req.user.id, "generate");
-      return res.json({ title: topic, body });
+      return res.json({ title: topic, body, task });
     } catch (e) {
+      if (e instanceof SyntaxError) return res.status(502).json({ error: "ai_bad_json" });
       return sendAiError(res, e, req.user);
     }
   },

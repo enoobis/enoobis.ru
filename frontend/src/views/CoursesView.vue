@@ -8,7 +8,9 @@ import {
   createStreamComment,
   createLecture,
   createStreamPost,
+  deleteAssignment,
   deleteCourse,
+  deleteLecture,
   enrollCourse,
   joinCourseByCode,
   getClassroom,
@@ -1200,6 +1202,22 @@ async function onSaveLectureEdit() {
   }
 }
 
+async function onDeleteLecture() {
+  if (!auth.token || !classroom.value || !editingLecture.value) return;
+  const id = editingLecture.value.id;
+  const tasks = classroom.value.assignments.filter((a) => a.lecture_id === id).length;
+  const warn = tasks ? ` и ${tasks} заданий с оценками` : "";
+  if (!window.confirm(`удалить тему${warn}?`)) return;
+  err.value = "";
+  try {
+    await deleteLecture(classroom.value.course.id, id, auth.token);
+    closeLecture();
+    await loadClassroom(classroom.value.course.id);
+  } catch (e) {
+    err.value = e instanceof Error ? e.message : "ошибка";
+  }
+}
+
 function startEditAssignment(a: Assignment) {
   editingAssignment.value = {
     id: a.id,
@@ -1225,6 +1243,21 @@ async function onSaveAssignmentEdit() {
       max_points: d.max_points,
     }, auth.token);
     editingAssignment.value = null;
+    await loadClassroom(classroom.value.course.id);
+  } catch (e) {
+    err.value = e instanceof Error ? e.message : "ошибка";
+  }
+}
+
+async function onDeleteAssignment() {
+  if (!auth.token || !classroom.value || !editingAssignment.value) return;
+  const id = editingAssignment.value.id;
+  if (!window.confirm("удалить задание вместе со сдачами?")) return;
+  err.value = "";
+  try {
+    await deleteAssignment(classroom.value.course.id, id, auth.token);
+    editingAssignment.value = null;
+    if (selectedAssignment.value?.id === id) closeAssignmentDetail();
     await loadClassroom(classroom.value.course.id);
   } catch (e) {
     err.value = e instanceof Error ? e.message : "ошибка";
@@ -1715,6 +1748,9 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
                   сохранить
                 </button>
                 <button type="button" class="secondary" @click="cancelEditLecture">отмена</button>
+                <button type="button" class="secondary row-remove" @click="onDeleteLecture">
+                  удалить тему
+                </button>
               </div>
             </template>
 
@@ -1811,6 +1847,13 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
                           <button type="button" @click="onSaveAssignmentEdit">сохранить</button>
                           <button type="button" class="secondary" @click="cancelEditAssignment">
                             отмена
+                          </button>
+                          <button
+                            type="button"
+                            class="secondary row-remove"
+                            @click="onDeleteAssignment"
+                          >
+                            удалить
                           </button>
                         </div>
                       </template>
@@ -2029,6 +2072,9 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
               <div class="row-actions">
                 <button type="button" @click="onSaveAssignmentEdit">сохранить</button>
                 <button type="button" class="secondary" @click="cancelEditAssignment">отмена</button>
+                <button type="button" class="secondary row-remove" @click="onDeleteAssignment">
+                  удалить
+                </button>
               </div>
             </template>
 
@@ -3281,6 +3327,10 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   min-height: 0;
   font-size: 0.85rem;
   border-radius: var(--radius);
+}
+.row-remove {
+  margin-left: auto;
+  color: var(--muted);
 }
 .grid-2 {
   display: grid;

@@ -401,6 +401,20 @@ export function createLecture(
   });
 }
 
+export function deleteLecture(courseId: string, lectureId: string, token: string) {
+  return api<{ ok: true }>(`/api/courses/${courseId}/lectures/${lectureId}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
+export function deleteAssignment(courseId: string, assignmentId: string, token: string) {
+  return api<{ ok: true }>(`/api/courses/${courseId}/assignments/${assignmentId}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
 export function patchLecture(
   courseId: string,
   lectureId: string,

@@ -6,6 +6,8 @@ import AppLoading from "../components/AppLoading.vue";
 import MarkdownText from "../components/MarkdownText.vue";
 import {
   createLecture,
+  deleteAssignment,
+  deleteLecture,
   getClassroom,
   patchLecture,
   submitAssignment,
@@ -22,6 +24,7 @@ import {
   generateLectureImage,
   getAiStatus,
   type AiChatMessage,
+  type AiLectureTask,
   type AiOutlineTopic,
   type AiStatus,
 } from "../api/ai";
@@ -230,6 +233,38 @@ async function saveEdit() {
   }
 }
 
+async function removeLecture() {
+  if (!auth.token || !classroom.value || !editing.value || savingEdit.value) return;
+  const tasks = tasksFor(editing.value.id).length;
+  const warn = tasks ? ` и ${tasks} заданий с оценками` : "";
+  if (!window.confirm(`удалить тему${warn}?`)) return;
+  savingEdit.value = true;
+  err.value = "";
+  try {
+    await deleteLecture(classroom.value.course.id, editing.value.id, auth.token);
+    editing.value = null;
+    activeId.value = "";
+    void router.replace({ query: { ...route.query, lecture: undefined } });
+    await load();
+  } catch (e) {
+    err.value = errorText(e);
+  } finally {
+    savingEdit.value = false;
+  }
+}
+
+async function removeTask(assignmentId: string) {
+  if (!auth.token || !classroom.value) return;
+  if (!window.confirm("удалить задание вместе со сдачами?")) return;
+  err.value = "";
+  try {
+    await deleteAssignment(classroom.value.course.id, assignmentId, auth.token);
+    await load();
+  } catch (e) {
+    err.value = errorText(e);
+  }
+}
+
 async function addImageToEdit() {
   if (!auth.token || !editing.value || imageBusy.value) return;
   imageBusy.value = true;
@@ -331,7 +366,7 @@ const genErr = ref("");
 const genProgress = ref("");
 const genTopics = ref<AiOutlineTopic[]>([]);
 const genPicked = ref<Record<string, boolean>>({});
-const genDraft = ref<{ title: string; body: string } | null>(null);
+const genDraft = ref<{ title: string; body: string; task: AiLectureTask | null } | null>(null);
 
 function openGen() {
   genOpen.value = true;
@@ -348,19 +383,21 @@ function closeGen() {
   genProgress.value = "";
 }
 
-async function draftBodyFor(topic: string, courseTitle: string): Promise<string> {
-  if (!auth.token) return "";
+type Draft = { body: string; task: AiLectureTask | null };
+
+async function draftFor(topic: string, courseTitle: string): Promise<Draft> {
+  if (!auth.token) return { body: "", task: null };
   const draft = await generateLectureDraft(auth.token, {
     topic,
     course_title: courseTitle,
     notes: genNotes.value.trim() || undefined,
   });
-  if (!genWithImages.value) return draft.body;
+  if (!genWithImages.value) return { body: draft.body, task: draft.task };
   try {
     const img = await generateLectureImage(auth.token, { topic });
-    return `![](${img.url})\n\n${draft.body}`;
+    return { body: `![](${img.url})\n\n${draft.body}`, task: draft.task };
   } catch {
-    return draft.body;
+    return { body: draft.body, task: draft.task };
   }
 }
 
@@ -379,10 +416,15 @@ async function generateWholeCourse() {
 
   for (const [i, t] of topics.entries()) {
     genProgress.value = `тема ${i + 1} из ${topics.length}: ${t.title}`;
-    const body = await draftBodyFor(t.title, courseTitle);
+    const draft = await draftFor(t.title, courseTitle);
     await createLecture(
       classroom.value.course.id,
-      { title: t.title, body_text: body, video_url: "" },
+      {
+        title: t.title,
+        body_text: draft.body,
+        video_url: "",
+        ...(draft.task ? { task: draft.task } : {}),
+      },
       auth.token,
     );
   }
@@ -413,10 +455,8 @@ async function runGenerate() {
       }
       const topic = genTopic.value.trim();
       genProgress.value = "пишу тему";
-      genDraft.value = {
-        title: topic,
-        body: await draftBodyFor(topic, classroom.value.course.title),
-      };
+      const draft = await draftFor(topic, classroom.value.course.title);
+      genDraft.value = { title: topic, ...draft };
       genProgress.value = "";
     }
   } catch (e) {
@@ -443,7 +483,12 @@ async function saveGenerated() {
     } else if (genDraft.value) {
       await createLecture(
         classroom.value.course.id,
-        { title: genDraft.value.title, body_text: genDraft.value.body, video_url: "" },
+        {
+          title: genDraft.value.title,
+          body_text: genDraft.value.body,
+          video_url: "",
+          ...(genDraft.value.task ? { task: genDraft.value.task } : {}),
+        },
         auth.token,
       );
     }
@@ -567,6 +612,14 @@ onBeforeUnmount(() => {
               {{ savingEdit ? "…" : "сохранить" }}
             </button>
             <button type="button" class="secondary" @click="editing = null">отмена</button>
+            <button
+              type="button"
+              class="secondary edit-remove"
+              :disabled="savingEdit"
+              @click="removeLecture"
+            >
+              удалить тему
+            </button>
           </div>
         </form>
 
@@ -612,7 +665,12 @@ onBeforeUnmount(() => {
               <div v-if="openTaskId === a.id" class="task-body">
                 <MarkdownText v-if="a.description" :text="a.description" />
 
-                <p v-if="isTeacher" class="muted small">проверка работ — в классе курса</p>
+                <div v-if="isTeacher" class="task-teacher">
+                  <p class="muted small">проверка работ — в классе курса</p>
+                  <button type="button" class="task-remove" @click="removeTask(a.id)">
+                    удалить задание
+                  </button>
+                </div>
                 <template v-else>
                   <p v-if="a.my_submission?.teacher_comment" class="task-comment muted">
                     {{ a.my_submission.teacher_comment }}
@@ -991,6 +1049,32 @@ onBeforeUnmount(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
+}
+
+.edit-remove {
+  margin-left: auto;
+  color: var(--muted);
+}
+
+.task-teacher {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.task-remove {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.task-remove:hover {
+  color: var(--text);
 }
 
 .files {

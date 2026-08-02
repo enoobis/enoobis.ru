@@ -59,11 +59,23 @@ export function generateLectureImage(token: string, payload: { topic: string }) 
   });
 }
 
+export type AiLectureTask = {
+  title: string;
+  description: string;
+  max_points: number;
+};
+
+export type AiLectureDraft = {
+  title: string;
+  body: string;
+  task: AiLectureTask | null;
+};
+
 export function generateLectureDraft(
   token: string,
   payload: { topic: string; course_title?: string; notes?: string },
 ) {
-  return api<{ title: string; body: string }>("/api/ai/lecture-draft", {
+  return api<AiLectureDraft>("/api/ai/lecture-draft", {
     method: "POST",
     token,
     body: JSON.stringify(payload),

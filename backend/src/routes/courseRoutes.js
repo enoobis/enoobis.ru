@@ -1007,4 +1007,60 @@ router.patch("/courses/:id/lectures/:lid", authRequired, (req, res) => {
   return res.json({ ...row, attachments: attachmentsFor(req.params.lid) });
 });
 
+/** удаляет задание вместе со сдачами и их файлами */
+function deleteAssignmentCascade(assignmentId) {
+  const submissions = all(
+    "SELECT id FROM course_assignment_submissions WHERE assignment_id = ?",
+    assignmentId,
+  );
+  for (const s of submissions) {
+    for (const f of attachmentsForSubmission(s.id)) {
+      if (f.url?.startsWith("/uploads/submissions/")) {
+        unlinkUploadUrl(f.url, ["submissions"]);
+      }
+    }
+    run("DELETE FROM course_submission_attachments WHERE submission_id = ?", s.id);
+  }
+  run("DELETE FROM course_assignment_submissions WHERE assignment_id = ?", assignmentId);
+  run("DELETE FROM course_assignments WHERE id = ?", assignmentId);
+}
+
+router.delete("/courses/:id/assignments/:aid", authRequired, (req, res) => {
+  const access = ensureCourseAccess(req.params.id, req.user);
+  if (access.error) return res.status(access.error).json({ error: "no access" });
+  if (!access.isTeacher && req.user.role !== "admin")
+    return res.status(403).json({ error: "forbidden" });
+  if (!assignmentInCourse(req.params.id, req.params.aid)) {
+    return res.status(404).json({ error: "not found" });
+  }
+  deleteAssignmentCascade(req.params.aid);
+  return res.json({ ok: true });
+});
+
+router.delete("/courses/:id/lectures/:lid", authRequired, (req, res) => {
+  const access = ensureCourseAccess(req.params.id, req.user);
+  if (access.error) return res.status(access.error).json({ error: "no access" });
+  if (!access.isTeacher && req.user.role !== "admin")
+    return res.status(403).json({ error: "forbidden" });
+  if (!lectureInCourse(req.params.id, req.params.lid)) {
+    return res.status(404).json({ error: "not found" });
+  }
+
+  for (const a of all(
+    "SELECT id FROM course_assignments WHERE lecture_id = ? AND course_id = ?",
+    req.params.lid,
+    req.params.id,
+  )) {
+    deleteAssignmentCascade(a.id);
+  }
+  for (const f of attachmentsFor(req.params.lid)) {
+    if (f.url?.startsWith("/uploads/course-lectures/")) {
+      unlinkUploadUrl(f.url, ["course-lectures"]);
+    }
+  }
+  run("DELETE FROM course_lecture_attachments WHERE lecture_id = ?", req.params.lid);
+  run("DELETE FROM course_lectures WHERE id = ? AND course_id = ?", req.params.lid, req.params.id);
+  return res.json({ ok: true });
+});
+
 export default router;
