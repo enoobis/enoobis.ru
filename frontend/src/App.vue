@@ -21,7 +21,10 @@ import SearchPanel from "./components/SearchPanel.vue";
 import NavExpandSearch from "./components/NavExpandSearch.vue";
 import NavBurgerIcon from "./components/NavBurgerIcon.vue";
 import { pathUsesPageSearchFilter } from "./utils/searchScope";
+import { installFilterTabsMotion } from "./utils/filterTabsMotion";
+
 const router = useRouter();
+let stopFilterTabsMotion: (() => void) | null = null;
 const route = useRoute();
 const onHome = computed(() => route.path === "/");
 const motionLite = useLiteMotion();
@@ -340,9 +343,12 @@ onMounted(() => {
   syncReaderTop();
   syncShell();
   syncHeaderSheetDocumentClass();
+  stopFilterTabsMotion = installFilterTabsMotion();
 });
 
 onUnmounted(() => {
+  stopFilterTabsMotion?.();
+  stopFilterTabsMotion = null;
   window.removeEventListener("enoobis:profile-cosmetics-updated", onProfileCosmeticsUpdated);
   window.removeEventListener("enoobis:nav-start", startNavProgress);
   window.removeEventListener("enoobis:nav-done", finishNavProgress);

@@ -531,6 +531,7 @@ input[type="search"]::-webkit-search-cancel-button:hover {
 }
 
 .filter-tabs {
+  position: relative;
   display: flex;
   gap: 0.2rem;
   flex: 1 1 auto;
@@ -540,6 +541,31 @@ input[type="search"]::-webkit-search-cancel-button:hover {
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
   background: var(--surface2);
+}
+
+.filter-tabs-thumb {
+  position: absolute;
+  top: 0.2rem;
+  bottom: 0.2rem;
+  left: 0.2rem;
+  width: 0;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0;
+  transform: translateX(0);
+  transition:
+    transform var(--dur-3) var(--ease-snap),
+    width var(--dur-3) var(--ease-snap),
+    opacity var(--dur-2) var(--ease-out);
+  will-change: transform, width;
+}
+
+.filter-tabs--motion .filter-tab {
+  position: relative;
+  z-index: 1;
 }
 
 .filter-tab {
@@ -560,6 +586,7 @@ input[type="search"]::-webkit-search-cancel-button:hover {
   text-transform: lowercase;
   white-space: nowrap;
   cursor: pointer;
+  transition: color var(--dur-2) var(--ease-out);
 }
 
 .filter-tab:hover {
@@ -572,6 +599,17 @@ input[type="search"]::-webkit-search-cancel-button:hover {
   color: var(--text);
   background: var(--surface);
   border-color: var(--border);
+}
+
+.filter-tabs--motion .filter-tab.on {
+  background: transparent;
+  border-color: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .filter-tabs-thumb {
+    transition: none;
+  }
 }
 
 /* dropdown trigger — same chrome as filter-tabs */
