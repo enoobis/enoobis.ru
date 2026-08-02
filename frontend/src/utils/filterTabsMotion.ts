@@ -35,10 +35,13 @@ function syncThumb(el: HTMLElement) {
   const ar = active.getBoundingClientRect();
   const style = getComputedStyle(el);
   const padL = parseFloat(style.paddingLeft) || 0;
+  const padT = parseFloat(style.paddingTop) || 0;
   const x = ar.left - er.left - padL + el.scrollLeft;
+  const y = ar.top - er.top - padT + el.scrollTop;
 
   thumb.style.width = `${Math.max(0, ar.width)}px`;
-  thumb.style.transform = `translateX(${Math.max(0, x)}px)`;
+  thumb.style.height = `${Math.max(0, ar.height)}px`;
+  thumb.style.transform = `translate(${Math.max(0, x)}px, ${Math.max(0, y)}px)`;
   thumb.style.opacity = "1";
 }
 

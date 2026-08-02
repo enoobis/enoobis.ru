@@ -545,22 +545,23 @@ input[type="search"]::-webkit-search-cancel-button:hover {
 
 .filter-tabs-thumb {
   position: absolute;
-  top: 0.2rem;
-  bottom: 0.2rem;
-  left: 0.2rem;
+  top: 0;
+  left: 0;
   width: 0;
+  height: 0;
   border-radius: var(--radius-pill);
   background: var(--surface);
   border: 1px solid var(--border);
   pointer-events: none;
   z-index: 0;
   opacity: 0;
-  transform: translateX(0);
+  transform: translate(0, 0);
   transition:
     transform var(--dur-3) var(--ease-snap),
     width var(--dur-3) var(--ease-snap),
+    height var(--dur-3) var(--ease-snap),
     opacity var(--dur-2) var(--ease-out);
-  will-change: transform, width;
+  will-change: transform, width, height;
 }
 
 .filter-tabs--motion .filter-tab {
@@ -848,11 +849,13 @@ input[type="search"]::-webkit-search-cancel-button:hover {
   .filter-select,
   .filter-tabs {
     width: 100%;
+    max-width: 100%;
   }
   .filter-tabs {
     display: flex;
     flex-wrap: nowrap;
     overflow-x: auto;
+    overscroll-behavior-x: contain;
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
   }
@@ -860,8 +863,20 @@ input[type="search"]::-webkit-search-cancel-button:hover {
     display: none;
   }
   .filter-tab {
-    flex: 1 0 auto;
+    flex: 0 0 auto;
     justify-content: center;
+  }
+  /* admin: many tabs — wrap instead of clipping */
+  .admin-tabs.filter-tabs {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    border-radius: calc(var(--radius) + 6px);
+  }
+  .admin-tabs .filter-tab {
+    flex: 1 1 calc(33.333% - 0.15rem);
+    min-width: 4.2rem;
+    padding-inline: 0.5rem;
+    font-size: 0.84rem;
   }
 }
 
