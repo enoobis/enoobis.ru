@@ -1,11 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import {
-  listShopCategories,
   listShopItemsPage,
   SHOP_PAGE_SIZE,
   buyShopItem,
-  type ShopCategory,
   type ShopItem,
   type ShopItemKind,
 } from "../api/shop";
@@ -30,10 +28,6 @@ const tabs: { key: ShopItemKind; label: string }[] = [
 ];
 
 const tab = ref<ShopItemKind>("avatar");
-const categoryFilter = ref("");
-const categoryOpen = ref(false);
-const categoryMenuRoot = ref<HTMLElement | null>(null);
-const shopCategories = ref<ShopCategory[]>([]);
 const items = ref<ShopItem[]>([]);
 const page = ref(1);
 const pageDraft = ref(1);
@@ -44,33 +38,11 @@ const profileCoins = computed(() => session.coins);
 
 let shopLoadSeq = 0;
 
-const categoryButtonLabel = computed(() => {
-  if (!categoryFilter.value) return "категория · все";
-  const name = shopCategories.value.find((c) => c.id === categoryFilter.value)?.name;
-  return name ? `категория · ${name}` : "категория";
-});
-
-function selectCategory(id: string) {
-  categoryFilter.value = id;
-  categoryOpen.value = false;
-}
-
-function onDocumentClick(e: MouseEvent) {
-  if (!categoryOpen.value) return;
-  const t = e.target as HTMLElement | null;
-  if (categoryMenuRoot.value?.contains(t)) return;
-  categoryOpen.value = false;
-}
-
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / SHOP_PAGE_SIZE)));
 
 watch(page, (p) => {
   pageDraft.value = p;
 });
-
-function itemCategoryLine(item: ShopItem): string {
-  return (item.categories ?? []).map((c) => c.name).join(" · ");
-}
 
 function shopSold(item: ShopItem): number {
   return Math.max(0, Math.floor(Number(item.sold_count ?? 0)));
@@ -114,19 +86,12 @@ async function load() {
     await loadCoins();
     if (seq !== shopLoadSeq) return;
 
-    const [listPage, cats] = await Promise.all([
-      listShopItemsPage(auth.token, {
-        kind,
-        category: categoryFilter.value || undefined,
-        page: page.value,
-      }),
-      shopCategories.value.length
-        ? Promise.resolve(shopCategories.value)
-        : listShopCategories(auth.token),
-    ]);
+    const listPage = await listShopItemsPage(auth.token, {
+      kind,
+      page: page.value,
+    });
     if (seq !== shopLoadSeq) return;
 
-    if (!shopCategories.value.length) shopCategories.value = cats;
     const maxPage = Math.max(1, Math.ceil(listPage.total / SHOP_PAGE_SIZE));
     if (page.value > maxPage) {
       page.value = maxPage;
@@ -170,29 +135,16 @@ async function onBuy(item: ShopItem) {
 }
 
 onMounted(() => {
-  document.addEventListener("click", onDocumentClick);
   void load();
-});
-
-onUnmounted(() => {
-  document.removeEventListener("click", onDocumentClick);
 });
 
 watch(tab, () => {
-  categoryFilter.value = "";
-  categoryOpen.value = false;
   page.value = 1;
   items.value = [];
   loading.value = true;
   void load();
 });
 
-watch(categoryFilter, () => {
-  page.value = 1;
-  items.value = [];
-  loading.value = true;
-  void load();
-});
 watch(
   () => auth.token,
   (t) => {
@@ -218,8 +170,8 @@ watch(
       </template>
     </PageHeader>
 
-    <div class="filter-bar filter-bar--stack shop-filters">
-      <div class="filter-tabs shop-kind" role="tablist" aria-label="разделы">
+    <div class="filter-bar filter-bar--stack">
+      <div class="filter-tabs" role="tablist" aria-label="разделы">
         <button
           v-for="t in tabs"
           :key="t.key"
@@ -233,51 +185,13 @@ watch(
           {{ t.label }}
         </button>
       </div>
-      <div
-        v-if="shopCategories.length && tab !== 'special'"
-        ref="categoryMenuRoot"
-        class="filter-menu-wrap"
-      >
-        <button
-          type="button"
-          class="filter-trigger"
-          :class="{ on: categoryOpen || !!categoryFilter }"
-          aria-haspopup="listbox"
-          :aria-expanded="categoryOpen"
-          @click.stop="categoryOpen = !categoryOpen"
-        >
-          <span>{{ categoryButtonLabel }}</span>
-        </button>
-        <div v-if="categoryOpen" class="filter-menu shop-cat-menu" role="listbox" aria-label="категории">
-          <button
-            type="button"
-            class="filter-menu-opt"
-            :class="{ on: !categoryFilter }"
-            role="option"
-            @click="selectCategory('')"
-          >
-            все
-          </button>
-          <button
-            v-for="c in shopCategories"
-            :key="c.id"
-            type="button"
-            class="filter-menu-opt"
-            :class="{ on: categoryFilter === c.id }"
-            role="option"
-            @click="selectCategory(c.id)"
-          >
-            {{ c.name }}
-          </button>
-        </div>
-      </div>
     </div>
 
     <AppLoading v-if="loading && !items.length" class="page-empty" />
     <div v-else-if="!loading && !items.length" class="page-empty muted">пусто</div>
     <MotionStagger
       v-if="items.length"
-      :list-key="`${tab}-${page}-${categoryFilter}`"
+      :list-key="`${tab}-${page}`"
       :class="['grid', { 'grid-special': tab === 'special' }]"
     >
       <MotionStaggerItem v-for="item in items" :key="item.id" class="item-card">
@@ -326,7 +240,6 @@ watch(
           </template>
         </div>
         <p class="item-name" :class="{ 'item-name-special': item.kind === 'special' }">{{ item.name }}</p>
-        <p v-if="item.kind !== 'special' && itemCategoryLine(item)" class="item-category muted small">{{ itemCategoryLine(item) }}</p>
         <p v-if="shopStockCap(item) !== null" class="stock-line muted">
           {{ shopSoldOut(item) ? "распродано" : `ещё ${shopStockLeft(item)}` }}
         </p>
@@ -380,18 +293,6 @@ watch(
 .shop {
   display: grid;
   gap: 0.5rem;
-}
-.shop-cat-menu {
-  left: 0;
-  right: 0;
-  width: 100%;
-  max-width: none;
-  max-height: min(14rem, 45vh);
-  overflow-y: auto;
-}
-.item-category {
-  margin: -0.15rem 0 0;
-  text-transform: lowercase;
 }
 .grid {
   list-style: none;
