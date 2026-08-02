@@ -760,7 +760,6 @@ onBeforeUnmount(() => {
   border: none;
   border-radius: 0;
   background: transparent;
-  padding: 0;
   min-height: 0;
   width: 100%;
 }
@@ -768,14 +767,16 @@ onBeforeUnmount(() => {
 .composer-head input {
   flex: 1;
   min-width: 0;
+  padding: 0.2rem 0;
   font-size: 0.98rem;
   font-weight: 500;
 }
 
 .composer textarea {
   resize: vertical;
-  min-height: 4rem;
+  min-height: 5rem;
   max-height: 12rem;
+  padding: 0.55rem 0 0.15rem;
   line-height: 1.5;
   font-size: 0.94rem;
   color: var(--text);
