@@ -1,4 +1,5 @@
 const enhanced = new WeakSet<HTMLElement>();
+const lastActive = new WeakMap<HTMLElement, HTMLElement>();
 
 function tabNodes(el: HTMLElement): HTMLElement[] {
   return Array.from(el.children).filter(
@@ -43,6 +44,14 @@ function syncThumb(el: HTMLElement) {
   thumb.style.height = `${Math.max(0, ar.height)}px`;
   thumb.style.transform = `translate(${Math.max(0, x)}px, ${Math.max(0, y)}px)`;
   thumb.style.opacity = "1";
+
+  if (active !== lastActive.get(el)) {
+    lastActive.set(el, active);
+    if (el.scrollWidth > el.clientWidth + 1) {
+      const left = active.offsetLeft - (el.clientWidth - active.offsetWidth) / 2;
+      el.scrollTo({ left: Math.max(0, left), behavior: "smooth" });
+    }
+  }
 }
 
 function enhance(el: HTMLElement) {
