@@ -21,7 +21,7 @@ const IMAGE_DIR = path.join(UPLOAD_ROOT, "course-lectures");
 fs.mkdirSync(IMAGE_DIR, { recursive: true });
 
 const CHAT_DAILY_LIMIT = Number(process.env.AI_CHAT_DAILY_LIMIT ?? 40);
-const GENERATE_DAILY_LIMIT = Number(process.env.AI_GENERATE_DAILY_LIMIT ?? 25);
+const GENERATE_DAILY_LIMIT = Number(process.env.AI_GENERATE_DAILY_LIMIT ?? 150);
 
 const MAX_MESSAGE_CHARS = 2000;
 const MAX_HISTORY = 12;
@@ -217,7 +217,7 @@ router.post(
   "/ai/course-outline",
   authRequired,
   staffOnly,
-  rateLimit({ windowMs: 60_000, max: 6, keyPrefix: "ai-outline" }),
+  rateLimit({ windowMs: 60_000, max: 10, keyPrefix: "ai-outline" }),
   async (req, res) => {
     if (!(await generateGuard(req, res))) return;
 
@@ -230,7 +230,7 @@ router.post(
       `составь план курса «${title}» из ${count} тем.`,
       description ? `описание курса: ${description}` : "",
       "верни строго json: { \"topics\": [{ \"title\": string, \"summary\": string }] }.",
-      "title — короткое название темы строчными буквами, summary — одно предложение о содержании.",
+      "title — короткое название темы строчными буквами, summary — до 12 слов о содержании.",
       "порядок тем — от простого к сложному, без нумерации в тексте.",
     ]
       .filter(Boolean)
@@ -240,7 +240,7 @@ router.post(
       const raw = await geminiGenerate({
         system: "ты методист. отвечаешь только валидным json на русском.",
         messages: [{ role: "user", text: prompt }],
-        maxTokens: 2000,
+        maxTokens: Math.min(1000 + count * 180, 8000),
         json: true,
       });
       const parsed = parseJsonLoose(raw);
@@ -265,7 +265,8 @@ router.post(
   "/ai/lecture-draft",
   authRequired,
   staffOnly,
-  rateLimit({ windowMs: 60_000, max: 6, keyPrefix: "ai-draft" }),
+  // генерация курса идёт темами подряд, поэтому лимит на минуту щедрый
+  rateLimit({ windowMs: 60_000, max: 40, keyPrefix: "ai-draft" }),
   async (req, res) => {
     if (!(await generateGuard(req, res))) return;
 
@@ -318,7 +319,7 @@ router.post(
   "/ai/image",
   authRequired,
   staffOnly,
-  rateLimit({ windowMs: 60_000, max: 6, keyPrefix: "ai-image" }),
+  rateLimit({ windowMs: 60_000, max: 40, keyPrefix: "ai-image" }),
   async (req, res) => {
     if (!(await generateGuard(req, res))) return;
 

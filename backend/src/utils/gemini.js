@@ -92,12 +92,19 @@ async function callGemini(model, body, timeoutMs) {
   return payload;
 }
 
+/** thinkingConfig понимают только 2.5-модели, остальные отвечают 400 */
+function bodyForModel(model, body) {
+  if (/2\.5/.test(model) || !body.generationConfig?.thinkingConfig) return body;
+  const { thinkingConfig: _drop, ...generationConfig } = body.generationConfig;
+  return { ...body, generationConfig };
+}
+
 /** перебираем модели, пока не найдётся существующая */
 async function callWithFallback(models, body, timeoutMs) {
   let last = null;
   for (const model of models) {
     try {
-      return await callGemini(model, body, timeoutMs);
+      return await callGemini(model, bodyForModel(model, body), timeoutMs);
     } catch (e) {
       last = e;
       if (e.message !== "ai_model_missing") throw e;
@@ -116,7 +123,7 @@ function blockedDetail(payload) {
 }
 
 /**
- * @param {{ system?: string, messages: { role: "user" | "model", text: string }[], maxTokens?: number, json?: boolean }} opts
+ * @param {{ system?: string, messages: { role: "user" | "model", text: string }[], maxTokens?: number, json?: boolean, think?: boolean }} opts
  * @returns {Promise<string>}
  */
 export async function geminiGenerate(opts) {
@@ -132,6 +139,8 @@ export async function geminiGenerate(opts) {
     generationConfig: {
       temperature: 0.7,
       maxOutputTokens: opts.maxTokens ?? 1200,
+      // 2.5 тратит maxOutputTokens на «мышление» и возвращает пустой ответ с MAX_TOKENS
+      ...(opts.think ? {} : { thinkingConfig: { thinkingBudget: 0 } }),
       ...(opts.json ? { responseMimeType: "application/json" } : {}),
     },
   };

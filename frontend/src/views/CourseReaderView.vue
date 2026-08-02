@@ -62,6 +62,7 @@ const AI_ERRORS: Record<string, string> = {
   ai_empty: "пустой ответ",
   ai_bad_json: "модель вернула не json",
   ai_failed: "gemini вернул ошибку",
+  too_many_requests: "слишком часто, подожди минуту",
 };
 
 function errorText(e: unknown): string {
@@ -379,6 +380,7 @@ function closeGen() {
   genOpen.value = false;
   genTopics.value = [];
   genDraft.value = null;
+  genQueue.value = [];
   genErr.value = "";
   genProgress.value = "";
 }
@@ -401,34 +403,122 @@ async function draftFor(topic: string, courseTitle: string): Promise<Draft> {
   }
 }
 
-/** весь курс: план -> текст каждой темы -> темы в курсе */
+/* весь курс: план -> темы по одной, каждая сохраняется сразу */
+
+type QueueItem = { title: string; state: "wait" | "run" | "done" | "fail" };
+
+const genQueue = ref<QueueItem[]>([]);
+const genStop = ref(false);
+
+const genDone = computed(() => genQueue.value.filter((t) => t.state === "done").length);
+const genFailed = computed(() => genQueue.value.filter((t) => t.state === "fail").length);
+const genPct = computed(() =>
+  genQueue.value.length ? Math.round((genDone.value / genQueue.value.length) * 100) : 0,
+);
+const genStatus = computed(() => {
+  const total = genQueue.value.length;
+  if (!total) return genProgress.value;
+  const head = `${genDone.value} из ${total}`;
+  if (genProgress.value) return `${head} · ${genProgress.value}`;
+  if (genFailed.value) return `${head} · не вышло ${genFailed.value}`;
+  return `${head} · готово`;
+});
+
+function errCode(e: unknown): string {
+  return e instanceof Error ? e.message : "";
+}
+
+/** лимиты на минуту переживаем ожиданием, ключ и дневной лимит — нет */
+function isFatal(e: unknown): boolean {
+  return ["daily_limit", "ai_disabled", "ai_key_invalid", "ai_key_forbidden", "ai_region_blocked"].includes(
+    errCode(e),
+  );
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+async function makeLecture(title: string, courseTitle: string) {
+  if (!auth.token || !classroom.value) return;
+  const draft = await draftFor(title, courseTitle);
+  await createLecture(
+    classroom.value.course.id,
+    {
+      title,
+      body_text: draft.body,
+      video_url: "",
+      ...(draft.task ? { task: draft.task } : {}),
+    },
+    auth.token,
+  );
+}
+
+async function makeLectureWithRetry(title: string, courseTitle: string) {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      await makeLecture(title, courseTitle);
+      return;
+    } catch (e) {
+      const code = errCode(e);
+      const throttled = code === "ai_rate_limited" || code === "too_many_requests";
+      if (!throttled || attempt >= 2 || genStop.value) throw e;
+      for (let left = 20; left > 0 && !genStop.value; left -= 1) {
+        genProgress.value = `лимит запросов, жду ${left} с`;
+        await sleep(1000);
+      }
+    }
+  }
+}
+
+async function runQueue() {
+  if (!classroom.value) return;
+  const courseTitle = classroom.value.course.title;
+  for (const item of genQueue.value) {
+    if (genStop.value) break;
+    if (item.state === "done") continue;
+    item.state = "run";
+    genProgress.value = item.title;
+    try {
+      await makeLectureWithRetry(item.title, courseTitle);
+      item.state = "done";
+      await load();
+    } catch (e) {
+      item.state = "fail";
+      if (isFatal(e)) {
+        genErr.value = errorText(e);
+        break;
+      }
+    }
+  }
+  genProgress.value = "";
+}
+
 async function generateWholeCourse() {
   if (!auth.token || !classroom.value) return;
-  const courseTitle = classroom.value.course.title;
+  genStop.value = false;
+  genQueue.value = [];
   genProgress.value = "составляю план";
   const outline = await generateCourseOutline(auth.token, {
-    title: courseTitle,
+    title: classroom.value.course.title,
     description: classroom.value.course.description,
     count: genCount.value,
   });
-  const topics = outline.topics;
-  if (!topics.length) throw new Error("пустой план");
-
-  for (const [i, t] of topics.entries()) {
-    genProgress.value = `тема ${i + 1} из ${topics.length}: ${t.title}`;
-    const draft = await draftFor(t.title, courseTitle);
-    await createLecture(
-      classroom.value.course.id,
-      {
-        title: t.title,
-        body_text: draft.body,
-        video_url: "",
-        ...(draft.task ? { task: draft.task } : {}),
-      },
-      auth.token,
-    );
-  }
+  if (!outline.topics.length) throw new Error("пустой план");
+  genQueue.value = outline.topics.map((t) => ({ title: t.title, state: "wait" }));
   genProgress.value = "";
+  await runQueue();
+}
+
+async function retryFailed() {
+  if (genBusy.value) return;
+  genStop.value = false;
+  genErr.value = "";
+  for (const item of genQueue.value) if (item.state === "fail") item.state = "wait";
+  genBusy.value = true;
+  try {
+    await runQueue();
+  } finally {
+    genBusy.value = false;
+  }
 }
 
 async function runGenerate() {
@@ -438,8 +528,6 @@ async function runGenerate() {
   try {
     if (genMode.value === "course") {
       await generateWholeCourse();
-      genOpen.value = false;
-      await load();
     } else if (genMode.value === "outline") {
       const r = await generateCourseOutline(auth.token, {
         title: classroom.value.course.title,
@@ -848,11 +936,31 @@ onBeforeUnmount(() => {
             <MarkdownText :text="genDraft.body" />
           </div>
 
-          <p v-if="genProgress" class="muted small">{{ genProgress }}</p>
+          <div v-if="genQueue.length" class="gen-progress">
+            <div class="gen-bar"><span :style="{ width: `${genPct}%` }" /></div>
+            <p class="muted small">{{ genStatus }}</p>
+          </div>
+          <p v-else-if="genProgress" class="muted small">{{ genProgress }}</p>
           <p v-if="genErr" class="error">{{ genErr }}</p>
 
           <div class="gen-actions">
-            <button type="button" class="secondary" :disabled="genBusy" @click="runGenerate">
+            <button
+              v-if="genMode === 'course' && genBusy"
+              type="button"
+              class="secondary"
+              @click="genStop = true"
+            >
+              {{ genStop ? "останавливаю…" : "стоп" }}
+            </button>
+            <button
+              v-else-if="genMode === 'course' && genFailed"
+              type="button"
+              class="secondary"
+              @click="retryFailed"
+            >
+              повторить {{ genFailed }}
+            </button>
+            <button v-else type="button" class="secondary" :disabled="genBusy" @click="runGenerate">
               {{ genBusy ? "…" : genMode === "course" ? "создать курс" : "сгенерировать" }}
             </button>
             <button
@@ -1344,6 +1452,24 @@ onBeforeUnmount(() => {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   font-size: 0.88rem;
+}
+
+.gen-progress {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.gen-bar {
+  height: 2px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.gen-bar span {
+  display: block;
+  height: 100%;
+  background: var(--text);
+  transition: width var(--dur-3) var(--ease-out);
 }
 
 .gen-actions {
