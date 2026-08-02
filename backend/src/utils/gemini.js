@@ -1,17 +1,118 @@
-const API_ROOT = "https://generativelanguage.googleapis.com/v1beta/models";
+const DEFAULT_BASE = "https://generativelanguage.googleapis.com/v1beta";
 const DEFAULT_MODEL = "gemini-2.5-flash";
 const DEFAULT_IMAGE_MODEL = "gemini-2.5-flash-image";
+/** если заданной модели нет — пробуем эти по очереди */
+const TEXT_FALLBACKS = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-2.0-flash"];
+const IMAGE_FALLBACKS = ["gemini-2.5-flash-image", "gemini-2.0-flash-preview-image-generation"];
 
 export function geminiKey() {
   return process.env.GEMINI_API_KEY?.trim() ?? "";
+}
+
+/** прокси на случай, если из региона сервера google api недоступен */
+export function geminiBase() {
+  return (process.env.GEMINI_BASE_URL?.trim() || DEFAULT_BASE).replace(/\/+$/, "");
 }
 
 export function geminiEnabled() {
   return geminiKey().length > 0;
 }
 
-function geminiModel() {
+function textModel() {
   return process.env.GEMINI_MODEL?.trim() || DEFAULT_MODEL;
+}
+
+function imageModel() {
+  return process.env.GEMINI_IMAGE_MODEL?.trim() || DEFAULT_IMAGE_MODEL;
+}
+
+function modelChain(primary, fallbacks) {
+  return [primary, ...fallbacks.filter((m) => m !== primary)];
+}
+
+/**
+ * @param {string} code
+ * @param {string} [detail]
+ */
+function aiError(code, detail) {
+  const e = new Error(code);
+  if (detail) e.detail = detail;
+  return e;
+}
+
+/** ключ передаём заголовком, поэтому в теле ошибки его не бывает */
+function describeUpstream(status, payload) {
+  const message = payload?.error?.message ?? "";
+  const reason = payload?.error?.status ?? "";
+  const short = String(message).slice(0, 300);
+  if (/location is not supported/i.test(message)) {
+    return { code: "ai_region_blocked", detail: short };
+  }
+  if (status === 429) return { code: "ai_rate_limited", detail: short };
+  if (status === 400 && /api key/i.test(message)) return { code: "ai_key_invalid", detail: short };
+  if (status === 400) return { code: "ai_bad_request", detail: short };
+  if (status === 401 || status === 403) {
+    return { code: "ai_key_forbidden", detail: short || reason };
+  }
+  if (status === 404) return { code: "ai_model_missing", detail: short };
+  if (status >= 500) return { code: "ai_upstream", detail: short };
+  return { code: "ai_failed", detail: short || `http ${status}` };
+}
+
+async function callGemini(model, body, timeoutMs) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  let res;
+  try {
+    res = await fetch(`${geminiBase()}/models/${model}:generateContent`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": geminiKey() },
+      body: JSON.stringify(body),
+      signal: ctrl.signal,
+    });
+  } catch {
+    throw aiError("ai_unreachable");
+  } finally {
+    clearTimeout(timer);
+  }
+
+  const raw = await res.text();
+  let payload = null;
+  try {
+    payload = raw ? JSON.parse(raw) : null;
+  } catch {
+    payload = null;
+  }
+
+  if (!res.ok) {
+    const { code, detail } = describeUpstream(res.status, payload);
+    console.error(`gemini ${model} ${res.status} ${code}: ${detail ?? ""}`);
+    throw aiError(code, detail);
+  }
+  return payload;
+}
+
+/** перебираем модели, пока не найдётся существующая */
+async function callWithFallback(models, body, timeoutMs) {
+  let last = null;
+  for (const model of models) {
+    try {
+      return await callGemini(model, body, timeoutMs);
+    } catch (e) {
+      last = e;
+      if (e.message !== "ai_model_missing") throw e;
+    }
+  }
+  throw last ?? aiError("ai_failed");
+}
+
+function blockedDetail(payload) {
+  const candidate = payload?.candidates?.[0];
+  const blockReason = payload?.promptFeedback?.blockReason;
+  if (blockReason) return `запрос отклонён фильтром: ${blockReason}`;
+  if (candidate?.finishReason === "SAFETY") return "ответ отклонён фильтром безопасности";
+  if (candidate?.finishReason === "MAX_TOKENS") return "ответ не поместился в лимит токенов";
+  return candidate?.finishReason ? `finishReason: ${candidate.finishReason}` : undefined;
 }
 
 /**
@@ -19,13 +120,12 @@ function geminiModel() {
  * @returns {Promise<string>}
  */
 export async function geminiGenerate(opts) {
-  const key = geminiKey();
-  if (!key) throw new Error("ai_disabled");
+  if (!geminiKey()) throw aiError("ai_disabled");
 
   const contents = opts.messages
     .filter((m) => m.text.trim())
     .map((m) => ({ role: m.role, parts: [{ text: m.text }] }));
-  if (!contents.length) throw new Error("empty_prompt");
+  if (!contents.length) throw aiError("empty_prompt");
 
   const body = {
     contents,
@@ -37,32 +137,10 @@ export async function geminiGenerate(opts) {
   };
   if (opts.system) body.systemInstruction = { parts: [{ text: opts.system }] };
 
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 60_000);
-  let res;
-  try {
-    res = await fetch(`${API_ROOT}/${geminiModel()}:generateContent`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-      body: JSON.stringify(body),
-      signal: ctrl.signal,
-    });
-  } catch {
-    throw new Error("ai_unreachable");
-  } finally {
-    clearTimeout(timer);
-  }
-
-  if (!res.ok) {
-    // never leak the upstream payload — it can echo the key back
-    console.error("gemini error:", res.status);
-    throw new Error(res.status === 429 ? "ai_rate_limited" : "ai_failed");
-  }
-
-  const data = await res.json();
+  const data = await callWithFallback(modelChain(textModel(), TEXT_FALLBACKS), body, 60_000);
   const parts = data?.candidates?.[0]?.content?.parts ?? [];
   const text = parts.map((p) => p?.text ?? "").join("").trim();
-  if (!text) throw new Error("ai_empty");
+  if (!text) throw aiError("ai_empty", blockedDetail(data));
   return text;
 }
 
@@ -71,37 +149,19 @@ export async function geminiGenerate(opts) {
  * @returns {Promise<{ buffer: Buffer, mime: string }>}
  */
 export async function geminiGenerateImage(prompt) {
-  const key = geminiKey();
-  if (!key) throw new Error("ai_disabled");
+  if (!geminiKey()) throw aiError("ai_disabled");
 
-  const model = process.env.GEMINI_IMAGE_MODEL?.trim() || DEFAULT_IMAGE_MODEL;
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 90_000);
-  let res;
-  try {
-    res = await fetch(`${API_ROOT}/${model}:generateContent`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-      body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }] }),
-      signal: ctrl.signal,
-    });
-  } catch {
-    throw new Error("ai_unreachable");
-  } finally {
-    clearTimeout(timer);
-  }
+  const body = {
+    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    generationConfig: { responseModalities: ["IMAGE"] },
+  };
+  const data = await callWithFallback(modelChain(imageModel(), IMAGE_FALLBACKS), body, 90_000);
 
-  if (!res.ok) {
-    console.error("gemini image error:", res.status);
-    throw new Error(res.status === 429 ? "ai_rate_limited" : "ai_failed");
-  }
-
-  const data = await res.json();
   const parts = data?.candidates?.[0]?.content?.parts ?? [];
   const image = parts.find((p) => p?.inlineData?.data);
-  if (!image) throw new Error("ai_empty");
+  if (!image) throw aiError("ai_empty", blockedDetail(data));
   const mime = String(image.inlineData.mimeType ?? "image/png");
-  if (!/^image\/(png|jpeg|webp)$/.test(mime)) throw new Error("ai_failed");
+  if (!/^image\/(png|jpeg|webp)$/.test(mime)) throw aiError("ai_failed", `mime ${mime}`);
   return { buffer: Buffer.from(image.inlineData.data, "base64"), mime };
 }
 

@@ -52,8 +52,10 @@ export async function api<T>(
   }
   if (!res.ok) {
     if (res.status === 401 && opts.token) unauthorizedHandler?.();
-    const err = (data as { error?: string })?.error ?? res.statusText;
-    throw new Error(err);
+    const payload = data as { error?: string; detail?: string } | null;
+    const error: Error & { detail?: string } = new Error(payload?.error ?? res.statusText);
+    if (payload?.detail) error.detail = payload.detail;
+    throw error;
   }
   return data as T;
 }

@@ -86,10 +86,13 @@ function courseAccess(courseId, user) {
   return { course, isTeacher };
 }
 
-function aiErrorStatus(message) {
-  if (message === "ai_disabled") return 503;
-  if (message === "ai_rate_limited") return 429;
-  return 502;
+function sendAiError(res, e, user) {
+  const code = e?.message ?? "ai_failed";
+  const status = code === "ai_disabled" ? 503 : code === "ai_rate_limited" ? 429 : 502;
+  const body = { error: code };
+  /* точную причину от google видит только персонал */
+  if (e?.detail && isStaffRole(user?.role)) body.detail = String(e.detail);
+  return res.status(status).json(body);
 }
 
 function lectureContext(course, lectureId) {
@@ -187,8 +190,7 @@ router.post(
         limit: CHAT_DAILY_LIMIT,
       });
     } catch (e) {
-      const message = e?.message ?? "ai_failed";
-      return res.status(aiErrorStatus(message)).json({ error: message });
+      return sendAiError(res, e, req.user);
     }
   },
 );
@@ -253,11 +255,8 @@ router.post(
           .filter((t) => t.title),
       });
     } catch (e) {
-      const message = e?.message ?? "ai_failed";
-      if (message.startsWith("Unexpected") || e instanceof SyntaxError) {
-        return res.status(502).json({ error: "ai_bad_json" });
-      }
-      return res.status(aiErrorStatus(message)).json({ error: message });
+      if (e instanceof SyntaxError) return res.status(502).json({ error: "ai_bad_json" });
+      return sendAiError(res, e, req.user);
     }
   },
 );
@@ -295,8 +294,7 @@ router.post(
       bumpUsage(req.user.id, "generate");
       return res.json({ title: topic, body });
     } catch (e) {
-      const message = e?.message ?? "ai_failed";
-      return res.status(aiErrorStatus(message)).json({ error: message });
+      return sendAiError(res, e, req.user);
     }
   },
 );
@@ -334,8 +332,7 @@ router.post(
       bumpUsage(req.user.id, "generate");
       return res.json({ url: `/uploads/course-lectures/${finalName}` });
     } catch (e) {
-      const message = e?.message ?? "ai_failed";
-      return res.status(aiErrorStatus(message)).json({ error: message });
+      return sendAiError(res, e, req.user);
     }
   },
 );

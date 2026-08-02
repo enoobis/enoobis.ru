@@ -45,13 +45,27 @@ function videoEmbed(url: string): VideoEmbed {
   return null;
 }
 
+const AI_ERRORS: Record<string, string> = {
+  daily_limit: "лимит на сегодня исчерпан",
+  ai_disabled: "нет ключа gemini",
+  ai_key_invalid: "ключ gemini неверный",
+  ai_key_forbidden: "ключ не даёт доступ к generative language api",
+  ai_region_blocked: "gemini не работает из региона сервера",
+  ai_model_missing: "такой модели нет",
+  ai_bad_request: "gemini отклонил запрос",
+  ai_rate_limited: "gemini перегружен, попробуй позже",
+  ai_unreachable: "gemini недоступен",
+  ai_upstream: "сбой на стороне google",
+  ai_empty: "пустой ответ",
+  ai_bad_json: "модель вернула не json",
+  ai_failed: "gemini вернул ошибку",
+};
+
 function errorText(e: unknown): string {
-  const message = e instanceof Error ? e.message : "ошибка";
-  if (message === "daily_limit") return "лимит на сегодня исчерпан";
-  if (message === "ai_disabled") return "нет ключа gemini";
-  if (message === "ai_rate_limited") return "gemini перегружен, попробуй позже";
-  if (message === "ai_unreachable") return "gemini недоступен";
-  return message;
+  if (!(e instanceof Error)) return "ошибка";
+  const base = AI_ERRORS[e.message] ?? e.message;
+  const detail = (e as Error & { detail?: string }).detail;
+  return detail ? `${base}: ${detail}` : base;
 }
 
 const auth = useAuthStore();
