@@ -19,10 +19,12 @@ import {
 } from "../api/courses";
 import {
   askCourseTutor,
+  clearChatHistory,
   generateCourseOutline,
   generateLectureDraft,
   generateLectureImage,
   getAiStatus,
+  getChatHistory,
   type AiChatMessage,
   type AiLectureTask,
   type AiOutlineTopic,
@@ -301,6 +303,17 @@ async function loadAiStatus() {
   }
 }
 
+async function loadChat() {
+  if (!auth.token || !courseId.value) return;
+  try {
+    const r = await getChatHistory(auth.token, courseId.value);
+    chat.value = r.messages;
+    void scrollChatDown();
+  } catch {
+    chat.value = [];
+  }
+}
+
 async function scrollChatDown() {
   await nextTick();
   const el = chatBodyRef.value;
@@ -326,7 +339,7 @@ async function sendChat() {
     const r = await askCourseTutor(auth.token, {
       course_id: classroom.value.course.id,
       lecture_id: activeLecture.value?.id ?? null,
-      messages: chat.value,
+      message: text,
     });
     chat.value.push({ role: "model", text: r.reply });
     if (ai.value) ai.value = { ...ai.value, chat_used: r.used, chat_limit: r.limit };
@@ -347,9 +360,15 @@ function onChatKeydown(e: KeyboardEvent) {
   }
 }
 
-function clearChat() {
+async function clearChat() {
   chat.value = [];
   chatErr.value = "";
+  if (!auth.token || !courseId.value) return;
+  try {
+    await clearChatHistory(auth.token, courseId.value);
+  } catch {
+    /* локально уже очищено */
+  }
 }
 
 /* ---------- генерация (преподаватель) ---------- */
@@ -613,6 +632,7 @@ onMounted(() => {
   document.addEventListener("keydown", onEscape);
   void load();
   void loadAiStatus();
+  void loadChat();
 });
 
 onBeforeUnmount(() => {

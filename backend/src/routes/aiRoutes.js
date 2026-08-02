@@ -28,15 +28,27 @@ const MAX_HISTORY = 12;
 /* сколько текста лекции отдаём модели как контекст */
 const MAX_CONTEXT_CHARS = 8000;
 
+/** неделя истории на пользователя и курс, дальше чистим */
+const CHAT_TTL_DAYS = 7;
+
+const HUMAN_STYLE = [
+  "пиши как живой человек и практик, а не как ассистент.",
+  "никаких длинных тире, эмодзи, канцелярита и англицизмов без нужды.",
+  "не начинай с «отличный вопрос», не хвали вопрос, не извиняйся и не пересказывай его.",
+  "не пиши воду и списки ради списков, лучше нормальный связный абзац.",
+].join(" ");
+
 const TUTOR_SYSTEM = [
-  "ты — преподаватель-ассистент внутри курса на платформе enoobis.",
+  "ты ведёшь этот курс на платформе enoobis и объясняешь материал студенту.",
+  "держись как преподаватель, который знает предмет на практике: спокойно, уверенно, по делу.",
   "ученик читает конкретную тему, её полный текст дан ниже в контексте.",
-  "по умолчанию считай, что вопрос — про открытую тему, даже если ученик не назвал её.",
-  "сначала ищи ответ в тексте темы и объясняй своими словами на его примерах и терминах.",
-  "если в теме ответа нет — скажи об этом одной фразой и ответь по своим знаниям.",
-  "отвечай на русском, кратко и по делу, без воды и без извинений.",
+  "по умолчанию считай, что вопрос про открытую тему, даже если ученик её не назвал.",
+  "сначала ищи ответ в тексте темы и объясняй своими словами, на его примерах и терминах.",
+  "если в теме ответа нет, скажи это одной фразой и ответь по своим знаниям.",
+  "объясняй так, чтобы студент понял: от простого к сложному, короткими абзацами, с примером там, где он помогает.",
+  HUMAN_STYLE,
   "не выдумывай оценки, сроки и факты о курсе.",
-  "готовые решения домашних заданий не выдавай — объясняй ход и подсказывай.",
+  "готовые решения домашних заданий не выдавай, объясняй ход и подсказывай.",
 ].join(" ");
 
 function today() {
@@ -151,6 +163,50 @@ router.get("/ai/status", authRequired, (req, res) => {
   });
 });
 
+function purgeOldChat() {
+  const edge = new Date(Date.now() - CHAT_TTL_DAYS * 86_400_000).toISOString();
+  run("DELETE FROM ai_chat_messages WHERE created_at < ?", edge);
+}
+
+function chatHistory(userId, courseId, limit) {
+  const rows = all(
+    `SELECT role, text, created_at FROM ai_chat_messages
+     WHERE user_id = ? AND course_id = ? ORDER BY created_at DESC, rowid DESC LIMIT ?`,
+    userId,
+    courseId,
+    limit,
+  );
+  return rows.reverse();
+}
+
+function saveChatMessage(userId, courseId, role, text) {
+  run(
+    "INSERT INTO ai_chat_messages (id, user_id, course_id, role, text, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+    uuidv4(),
+    userId,
+    courseId,
+    role,
+    text,
+    new Date().toISOString(),
+  );
+}
+
+router.get("/ai/chat/:courseId", authRequired, (req, res) => {
+  const access = courseAccess(req.params.courseId, req.user);
+  if (access.error) return res.status(access.error).json({ error: "no access" });
+  purgeOldChat();
+  return res.json({ messages: chatHistory(req.user.id, req.params.courseId, 100) });
+});
+
+router.delete("/ai/chat/:courseId", authRequired, (req, res) => {
+  run(
+    "DELETE FROM ai_chat_messages WHERE user_id = ? AND course_id = ?",
+    req.user.id,
+    req.params.courseId,
+  );
+  return res.json({ ok: true });
+});
+
 router.post(
   "/ai/chat",
   authRequired,
@@ -158,23 +214,26 @@ router.post(
   async (req, res) => {
     if (!geminiEnabled()) return res.status(503).json({ error: "ai_disabled" });
 
-    const access = courseAccess(String(req.body?.course_id ?? ""), req.user);
+    const courseId = String(req.body?.course_id ?? "");
+    const access = courseAccess(courseId, req.user);
     if (access.error) return res.status(access.error).json({ error: "no access" });
 
-    const raw = Array.isArray(req.body?.messages) ? req.body.messages : [];
-    const messages = raw
-      .slice(-MAX_HISTORY)
-      .map((m) => ({
-        role: m?.role === "model" ? "model" : "user",
-        text: String(m?.text ?? "").slice(0, MAX_MESSAGE_CHARS),
-      }))
-      .filter((m) => m.text.trim());
-    if (!messages.length) return res.status(400).json({ error: "empty" });
+    const question = String(req.body?.message ?? "").slice(0, MAX_MESSAGE_CHARS).trim();
+    if (!question) return res.status(400).json({ error: "empty" });
 
     const used = usageCount(req.user.id, "chat");
     if (used >= CHAT_DAILY_LIMIT) {
       return res.status(429).json({ error: "daily_limit", limit: CHAT_DAILY_LIMIT });
     }
+
+    purgeOldChat();
+    const messages = [
+      ...chatHistory(req.user.id, courseId, MAX_HISTORY).map((m) => ({
+        role: m.role === "model" ? "model" : "user",
+        text: String(m.text).slice(0, MAX_MESSAGE_CHARS),
+      })),
+      { role: "user", text: question },
+    ];
 
     const context = lectureContext(access.course, String(req.body?.lecture_id ?? ""));
     try {
@@ -184,6 +243,8 @@ router.post(
         maxTokens: 1200,
       });
       bumpUsage(req.user.id, "chat");
+      saveChatMessage(req.user.id, courseId, "user", question);
+      saveChatMessage(req.user.id, courseId, "model", reply);
       return res.json({
         reply,
         used: used + 1,
@@ -238,7 +299,7 @@ router.post(
 
     try {
       const raw = await geminiGenerate({
-        system: "ты методист. отвечаешь только валидным json на русском.",
+        system: `ты методист. ${HUMAN_STYLE} отвечаешь только валидным json на русском.`,
         messages: [{ role: "user", text: prompt }],
         maxTokens: Math.min(1000 + count * 180, 8000),
         json: true,
@@ -289,7 +350,7 @@ router.post(
 
     try {
       const raw = await geminiGenerate({
-        system: "ты преподаватель. пишешь ясно, на русском, без воды. отвечаешь только валидным json.",
+        system: `ты преподаватель-практик, пишешь учебный текст на русском. ${HUMAN_STYLE} отвечаешь только валидным json.`,
         messages: [{ role: "user", text: prompt }],
         maxTokens: 4000,
         json: true,

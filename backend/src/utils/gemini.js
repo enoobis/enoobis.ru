@@ -150,7 +150,12 @@ export async function geminiGenerate(opts) {
   const parts = data?.candidates?.[0]?.content?.parts ?? [];
   const text = parts.map((p) => p?.text ?? "").join("").trim();
   if (!text) throw aiError("ai_empty", blockedDetail(data));
-  return text;
+  return humanize(text);
+}
+
+/** длинное тире — самый заметный след ии-текста, промпта мало */
+function humanize(text) {
+  return text.replace(/(\d)\s*[—–]\s*(\d)/g, "$1-$2").replace(/\s*[—–]\s*/g, " - ");
 }
 
 /**

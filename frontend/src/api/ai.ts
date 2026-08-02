@@ -31,13 +31,22 @@ export function getAiStatus(token: string) {
 
 export function askCourseTutor(
   token: string,
-  payload: { course_id: string; lecture_id?: string | null; messages: AiChatMessage[] },
+  payload: { course_id: string; lecture_id?: string | null; message: string },
 ) {
   return api<AiChatReply>("/api/ai/chat", {
     method: "POST",
     token,
     body: JSON.stringify(payload),
   });
+}
+
+/** история живёт неделю, дальше сервер её чистит */
+export function getChatHistory(token: string, courseId: string) {
+  return api<{ messages: AiChatMessage[] }>(`/api/ai/chat/${courseId}`, { token });
+}
+
+export function clearChatHistory(token: string, courseId: string) {
+  return api<{ ok: true }>(`/api/ai/chat/${courseId}`, { method: "DELETE", token });
 }
 
 export function generateCourseOutline(
