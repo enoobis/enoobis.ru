@@ -7,6 +7,7 @@ import MarkdownText from "../components/MarkdownText.vue";
 import {
   createLecture,
   getClassroom,
+  patchLecture,
   submitAssignment,
   uploadSubmissionFile,
   type Assignment,
@@ -18,6 +19,7 @@ import {
   askCourseTutor,
   generateCourseOutline,
   generateLectureDraft,
+  generateLectureImage,
   getAiStatus,
   type AiChatMessage,
   type AiOutlineTopic,
@@ -43,6 +45,15 @@ function videoEmbed(url: string): VideoEmbed {
   return null;
 }
 
+function errorText(e: unknown): string {
+  const message = e instanceof Error ? e.message : "ошибка";
+  if (message === "daily_limit") return "лимит на сегодня исчерпан";
+  if (message === "ai_disabled") return "нет ключа gemini";
+  if (message === "ai_rate_limited") return "gemini перегружен, попробуй позже";
+  if (message === "ai_unreachable") return "gemini недоступен";
+  return message;
+}
+
 const auth = useAuthStore();
 const route = useRoute();
 const router = useRouter();
@@ -53,11 +64,12 @@ const loading = ref(false);
 const err = ref("");
 const activeId = ref("");
 
-/** на узком экране колонки становятся шторками */
-const panel = ref<"topics" | "chat" | null>(null);
+const topicsOpen = ref(false);
+const chatOpen = ref(false);
 
 const lectures = computed(() => classroom.value?.lectures ?? []);
 const isTeacher = computed(() => classroom.value?.is_teacher === true);
+const canGenerate = computed(() => isTeacher.value && ai.value?.enabled && ai.value?.can_generate);
 
 const activeLecture = computed<Lecture | null>(
   () => lectures.value.find((l) => l.id === activeId.value) ?? lectures.value[0] ?? null,
@@ -83,7 +95,7 @@ async function load() {
     const exists = classroom.value.lectures.some((l) => l.id === wanted);
     activeId.value = exists ? wanted : (classroom.value.lectures[0]?.id ?? "");
   } catch (e) {
-    err.value = e instanceof Error ? e.message : "ошибка";
+    err.value = errorText(e);
   } finally {
     loading.value = false;
   }
@@ -91,10 +103,10 @@ async function load() {
 
 function openLecture(id: string) {
   activeId.value = id;
-  panel.value = null;
-  chatErr.value = "";
+  topicsOpen.value = false;
+  editing.value = null;
   void router.replace({ query: { ...route.query, lecture: id } });
-  document.querySelector(".reader-main")?.scrollTo({ top: 0 });
+  window.scrollTo({ top: 0 });
 }
 
 function exitReader() {
@@ -155,9 +167,68 @@ async function submitTask(a: Assignment) {
     pendingFiles.value[a.id] = [];
     await load();
   } catch (e) {
-    err.value = e instanceof Error ? e.message : "ошибка";
+    err.value = errorText(e);
   } finally {
     sending.value[a.id] = false;
+  }
+}
+
+/* ---------- правка темы (преподаватель) ---------- */
+
+const editing = ref<{ id: string; title: string; body_text: string; video_url: string } | null>(
+  null,
+);
+const savingEdit = ref(false);
+const imageBusy = ref(false);
+
+function startEdit() {
+  const l = activeLecture.value;
+  if (!l) return;
+  editing.value = {
+    id: l.id,
+    title: l.title,
+    body_text: l.body_text,
+    video_url: l.video_url,
+  };
+}
+
+async function saveEdit() {
+  if (!auth.token || !classroom.value || !editing.value) return;
+  savingEdit.value = true;
+  err.value = "";
+  try {
+    await patchLecture(
+      classroom.value.course.id,
+      editing.value.id,
+      {
+        title: editing.value.title.trim(),
+        body_text: editing.value.body_text,
+        video_url: editing.value.video_url.trim(),
+      },
+      auth.token,
+    );
+    editing.value = null;
+    await load();
+  } catch (e) {
+    err.value = errorText(e);
+  } finally {
+    savingEdit.value = false;
+  }
+}
+
+async function addImageToEdit() {
+  if (!auth.token || !editing.value || imageBusy.value) return;
+  imageBusy.value = true;
+  err.value = "";
+  try {
+    const r = await generateLectureImage(auth.token, {
+      topic: editing.value.title || activeLecture.value?.title || "",
+    });
+    editing.value.body_text = `${editing.value.body_text.trimEnd()}\n\n![](${r.url})\n`;
+  } catch (e) {
+    err.value = errorText(e);
+  } finally {
+    imageBusy.value = false;
   }
 }
 
@@ -169,11 +240,7 @@ const chatInput = ref("");
 const chatBusy = ref(false);
 const chatErr = ref("");
 const chatBodyRef = ref<HTMLElement | null>(null);
-
-const chatLeft = computed(() => {
-  if (!ai.value) return null;
-  return Math.max(0, ai.value.chat_limit - ai.value.chat_used);
-});
+const chatFieldRef = ref<HTMLTextAreaElement | null>(null);
 
 async function loadAiStatus() {
   if (!auth.token) return;
@@ -188,6 +255,13 @@ async function scrollChatDown() {
   await nextTick();
   const el = chatBodyRef.value;
   if (el) el.scrollTop = el.scrollHeight;
+}
+
+async function openChat() {
+  chatOpen.value = true;
+  await nextTick();
+  chatFieldRef.value?.focus();
+  void scrollChatDown();
 }
 
 async function sendChat() {
@@ -207,13 +281,7 @@ async function sendChat() {
     chat.value.push({ role: "model", text: r.reply });
     if (ai.value) ai.value = { ...ai.value, chat_used: r.used, chat_limit: r.limit };
   } catch (e) {
-    const message = e instanceof Error ? e.message : "ошибка";
-    chatErr.value =
-      message === "daily_limit"
-        ? "лимит вопросов на сегодня исчерпан"
-        : message === "ai_disabled"
-          ? "чат выключен: нет ключа"
-          : message;
+    chatErr.value = errorText(e);
     chat.value.pop();
     chatInput.value = text;
   } finally {
@@ -234,15 +302,19 @@ function clearChat() {
   chatErr.value = "";
 }
 
-/* ---------- генерация тем (преподаватель) ---------- */
+/* ---------- генерация (преподаватель) ---------- */
+
+type GenMode = "course" | "outline" | "lecture";
 
 const genOpen = ref(false);
-const genMode = ref<"outline" | "lecture">("outline");
+const genMode = ref<GenMode>("course");
 const genTopic = ref("");
 const genNotes = ref("");
 const genCount = ref(8);
+const genWithImages = ref(true);
 const genBusy = ref(false);
 const genErr = ref("");
+const genProgress = ref("");
 const genTopics = ref<AiOutlineTopic[]>([]);
 const genPicked = ref<Record<string, boolean>>({});
 const genDraft = ref<{ title: string; body: string } | null>(null);
@@ -250,13 +322,57 @@ const genDraft = ref<{ title: string; body: string } | null>(null);
 function openGen() {
   genOpen.value = true;
   genErr.value = "";
+  genProgress.value = "";
 }
 
 function closeGen() {
+  if (genBusy.value) return;
   genOpen.value = false;
   genTopics.value = [];
   genDraft.value = null;
   genErr.value = "";
+  genProgress.value = "";
+}
+
+async function draftBodyFor(topic: string, courseTitle: string): Promise<string> {
+  if (!auth.token) return "";
+  const draft = await generateLectureDraft(auth.token, {
+    topic,
+    course_title: courseTitle,
+    notes: genNotes.value.trim() || undefined,
+  });
+  if (!genWithImages.value) return draft.body;
+  try {
+    const img = await generateLectureImage(auth.token, { topic });
+    return `![](${img.url})\n\n${draft.body}`;
+  } catch {
+    return draft.body;
+  }
+}
+
+/** весь курс: план -> текст каждой темы -> темы в курсе */
+async function generateWholeCourse() {
+  if (!auth.token || !classroom.value) return;
+  const courseTitle = classroom.value.course.title;
+  genProgress.value = "составляю план";
+  const outline = await generateCourseOutline(auth.token, {
+    title: courseTitle,
+    description: classroom.value.course.description,
+    count: genCount.value,
+  });
+  const topics = outline.topics;
+  if (!topics.length) throw new Error("пустой план");
+
+  for (const [i, t] of topics.entries()) {
+    genProgress.value = `тема ${i + 1} из ${topics.length}: ${t.title}`;
+    const body = await draftBodyFor(t.title, courseTitle);
+    await createLecture(
+      classroom.value.course.id,
+      { title: t.title, body_text: body, video_url: "" },
+      auth.token,
+    );
+  }
+  genProgress.value = "";
 }
 
 async function runGenerate() {
@@ -264,7 +380,11 @@ async function runGenerate() {
   genBusy.value = true;
   genErr.value = "";
   try {
-    if (genMode.value === "outline") {
+    if (genMode.value === "course") {
+      await generateWholeCourse();
+      genOpen.value = false;
+      await load();
+    } else if (genMode.value === "outline") {
       const r = await generateCourseOutline(auth.token, {
         title: classroom.value.course.title,
         description: classroom.value.course.description,
@@ -277,15 +397,17 @@ async function runGenerate() {
         genErr.value = "нужна тема";
         return;
       }
-      genDraft.value = await generateLectureDraft(auth.token, {
-        topic: genTopic.value.trim(),
-        course_title: classroom.value.course.title,
-        notes: genNotes.value.trim() || undefined,
-      });
+      const topic = genTopic.value.trim();
+      genProgress.value = "пишу тему";
+      genDraft.value = {
+        title: topic,
+        body: await draftBodyFor(topic, classroom.value.course.title),
+      };
+      genProgress.value = "";
     }
   } catch (e) {
-    const message = e instanceof Error ? e.message : "ошибка";
-    genErr.value = message === "daily_limit" ? "лимит генераций на сегодня" : message;
+    genErr.value = errorText(e);
+    genProgress.value = "";
   } finally {
     genBusy.value = false;
   }
@@ -297,8 +419,7 @@ async function saveGenerated() {
   genErr.value = "";
   try {
     if (genMode.value === "outline") {
-      const picked = genTopics.value.filter((t) => genPicked.value[t.title]);
-      for (const t of picked) {
+      for (const t of genTopics.value.filter((x) => genPicked.value[x.title])) {
         await createLecture(
           classroom.value.course.id,
           { title: t.title, body_text: t.summary, video_url: "" },
@@ -312,16 +433,19 @@ async function saveGenerated() {
         auth.token,
       );
     }
-    closeGen();
+    genOpen.value = false;
+    genTopics.value = [];
+    genDraft.value = null;
     await load();
   } catch (e) {
-    genErr.value = e instanceof Error ? e.message : "ошибка";
+    genErr.value = errorText(e);
   } finally {
     genBusy.value = false;
   }
 }
 
 const canSaveGenerated = computed(() => {
+  if (genMode.value === "course") return false;
   if (genMode.value === "lecture") return !!genDraft.value;
   return genTopics.value.some((t) => genPicked.value[t.title]);
 });
@@ -330,14 +454,23 @@ watch(activeId, () => {
   openTaskId.value = "";
 });
 
+function onEscape(e: KeyboardEvent) {
+  if (e.key !== "Escape") return;
+  if (genOpen.value) closeGen();
+  else if (chatOpen.value) chatOpen.value = false;
+  else if (topicsOpen.value) topicsOpen.value = false;
+}
+
 onMounted(() => {
   document.documentElement.classList.add("course-reader");
+  document.addEventListener("keydown", onEscape);
   void load();
   void loadAiStatus();
 });
 
 onBeforeUnmount(() => {
   document.documentElement.classList.remove("course-reader");
+  document.removeEventListener("keydown", onEscape);
 });
 </script>
 
@@ -346,8 +479,9 @@ onBeforeUnmount(() => {
     <AppLoading v-if="loading && !classroom" class="page-empty" />
     <p v-else-if="err && !classroom" class="page-empty">{{ err }}</p>
 
-    <div v-else-if="classroom" class="reader-grid" :class="{ 'panel-open': panel !== null }">
-      <aside class="reader-side reader-topics" :class="{ open: panel === 'topics' }">
+    <div v-else-if="classroom" class="reader-grid">
+      <!-- темы -->
+      <aside class="reader-topics" :class="{ open: topicsOpen }">
         <header class="side-head">
           <button type="button" class="filter-icon-btn" aria-label="к курсу" @click="exitReader">
             <AppIcon name="back" :size="18" />
@@ -370,41 +504,59 @@ onBeforeUnmount(() => {
           <p v-if="!lectures.length" class="side-empty muted">тем нет</p>
         </nav>
 
-        <button
-          v-if="isTeacher && ai?.can_generate && ai?.enabled"
-          type="button"
-          class="side-gen secondary"
-          @click="openGen"
-        >
+        <button v-if="canGenerate" type="button" class="side-gen secondary" @click="openGen">
           <AppIcon name="spark" :size="16" />
           <span>сгенерировать</span>
         </button>
       </aside>
 
+      <!-- тема -->
       <main class="reader-main">
         <div class="main-bar">
           <button
             type="button"
             class="filter-icon-btn only-narrow"
             aria-label="темы"
-            @click="panel = 'topics'"
+            @click="topicsOpen = true"
           >
             <AppIcon name="list" :size="18" />
           </button>
           <span class="main-bar-title">{{ activeLecture?.title ?? "" }}</span>
           <button
+            v-if="isTeacher && activeLecture && !editing"
             type="button"
-            class="filter-icon-btn only-narrow"
-            aria-label="чат"
-            @click="panel = 'chat'"
+            class="filter-icon-btn"
+            aria-label="править"
+            @click="startEdit"
           >
-            <AppIcon name="chat" :size="18" />
+            <AppIcon name="edit" :size="17" />
           </button>
         </div>
 
         <p v-if="err" class="error">{{ err }}</p>
 
-        <article v-if="activeLecture" class="lecture">
+        <form v-if="editing" class="edit-form" @submit.prevent="saveEdit">
+          <input v-model="editing.title" placeholder="название темы" />
+          <input v-model="editing.video_url" placeholder="видео url" />
+          <textarea v-model="editing.body_text" rows="16" placeholder="текст темы, markdown" />
+          <div class="edit-actions">
+            <button
+              v-if="canGenerate"
+              type="button"
+              class="secondary"
+              :disabled="imageBusy"
+              @click="addImageToEdit"
+            >
+              {{ imageBusy ? "рисую…" : "картинка ии" }}
+            </button>
+            <button type="submit" :disabled="savingEdit">
+              {{ savingEdit ? "…" : "сохранить" }}
+            </button>
+            <button type="button" class="secondary" @click="editing = null">отмена</button>
+          </div>
+        </form>
+
+        <article v-else-if="activeLecture" class="lecture">
           <h1 class="lecture-title">{{ activeLecture.title }}</h1>
 
           <template v-for="ev in [videoEmbed(activeLecture.video_url)]" :key="activeLecture.id">
@@ -435,7 +587,7 @@ onBeforeUnmount(() => {
               <button type="button" class="task-head" @click="toggleTask(a.id)">
                 <span class="task-name">{{ a.title }}</span>
                 <span class="task-score muted">
-                  <template v-if="a.my_submission?.grade_points !== null && a.my_submission">
+                  <template v-if="a.my_submission && a.my_submission.grade_points !== null">
                     {{ a.my_submission.grade_points }} / {{ a.max_points }}
                   </template>
                   <template v-else-if="a.my_submission">сдано</template>
@@ -446,9 +598,7 @@ onBeforeUnmount(() => {
               <div v-if="openTaskId === a.id" class="task-body">
                 <MarkdownText v-if="a.description" :text="a.description" />
 
-                <template v-if="isTeacher">
-                  <p class="muted small">проверка работ — в классе курса</p>
-                </template>
+                <p v-if="isTeacher" class="muted small">проверка работ — в классе курса</p>
                 <template v-else>
                   <p v-if="a.my_submission?.teacher_comment" class="task-comment muted">
                     {{ a.my_submission.teacher_comment }}
@@ -483,9 +633,16 @@ onBeforeUnmount(() => {
         <p v-else class="page-empty">тем нет</p>
       </main>
 
-      <aside class="reader-side reader-chat" :class="{ open: panel === 'chat' }">
-        <header class="side-head">
-          <span class="side-title">ии чат</span>
+      <!-- чат -->
+      <aside class="reader-chat" :class="{ open: chatOpen }">
+        <header class="side-head chat-head">
+          <span class="chat-grabber only-narrow" aria-hidden="true" />
+          <div class="chat-titles">
+            <span class="side-title">ии чат</span>
+            <span v-if="activeLecture" class="chat-topic muted">
+              по теме: {{ activeLecture.title }}
+            </span>
+          </div>
           <button
             v-if="chat.length"
             type="button"
@@ -495,11 +652,19 @@ onBeforeUnmount(() => {
           >
             <AppIcon name="clear" :size="18" />
           </button>
+          <button
+            type="button"
+            class="filter-icon-btn only-narrow"
+            aria-label="закрыть"
+            @click="chatOpen = false"
+          >
+            <AppIcon name="close" :size="18" />
+          </button>
         </header>
 
         <div ref="chatBodyRef" class="chat-body">
           <p v-if="!ai?.enabled" class="chat-hint muted">чат выключен</p>
-          <p v-else-if="!chat.length" class="chat-hint muted">спроси по теме</p>
+          <p v-else-if="!chat.length" class="chat-hint muted">спроси по этой теме</p>
           <div
             v-for="(m, i) in chat"
             :key="i"
@@ -514,10 +679,11 @@ onBeforeUnmount(() => {
 
         <form class="chat-form" @submit.prevent="sendChat">
           <textarea
+            ref="chatFieldRef"
             v-model="chatInput"
             rows="1"
             :disabled="!ai?.enabled || chatBusy"
-            placeholder="запрос"
+            placeholder="что непонятно?"
             @keydown="onChatKeydown"
           />
           <button
@@ -529,13 +695,25 @@ onBeforeUnmount(() => {
             <AppIcon name="send" :size="18" />
           </button>
         </form>
-        <p v-if="chatLeft !== null && ai?.enabled" class="chat-left muted">
-          осталось {{ chatLeft }}
-        </p>
       </aside>
+
+      <!-- мобильный вход в чат -->
+      <button
+        v-if="!chatOpen && !topicsOpen"
+        type="button"
+        class="ask-bar only-narrow"
+        @click="openChat"
+      >
+        <span>что непонятно?</span>
+        <AppIcon name="chat" :size="18" />
+      </button>
     </div>
 
-    <div v-if="panel" class="panel-backdrop" @click="panel = null" />
+    <div
+      v-if="topicsOpen || chatOpen"
+      class="panel-backdrop only-narrow"
+      @click="topicsOpen = false; chatOpen = false"
+    />
 
     <Teleport to="body">
       <div v-if="genOpen" class="gen-root" role="presentation">
@@ -545,10 +723,18 @@ onBeforeUnmount(() => {
             <button
               type="button"
               class="filter-tab"
+              :class="{ on: genMode === 'course' }"
+              @click="genMode = 'course'"
+            >
+              весь курс
+            </button>
+            <button
+              type="button"
+              class="filter-tab"
               :class="{ on: genMode === 'outline' }"
               @click="genMode = 'outline'"
             >
-              план курса
+              план
             </button>
             <button
               type="button"
@@ -560,42 +746,54 @@ onBeforeUnmount(() => {
             </button>
           </div>
 
-          <template v-if="genMode === 'outline'">
-            <label class="gen-field">
-              <span class="muted small">сколько тем</span>
-              <input v-model.number="genCount" type="number" min="3" max="20" />
-            </label>
-            <ul v-if="genTopics.length" class="gen-list">
-              <li v-for="t in genTopics" :key="t.title">
-                <label>
-                  <input v-model="genPicked[t.title]" type="checkbox" />
-                  <span>
-                    <strong>{{ t.title }}</strong>
-                    <span class="muted small">{{ t.summary }}</span>
-                  </span>
-                </label>
-              </li>
-            </ul>
-          </template>
+          <label v-if="genMode !== 'lecture'" class="gen-field">
+            <span class="muted small">сколько тем</span>
+            <input v-model.number="genCount" type="number" min="3" max="20" />
+          </label>
 
-          <template v-else>
-            <input v-model="genTopic" placeholder="тема" />
-            <textarea v-model="genNotes" rows="2" placeholder="пожелания" />
-            <div v-if="genDraft" class="gen-preview">
-              <MarkdownText :text="genDraft.body" />
-            </div>
-          </template>
+          <input v-if="genMode === 'lecture'" v-model="genTopic" placeholder="тема" />
 
+          <textarea v-model="genNotes" rows="2" placeholder="пожелания" />
+
+          <label v-if="genMode !== 'outline'" class="gen-check">
+            <input v-model="genWithImages" type="checkbox" />
+            <span>с картинками</span>
+          </label>
+
+          <ul v-if="genMode === 'outline' && genTopics.length" class="gen-list">
+            <li v-for="t in genTopics" :key="t.title">
+              <label>
+                <input v-model="genPicked[t.title]" type="checkbox" />
+                <span>
+                  <strong>{{ t.title }}</strong>
+                  <span class="muted small">{{ t.summary }}</span>
+                </span>
+              </label>
+            </li>
+          </ul>
+
+          <div v-if="genMode === 'lecture' && genDraft" class="gen-preview">
+            <MarkdownText :text="genDraft.body" />
+          </div>
+
+          <p v-if="genProgress" class="muted small">{{ genProgress }}</p>
           <p v-if="genErr" class="error">{{ genErr }}</p>
 
           <div class="gen-actions">
             <button type="button" class="secondary" :disabled="genBusy" @click="runGenerate">
-              {{ genBusy ? "…" : "сгенерировать" }}
+              {{ genBusy ? "…" : genMode === "course" ? "создать курс" : "сгенерировать" }}
             </button>
-            <button type="button" :disabled="genBusy || !canSaveGenerated" @click="saveGenerated">
+            <button
+              v-if="genMode !== 'course'"
+              type="button"
+              :disabled="genBusy || !canSaveGenerated"
+              @click="saveGenerated"
+            >
               добавить
             </button>
-            <button type="button" class="secondary" @click="closeGen">закрыть</button>
+            <button type="button" class="secondary" :disabled="genBusy" @click="closeGen">
+              закрыть
+            </button>
           </div>
         </div>
       </div>
@@ -615,14 +813,23 @@ onBeforeUnmount(() => {
   align-items: start;
 }
 
-.reader-side {
+.reader-topics,
+.reader-chat {
   position: sticky;
   top: 4.5rem;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  max-height: calc(100vh - 6rem);
   min-width: 0;
+}
+
+.reader-topics {
+  max-height: calc(100dvh - 6rem);
+}
+
+/* чат тянется на всю высоту экрана, чтобы поле ввода стояло внизу */
+.reader-chat {
+  height: calc(100dvh - 6rem);
 }
 
 .side-head {
@@ -633,7 +840,6 @@ onBeforeUnmount(() => {
 }
 
 .side-title {
-  flex: 1;
   min-width: 0;
   font-weight: 500;
   letter-spacing: -0.02em;
@@ -641,6 +847,10 @@ onBeforeUnmount(() => {
   text-overflow: ellipsis;
   white-space: nowrap;
   text-transform: lowercase;
+}
+
+.reader-topics .side-title {
+  flex: 1;
 }
 
 .topic-list {
@@ -666,11 +876,7 @@ onBeforeUnmount(() => {
   text-transform: lowercase;
 }
 
-.topic:hover {
-  background: var(--surface);
-  color: var(--text);
-}
-
+.topic:hover,
 .topic.on {
   background: var(--surface);
   color: var(--text);
@@ -754,6 +960,23 @@ onBeforeUnmount(() => {
   width: 100%;
   aspect-ratio: 16 / 9;
   border: none;
+}
+
+.edit-form {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.edit-form textarea {
+  line-height: 1.6;
+  font-family: var(--mono);
+  font-size: 0.86rem;
+}
+
+.edit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
 }
 
 .files {
@@ -875,10 +1098,30 @@ onBeforeUnmount(() => {
   padding-left: var(--space-4);
 }
 
+.chat-head {
+  align-items: flex-start;
+}
+
+.chat-titles {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 0.1rem;
+}
+
+.chat-topic {
+  font-size: 0.75rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-transform: lowercase;
+}
+
 .chat-body {
   flex: 1;
   min-height: 12rem;
   overflow-y: auto;
+  overscroll-behavior: contain;
   display: grid;
   align-content: start;
   gap: 0.5rem;
@@ -924,12 +1167,6 @@ onBeforeUnmount(() => {
   font-size: 0.9rem;
 }
 
-.chat-left {
-  margin: 0;
-  font-size: 0.75rem;
-  text-align: right;
-}
-
 /* ---------- генерация ---------- */
 
 .gen-root {
@@ -954,7 +1191,7 @@ onBeforeUnmount(() => {
   display: grid;
   gap: var(--space-3);
   width: min(100%, 34rem);
-  max-height: 85vh;
+  max-height: 85dvh;
   overflow-y: auto;
   padding: var(--space-5);
   border: 1px solid var(--border);
@@ -967,13 +1204,21 @@ onBeforeUnmount(() => {
   gap: 0.3rem;
 }
 
+.gen-check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
 .gen-list {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
   gap: 0.5rem;
-  max-height: 40vh;
+  max-height: 40dvh;
   overflow-y: auto;
 }
 
@@ -995,7 +1240,7 @@ onBeforeUnmount(() => {
 }
 
 .gen-preview {
-  max-height: 40vh;
+  max-height: 40dvh;
   overflow-y: auto;
   padding: var(--space-3);
   border: 1px solid var(--border);
@@ -1020,6 +1265,8 @@ onBeforeUnmount(() => {
   display: none;
 }
 
+/* ---------- телефон: центр читается, чат в одно касание ---------- */
+
 @media (max-width: 1024px) {
   .reader-grid {
     grid-template-columns: minmax(0, 1fr);
@@ -1029,33 +1276,93 @@ onBeforeUnmount(() => {
     display: inline-flex;
   }
 
-  .reader-side {
-    position: fixed;
-    top: 0;
-    bottom: 0;
-    z-index: 95;
-    width: min(86vw, 20rem);
-    max-height: none;
-    padding: var(--layout-pad);
-    background: var(--bg);
-    border: 1px solid var(--border);
-    transition: transform var(--dur-3) var(--ease-snap);
+  .reader-main {
+    padding-bottom: calc(var(--control-h) + var(--space-8));
   }
 
   .reader-topics {
+    position: fixed;
+    top: 0;
+    bottom: 0;
     left: 0;
-    transform: translateX(-102%);
+    z-index: 96;
+    width: min(84vw, 20rem);
+    max-height: none;
+    /* верх экрана занимает шапка сайта */
+    padding: calc(var(--layout-pad) + 3.4rem) var(--layout-pad) var(--layout-pad);
+    background: var(--bg);
+    border-right: 1px solid var(--border);
+    transform: translateX(-110%);
+    transition: transform var(--dur-3) var(--ease-snap);
+  }
+
+  .reader-topics.open {
+    transform: translateX(0);
   }
 
   .reader-chat {
+    position: fixed;
+    left: 0;
     right: 0;
-    width: min(92vw, 24rem);
-    padding-left: var(--layout-pad);
-    transform: translateX(102%);
+    bottom: 0;
+    z-index: 96;
+    height: 88dvh;
+    max-height: none;
+    padding: var(--space-3) var(--layout-pad)
+      max(var(--space-3), env(safe-area-inset-bottom));
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-bottom: none;
+    border-radius: calc(var(--radius) + 6px) calc(var(--radius) + 6px) 0 0;
+    transform: translateY(110%);
+    transition: transform var(--dur-3) var(--ease-snap);
   }
 
-  .reader-side.open {
-    transform: translateX(0);
+  .reader-chat.open {
+    transform: translateY(0);
+  }
+
+  .chat-grabber {
+    position: absolute;
+    top: 0.5rem;
+    left: 50%;
+    width: 2.2rem;
+    height: 3px;
+    border-radius: var(--radius-pill);
+    background: var(--border);
+    transform: translateX(-50%);
+  }
+
+  .chat-head {
+    padding-top: 0.6rem;
+  }
+
+  .chat-body {
+    font-size: 0.94rem;
+  }
+
+  .chat-form textarea {
+    font-size: 16px;
+  }
+
+  .ask-bar {
+    position: fixed;
+    left: var(--layout-pad);
+    right: var(--layout-pad);
+    bottom: max(var(--layout-pad), env(safe-area-inset-bottom));
+    z-index: 92;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    min-height: var(--control-h);
+    padding: 0 0.5rem 0 1.1rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    background: var(--surface);
+    color: var(--muted);
+    font-size: 0.92rem;
+    text-transform: lowercase;
   }
 
   .panel-backdrop {
@@ -1068,7 +1375,8 @@ onBeforeUnmount(() => {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .reader-side {
+  .reader-topics,
+  .reader-chat {
     transition: none;
   }
 }

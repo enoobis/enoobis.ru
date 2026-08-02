@@ -1,11 +1,24 @@
 import express from "express";
+import fs from "node:fs";
+import path from "node:path";
+import { v4 as uuidv4 } from "uuid";
 import { all, get, run } from "../db.js";
 import { authRequired } from "../auth.js";
 import { rateLimit } from "../utils/security.js";
 import { isStaffRole } from "../utils/roles.js";
-import { geminiEnabled, geminiGenerate, parseJsonLoose } from "../utils/gemini.js";
+import { UPLOAD_ROOT } from "../utils/uploadSafe.js";
+import { optimizeUploadedFile } from "../utils/imageOptimize.js";
+import {
+  geminiEnabled,
+  geminiGenerate,
+  geminiGenerateImage,
+  parseJsonLoose,
+} from "../utils/gemini.js";
 
 const router = express.Router();
+
+const IMAGE_DIR = path.join(UPLOAD_ROOT, "course-lectures");
+fs.mkdirSync(IMAGE_DIR, { recursive: true });
 
 const CHAT_DAILY_LIMIT = Number(process.env.AI_CHAT_DAILY_LIMIT ?? 40);
 const GENERATE_DAILY_LIMIT = Number(process.env.AI_GENERATE_DAILY_LIMIT ?? 25);
@@ -17,9 +30,11 @@ const MAX_CONTEXT_CHARS = 8000;
 
 const TUTOR_SYSTEM = [
   "ты — преподаватель-ассистент внутри курса на платформе enoobis.",
+  "ученик читает конкретную тему, её полный текст дан ниже в контексте.",
+  "по умолчанию считай, что вопрос — про открытую тему, даже если ученик не назвал её.",
+  "сначала ищи ответ в тексте темы и объясняй своими словами на его примерах и терминах.",
+  "если в теме ответа нет — скажи об этом одной фразой и ответь по своим знаниям.",
   "отвечай на русском, кратко и по делу, без воды и без извинений.",
-  "если вопрос про материал темы — опирайся на контекст темы.",
-  "если в контексте нет ответа — скажи об этом прямо и ответь по своим знаниям.",
   "не выдумывай оценки, сроки и факты о курсе.",
   "готовые решения домашних заданий не выдавай — объясняй ход и подсказывай.",
 ].join(" ");
@@ -80,6 +95,14 @@ function aiErrorStatus(message) {
 function lectureContext(course, lectureId) {
   const lines = [`курс: ${course.title}`];
   if (course.description) lines.push(`описание курса: ${course.description}`);
+
+  const allTopics = all(
+    "SELECT title FROM course_lectures WHERE course_id = ? ORDER BY created_at",
+    course.id,
+  );
+  if (allTopics.length) {
+    lines.push(`все темы курса: ${allTopics.map((t) => t.title).join("; ")}`);
+  }
   if (!lectureId) return lines.join("\n");
 
   const lecture = get(
@@ -89,9 +112,9 @@ function lectureContext(course, lectureId) {
   );
   if (!lecture) return lines.join("\n");
 
-  lines.push(`тема: ${lecture.title}`);
+  lines.push(`ученик сейчас читает тему: ${lecture.title}`);
   if (lecture.body_text) {
-    lines.push("текст темы:");
+    lines.push("полный текст открытой темы:");
     lines.push(String(lecture.body_text).slice(0, MAX_CONTEXT_CHARS));
   }
   const files = all(
@@ -99,7 +122,16 @@ function lectureContext(course, lectureId) {
     lecture.id,
   );
   if (files.length) {
-    lines.push(`вложения: ${files.map((f) => f.file_name).join(", ")}`);
+    lines.push(`вложения темы: ${files.map((f) => f.file_name).join(", ")}`);
+  }
+  const tasks = all(
+    "SELECT title, description FROM course_assignments WHERE lecture_id = ?",
+    lecture.id,
+  );
+  if (tasks.length) {
+    lines.push(
+      `задания темы: ${tasks.map((t) => `${t.title} — ${t.description ?? ""}`.trim()).join("; ")}`,
+    );
   }
   return lines.join("\n");
 }
@@ -262,6 +294,45 @@ router.post(
       });
       bumpUsage(req.user.id, "generate");
       return res.json({ title: topic, body });
+    } catch (e) {
+      const message = e?.message ?? "ai_failed";
+      return res.status(aiErrorStatus(message)).json({ error: message });
+    }
+  },
+);
+
+router.post(
+  "/ai/image",
+  authRequired,
+  staffOnly,
+  rateLimit({ windowMs: 60_000, max: 6, keyPrefix: "ai-image" }),
+  async (req, res) => {
+    if (!(await generateGuard(req, res))) return;
+
+    const topic = String(req.body?.topic ?? "").trim().slice(0, 300);
+    if (!topic) return res.status(400).json({ error: "topic_required" });
+
+    const prompt = [
+      `учебная иллюстрация к теме «${topic}».`,
+      "строго чёрно-белая графика: белый фон, чёрные линии, без цвета и без градиентов.",
+      "чистая схема или минималистичный рисунок, поясняющий суть темы.",
+      "без текста и подписей на картинке.",
+    ].join(" ");
+
+    try {
+      const { buffer, mime } = await geminiGenerateImage(prompt);
+      if (buffer.length > 8 * 1024 * 1024) return res.status(502).json({ error: "ai_failed" });
+      const ext = mime === "image/jpeg" ? ".jpg" : mime === "image/webp" ? ".webp" : ".png";
+      const filename = `ai-${uuidv4().replace(/-/g, "")}${ext}`;
+      const filePath = path.join(IMAGE_DIR, filename);
+      fs.writeFileSync(filePath, buffer);
+
+      let finalName = filename;
+      const optimized = await optimizeUploadedFile(filePath, "lecture");
+      if (optimized.ok) finalName = optimized.filename;
+
+      bumpUsage(req.user.id, "generate");
+      return res.json({ url: `/uploads/course-lectures/${finalName}` });
     } catch (e) {
       const message = e?.message ?? "ai_failed";
       return res.status(aiErrorStatus(message)).json({ error: message });

@@ -51,6 +51,14 @@ export function generateCourseOutline(
   });
 }
 
+export function generateLectureImage(token: string, payload: { topic: string }) {
+  return api<{ url: string }>("/api/ai/image", {
+    method: "POST",
+    token,
+    body: JSON.stringify(payload),
+  });
+}
+
 export function generateLectureDraft(
   token: string,
   payload: { topic: string; course_title?: string; notes?: string },

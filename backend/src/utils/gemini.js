@@ -1,5 +1,6 @@
 const API_ROOT = "https://generativelanguage.googleapis.com/v1beta/models";
 const DEFAULT_MODEL = "gemini-2.5-flash";
+const DEFAULT_IMAGE_MODEL = "gemini-2.5-flash-image";
 
 export function geminiKey() {
   return process.env.GEMINI_API_KEY?.trim() ?? "";
@@ -63,6 +64,45 @@ export async function geminiGenerate(opts) {
   const text = parts.map((p) => p?.text ?? "").join("").trim();
   if (!text) throw new Error("ai_empty");
   return text;
+}
+
+/**
+ * @param {string} prompt
+ * @returns {Promise<{ buffer: Buffer, mime: string }>}
+ */
+export async function geminiGenerateImage(prompt) {
+  const key = geminiKey();
+  if (!key) throw new Error("ai_disabled");
+
+  const model = process.env.GEMINI_IMAGE_MODEL?.trim() || DEFAULT_IMAGE_MODEL;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 90_000);
+  let res;
+  try {
+    res = await fetch(`${API_ROOT}/${model}:generateContent`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+      body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }] }),
+      signal: ctrl.signal,
+    });
+  } catch {
+    throw new Error("ai_unreachable");
+  } finally {
+    clearTimeout(timer);
+  }
+
+  if (!res.ok) {
+    console.error("gemini image error:", res.status);
+    throw new Error(res.status === 429 ? "ai_rate_limited" : "ai_failed");
+  }
+
+  const data = await res.json();
+  const parts = data?.candidates?.[0]?.content?.parts ?? [];
+  const image = parts.find((p) => p?.inlineData?.data);
+  if (!image) throw new Error("ai_empty");
+  const mime = String(image.inlineData.mimeType ?? "image/png");
+  if (!/^image\/(png|jpeg|webp)$/.test(mime)) throw new Error("ai_failed");
+  return { buffer: Buffer.from(image.inlineData.data, "base64"), mime };
 }
 
 /**

@@ -90,4 +90,52 @@ const html = computed(() => renderMarkdown(props.text));
   border: none;
   border-top: 1px solid var(--border);
 }
+
+/* подсветка кода — монохром, без цветных токенов */
+.markdown-body :deep(.hljs) {
+  background: transparent;
+  color: var(--text);
+}
+.markdown-body :deep(.hljs-comment),
+.markdown-body :deep(.hljs-quote),
+.markdown-body :deep(.hljs-meta) {
+  color: var(--muted);
+  font-style: italic;
+}
+.markdown-body :deep(.hljs-keyword),
+.markdown-body :deep(.hljs-selector-tag),
+.markdown-body :deep(.hljs-built_in),
+.markdown-body :deep(.hljs-name),
+.markdown-body :deep(.hljs-title),
+.markdown-body :deep(.hljs-section),
+.markdown-body :deep(.hljs-strong) {
+  color: var(--text);
+  font-weight: 600;
+}
+.markdown-body :deep(.hljs-string),
+.markdown-body :deep(.hljs-number),
+.markdown-body :deep(.hljs-literal),
+.markdown-body :deep(.hljs-symbol),
+.markdown-body :deep(.hljs-attr),
+.markdown-body :deep(.hljs-attribute),
+.markdown-body :deep(.hljs-variable),
+.markdown-body :deep(.hljs-type),
+.markdown-body :deep(.hljs-params),
+.markdown-body :deep(.hljs-regexp),
+.markdown-body :deep(.hljs-template-variable),
+.markdown-body :deep(.hljs-selector-class),
+.markdown-body :deep(.hljs-selector-id),
+.markdown-body :deep(.hljs-tag),
+.markdown-body :deep(.hljs-emphasis),
+.markdown-body :deep(.hljs-addition),
+.markdown-body :deep(.hljs-deletion),
+.markdown-body :deep(.hljs-bullet),
+.markdown-body :deep(.hljs-link),
+.markdown-body :deep(.hljs-doctag) {
+  color: var(--muted);
+  font-weight: inherit;
+  font-style: normal;
+  text-decoration: none;
+  background: transparent;
+}
 </style>
