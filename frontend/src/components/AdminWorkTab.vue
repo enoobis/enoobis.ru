@@ -548,14 +548,14 @@ onBeforeUnmount(() => {
             </button>
           </div>
         </div>
-      </div>
-
-      <div class="checkins-toolbar">
-        <div class="range-nav">
+        <div class="checkins-range">
           <button class="filter-icon-btn" type="button" aria-label="назад" @click="periodOffset--">
             <AppIcon name="back" :size="18" />
           </button>
-          <span class="range-label">{{ rangeLabel }}</span>
+          <div class="checkins-range-mid">
+            <span class="range-label">{{ rangeLabel }}</span>
+            <span class="checkins-meta muted">{{ checkinsCountLabel }}</span>
+          </div>
           <button
             class="filter-icon-btn range-next"
             type="button"
@@ -565,22 +565,20 @@ onBeforeUnmount(() => {
           >
             <AppIcon name="back" :size="18" />
           </button>
+          <button
+            class="filter-icon-btn"
+            type="button"
+            aria-label="скачать excel"
+            :disabled="exporting || !checkins.length"
+            @click="exportXlsx"
+          >
+            <AppIcon name="download" :size="18" />
+          </button>
         </div>
-        <button
-          class="filter-icon-btn"
-          type="button"
-          aria-label="скачать excel"
-          :disabled="exporting || !checkins.length"
-          @click="exportXlsx"
-        >
-          <AppIcon name="download" :size="18" />
-        </button>
       </div>
 
-      <p class="checkins-meta muted">{{ checkinsCountLabel }}</p>
-
-      <AppLoading v-if="loadingCheckins" class="page-empty" />
-      <p v-else-if="!checkins.length" class="page-empty">пусто</p>
+      <AppLoading v-if="loadingCheckins" class="page-empty page-empty--tight" />
+      <p v-else-if="!checkins.length" class="page-empty page-empty--tight">пусто</p>
       <ul v-else class="checkin-list">
         <li v-for="c in checkins" :key="c.id" class="checkin-row">
           <div class="checkin-top">
@@ -745,8 +743,6 @@ onBeforeUnmount(() => {
   color: inherit;
   font: inherit;
   cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 2px;
 }
 
 .checkins-link:hover {
@@ -799,31 +795,42 @@ onBeforeUnmount(() => {
 .checkins-panel {
   display: grid;
   gap: var(--space-3);
-  padding-top: var(--space-2);
+  padding-top: var(--space-4);
   border-top: 1px solid var(--border);
 }
 
-.checkins-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
+.checkins-panel :deep(.filter-bar) {
+  margin-bottom: 0;
 }
 
-.range-nav {
+.checkins-range {
   display: flex;
   align-items: center;
   gap: 0.15rem;
+  width: 100%;
+  min-height: var(--control-h);
+  padding: 0.15rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface2);
+  box-sizing: border-box;
+}
+
+.checkins-range-mid {
+  flex: 1;
   min-width: 0;
+  display: grid;
+  justify-items: center;
+  gap: 0.05rem;
+  padding: 0 0.25rem;
 }
 
 .range-label {
   font-size: 0.88rem;
-  color: var(--muted);
+  color: var(--text);
   text-align: center;
-  min-width: 0;
-  padding: 0 0.35rem;
   text-transform: lowercase;
+  line-height: 1.2;
 }
 
 .range-next :deep(.app-icon) {
@@ -832,7 +839,8 @@ onBeforeUnmount(() => {
 
 .checkins-meta {
   margin: 0;
-  font-size: 0.82rem;
+  font-size: 0.75rem;
+  line-height: 1.2;
 }
 
 .checkin-list {
