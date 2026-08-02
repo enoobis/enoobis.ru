@@ -257,9 +257,24 @@ type Period = "week" | "month";
 const period = ref<Period>("month");
 const periodOffset = ref(0);
 const pointFilter = ref("");
+const pointMenuOpen = ref(false);
+const pointMenuRoot = ref<HTMLElement | null>(null);
 const checkins = ref<WorkCheckin[]>([]);
 const loadingCheckins = ref(false);
 const exporting = ref(false);
+
+function selectPointFilter(id: string) {
+  pointFilter.value = id;
+  pointMenuOpen.value = false;
+}
+
+function onDocumentClick(event: MouseEvent) {
+  if (!pointMenuOpen.value) return;
+  const target = event.target as HTMLElement | null;
+  const root = pointMenuRoot.value;
+  if (root && target && root.contains(target)) return;
+  pointMenuOpen.value = false;
+}
 
 const checkinsCountLabel = computed(() => {
   const n = checkins.value.length;
@@ -326,6 +341,7 @@ watch([period, periodOffset, pointFilter], loadCheckins);
 
 function filterByPoint(p: WorkPoint) {
   pointFilter.value = p.id;
+  pointMenuOpen.value = false;
 }
 
 function setPeriod(p: Period) {
@@ -372,6 +388,7 @@ function fmtWorkTime(iso: string | Date) {
 }
 
 onMounted(async () => {
+  document.addEventListener("click", onDocumentClick);
   if (!auth.token) return;
   try {
     const r = await listWorkPoints(auth.token);
@@ -391,6 +408,7 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  document.removeEventListener("click", onDocumentClick);
   themeObserver?.disconnect();
   themeObserver = null;
   destroyMap();
@@ -401,20 +419,20 @@ onBeforeUnmount(() => {
   <div class="work-tab">
     <p v-if="err" class="error">{{ err }}</p>
 
-    <div class="work-points-head">
-      <button type="button" @click="openCreateMap">создать точку</button>
-    </div>
+    <button type="button" class="work-create" @click="openCreateMap">создать точку</button>
 
     <div v-if="mapOpen" class="work-map-wrap">
       <div class="work-map-head">
         <span class="work-map-label muted small">
-          {{ createMode ? "новая точка - кликните на карту" : "просмотр на карте" }}
+          {{ createMode ? "кликните на карту" : "просмотр" }}
         </span>
-        <button class="secondary work-map-close" type="button" @click="closeMap">закрыть</button>
+        <button class="filter-icon-btn" type="button" aria-label="закрыть" @click="closeMap">
+          <AppIcon name="close" :size="18" />
+        </button>
       </div>
       <div ref="mapEl" class="work-map" />
       <div v-if="createMode" class="work-new">
-        <input v-model="newName" type="text" placeholder="название точки" />
+        <input v-model="newName" type="text" placeholder="название" />
         <label class="radius-label">
           <span class="radius-label-text">радиус · {{ newRadius }} м</span>
           <input
@@ -427,112 +445,153 @@ onBeforeUnmount(() => {
           />
         </label>
         <button type="button" :disabled="!picked || creating" @click="addPoint">
-          {{ creating ? "добавляем…" : picked ? "добавить точку" : "выберите место" }}
+          {{ creating ? "…" : picked ? "добавить" : "выберите место" }}
         </button>
       </div>
     </div>
 
-    <ul v-if="points.length" class="list">
-      <li v-for="p in points" :key="p.id">
-        <div>
-          <strong>{{ p.name }}</strong>
-          <span class="muted small"> · {{ p.radius_m }} м · </span>
-          <button type="button" class="checkins-link muted small" @click="filterByPoint(p)">
-            {{ p.checkin_count ?? 0 }} отметок
-          </button>
+    <ul v-if="points.length" class="point-list">
+      <li v-for="p in points" :key="p.id" class="point-row">
+        <div class="point-main">
+          <strong class="point-name">{{ p.name }}</strong>
+          <p class="point-meta muted">
+            {{ p.radius_m }} м ·
+            <button type="button" class="checkins-link" @click="filterByPoint(p)">
+              {{ p.checkin_count ?? 0 }} отметок
+            </button>
+          </p>
         </div>
-        <div class="row-actions">
-          <button class="secondary" type="button" @click="openMapView(p)">на карте</button>
-          <button class="secondary" type="button" @click="changeRadius(p)">радиус</button>
-          <button class="secondary" type="button" @click="showQr(p)">qr</button>
-          <button class="secondary danger" type="button" @click="removePoint(p)">удалить</button>
+        <div class="point-actions">
+          <button class="filter-icon-btn" type="button" aria-label="на карте" @click="openMapView(p)">
+            <AppIcon name="pin" :size="18" />
+          </button>
+          <button class="filter-icon-btn" type="button" aria-label="радиус" @click="changeRadius(p)">
+            <AppIcon name="edit" :size="18" />
+          </button>
+          <button class="filter-icon-btn" type="button" aria-label="qr" @click="showQr(p)">
+            <AppIcon name="qr" :size="18" />
+          </button>
+          <button class="filter-icon-btn" type="button" aria-label="удалить" @click="removePoint(p)">
+            <AppIcon name="delete" :size="18" />
+          </button>
         </div>
       </li>
     </ul>
-    <p v-else class="muted">точек пока нет</p>
+    <p v-else class="page-empty">точек нет</p>
 
     <div v-if="qrPoint" class="qr-modal" @click.self="qrPoint = null">
       <div class="qr-card">
         <p class="qr-title">{{ qrPoint.name }}</p>
         <img v-if="qrDataUrl" :src="qrDataUrl" width="280" height="280" alt="qr точки" />
-        <div class="row-actions">
-          <button type="button" @click="downloadQr">скачать png</button>
+        <div class="qr-actions">
+          <button type="button" @click="downloadQr">скачать</button>
           <button class="secondary" type="button" @click="qrPoint = null">закрыть</button>
         </div>
       </div>
     </div>
 
     <section class="checkins-panel">
-      <div class="checkins-head">
-        <div class="filter-tabs">
-          <button class="filter-tab" :class="{ on: period === 'week' }" type="button" @click="setPeriod('week')">
+      <div class="filter-bar filter-bar--stack">
+        <div class="filter-tabs" role="tablist" aria-label="период">
+          <button
+            class="filter-tab"
+            :class="{ on: period === 'week' }"
+            type="button"
+            role="tab"
+            :aria-selected="period === 'week'"
+            @click="setPeriod('week')"
+          >
             неделя
           </button>
-          <button class="filter-tab" :class="{ on: period === 'month' }" type="button" @click="setPeriod('month')">
+          <button
+            class="filter-tab"
+            :class="{ on: period === 'month' }"
+            type="button"
+            role="tab"
+            :aria-selected="period === 'month'"
+            @click="setPeriod('month')"
+          >
             месяц
           </button>
         </div>
-        <label v-if="points.length" class="point-filter">
-          <span class="sr-only">точка</span>
-          <select v-model="pointFilter">
-            <option value="">все точки</option>
-            <option v-for="p in points" :key="p.id" :value="p.id">{{ p.name }}</option>
-          </select>
-        </label>
+        <div v-if="points.length" ref="pointMenuRoot" class="filter-menu-wrap">
+          <button
+            type="button"
+            class="filter-trigger"
+            :class="{ on: pointMenuOpen || !!pointFilter }"
+            aria-haspopup="listbox"
+            :aria-expanded="pointMenuOpen"
+            @click.stop="pointMenuOpen = !pointMenuOpen"
+          >
+            <span>{{ pointFilterLabel }}</span>
+          </button>
+          <div v-if="pointMenuOpen" class="filter-menu" role="listbox">
+            <button
+              type="button"
+              class="filter-menu-opt"
+              :class="{ on: !pointFilter }"
+              role="option"
+              @click="selectPointFilter('')"
+            >
+              все точки
+            </button>
+            <button
+              v-for="p in points"
+              :key="p.id"
+              type="button"
+              class="filter-menu-opt"
+              :class="{ on: pointFilter === p.id }"
+              role="option"
+              @click="selectPointFilter(p.id)"
+            >
+              {{ p.name }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="checkins-toolbar">
         <div class="range-nav">
-          <button class="secondary" type="button" aria-label="назад" @click="periodOffset--">
-            <AppIcon name="back" :size="16" />
+          <button class="filter-icon-btn" type="button" aria-label="назад" @click="periodOffset--">
+            <AppIcon name="back" :size="18" />
           </button>
           <span class="range-label">{{ rangeLabel }}</span>
           <button
-            class="secondary range-next"
+            class="filter-icon-btn range-next"
             type="button"
             aria-label="вперёд"
             :disabled="periodOffset >= 0"
             @click="periodOffset++"
           >
-            <AppIcon name="back" :size="16" />
+            <AppIcon name="back" :size="18" />
           </button>
         </div>
-        <button class="secondary" type="button" :disabled="exporting || !checkins.length" @click="exportXlsx">
-          {{ exporting ? "скачиваем…" : "excel" }}
+        <button
+          class="filter-icon-btn"
+          type="button"
+          aria-label="скачать excel"
+          :disabled="exporting || !checkins.length"
+          @click="exportXlsx"
+        >
+          <AppIcon name="download" :size="18" />
         </button>
       </div>
 
-      <p class="checkins-meta muted small">
-        {{ checkinsCountLabel }} · {{ pointFilterLabel }} · {{ rangeLabel }}
-      </p>
+      <p class="checkins-meta muted">{{ checkinsCountLabel }}</p>
 
-      <div class="checkins-table-wrap">
-        <table class="checkins-table">
-          <thead>
-            <tr>
-              <th>имя</th>
-              <th class="num">дата</th>
-              <th class="num">время</th>
-              <th>точка</th>
-              <th class="num">расстояние, м</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="loadingCheckins">
-              <td colspan="5" class="empty-cell">
-                <AppLoading inline />
-              </td>
-            </tr>
-            <tr v-else-if="!checkins.length">
-              <td colspan="5" class="empty-cell muted">отметок нет за этот период</td>
-            </tr>
-            <tr v-for="c in checkins" v-else :key="c.id">
-              <td class="person-cell">{{ checkinPersonLabel(c) }}</td>
-              <td class="num muted">{{ fmtWorkDate(c.created_at) }}</td>
-              <td class="num muted">{{ fmtWorkTime(c.created_at) }}</td>
-              <td>{{ c.point_name }}</td>
-              <td class="num muted">{{ c.distance_m }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <AppLoading v-if="loadingCheckins" class="page-empty" />
+      <p v-else-if="!checkins.length" class="page-empty">пусто</p>
+      <ul v-else class="checkin-list">
+        <li v-for="c in checkins" :key="c.id" class="checkin-row">
+          <div class="checkin-top">
+            <span class="checkin-name">{{ checkinPersonLabel(c) }}</span>
+            <span class="checkin-dist muted">{{ c.distance_m }} м</span>
+          </div>
+          <p class="checkin-sub muted">
+            {{ fmtWorkDate(c.created_at) }} · {{ fmtWorkTime(c.created_at) }} · {{ c.point_name }}
+          </p>
+        </li>
+      </ul>
     </section>
   </div>
 </template>
@@ -540,36 +599,31 @@ onBeforeUnmount(() => {
 <style scoped>
 .work-tab {
   display: grid;
-  gap: 1rem;
+  gap: var(--space-5);
 }
 
-.work-points-head {
-  display: flex;
-  justify-content: flex-start;
+.work-create {
+  width: 100%;
 }
 
 .work-map-wrap {
   display: grid;
-  gap: 0.65rem;
+  gap: var(--space-3);
 }
 
 .work-map-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: var(--space-3);
 }
 
 .work-map-label {
   margin: 0;
 }
 
-.work-map-close {
-  flex-shrink: 0;
-}
-
 .work-map {
-  height: 320px;
+  height: min(52vh, 320px);
   border-radius: var(--radius);
   border: 1px solid var(--border);
   overflow: hidden;
@@ -578,25 +632,21 @@ onBeforeUnmount(() => {
 }
 
 .work-new {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  flex-wrap: wrap;
+  display: grid;
+  gap: var(--space-3);
 }
 
 .work-new input[type="text"] {
-  flex: 1;
-  min-width: 10rem;
+  width: 100%;
 }
 
 .radius-label {
   display: grid;
   gap: 0.35rem;
-  min-width: 11rem;
 }
 
 .radius-label-text {
-  font-size: 0.8125rem;
+  font-size: 0.82rem;
   color: var(--muted);
 }
 
@@ -629,11 +679,6 @@ onBeforeUnmount(() => {
   border-radius: 50%;
   border: 1px solid var(--border);
   background: var(--text);
-  transition: transform var(--dur-2) var(--ease-out);
-}
-
-.radius-range:hover::-webkit-slider-thumb {
-  transform: scale(1.06);
 }
 
 .radius-range::-moz-range-track {
@@ -650,68 +695,54 @@ onBeforeUnmount(() => {
   background: var(--text);
 }
 
-.qr-modal {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  display: grid;
-  place-items: center;
-  background: rgba(0, 0, 0, 0.6);
-}
-
-.qr-card {
-  display: grid;
-  justify-items: center;
-  gap: 0.75rem;
-  padding: 1.25rem;
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-  background: var(--surface);
-}
-
-.qr-card img {
-  border-radius: var(--radius);
-  background: #fff;
-}
-
-.qr-title {
+.point-list {
+  list-style: none;
   margin: 0;
-  font-weight: 600;
+  padding: 0;
+  display: grid;
+  gap: 0;
 }
 
-.checkins-head {
+.point-row {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border);
 }
 
-.checkins-panel {
-  display: grid;
-  gap: 0.65rem;
-  margin-top: 0.25rem;
+.point-row:last-child {
+  border-bottom: none;
 }
 
-.checkins-meta {
-  margin: 0;
+.point-main {
+  flex: 1;
+  min-width: 0;
 }
 
-.point-filter select {
-  min-height: var(--control-h);
-  padding: 0.35rem 0.75rem;
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text);
-  font: inherit;
-  font-size: 0.8125rem;
-  max-width: 12rem;
+.point-name {
+  display: block;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.point-meta {
+  margin: 0.15rem 0 0;
+  font-size: 0.82rem;
+}
+
+.point-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  flex-shrink: 0;
 }
 
 .checkins-link {
   padding: 0;
   border: none;
   background: none;
+  color: inherit;
   font: inherit;
   cursor: pointer;
   text-decoration: underline;
@@ -722,87 +753,128 @@ onBeforeUnmount(() => {
   color: var(--text);
 }
 
-.checkins-table-wrap {
-  width: 100%;
-  overflow-x: auto;
-  border: 1px solid var(--border);
+.qr-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: var(--layout-pad);
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.qr-card {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-3);
+  width: min(100%, 20rem);
+  padding: var(--space-5);
   border-radius: var(--radius);
+  border: 1px solid var(--border);
   background: var(--surface);
 }
 
-.checkins-table {
+.qr-card img {
   width: 100%;
-  border-collapse: collapse;
-  font-size: 0.875rem;
+  height: auto;
+  border-radius: var(--radius);
+  background: #fff;
 }
 
-.checkins-table th,
-.checkins-table td {
-  padding: 0.65rem 0.85rem;
-  text-align: left;
-  border-bottom: 1px solid var(--border);
-  vertical-align: middle;
+.qr-title {
+  margin: 0;
+  font-weight: 500;
 }
 
-.checkins-table thead th {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--muted);
-  text-transform: lowercase;
-  background: var(--bg);
+.qr-actions {
+  display: flex;
+  gap: 0.4rem;
+  width: 100%;
 }
 
-.checkins-table tbody tr:last-child td {
-  border-bottom: none;
+.qr-actions > * {
+  flex: 1;
 }
 
-.checkins-table tbody tr:hover td {
-  background: var(--hover-surface);
+.checkins-panel {
+  display: grid;
+  gap: var(--space-3);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
 }
 
-.checkins-table th.num,
-.checkins-table td.num {
-  text-align: right;
-  white-space: nowrap;
-}
-
-.person-cell {
-  white-space: nowrap;
-}
-
-.empty-cell {
-  text-align: center;
-  padding: 2rem 0.85rem;
-}
-
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
+.checkins-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
 }
 
 .range-nav {
   display: flex;
   align-items: center;
-  gap: 0.35rem;
-  margin-left: auto;
+  gap: 0.15rem;
+  min-width: 0;
 }
 
 .range-label {
-  font-size: 0.8125rem;
+  font-size: 0.88rem;
   color: var(--muted);
-  min-width: 9rem;
   text-align: center;
+  min-width: 0;
+  padding: 0 0.35rem;
+  text-transform: lowercase;
 }
 
 .range-next :deep(.app-icon) {
   transform: rotate(180deg);
+}
+
+.checkins-meta {
+  margin: 0;
+  font-size: 0.82rem;
+}
+
+.checkin-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.checkin-row {
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.checkin-row:last-child {
+  border-bottom: none;
+}
+
+.checkin-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.checkin-name {
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.checkin-dist {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.82rem;
+}
+
+.checkin-sub {
+  margin: 0.2rem 0 0;
+  font-size: 0.82rem;
 }
 
 :deep(.leaflet-control-zoom a) {
