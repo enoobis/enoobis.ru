@@ -163,6 +163,7 @@ onMounted(load);
   min-width: 0;
   color: var(--text);
   text-transform: lowercase;
+  border-bottom: none;
 }
 .user img,
 .ava {
