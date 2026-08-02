@@ -32,10 +32,17 @@ function syncThumb(el: HTMLElement) {
       (t) => t.classList.contains("on") || t.getAttribute("aria-selected") === "true",
     ) ?? tabs[0];
 
-  // offset* is relative to the padding edge — same origin as absolute thumb
-  thumb.style.width = `${active.offsetWidth}px`;
-  thumb.style.height = `${active.offsetHeight}px`;
-  thumb.style.transform = `translate(${active.offsetLeft}px, ${active.offsetTop}px)`;
+  const style = getComputedStyle(el);
+  const borderL = parseFloat(style.borderLeftWidth) || 0;
+  const borderT = parseFloat(style.borderTopWidth) || 0;
+  const er = el.getBoundingClientRect();
+  const ar = active.getBoundingClientRect();
+  const x = ar.left - er.left - borderL + el.scrollLeft;
+  const y = ar.top - er.top - borderT + el.scrollTop;
+
+  thumb.style.width = `${ar.width}px`;
+  thumb.style.height = `${ar.height}px`;
+  thumb.style.transform = `translate(${x}px, ${y}px)`;
   thumb.style.opacity = "1";
 
   if (active !== lastActive.get(el)) {
