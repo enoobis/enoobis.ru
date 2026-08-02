@@ -285,7 +285,8 @@ router.post(
       notes
         ? "если в требованиях перечислены темы или подтемы — возьми именно их, в том же порядке и формулировках, ничего не выбрасывай и не переименовывай."
         : "",
-      `${count} тем — ориентир. если материала больше, сделай больше тем, если меньше — меньше. границы: от 3 до ${MAX_TOPICS}.`,
+      `тем должно быть не меньше ${count}. меньше нельзя ни при каких условиях: дроби крупные темы на отдельные, добавляй смежные, но выдай минимум ${count}.`,
+      `если материала на курс больше, сделай больше тем, вплоть до ${MAX_TOPICS}.`,
       'верни строго json: { "topics": [{ "title": string, "summary": string }] }.',
       "title — название темы строчными буквами, без нумерации.",
       "summary — 1-2 предложения строго о том, что разбирается внутри этой темы и чего в ней нет.",
@@ -294,25 +295,48 @@ router.post(
       .filter(Boolean)
       .join("\n");
 
-    try {
+    const system = `ты методист. ${HUMAN_STYLE} отвечаешь только валидным json на русском.`;
+    const askTopics = async (text) => {
       const raw = await geminiGenerate({
-        system: `ты методист. ${HUMAN_STYLE} отвечаешь только валидным json на русском.`,
-        messages: [{ role: "user", text: prompt }],
+        system,
+        messages: [{ role: "user", text }],
         maxTokens: 8000,
         json: true,
       });
       const parsed = parseJsonLoose(raw);
-      const topics = Array.isArray(parsed?.topics) ? parsed.topics : [];
+      return (Array.isArray(parsed?.topics) ? parsed.topics : [])
+        .map((t) => ({
+          title: String(t?.title ?? "").trim().slice(0, 200),
+          summary: String(t?.summary ?? "").trim().slice(0, 500),
+        }))
+        .filter((t) => t.title);
+    };
+
+    try {
+      const topics = await askTopics(prompt);
       bumpUsage(req.user.id, "generate");
-      return res.json({
-        topics: topics
-          .slice(0, MAX_TOPICS)
-          .map((t) => ({
-            title: String(t?.title ?? "").trim().slice(0, 200),
-            summary: String(t?.summary ?? "").trim().slice(0, 500),
-          }))
-          .filter((t) => t.title),
-      });
+
+      /* модель любит срезать количество, поэтому добираем недостающие отдельной просьбой */
+      const seen = new Set(topics.map((t) => t.title.toLowerCase()));
+      for (let tries = 0; topics.length < count && tries < 2; tries += 1) {
+        const need = count - topics.length;
+        const extra = await askTopics(
+          [
+            prompt,
+            `уже есть темы: ${topics.map((t) => t.title).join("; ")}.`,
+            `добавь ещё ${need} тем, которых в этом списке нет. верни в json только новые темы.`,
+          ].join("\n"),
+        );
+        bumpUsage(req.user.id, "generate");
+        for (const t of extra) {
+          const key = t.title.toLowerCase();
+          if (seen.has(key)) continue;
+          seen.add(key);
+          topics.push(t);
+        }
+      }
+
+      return res.json({ topics: topics.slice(0, MAX_TOPICS) });
     } catch (e) {
       if (e instanceof SyntaxError) return res.status(502).json({ error: "ai_bad_json" });
       return sendAiError(res, e, req.user);

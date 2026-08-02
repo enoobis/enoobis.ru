@@ -16,22 +16,54 @@ const html = computed(() => renderMarkdown(props.text));
   min-width: 0;
 }
 
-/* учебный текст: по левому краю, красная строка, полуторный интервал */
+/* гост: times new roman 14pt, по ширине, красная строка 1.25 см, интервал 1.5 */
 .markdown-body.doc {
-  text-align: left;
+  font-family: "Times New Roman", Times, serif;
+  font-size: 14pt;
   line-height: 1.5;
+  text-align: justify;
+  hyphens: auto;
 }
 .markdown-body.doc :deep(p) {
-  margin: 0 0 0.7rem;
+  margin: 0;
   text-indent: 1.25cm;
+}
+.markdown-body.doc :deep(p + p) {
+  margin-top: 0.2rem;
 }
 .markdown-body.doc :deep(li p),
 .markdown-body.doc :deep(blockquote p) {
   text-indent: 0;
 }
+.markdown-body.doc :deep(ul),
+.markdown-body.doc :deep(ol) {
+  padding-left: 1.25cm;
+}
+.markdown-body.doc :deep(h1),
 .markdown-body.doc :deep(h2),
 .markdown-body.doc :deep(h3) {
-  margin: 1.6rem 0 0.7rem;
+  font-family: inherit;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-align: left;
+  text-indent: 1.25cm;
+  margin: 1.4rem 0 0.6rem;
+}
+.markdown-body.doc :deep(h1) {
+  font-size: 16pt;
+}
+.markdown-body.doc :deep(h2) {
+  font-size: 15pt;
+}
+.markdown-body.doc :deep(h3) {
+  font-size: 14pt;
+}
+.markdown-body.doc :deep(pre),
+.markdown-body.doc :deep(code) {
+  font-size: 0.85em;
+  text-align: left;
+  text-indent: 0;
+  hyphens: none;
 }
 .markdown-body :deep(> *:first-child) {
   margin-top: 0;

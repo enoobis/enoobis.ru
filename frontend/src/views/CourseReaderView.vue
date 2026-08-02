@@ -127,6 +127,18 @@ function openLecture(id: string) {
   window.scrollTo({ top: 0 });
 }
 
+async function downloadLecture() {
+  const l = activeLecture.value;
+  if (!l) return;
+  err.value = "";
+  try {
+    const { downloadLectureDocx } = await import("../utils/lectureDocx");
+    await downloadLectureDocx(l.title, l.body_text);
+  } catch {
+    err.value = "не вышло собрать документ";
+  }
+}
+
 function exitReader() {
   void router.push(`/courses/${courseId.value}/lectures`);
 }
@@ -655,6 +667,15 @@ onBeforeUnmount(() => {
           </button>
           <span class="main-bar-title">{{ activeLecture?.title ?? "" }}</span>
           <button
+            v-if="activeLecture && !editing"
+            type="button"
+            class="filter-icon-btn"
+            aria-label="скачать word"
+            @click="downloadLecture"
+          >
+            <AppIcon name="download" :size="17" />
+          </button>
+          <button
             v-if="isTeacher && activeLecture && !editing"
             type="button"
             class="filter-icon-btn"
@@ -879,7 +900,7 @@ onBeforeUnmount(() => {
           </div>
 
           <label v-if="genMode === 'course'" class="gen-field">
-            <span class="muted small">примерно тем, точное число выберет модель</span>
+            <span class="muted small">минимум тем, больше можно</span>
             <input v-model.number="genCount" type="number" min="3" max="40" />
           </label>
 
