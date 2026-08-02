@@ -18,213 +18,158 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <li
-    class="list-row"
-    :class="{ 'has-cover': !!book.cover_url }"
-    :data-book-id="book.id"
-  >
-    <span class="title">{{ book.title }}</span>
-    <div class="row-actions">
-      <button
-        v-if="canRead"
-        class="secondary read-btn"
-        type="button"
-        @click="emit('read')"
-      >
-        читать
-      </button>
-      <button
-        class="icon-btn-sm"
-        type="button"
-        aria-label="скачать"
-        title="скачать"
-        @click="emit('download')"
-      >
-        <AppIcon name="download" :size="16" />
-      </button>
-      <button
-        v-if="canManage"
-        class="icon-btn-sm"
-        type="button"
-        aria-label="изменить"
-        title="изменить"
-        @click="emit('edit')"
-      >
-        <AppIcon name="edit" :size="16" />
-      </button>
-    </div>
-    <span v-if="book.author" class="muted small author">{{ book.author }}</span>
-    <span v-if="book.description" class="muted small desc">{{ book.description }}</span>
-    <span class="muted small meta">
-      <span v-if="book.category" class="cat-pill">{{ book.category }}</span>
-      @{{ book.uploader_nickname }}<template v-if="showSize"> · {{ sizeLabel }}</template>
-    </span>
+  <li class="book" :class="{ 'has-cover': !!book.cover_url }" :data-book-id="book.id">
     <img
       v-if="book.cover_url"
       :src="book.cover_url"
       :alt="book.title"
-      class="book-cover"
+      class="cover"
       loading="lazy"
       decoding="async"
     />
+    <div class="body">
+      <div class="top">
+        <div class="info">
+          <span class="title">{{ book.title }}</span>
+          <span v-if="book.author" class="muted small">{{ book.author }}</span>
+        </div>
+        <div class="actions">
+          <button
+            v-if="canRead"
+            class="icon-btn-sm"
+            type="button"
+            aria-label="читать"
+            title="читать"
+            @click="emit('read')"
+          >
+            <AppIcon name="play" :size="18" />
+          </button>
+          <button
+            class="icon-btn-sm"
+            type="button"
+            aria-label="скачать"
+            title="скачать"
+            @click="emit('download')"
+          >
+            <AppIcon name="download" :size="18" />
+          </button>
+          <button
+            v-if="canManage"
+            class="icon-btn-sm"
+            type="button"
+            aria-label="изменить"
+            title="изменить"
+            @click="emit('edit')"
+          >
+            <AppIcon name="edit" :size="18" />
+          </button>
+        </div>
+      </div>
+      <p v-if="book.description" class="muted small desc">{{ book.description }}</p>
+      <p class="muted small meta">
+        <template v-if="book.category">{{ book.category }} · </template>
+        <template v-if="showSize">{{ sizeLabel }}</template>
+        <template v-else>@{{ book.uploader_nickname }}</template>
+      </p>
+    </div>
   </li>
 </template>
 
 <style scoped>
-.list-row {
+.book {
+  display: flex;
+  gap: 0.85rem;
+  align-items: flex-start;
+  min-width: 0;
+  padding: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  list-style: none;
+}
+
+.cover {
+  flex: 0 0 auto;
+  width: 52px;
+  height: 78px;
+  object-fit: cover;
+  border-radius: 4px;
+  background: var(--surface2);
+}
+
+.body {
+  flex: 1;
+  min-width: 0;
   display: grid;
-  column-gap: 0.75rem;
-  row-gap: 0.2rem;
-  align-items: start;
-  grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-areas:
-    "title actions"
-    "author actions"
-    "desc desc"
-    "meta meta";
+  gap: 0.35rem;
 }
 
-.list-row:not(:has(.author)) {
-  grid-template-areas:
-    "title actions"
-    "desc desc"
-    "meta meta";
+.top {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  min-width: 0;
 }
 
-.list-row.has-cover {
-  grid-template-columns: minmax(0, 1fr) 68px;
-  grid-template-areas:
-    "title actions"
-    "author actions"
-    "desc cover"
-    "meta cover";
-}
-
-.list-row.has-cover:not(:has(.author)) {
-  grid-template-areas:
-    "title actions"
-    "desc cover"
-    "meta cover";
+.info {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 0.15rem;
 }
 
 .title {
-  grid-area: title;
-  font-size: 0.95rem;
-  text-transform: none;
+  font-size: 0.98rem;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  line-height: 1.3;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   overflow: hidden;
 }
 
-.author {
-  grid-area: author;
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 0.05rem;
+  flex-shrink: 0;
+}
+
+.actions .icon-btn-sm {
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+  color: var(--muted);
+}
+
+.actions .icon-btn-sm:hover {
+  color: var(--text);
+  background: var(--surface2);
 }
 
 .desc {
-  grid-area: desc;
-  white-space: pre-wrap;
+  margin: 0;
   line-height: 1.45;
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 4;
+  -webkit-line-clamp: 2;
   overflow: hidden;
+  white-space: pre-wrap;
 }
 
 .meta {
-  grid-area: meta;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-  margin-top: 0.15rem;
+  margin: 0;
 }
 
-.row-actions {
-  grid-area: actions;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  justify-self: end;
-  gap: 0.15rem;
-  flex-wrap: nowrap;
+.small {
+  font-size: 0.8rem;
 }
 
-.read-btn {
-  min-height: 0;
-  padding: 0.3rem 0.55rem;
-  font-size: 0.78rem;
-}
-
-.row-actions button {
-  min-height: 0;
-}
-
-.cat-pill {
-  display: inline-block;
-  padding: 0.05rem 0.45rem;
-  border-radius: var(--radius);
-  background: var(--surface2);
-  color: var(--text);
-  font-size: 0.74rem;
-}
-
-.book-cover {
-  grid-area: cover;
-  justify-self: center;
-  align-self: center;
-  display: block;
-  width: 60px;
-  height: 90px;
-  object-fit: cover;
-  border-radius: 3px;
-}
-
-@media (max-width: 640px) {
-  .list-row {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas:
-      "title"
-      "actions"
-      "author"
-      "desc"
-      "meta";
-  }
-
-  .list-row:not(:has(.author)) {
-    grid-template-areas:
-      "title"
-      "actions"
-      "desc"
-      "meta";
-  }
-
-  .list-row.has-cover {
-    grid-template-columns: minmax(0, 1fr) 60px;
-    grid-template-areas:
-      "title title"
-      "actions actions"
-      "author author"
-      "desc cover"
-      "meta cover";
-  }
-
-  .list-row.has-cover:not(:has(.author)) {
-    grid-template-areas:
-      "title title"
-      "actions actions"
-      "desc cover"
-      "meta cover";
-  }
-
-  .row-actions {
-    justify-self: start;
-    justify-content: flex-start;
-  }
-
-  .book-cover {
-    width: 52px;
-    height: 78px;
+@media (max-width: 520px) {
+  .cover {
+    width: 44px;
+    height: 66px;
   }
 }
 </style>

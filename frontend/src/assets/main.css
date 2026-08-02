@@ -462,6 +462,10 @@ a.card:hover {
   flex: 1 1 auto;
 }
 
+.filter-bar--stack .filter-trigger {
+  width: 100%;
+}
+
 .filter-search {
   flex: 1 1 auto;
   width: auto;

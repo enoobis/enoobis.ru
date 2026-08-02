@@ -45,22 +45,6 @@ const activeCategory = ref("");
 const sort = ref<"new" | "title">("new");
 const categoryOpen = ref(false);
 const categoryMenuRoot = ref<HTMLElement | null>(null);
-const sortOpen = ref(false);
-const sortMenuRoot = ref<HTMLElement | null>(null);
-
-const sortOptions = [
-  { value: "new" as const, label: "новые" },
-  { value: "title" as const, label: "по названию" },
-];
-
-const sortButtonLabel = computed(
-  () => sortOptions.find((o) => o.value === sort.value)?.label ?? "новые",
-);
-
-function selectSort(value: "new" | "title") {
-  sort.value = value;
-  sortOpen.value = false;
-}
 
 const showForm = ref(false);
 const newTitle = ref("");
@@ -76,15 +60,21 @@ const coverUploading = ref(false);
 const totalCount = computed(() => booksTotal.value);
 const storageBytesUsed = ref(0);
 
-const libraryHeadMeta = computed(() => {
-  if (!isStaff.value) return undefined;
-  const n = totalCount.value;
-  return `${n} ${n === 1 ? "книга" : "книг"} · ${fmtUsed(storageBytesUsed.value)} / ${libraryQuotaLabel.value}`;
-});
-
 const libraryQuotaLabel = computed(() => {
   const gb = LIBRARY_QUOTA_BYTES / 1024 ** 3;
   return `${gb} гб`;
+});
+
+const usedPercent = computed(() =>
+  LIBRARY_QUOTA_BYTES > 0
+    ? Math.min(100, Math.round((storageBytesUsed.value / LIBRARY_QUOTA_BYTES) * 100))
+    : 0,
+);
+
+const quotaMeta = computed(() => {
+  const n = totalCount.value;
+  const books = n === 1 ? "книга" : "книг";
+  return `${n} ${books} · ${fmtUsed(storageBytesUsed.value)} / ${libraryQuotaLabel.value}`;
 });
 
 function fmt(n: number) {
@@ -207,15 +197,11 @@ const activeChips = computed(() => {
 const listEmptyLabel = computed(() => (search.value.trim() ? "ничего не найдено" : "пусто"));
 
 function onDocumentClick(event: MouseEvent) {
+  if (!categoryOpen.value) return;
   const target = event.target as HTMLElement | null;
-  if (categoryOpen.value) {
-    const root = categoryMenuRoot.value;
-    if (!(root && target && root.contains(target))) categoryOpen.value = false;
-  }
-  if (sortOpen.value) {
-    const root = sortMenuRoot.value;
-    if (!(root && target && root.contains(target))) sortOpen.value = false;
-  }
+  const root = categoryMenuRoot.value;
+  if (root && target && root.contains(target)) return;
+  categoryOpen.value = false;
 }
 
 function onPickFile(ev: Event) {
@@ -458,14 +444,16 @@ onBeforeUnmount(() => {
     <div v-if="!auth.token" class="muted">войдите, чтобы видеть библиотеку</div>
 
     <template v-else>
-      <PageHeader
-        title="библиотека"
-        :meta="libraryHeadMeta"
-      >
+      <PageHeader title="библиотека">
         <template v-if="isStaff && !showForm" #actions>
           <button type="button" @click="showForm = true">добавить</button>
         </template>
       </PageHeader>
+
+      <div v-if="isStaff" class="quota">
+        <div class="quota-bar"><span :style="{ width: usedPercent + '%' }" /></div>
+        <p class="quota-meta muted">{{ quotaMeta }}</p>
+      </div>
 
       <p v-if="err" class="error">{{ err }}</p>
 
@@ -508,7 +496,7 @@ onBeforeUnmount(() => {
         </div>
       </form>
 
-      <div class="filter-bar">
+      <div class="filter-bar filter-bar--stack">
         <div ref="categoryMenuRoot" class="filter-menu-wrap">
           <button
             type="button"
@@ -544,31 +532,27 @@ onBeforeUnmount(() => {
             </button>
           </div>
         </div>
-        <div ref="sortMenuRoot" class="filter-menu-wrap">
+        <div class="filter-tabs" role="tablist" aria-label="сортировка">
           <button
             type="button"
-            class="filter-trigger"
-            :class="{ on: sortOpen || sort !== 'new' }"
-            aria-label="сортировка"
-            aria-haspopup="listbox"
-            :aria-expanded="sortOpen"
-            @click.stop="sortOpen = !sortOpen"
+            class="filter-tab"
+            :class="{ on: sort === 'new' }"
+            role="tab"
+            :aria-selected="sort === 'new'"
+            @click="sort = 'new'"
           >
-            <span>{{ sortButtonLabel }}</span>
+            новые
           </button>
-          <div v-if="sortOpen" class="filter-menu" role="listbox">
-            <button
-              v-for="o in sortOptions"
-              :key="o.value"
-              type="button"
-              class="filter-menu-opt"
-              :class="{ on: sort === o.value }"
-              role="option"
-              @click="selectSort(o.value)"
-            >
-              {{ o.label }}
-            </button>
-          </div>
+          <button
+            type="button"
+            class="filter-tab"
+            :class="{ on: sort === 'title' }"
+            role="tab"
+            :aria-selected="sort === 'title'"
+            @click="sort = 'title'"
+          >
+            по названию
+          </button>
         </div>
       </div>
 
@@ -689,7 +673,32 @@ onBeforeUnmount(() => {
 <style scoped>
 .library {
   display: grid;
-  gap: 0.75rem;
+  gap: var(--space-4);
+}
+
+.quota {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: -0.35rem;
+}
+
+.quota-bar {
+  height: 3px;
+  border-radius: 999px;
+  background: var(--surface2);
+  overflow: hidden;
+}
+
+.quota-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--text);
+  transition: width var(--dur-2) var(--ease-out);
+}
+
+.quota-meta {
+  margin: 0;
+  font-size: 0.82rem;
 }
 
 .form {
