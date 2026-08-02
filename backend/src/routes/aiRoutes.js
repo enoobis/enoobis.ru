@@ -1,30 +1,20 @@
 import express from "express";
-import fs from "node:fs";
-import path from "node:path";
 import { v4 as uuidv4 } from "uuid";
 import { all, get, run } from "../db.js";
 import { authRequired } from "../auth.js";
 import { rateLimit } from "../utils/security.js";
 import { isStaffRole } from "../utils/roles.js";
-import { UPLOAD_ROOT } from "../utils/uploadSafe.js";
-import { optimizeUploadedFile } from "../utils/imageOptimize.js";
-import {
-  geminiEnabled,
-  geminiGenerate,
-  geminiGenerateImage,
-  parseJsonLoose,
-} from "../utils/gemini.js";
+import { geminiEnabled, geminiGenerate, parseJsonLoose } from "../utils/gemini.js";
 
 const router = express.Router();
-
-const IMAGE_DIR = path.join(UPLOAD_ROOT, "course-lectures");
-fs.mkdirSync(IMAGE_DIR, { recursive: true });
 
 const CHAT_DAILY_LIMIT = Number(process.env.AI_CHAT_DAILY_LIMIT ?? 40);
 const GENERATE_DAILY_LIMIT = Number(process.env.AI_GENERATE_DAILY_LIMIT ?? 150);
 
 const MAX_MESSAGE_CHARS = 2000;
 const MAX_HISTORY = 12;
+/* модель сама решает, сколько тем нужно, но не бесконечно */
+const MAX_TOPICS = 40;
 /* сколько текста лекции отдаём модели как контекст */
 const MAX_CONTEXT_CHARS = 8000;
 
@@ -285,14 +275,21 @@ router.post(
     const title = String(req.body?.title ?? "").trim().slice(0, 200);
     if (!title) return res.status(400).json({ error: "title_required" });
     const description = String(req.body?.description ?? "").trim().slice(0, 1000);
-    const count = Math.min(Math.max(Number(req.body?.count ?? 8), 3), 20);
+    const notes = String(req.body?.notes ?? "").trim().slice(0, 4000);
+    const count = Math.min(Math.max(Number(req.body?.count ?? 8), 3), MAX_TOPICS);
 
     const prompt = [
-      `составь план курса «${title}» из ${count} тем.`,
+      `составь программу курса «${title}».`,
       description ? `описание курса: ${description}` : "",
-      "верни строго json: { \"topics\": [{ \"title\": string, \"summary\": string }] }.",
-      "title — короткое название темы строчными буквами, summary — до 12 слов о содержании.",
-      "порядок тем — от простого к сложному, без нумерации в тексте.",
+      notes ? `требования преподавателя, выполнить дословно:\n${notes}` : "",
+      notes
+        ? "если в требованиях перечислены темы или подтемы — возьми именно их, в том же порядке и формулировках, ничего не выбрасывай и не переименовывай."
+        : "",
+      `${count} тем — ориентир. если материала больше, сделай больше тем, если меньше — меньше. границы: от 3 до ${MAX_TOPICS}.`,
+      'верни строго json: { "topics": [{ "title": string, "summary": string }] }.',
+      "title — название темы строчными буквами, без нумерации.",
+      "summary — 1-2 предложения строго о том, что разбирается внутри этой темы и чего в ней нет.",
+      "темы не должны пересекаться: каждая закрывает свой кусок материала, порядок от простого к сложному.",
     ]
       .filter(Boolean)
       .join("\n");
@@ -301,7 +298,7 @@ router.post(
       const raw = await geminiGenerate({
         system: `ты методист. ${HUMAN_STYLE} отвечаешь только валидным json на русском.`,
         messages: [{ role: "user", text: prompt }],
-        maxTokens: Math.min(1000 + count * 180, 8000),
+        maxTokens: 8000,
         json: true,
       });
       const parsed = parseJsonLoose(raw);
@@ -309,6 +306,7 @@ router.post(
       bumpUsage(req.user.id, "generate");
       return res.json({
         topics: topics
+          .slice(0, MAX_TOPICS)
           .map((t) => ({
             title: String(t?.title ?? "").trim().slice(0, 200),
             summary: String(t?.summary ?? "").trim().slice(0, 500),
@@ -334,14 +332,33 @@ router.post(
     const topic = String(req.body?.topic ?? "").trim().slice(0, 300);
     if (!topic) return res.status(400).json({ error: "topic_required" });
     const courseTitle = String(req.body?.course_title ?? "").trim().slice(0, 200);
-    const notes = String(req.body?.notes ?? "").trim().slice(0, 1000);
+    const notes = String(req.body?.notes ?? "").trim().slice(0, 4000);
+    const scope = String(req.body?.scope ?? "").trim().slice(0, 500);
+    const list = (v) =>
+      (Array.isArray(v) ? v : [])
+        .map((x) => String(x ?? "").trim())
+        .filter(Boolean)
+        .slice(0, 60)
+        .join("; ");
+    const covered = list(req.body?.covered);
+    const upcoming = list(req.body?.upcoming);
 
     const prompt = [
-      `напиши учебную тему «${topic}».`,
+      `напиши раздел учебного пособия по теме «${topic}».`,
       courseTitle ? `курс: ${courseTitle}` : "",
-      notes ? `пожелания преподавателя: ${notes}` : "",
+      scope ? `границы темы: ${scope}` : "",
+      notes ? `требования преподавателя, выполнить дословно:\n${notes}` : "",
+      covered ? `уже написаны и разобраны прошлые темы: ${covered}` : "",
+      covered
+        ? "материал прошлых тем не пересказывай. если он нужен, сошлись на него одной фразой и иди дальше."
+        : "",
+      upcoming ? `дальше по программе идут: ${upcoming}. их материал не занимай.` : "",
       'верни строго json: { "body": string, "task": { "title": string, "description": string, "max_points": number } }.',
-      "body — markdown темы: короткое вступление, основная часть с подзаголовками, пример, короткий итог. 400-700 слов, без картинок и html.",
+      "body — markdown, 900-1400 слов, академический стиль учебного пособия, как глава в книге или статья.",
+      "начинай сразу с сути. никаких «добро пожаловать», «в этой теме мы», «давайте разберём», обращений к читателю и анонсов.",
+      "структура: постановка вопроса, точные определения, разбор по подзаголовкам ##, разобранный пример, типичные ошибки, короткий вывод.",
+      "термин при первом появлении выделяй жирным один раз, код — в блоках ```, формулы — текстом.",
+      "без картинок, без html, без ссылок на внешние сайты, без нумерации разделов.",
       "задание в body не включай — оно идёт отдельным полем task.",
       "task.title — короткое название строчными буквами, task.description — что именно нужно сделать, task.max_points — целое от 10 до 100.",
     ]
@@ -350,9 +367,9 @@ router.post(
 
     try {
       const raw = await geminiGenerate({
-        system: `ты преподаватель-практик, пишешь учебный текст на русском. ${HUMAN_STYLE} отвечаешь только валидным json.`,
+        system: `ты автор учебного пособия и практик в предмете. пишешь на русском строго, точно, без разговорных вставок. ${HUMAN_STYLE} отвечаешь только валидным json.`,
         messages: [{ role: "user", text: prompt }],
-        maxTokens: 4000,
+        maxTokens: 10000,
         json: true,
       });
       const parsed = parseJsonLoose(raw);
@@ -371,44 +388,6 @@ router.post(
       return res.json({ title: topic, body, task });
     } catch (e) {
       if (e instanceof SyntaxError) return res.status(502).json({ error: "ai_bad_json" });
-      return sendAiError(res, e, req.user);
-    }
-  },
-);
-
-router.post(
-  "/ai/image",
-  authRequired,
-  staffOnly,
-  rateLimit({ windowMs: 60_000, max: 40, keyPrefix: "ai-image" }),
-  async (req, res) => {
-    if (!(await generateGuard(req, res))) return;
-
-    const topic = String(req.body?.topic ?? "").trim().slice(0, 300);
-    if (!topic) return res.status(400).json({ error: "topic_required" });
-
-    const prompt = [
-      `учебная иллюстрация к теме «${topic}».`,
-      "строго чёрно-белая графика: белый фон, чёрные линии, без цвета и без градиентов.",
-      "чистая схема или минималистичный рисунок, поясняющий суть темы.",
-      "без текста и подписей на картинке.",
-    ].join(" ");
-
-    try {
-      const { buffer, mime } = await geminiGenerateImage(prompt);
-      if (buffer.length > 8 * 1024 * 1024) return res.status(502).json({ error: "ai_failed" });
-      const ext = mime === "image/jpeg" ? ".jpg" : mime === "image/webp" ? ".webp" : ".png";
-      const filename = `ai-${uuidv4().replace(/-/g, "")}${ext}`;
-      const filePath = path.join(IMAGE_DIR, filename);
-      fs.writeFileSync(filePath, buffer);
-
-      let finalName = filename;
-      const optimized = await optimizeUploadedFile(filePath, "lecture");
-      if (optimized.ok) finalName = optimized.filename;
-
-      bumpUsage(req.user.id, "generate");
-      return res.json({ url: `/uploads/course-lectures/${finalName}` });
-    } catch (e) {
       return sendAiError(res, e, req.user);
     }
   },

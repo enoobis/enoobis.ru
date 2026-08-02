@@ -22,12 +22,10 @@ import {
   clearChatHistory,
   generateCourseOutline,
   generateLectureDraft,
-  generateLectureImage,
   getAiStatus,
   getChatHistory,
   type AiChatMessage,
   type AiLectureTask,
-  type AiOutlineTopic,
   type AiStatus,
 } from "../api/ai";
 import { useAuthStore } from "../stores/auth";
@@ -199,7 +197,6 @@ const editing = ref<{ id: string; title: string; body_text: string; video_url: s
   null,
 );
 const savingEdit = ref(false);
-const imageBusy = ref(false);
 
 function startEdit() {
   const l = activeLecture.value;
@@ -265,22 +262,6 @@ async function removeTask(assignmentId: string) {
     await load();
   } catch (e) {
     err.value = errorText(e);
-  }
-}
-
-async function addImageToEdit() {
-  if (!auth.token || !editing.value || imageBusy.value) return;
-  imageBusy.value = true;
-  err.value = "";
-  try {
-    const r = await generateLectureImage(auth.token, {
-      topic: editing.value.title || activeLecture.value?.title || "",
-    });
-    editing.value.body_text = `${editing.value.body_text.trimEnd()}\n\n![](${r.url})\n`;
-  } catch (e) {
-    err.value = errorText(e);
-  } finally {
-    imageBusy.value = false;
   }
 }
 
@@ -373,19 +354,16 @@ async function clearChat() {
 
 /* ---------- генерация (преподаватель) ---------- */
 
-type GenMode = "course" | "outline" | "lecture";
+type GenMode = "course" | "lecture";
 
 const genOpen = ref(false);
 const genMode = ref<GenMode>("course");
 const genTopic = ref("");
 const genNotes = ref("");
-const genCount = ref(8);
-const genWithImages = ref(true);
+const genCount = ref(10);
 const genBusy = ref(false);
 const genErr = ref("");
 const genProgress = ref("");
-const genTopics = ref<AiOutlineTopic[]>([]);
-const genPicked = ref<Record<string, boolean>>({});
 const genDraft = ref<{ title: string; body: string; task: AiLectureTask | null } | null>(null);
 
 function openGen() {
@@ -397,7 +375,6 @@ function openGen() {
 function closeGen() {
   if (genBusy.value) return;
   genOpen.value = false;
-  genTopics.value = [];
   genDraft.value = null;
   genQueue.value = [];
   genErr.value = "";
@@ -405,26 +382,26 @@ function closeGen() {
 }
 
 type Draft = { body: string; task: AiLectureTask | null };
+type DraftContext = { scope?: string; covered?: string[]; upcoming?: string[] };
 
-async function draftFor(topic: string, courseTitle: string): Promise<Draft> {
+async function draftFor(
+  topic: string,
+  courseTitle: string,
+  ctx: DraftContext = {},
+): Promise<Draft> {
   if (!auth.token) return { body: "", task: null };
   const draft = await generateLectureDraft(auth.token, {
     topic,
     course_title: courseTitle,
     notes: genNotes.value.trim() || undefined,
+    ...ctx,
   });
-  if (!genWithImages.value) return { body: draft.body, task: draft.task };
-  try {
-    const img = await generateLectureImage(auth.token, { topic });
-    return { body: `![](${img.url})\n\n${draft.body}`, task: draft.task };
-  } catch {
-    return { body: draft.body, task: draft.task };
-  }
+  return { body: draft.body, task: draft.task };
 }
 
-/* весь курс: план -> темы по одной, каждая сохраняется сразу */
+/* весь курс: программа -> темы по одной, каждая сохраняется сразу */
 
-type QueueItem = { title: string; state: "wait" | "run" | "done" | "fail" };
+type QueueItem = { title: string; summary: string; state: "wait" | "run" | "done" | "fail" };
 
 const genQueue = ref<QueueItem[]>([]);
 const genStop = ref(false);
@@ -456,13 +433,17 @@ function isFatal(e: unknown): boolean {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-async function makeLecture(title: string, courseTitle: string) {
+async function makeLecture(item: QueueItem, courseTitle: string, index: number) {
   if (!auth.token || !classroom.value) return;
-  const draft = await draftFor(title, courseTitle);
+  const draft = await draftFor(item.title, courseTitle, {
+    scope: item.summary || undefined,
+    covered: genQueue.value.slice(0, index).map((t) => t.title),
+    upcoming: genQueue.value.slice(index + 1).map((t) => t.title),
+  });
   await createLecture(
     classroom.value.course.id,
     {
-      title,
+      title: item.title,
       body_text: draft.body,
       video_url: "",
       ...(draft.task ? { task: draft.task } : {}),
@@ -471,10 +452,10 @@ async function makeLecture(title: string, courseTitle: string) {
   );
 }
 
-async function makeLectureWithRetry(title: string, courseTitle: string) {
+async function makeLectureWithRetry(item: QueueItem, courseTitle: string, index: number) {
   for (let attempt = 0; ; attempt += 1) {
     try {
-      await makeLecture(title, courseTitle);
+      await makeLecture(item, courseTitle, index);
       return;
     } catch (e) {
       const code = errCode(e);
@@ -491,13 +472,13 @@ async function makeLectureWithRetry(title: string, courseTitle: string) {
 async function runQueue() {
   if (!classroom.value) return;
   const courseTitle = classroom.value.course.title;
-  for (const item of genQueue.value) {
+  for (const [i, item] of genQueue.value.entries()) {
     if (genStop.value) break;
     if (item.state === "done") continue;
     item.state = "run";
     genProgress.value = item.title;
     try {
-      await makeLectureWithRetry(item.title, courseTitle);
+      await makeLectureWithRetry(item, courseTitle, i);
       item.state = "done";
       await load();
     } catch (e) {
@@ -515,14 +496,19 @@ async function generateWholeCourse() {
   if (!auth.token || !classroom.value) return;
   genStop.value = false;
   genQueue.value = [];
-  genProgress.value = "составляю план";
+  genProgress.value = "составляю программу";
   const outline = await generateCourseOutline(auth.token, {
     title: classroom.value.course.title,
     description: classroom.value.course.description,
     count: genCount.value,
+    notes: genNotes.value.trim() || undefined,
   });
-  if (!outline.topics.length) throw new Error("пустой план");
-  genQueue.value = outline.topics.map((t) => ({ title: t.title, state: "wait" }));
+  if (!outline.topics.length) throw new Error("пустая программа");
+  genQueue.value = outline.topics.map((t) => ({
+    title: t.title,
+    summary: t.summary,
+    state: "wait",
+  }));
   genProgress.value = "";
   await runQueue();
 }
@@ -547,14 +533,6 @@ async function runGenerate() {
   try {
     if (genMode.value === "course") {
       await generateWholeCourse();
-    } else if (genMode.value === "outline") {
-      const r = await generateCourseOutline(auth.token, {
-        title: classroom.value.course.title,
-        description: classroom.value.course.description,
-        count: genCount.value,
-      });
-      genTopics.value = r.topics;
-      genPicked.value = Object.fromEntries(r.topics.map((t) => [t.title, true]));
     } else {
       if (!genTopic.value.trim()) {
         genErr.value = "нужна тема";
@@ -562,7 +540,9 @@ async function runGenerate() {
       }
       const topic = genTopic.value.trim();
       genProgress.value = "пишу тему";
-      const draft = await draftFor(topic, classroom.value.course.title);
+      const draft = await draftFor(topic, classroom.value.course.title, {
+        covered: lectures.value.map((l) => l.title),
+      });
       genDraft.value = { title: topic, ...draft };
       genProgress.value = "";
     }
@@ -579,15 +559,7 @@ async function saveGenerated() {
   genBusy.value = true;
   genErr.value = "";
   try {
-    if (genMode.value === "outline") {
-      for (const t of genTopics.value.filter((x) => genPicked.value[x.title])) {
-        await createLecture(
-          classroom.value.course.id,
-          { title: t.title, body_text: t.summary, video_url: "" },
-          auth.token,
-        );
-      }
-    } else if (genDraft.value) {
+    if (genDraft.value) {
       await createLecture(
         classroom.value.course.id,
         {
@@ -600,7 +572,6 @@ async function saveGenerated() {
       );
     }
     genOpen.value = false;
-    genTopics.value = [];
     genDraft.value = null;
     await load();
   } catch (e) {
@@ -609,12 +580,6 @@ async function saveGenerated() {
     genBusy.value = false;
   }
 }
-
-const canSaveGenerated = computed(() => {
-  if (genMode.value === "course") return false;
-  if (genMode.value === "lecture") return !!genDraft.value;
-  return genTopics.value.some((t) => genPicked.value[t.title]);
-});
 
 watch(activeId, () => {
   openTaskId.value = "";
@@ -707,15 +672,6 @@ onBeforeUnmount(() => {
           <input v-model="editing.video_url" placeholder="видео url" />
           <textarea v-model="editing.body_text" rows="16" placeholder="текст темы, markdown" />
           <div class="edit-actions">
-            <button
-              v-if="canGenerate"
-              type="button"
-              class="secondary"
-              :disabled="imageBusy"
-              @click="addImageToEdit"
-            >
-              {{ imageBusy ? "рисую…" : "картинка ии" }}
-            </button>
             <button type="submit" :disabled="savingEdit">
               {{ savingEdit ? "…" : "сохранить" }}
             </button>
@@ -748,7 +704,11 @@ onBeforeUnmount(() => {
             </div>
           </template>
 
-          <MarkdownText v-if="activeLecture.body_text" :text="activeLecture.body_text" />
+          <MarkdownText
+            v-if="activeLecture.body_text"
+            :text="activeLecture.body_text"
+            variant="doc"
+          />
 
           <ul v-if="activeLecture.attachments.length" class="files">
             <li v-for="f in activeLecture.attachments" :key="f.id">
@@ -911,14 +871,6 @@ onBeforeUnmount(() => {
             <button
               type="button"
               class="filter-tab"
-              :class="{ on: genMode === 'outline' }"
-              @click="genMode = 'outline'"
-            >
-              план
-            </button>
-            <button
-              type="button"
-              class="filter-tab"
               :class="{ on: genMode === 'lecture' }"
               @click="genMode = 'lecture'"
             >
@@ -926,34 +878,21 @@ onBeforeUnmount(() => {
             </button>
           </div>
 
-          <label v-if="genMode !== 'lecture'" class="gen-field">
-            <span class="muted small">сколько тем</span>
-            <input v-model.number="genCount" type="number" min="3" max="20" />
+          <label v-if="genMode === 'course'" class="gen-field">
+            <span class="muted small">примерно тем, точное число выберет модель</span>
+            <input v-model.number="genCount" type="number" min="3" max="40" />
           </label>
 
-          <input v-if="genMode === 'lecture'" v-model="genTopic" placeholder="тема" />
+          <input v-else v-model="genTopic" placeholder="тема" />
 
-          <textarea v-model="genNotes" rows="2" placeholder="пожелания" />
-
-          <label v-if="genMode !== 'outline'" class="gen-check">
-            <input v-model="genWithImages" type="checkbox" />
-            <span>с картинками</span>
-          </label>
-
-          <ul v-if="genMode === 'outline' && genTopics.length" class="gen-list">
-            <li v-for="t in genTopics" :key="t.title">
-              <label>
-                <input v-model="genPicked[t.title]" type="checkbox" />
-                <span>
-                  <strong>{{ t.title }}</strong>
-                  <span class="muted small">{{ t.summary }}</span>
-                </span>
-              </label>
-            </li>
-          </ul>
+          <textarea
+            v-model="genNotes"
+            rows="4"
+            placeholder="что должно быть в курсе: темы, подтемы, требования"
+          />
 
           <div v-if="genMode === 'lecture' && genDraft" class="gen-preview">
-            <MarkdownText :text="genDraft.body" />
+            <MarkdownText :text="genDraft.body" variant="doc" />
           </div>
 
           <div v-if="genQueue.length" class="gen-progress">
@@ -984,9 +923,9 @@ onBeforeUnmount(() => {
               {{ genBusy ? "…" : genMode === "course" ? "создать курс" : "сгенерировать" }}
             </button>
             <button
-              v-if="genMode !== 'course'"
+              v-if="genMode === 'lecture'"
               type="button"
-              :disabled="genBusy || !canSaveGenerated"
+              :disabled="genBusy || !genDraft"
               @click="saveGenerated"
             >
               добавить
@@ -1428,41 +1367,6 @@ onBeforeUnmount(() => {
 .gen-field {
   display: grid;
   gap: 0.3rem;
-}
-
-.gen-check {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.88rem;
-  cursor: pointer;
-}
-
-.gen-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 0.5rem;
-  max-height: 40dvh;
-  overflow-y: auto;
-}
-
-.gen-list label {
-  display: flex;
-  align-items: start;
-  gap: 0.55rem;
-  cursor: pointer;
-}
-
-.gen-list label > span {
-  display: grid;
-  gap: 0.1rem;
-  min-width: 0;
-}
-
-.gen-list input[type="checkbox"] {
-  margin-top: 0.2rem;
 }
 
 .gen-preview {

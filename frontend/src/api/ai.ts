@@ -51,17 +51,9 @@ export function clearChatHistory(token: string, courseId: string) {
 
 export function generateCourseOutline(
   token: string,
-  payload: { title: string; description?: string; count?: number },
+  payload: { title: string; description?: string; count?: number; notes?: string },
 ) {
   return api<{ topics: AiOutlineTopic[] }>("/api/ai/course-outline", {
-    method: "POST",
-    token,
-    body: JSON.stringify(payload),
-  });
-}
-
-export function generateLectureImage(token: string, payload: { topic: string }) {
-  return api<{ url: string }>("/api/ai/image", {
     method: "POST",
     token,
     body: JSON.stringify(payload),
@@ -82,7 +74,14 @@ export type AiLectureDraft = {
 
 export function generateLectureDraft(
   token: string,
-  payload: { topic: string; course_title?: string; notes?: string },
+  payload: {
+    topic: string;
+    course_title?: string;
+    notes?: string;
+    scope?: string;
+    covered?: string[];
+    upcoming?: string[];
+  },
 ) {
   return api<AiLectureDraft>("/api/ai/lecture-draft", {
     method: "POST",

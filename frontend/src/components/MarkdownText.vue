@@ -2,18 +2,36 @@
 import { computed } from "vue";
 import { renderMarkdown } from "../utils/markdown";
 
-const props = defineProps<{ text: string }>();
+const props = defineProps<{ text: string; variant?: "doc" }>();
 const html = computed(() => renderMarkdown(props.text));
 </script>
 
 <template>
-  <div class="markdown-body" v-html="html" />
+  <div class="markdown-body" :class="{ doc: variant === 'doc' }" v-html="html" />
 </template>
 
 <style scoped>
 .markdown-body {
   line-height: 1.7;
   min-width: 0;
+}
+
+/* учебный текст: по левому краю, красная строка, полуторный интервал */
+.markdown-body.doc {
+  text-align: left;
+  line-height: 1.5;
+}
+.markdown-body.doc :deep(p) {
+  margin: 0 0 0.7rem;
+  text-indent: 1.25cm;
+}
+.markdown-body.doc :deep(li p),
+.markdown-body.doc :deep(blockquote p) {
+  text-indent: 0;
+}
+.markdown-body.doc :deep(h2),
+.markdown-body.doc :deep(h3) {
+  margin: 1.6rem 0 0.7rem;
 }
 .markdown-body :deep(> *:first-child) {
   margin-top: 0;

@@ -1,9 +1,7 @@
 const DEFAULT_BASE = "https://generativelanguage.googleapis.com/v1beta";
 const DEFAULT_MODEL = "gemini-2.5-flash";
-const DEFAULT_IMAGE_MODEL = "gemini-2.5-flash-image";
 /** если заданной модели нет — пробуем эти по очереди */
 const TEXT_FALLBACKS = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-2.0-flash"];
-const IMAGE_FALLBACKS = ["gemini-2.5-flash-image", "gemini-2.0-flash-preview-image-generation"];
 
 export function geminiKey() {
   return process.env.GEMINI_API_KEY?.trim() ?? "";
@@ -20,10 +18,6 @@ export function geminiEnabled() {
 
 function textModel() {
   return process.env.GEMINI_MODEL?.trim() || DEFAULT_MODEL;
-}
-
-function imageModel() {
-  return process.env.GEMINI_IMAGE_MODEL?.trim() || DEFAULT_IMAGE_MODEL;
 }
 
 function modelChain(primary, fallbacks) {
@@ -156,27 +150,6 @@ export async function geminiGenerate(opts) {
 /** длинное тире — самый заметный след ии-текста, промпта мало */
 function humanize(text) {
   return text.replace(/(\d)\s*[—–]\s*(\d)/g, "$1-$2").replace(/\s*[—–]\s*/g, " - ");
-}
-
-/**
- * @param {string} prompt
- * @returns {Promise<{ buffer: Buffer, mime: string }>}
- */
-export async function geminiGenerateImage(prompt) {
-  if (!geminiKey()) throw aiError("ai_disabled");
-
-  const body = {
-    contents: [{ role: "user", parts: [{ text: prompt }] }],
-    generationConfig: { responseModalities: ["IMAGE"] },
-  };
-  const data = await callWithFallback(modelChain(imageModel(), IMAGE_FALLBACKS), body, 90_000);
-
-  const parts = data?.candidates?.[0]?.content?.parts ?? [];
-  const image = parts.find((p) => p?.inlineData?.data);
-  if (!image) throw aiError("ai_empty", blockedDetail(data));
-  const mime = String(image.inlineData.mimeType ?? "image/png");
-  if (!/^image\/(png|jpeg|webp)$/.test(mime)) throw aiError("ai_failed", `mime ${mime}`);
-  return { buffer: Buffer.from(image.inlineData.data, "base64"), mime };
 }
 
 /**
