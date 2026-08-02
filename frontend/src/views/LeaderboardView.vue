@@ -3,6 +3,8 @@ import { computed, onMounted, ref, watch } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import AppIcon from "../components/AppIcon.vue";
 import AppLoading from "../components/AppLoading.vue";
+import MotionStagger from "../components/MotionStagger.vue";
+import MotionStaggerItem from "../components/MotionStaggerItem.vue";
 import PageHeader from "../components/PageHeader.vue";
 import { listLeaderboard, type LeaderboardEntry } from "../api/leaderboard";
 import { useAuthStore } from "../stores/auth";
@@ -87,8 +89,14 @@ onMounted(load);
     <AppLoading v-else-if="loading" class="page-empty" />
     <p v-else-if="!list.length" class="page-empty muted">пусто</p>
     <p v-else-if="search.trim() && !visible.length" class="page-empty muted">ничего не найдено</p>
-    <ol v-else class="list">
-      <li v-for="u in visible" :key="u.id" class="row" :class="{ top: u.rank <= 3 }">
+    <MotionStagger v-else :list-key="`${search.trim()}-${visible.length}`" class="list">
+      <MotionStaggerItem
+        v-for="u in visible"
+        :key="u.id"
+        class="row"
+        :class="{ top: u.rank <= 3 }"
+        :interactive="false"
+      >
         <span class="rank">{{ u.rank }}</span>
         <RouterLink :to="`/u/${u.nickname}`" class="user">
           <img v-if="u.avatar_url" :src="u.avatar_url" alt="" />
@@ -99,8 +107,8 @@ onMounted(load);
           <img src="/coin-gem.png" alt="" width="16" height="16" loading="lazy" />
           {{ u.coins }}
         </span>
-      </li>
-    </ol>
+      </MotionStaggerItem>
+    </MotionStagger>
   </section>
 </template>
 
