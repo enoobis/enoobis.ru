@@ -533,14 +533,15 @@ input[type="search"]::-webkit-search-cancel-button:hover {
 .filter-tabs {
   position: relative;
   display: flex;
-  gap: 0.2rem;
+  gap: 2px;
   flex: 1 1 auto;
   min-width: 0;
   align-items: stretch;
-  padding: 0.2rem;
+  padding: 3px;
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
   background: var(--surface2);
+  box-sizing: border-box;
 }
 
 .filter-tabs-thumb {
@@ -551,7 +552,7 @@ input[type="search"]::-webkit-search-cancel-button:hover {
   height: 0;
   border-radius: var(--radius-pill);
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: none;
   pointer-events: none;
   z-index: 0;
   opacity: 0;
@@ -562,6 +563,7 @@ input[type="search"]::-webkit-search-cancel-button:hover {
     height var(--dur-3) var(--ease-snap),
     opacity var(--dur-2) var(--ease-out);
   will-change: transform, width, height;
+  box-sizing: border-box;
 }
 
 .filter-tabs--motion .filter-tab {
@@ -569,14 +571,15 @@ input[type="search"]::-webkit-search-cancel-button:hover {
   z-index: 1;
 }
 
-.filter-tab {
+/* beat global `button` border/padding so the active fill has no double ring */
+.filter-tabs .filter-tab {
   flex: 1 1 auto;
-  min-height: calc(var(--control-h) - 0.4rem);
+  min-height: calc(var(--control-h) - 6px);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 0.35rem 0.85rem;
-  border: 1px solid transparent;
+  border: none;
   border-radius: var(--radius-pill);
   background: transparent;
   color: var(--muted);
@@ -588,23 +591,23 @@ input[type="search"]::-webkit-search-cancel-button:hover {
   white-space: nowrap;
   cursor: pointer;
   transition: color var(--dur-2) var(--ease-out);
+  box-sizing: border-box;
+  overflow: visible;
 }
 
-.filter-tab:hover {
+.filter-tabs .filter-tab:hover {
   color: var(--text);
   background: transparent;
   border-color: transparent;
 }
 
-.filter-tab.on {
+.filter-tabs .filter-tab.on {
   color: var(--text);
   background: var(--surface);
-  border-color: var(--border);
 }
 
 .filter-tabs--motion .filter-tab.on {
   background: transparent;
-  border-color: transparent;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -862,17 +865,14 @@ input[type="search"]::-webkit-search-cancel-button:hover {
   .filter-tabs::-webkit-scrollbar {
     display: none;
   }
-  .filter-tab {
+  .filter-tabs .filter-tab {
     flex: 0 0 auto;
     justify-content: center;
   }
-  /* admin: keep one row — wrap + pill radius left a hollow bottom */
   .admin-tabs.filter-tabs {
     flex-wrap: nowrap;
-    align-content: center;
-    align-items: center;
+    align-items: stretch;
     overflow-x: auto;
-    padding: 0.2rem;
   }
   .admin-tabs .filter-tab {
     flex: 0 0 auto;
