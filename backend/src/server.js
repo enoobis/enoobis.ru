@@ -23,6 +23,7 @@ import storageRoutes from "./routes/storageRoutes.js";
 import libraryRoutes from "./routes/libraryRoutes.js";
 import shopRoutes from "./routes/shopRoutes.js";
 import workRoutes from "./routes/workRoutes.js";
+import aiRoutes from "./routes/aiRoutes.js";
 
 getJwtSecret();
 
@@ -51,6 +52,7 @@ app.use("/api", storageRoutes);
 app.use("/api", libraryRoutes);
 app.use("/api", shopRoutes);
 app.use("/api", workRoutes);
+app.use("/api", aiRoutes);
 app.use("/api", adminRoutes);
 
 app.use("/api", (req, res) => res.status(404).json({ error: "api not found" }));

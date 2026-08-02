@@ -1008,6 +1008,9 @@ html.profile-wallpaper-desktop .layout {
   padding-left: 0;
   padding-right: 0;
 }
+html.course-reader .layout {
+  max-width: 1180px;
+}
 html.profile-wallpaper-desktop #app {
   position: relative;
   z-index: 1;

@@ -1493,6 +1493,12 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
         <div class="course-head-top">
           <button class="back" type="button" @click="closeCourse">← к курсам</button>
           <div class="course-head-actions">
+            <RouterLink
+              :to="`/courses/${classroom.course.id}/learn`"
+              class="course-read-link"
+            >
+              читать
+            </RouterLink>
             <span
               v-if="classroom.course.is_pinned"
               class="course-card-pin"
@@ -2881,6 +2887,18 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   align-items: center;
   gap: 0.35rem;
   flex-shrink: 0;
+}
+.course-read-link {
+  padding: 0.3rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+.course-read-link:hover {
+  color: var(--text);
+  border-color: var(--text);
+  text-decoration: none;
 }
 .course-head h2 {
   margin: 0;

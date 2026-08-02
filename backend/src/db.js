@@ -1057,4 +1057,12 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_work_checkins_created ON work_checkins(created_at DESC);
   CREATE INDEX IF NOT EXISTS idx_work_checkins_user ON work_checkins(user_id);
+
+  CREATE TABLE IF NOT EXISTS ai_usage (
+    user_id TEXT NOT NULL,
+    day TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    count INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, day, kind)
+  );
 `);
