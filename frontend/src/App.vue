@@ -96,7 +96,7 @@ const headerSheetOpen = computed(
 );
 const navFullSheetOpen = computed(() => headerSheetOpen.value && !sheetMobile.value);
 const headerBackdropOpen = computed(
-  () => (profileMenuOpen.value || searchDropdownOpen.value) && !sheetMobile.value,
+  () => searchDropdownOpen.value && !sheetMobile.value,
 );
 
 function syncHeaderSheetDocumentClass() {
@@ -1061,7 +1061,7 @@ function submitReaderPage() {
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.35);
+  background: transparent;
 }
 
 .nav-menu-root--mobile {
