@@ -1677,14 +1677,17 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
           <button
             v-if="isTeacherInCurrent"
             type="button"
-            class="secondary"
+            class="secondary desktop-only"
             :class="{ active: addingLecture }"
             @click="addingLecture = !addingLecture"
           >
             {{ addingLecture ? "отмена" : "+ лекция" }}
           </button>
         </div>
-        <div v-if="isTeacherInCurrent && addingLecture && !selectedLecture" class="form-card">
+        <div
+          v-if="isTeacherInCurrent && addingLecture && !selectedLecture"
+          class="form-card desktop-only"
+        >
           <input v-model="lectureTitle" placeholder="название" />
           <textarea v-model="lectureBody" rows="4" placeholder="текст" />
           <input v-model="lectureVideoUrl" placeholder="ссылка на видео" />
