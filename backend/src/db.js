@@ -52,7 +52,8 @@ db.exec(`
     slug TEXT NOT NULL,
     excerpt TEXT NOT NULL DEFAULT '',
     cover_image_url TEXT NOT NULL DEFAULT '',
-    is_deleted INTEGER NOT NULL DEFAULT 0
+    is_deleted INTEGER NOT NULL DEFAULT 0,
+    is_pinned INTEGER NOT NULL DEFAULT 0
   );
   CREATE INDEX IF NOT EXISTS idx_blog_posts_author ON blog_posts(author_id);
   CREATE INDEX IF NOT EXISTS idx_blog_posts_status_published ON blog_posts(status);
@@ -329,6 +330,16 @@ try {
 } catch {
   try {
     db.exec("ALTER TABLE blog_post_likes ADD COLUMN vote INTEGER NOT NULL DEFAULT 1");
+  } catch {
+    // ignore
+  }
+}
+
+try {
+  db.prepare("SELECT is_pinned FROM blog_posts LIMIT 1").get();
+} catch {
+  try {
+    db.exec("ALTER TABLE blog_posts ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0");
   } catch {
     // ignore
   }

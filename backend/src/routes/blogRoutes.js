@@ -47,6 +47,7 @@ function rowToListItem(row) {
     categories: categoriesForPost(row.id),
     ...voteSummary("blog_post_likes", "post_id", row.id, null),
     comment_count: commentCount(row.id),
+    is_pinned: !!row.is_pinned,
   };
 }
 
@@ -113,12 +114,12 @@ function listPaged(req, opts) {
     get(`SELECT COUNT(*) as v FROM blog_posts bp WHERE ${where}`, ...params)?.v ?? 0;
   const items = all(
     `SELECT bp.id, bp.title, bp.slug, bp.excerpt, bp.cover_image_url, bp.status,
-            bp.created_at, bp.published_at, bp.updated_at,
+            bp.created_at, bp.published_at, bp.updated_at, bp.is_pinned,
             u.nickname as author_nickname
      FROM blog_posts bp
      JOIN users u ON u.id = bp.author_id
      WHERE ${where}
-     ORDER BY COALESCE(bp.published_at, bp.created_at) DESC
+     ORDER BY bp.is_pinned DESC, COALESCE(bp.published_at, bp.created_at) DESC
      LIMIT ? OFFSET ?`,
     ...params,
     pageSize,
@@ -158,7 +159,7 @@ router.get("/blog/bookmarks/me", authRequired, (req, res) => {
     )?.v ?? 0;
   const items = all(
     `SELECT bp.id, bp.title, bp.slug, bp.excerpt, bp.cover_image_url, bp.status,
-            bp.created_at, bp.published_at, bp.updated_at,
+            bp.created_at, bp.published_at, bp.updated_at, bp.is_pinned,
             u.nickname as author_nickname
      FROM blog_post_bookmarks b
      JOIN blog_posts bp ON bp.id = b.post_id
@@ -241,6 +242,7 @@ function fetchPostFull(id, viewer) {
     comment_count: commentCount(id),
     bookmarked_by_me: bookmarked,
     can_edit,
+    is_pinned: !!row.is_pinned,
   };
 }
 
@@ -485,11 +487,29 @@ router.post("/blog/:id/recall", authRequired, (req, res) => {
   if (req.user.role !== "admin") return res.status(403).json({ error: "forbidden" });
   if (row.status !== "published") return res.status(400).json({ error: "not published" });
   run(
-    "UPDATE blog_posts SET status = 'recalled', updated_at = ? WHERE id = ?",
+    "UPDATE blog_posts SET status = 'recalled', is_pinned = 0, updated_at = ? WHERE id = ?",
     nowIso(),
     req.params.id,
   );
   return res.json({ ok: true, status: "recalled" });
+});
+
+router.post("/blog/:id/pin", authRequired, (req, res) => {
+  const row = get(
+    "SELECT status FROM blog_posts WHERE id = ? AND is_deleted = 0",
+    req.params.id,
+  );
+  if (!row) return res.status(404).json({ error: "not found" });
+  if (req.user.role !== "admin") return res.status(403).json({ error: "forbidden" });
+  if (row.status !== "published") return res.status(400).json({ error: "not published" });
+  const wantPin = req.body?.pinned === true;
+  run(
+    "UPDATE blog_posts SET is_pinned = ?, updated_at = ? WHERE id = ?",
+    wantPin ? 1 : 0,
+    nowIso(),
+    req.params.id,
+  );
+  return res.json({ ok: true, is_pinned: wantPin });
 });
 
 router.delete("/blog/:id", authRequired, (req, res) => {

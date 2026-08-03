@@ -16,6 +16,7 @@ export type BlogListItem = {
   up_count: number;
   down_count: number;
   comment_count: number;
+  is_pinned?: boolean;
 };
 
 export type BlogPost = {
@@ -41,6 +42,7 @@ export type BlogPost = {
   comment_count: number;
   bookmarked_by_me: boolean;
   can_edit: boolean;
+  is_pinned?: boolean;
 };
 
 export type PagedPosts = {
@@ -196,6 +198,14 @@ export function archivePost(id: string, token: string) {
 
 export function recallBlogPost(id: string, token: string) {
   return api<{ ok: boolean; status: string }>(`/api/blog/${id}/recall`, { method: "POST", token });
+}
+
+export function setBlogPinned(id: string, pinned: boolean, token: string) {
+  return api<{ ok: true; is_pinned: boolean }>(`/api/blog/${id}/pin`, {
+    method: "POST",
+    token,
+    body: JSON.stringify({ pinned }),
+  });
 }
 
 export function deletePost(id: string, token: string) {

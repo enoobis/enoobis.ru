@@ -13,6 +13,7 @@ import {
   recallBlogPost,
   reportComment,
   reportPost,
+  setBlogPinned,
   votePost,
   unbookmarkPost,
   type BlogPost,
@@ -253,6 +254,20 @@ async function recallPost() {
   }
 }
 
+async function togglePin() {
+  if (!auth.token || !post.value || working.value || auth.role !== "admin" || !isPublished.value) return;
+  working.value = true;
+  try {
+    const next = !post.value.is_pinned;
+    const res = await setBlogPinned(post.value.id, next, auth.token);
+    post.value = { ...post.value, is_pinned: res.is_pinned };
+  } catch (e) {
+    err.value = e instanceof Error ? e.message : "ошибка";
+  } finally {
+    working.value = false;
+  }
+}
+
 onMounted(() => {
   window.addEventListener("scroll", persistProgress, { passive: true });
   document.addEventListener("visibilitychange", onPostVisibility);
@@ -307,6 +322,17 @@ watch(() => route.params.id, load);
       <span class="post-actions-gap" aria-hidden="true" />
       <button v-if="isPublished" class="act" type="button" title="поделиться" @click="sharePost">
         <AppIcon name="send" :size="ACT" />
+      </button>
+      <button
+        v-if="auth.role === 'admin' && isPublished"
+        class="act"
+        type="button"
+        :class="{ on: post.is_pinned }"
+        :title="post.is_pinned ? 'снять закреп' : 'закрепить'"
+        :disabled="working"
+        @click="togglePin"
+      >
+        <AppIcon name="pinned" :size="ACT" />
       </button>
       <button
         v-if="auth.role === 'admin' && isPublished"

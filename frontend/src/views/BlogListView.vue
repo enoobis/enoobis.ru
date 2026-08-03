@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import PageHeader from "../components/PageHeader.vue";
+import AppIcon from "../components/AppIcon.vue";
 import AppLoading from "../components/AppLoading.vue";
 import PostMetaStats from "../components/PostMetaStats.vue";
 import {
@@ -51,8 +52,15 @@ function onDocumentClick(event: MouseEvent) {
 
 const sortedPosts = computed(() => {
   const items = posts.value.slice();
-  if (sort.value === "popular") items.sort((a, b) => b.up_count - a.up_count);
-  else if (sort.value === "discussed") items.sort((a, b) => b.comment_count - a.comment_count);
+  const pinFirst = (a: BlogListItem, b: BlogListItem) =>
+    Number(!!b.is_pinned) - Number(!!a.is_pinned);
+  if (sort.value === "popular") {
+    items.sort((a, b) => pinFirst(a, b) || b.up_count - a.up_count);
+  } else if (sort.value === "discussed") {
+    items.sort((a, b) => pinFirst(a, b) || b.comment_count - a.comment_count);
+  } else {
+    items.sort(pinFirst);
+  }
   return items;
 });
 
@@ -266,7 +274,10 @@ onBeforeUnmount(() => {
     <template v-else>
       <ul v-if="sortedPosts.length" class="post-list">
         <li v-for="p in sortedPosts" :key="p.id">
-          <RouterLink :to="`/blogs/${p.id}`" class="post-title">{{ p.title }}</RouterLink>
+          <RouterLink :to="`/blogs/${p.id}`" class="post-title">
+            <AppIcon v-if="p.is_pinned" name="pinned" :size="14" class="pin-mark" />
+            <span>{{ p.title }}</span>
+          </RouterLink>
           <p v-if="p.excerpt" class="excerpt muted">{{ p.excerpt }}</p>
           <div class="meta muted">
             <span>{{ p.author_nickname }}</span>
@@ -328,9 +339,16 @@ onBeforeUnmount(() => {
   gap: 0.3rem;
 }
 .post-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
   color: var(--text);
   font-size: 1.1rem;
   font-weight: 500;
+}
+.pin-mark {
+  flex-shrink: 0;
+  color: var(--muted);
 }
 .excerpt {
   margin: 0;
