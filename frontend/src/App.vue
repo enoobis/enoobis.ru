@@ -1208,6 +1208,8 @@ function submitReaderPage() {
   min-height: 48px;
   font-size: 1.08rem;
   padding: 0.8rem 1rem;
+  justify-content: center;
+  text-align: center;
 }
 
 .nav-menu-enter-active .nav-menu-sheet,
