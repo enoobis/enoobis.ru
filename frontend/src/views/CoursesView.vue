@@ -1938,7 +1938,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
                 </ul>
               </section>
 
-              <div v-if="isTeacherInCurrent" class="lecture-add-task">
+              <div v-if="isTeacherInCurrent" class="lecture-add-task desktop-only">
                 <template v-if="addTaskForLectureId === selectedLecture.id">
                   <input v-model="addTaskTitle" placeholder="название задания" />
                   <textarea v-model="addTaskDesc" rows="2" placeholder="описание" />
