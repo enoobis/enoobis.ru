@@ -128,31 +128,113 @@ function openLecture(id: string) {
   window.scrollTo({ top: 0 });
 }
 
-const ordering = ref(false);
-const savingOrder = ref(false);
+/* ---------- перетаскивание тем (преподаватель) ---------- */
 
-async function moveLecture(index: number, delta: number) {
-  if (!auth.token || !classroom.value || savingOrder.value) return;
+const topicListRef = ref<HTMLElement | null>(null);
+const dragIndex = ref(-1);
+const dragging = computed(() => dragIndex.value >= 0);
+
+let pressIndex = -1;
+let pressY = 0;
+let pressTimer = 0;
+let orderBefore: string[] = [];
+let dragged = false;
+
+function rowTops(): number[] {
+  const rows = topicListRef.value?.querySelectorAll<HTMLElement>(".topic-row") ?? [];
+  return Array.from(rows).map((el) => {
+    const r = el.getBoundingClientRect();
+    return r.top + r.height / 2;
+  });
+}
+
+function blockTouchScroll(e: TouchEvent) {
+  if (dragging.value) e.preventDefault();
+}
+
+function beginDrag(index: number) {
+  dragIndex.value = index;
+  dragged = true;
+  orderBefore = lectures.value.map((l) => l.id);
+  document.addEventListener("touchmove", blockTouchScroll, { passive: false });
+}
+
+function endPress() {
+  window.clearTimeout(pressTimer);
+  pressIndex = -1;
+  window.removeEventListener("pointermove", onPointerMove);
+  window.removeEventListener("pointerup", onPointerUp);
+  window.removeEventListener("pointercancel", onPointerUp);
+  document.removeEventListener("touchmove", blockTouchScroll);
+}
+
+function onTopicPointerDown(e: PointerEvent, index: number) {
+  if (!isTeacher.value || e.button > 0) return;
+  pressIndex = index;
+  pressY = e.clientY;
+  dragged = false;
+  window.addEventListener("pointermove", onPointerMove);
+  window.addEventListener("pointerup", onPointerUp);
+  window.addEventListener("pointercancel", onPointerUp);
+  /* палец: тянем после удержания, чтобы список можно было листать */
+  if (e.pointerType !== "mouse") {
+    pressTimer = window.setTimeout(() => {
+      if (pressIndex >= 0) beginDrag(pressIndex);
+    }, 280);
+  }
+}
+
+function onPointerMove(e: PointerEvent) {
+  if (pressIndex < 0 || !classroom.value) return;
+  if (!dragging.value) {
+    const far = Math.abs(e.clientY - pressY) > 6;
+    if (!far) return;
+    if (e.pointerType !== "mouse") {
+      window.clearTimeout(pressTimer);
+      endPress();
+      return;
+    }
+    beginDrag(pressIndex);
+  }
+
+  const tops = rowTops();
+  let to = tops.findIndex((mid) => e.clientY < mid);
+  if (to < 0) to = tops.length - 1;
+  if (to === dragIndex.value) return;
+
   const list = [...lectures.value];
-  const to = index + delta;
-  if (to < 0 || to >= list.length) return;
-  const [moved] = list.splice(index, 1);
+  const [moved] = list.splice(dragIndex.value, 1);
   list.splice(to, 0, moved);
   classroom.value = { ...classroom.value, lectures: list };
-  savingOrder.value = true;
+  dragIndex.value = to;
+}
+
+function onPointerUp() {
+  const wasDragging = dragging.value;
+  dragIndex.value = -1;
+  endPress();
+  if (wasDragging) void saveOrder();
+}
+
+async function saveOrder() {
+  if (!auth.token || !classroom.value) return;
+  const ids = lectures.value.map((l) => l.id);
+  if (ids.join() === orderBefore.join()) return;
   err.value = "";
   try {
-    await reorderLectures(
-      classroom.value.course.id,
-      list.map((l) => l.id),
-      auth.token,
-    );
+    await reorderLectures(classroom.value.course.id, ids, auth.token);
   } catch (e) {
     err.value = errorText(e);
     await load();
-  } finally {
-    savingOrder.value = false;
   }
+}
+
+function onTopicClick(id: string) {
+  if (dragged) {
+    dragged = false;
+    return;
+  }
+  openLecture(id);
 }
 
 async function downloadLecture() {
@@ -643,6 +725,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   document.documentElement.classList.remove("course-reader");
   document.removeEventListener("keydown", onEscape);
+  endPress();
 });
 </script>
 
@@ -660,15 +743,6 @@ onBeforeUnmount(() => {
           </button>
           <span class="side-title">{{ classroom.course.title }}</span>
           <button
-            v-if="isTeacher && lectures.length > 1"
-            type="button"
-            class="filter-icon-btn"
-            :aria-label="ordering ? 'готово' : 'порядок тем'"
-            @click="ordering = !ordering"
-          >
-            <AppIcon :name="ordering ? 'check' : 'sort'" :size="17" />
-          </button>
-          <button
             type="button"
             class="filter-icon-btn only-narrow"
             aria-label="закрыть"
@@ -678,39 +752,20 @@ onBeforeUnmount(() => {
           </button>
         </header>
 
-        <nav class="topic-list">
-          <div
+        <nav ref="topicListRef" class="topic-list" :class="{ dragging }">
+          <button
             v-for="(l, i) in lectures"
             :key="l.id"
-            class="topic-row"
-            :class="{ on: l.id === activeLecture?.id }"
+            type="button"
+            class="topic topic-row"
+            :class="{ on: l.id === activeLecture?.id, held: dragIndex === i, movable: isTeacher }"
+            @pointerdown="onTopicPointerDown($event, i)"
+            @click="onTopicClick(l.id)"
           >
-            <button type="button" class="topic" :disabled="ordering" @click="openLecture(l.id)">
-              <span class="topic-num muted">{{ i + 1 }}</span>
-              <span class="topic-title">{{ l.title }}</span>
-              <AppIcon v-if="lectureDone(l.id)" name="seen" :size="15" class="topic-done" />
-            </button>
-            <template v-if="ordering">
-              <button
-                type="button"
-                class="topic-move"
-                aria-label="выше"
-                :disabled="i === 0 || savingOrder"
-                @click="moveLecture(i, -1)"
-              >
-                <AppIcon name="up" :size="15" />
-              </button>
-              <button
-                type="button"
-                class="topic-move"
-                aria-label="ниже"
-                :disabled="i === lectures.length - 1 || savingOrder"
-                @click="moveLecture(i, 1)"
-              >
-                <AppIcon name="down" :size="15" />
-              </button>
-            </template>
-          </div>
+            <span class="topic-num muted">{{ i + 1 }}</span>
+            <span class="topic-title">{{ l.title }}</span>
+            <AppIcon v-if="lectureDone(l.id)" name="seen" :size="15" class="topic-done" />
+          </button>
           <p v-if="!lectures.length" class="side-empty muted">тем нет</p>
         </nav>
 
@@ -1089,28 +1144,11 @@ onBeforeUnmount(() => {
   flex: 1;
 }
 
-.topic-row {
-  display: flex;
-  align-items: center;
-  gap: 0.15rem;
-  border-radius: var(--radius);
-}
-
-.topic-row:hover,
-.topic-row.on {
-  background: var(--surface);
-}
-
-.topic-row.on .topic {
-  color: var(--text);
-}
-
 .topic {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  flex: 1;
-  min-width: 0;
+  width: 100%;
   min-height: 0;
   padding: 0.5rem 0.65rem;
   border: none;
@@ -1122,13 +1160,24 @@ onBeforeUnmount(() => {
   text-transform: lowercase;
 }
 
-.topic:hover {
-  background: transparent;
+.topic:hover,
+.topic.on {
+  background: var(--surface);
   color: var(--text);
 }
 
-.topic:disabled {
-  cursor: default;
+.topic.movable {
+  cursor: grab;
+}
+
+.topic.held {
+  cursor: grabbing;
+  background: var(--surface2);
+  color: var(--text);
+}
+
+.topic-list.dragging {
+  user-select: none;
 }
 
 .topic-num {
@@ -1136,29 +1185,6 @@ onBeforeUnmount(() => {
   min-width: 1.1rem;
   font-size: 0.78rem;
   font-variant-numeric: tabular-nums;
-}
-
-.topic-move {
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.7rem;
-  height: 1.7rem;
-  padding: 0;
-  border: none;
-  border-radius: var(--radius);
-  background: transparent;
-  color: var(--muted);
-}
-
-.topic-move:hover:not(:disabled) {
-  color: var(--text);
-  background: var(--surface2);
-}
-
-.topic-move:disabled {
-  opacity: 0.35;
 }
 
 .topic-title {
@@ -1217,12 +1243,14 @@ onBeforeUnmount(() => {
   min-width: 0;
 }
 
+/* заголовок — часть документа, значит тот же гост-шрифт */
 .lecture-title {
   margin: 0;
-  font-size: 1.45rem;
-  font-weight: 600;
-  letter-spacing: -0.03em;
-  line-height: 1.2;
+  font-family: "Times New Roman", Times, serif;
+  font-size: 18pt;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.3;
   text-transform: lowercase;
 }
 
@@ -1572,7 +1600,7 @@ onBeforeUnmount(() => {
   }
 
   .lecture-title {
-    font-size: 1.25rem;
+    font-size: 16pt;
   }
 
   /* 14pt на узком экране рвёт строки, читаем чуть мельче */
@@ -1605,11 +1633,6 @@ onBeforeUnmount(() => {
   .topic {
     min-height: 2.75rem;
     font-size: 0.95rem;
-  }
-
-  .topic-move {
-    width: 2.4rem;
-    height: 2.4rem;
   }
 
   .reader-topics.open {

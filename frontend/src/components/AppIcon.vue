@@ -1,14 +1,10 @@
 <script setup lang="ts">
 import { computed, type Component } from "vue";
 import {
-  ArrowDown,
-  ArrowDownUp,
-  ArrowUp,
   Ban,
   Bold,
   Bookmark,
   BriefcaseBusiness,
-  Check,
   ChevronLeft,
   Code,
   Contrast,
@@ -125,10 +121,6 @@ export type AppIconName =
   | "qr"
   | "briefcase"
   | "users"
-  | "sort"
-  | "up"
-  | "down"
-  | "check"
   | "plus";
 
 const icons: Record<AppIconName, Component> = {
@@ -192,10 +184,6 @@ const icons: Record<AppIconName, Component> = {
   qr: QrCode,
   briefcase: BriefcaseBusiness,
   users: Users,
-  sort: ArrowDownUp,
-  up: ArrowUp,
-  down: ArrowDown,
-  check: Check,
   plus: Plus,
 };
 
