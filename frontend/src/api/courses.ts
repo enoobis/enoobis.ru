@@ -401,6 +401,14 @@ export function createLecture(
   });
 }
 
+export function reorderLectures(courseId: string, ids: string[], token: string) {
+  return api<{ ok: true }>(`/api/courses/${courseId}/lectures-order`, {
+    method: "PATCH",
+    token,
+    body: JSON.stringify({ ids }),
+  });
+}
+
 export function deleteLecture(courseId: string, lectureId: string, token: string) {
   return api<{ ok: true }>(`/api/courses/${courseId}/lectures/${lectureId}`, {
     method: "DELETE",

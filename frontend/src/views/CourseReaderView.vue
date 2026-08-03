@@ -10,6 +10,7 @@ import {
   deleteLecture,
   getClassroom,
   patchLecture,
+  reorderLectures,
   submitAssignment,
   uploadSubmissionFile,
   type Assignment,
@@ -125,6 +126,33 @@ function openLecture(id: string) {
   editing.value = null;
   void router.replace({ query: { ...route.query, lecture: id } });
   window.scrollTo({ top: 0 });
+}
+
+const ordering = ref(false);
+const savingOrder = ref(false);
+
+async function moveLecture(index: number, delta: number) {
+  if (!auth.token || !classroom.value || savingOrder.value) return;
+  const list = [...lectures.value];
+  const to = index + delta;
+  if (to < 0 || to >= list.length) return;
+  const [moved] = list.splice(index, 1);
+  list.splice(to, 0, moved);
+  classroom.value = { ...classroom.value, lectures: list };
+  savingOrder.value = true;
+  err.value = "";
+  try {
+    await reorderLectures(
+      classroom.value.course.id,
+      list.map((l) => l.id),
+      auth.token,
+    );
+  } catch (e) {
+    err.value = errorText(e);
+    await load();
+  } finally {
+    savingOrder.value = false;
+  }
 }
 
 async function downloadLecture() {
@@ -631,20 +659,58 @@ onBeforeUnmount(() => {
             <AppIcon name="back" :size="18" />
           </button>
           <span class="side-title">{{ classroom.course.title }}</span>
+          <button
+            v-if="isTeacher && lectures.length > 1"
+            type="button"
+            class="filter-icon-btn"
+            :aria-label="ordering ? 'готово' : 'порядок тем'"
+            @click="ordering = !ordering"
+          >
+            <AppIcon :name="ordering ? 'check' : 'sort'" :size="17" />
+          </button>
+          <button
+            type="button"
+            class="filter-icon-btn only-narrow"
+            aria-label="закрыть"
+            @click="topicsOpen = false"
+          >
+            <AppIcon name="close" :size="18" />
+          </button>
         </header>
 
         <nav class="topic-list">
-          <button
-            v-for="l in lectures"
+          <div
+            v-for="(l, i) in lectures"
             :key="l.id"
-            type="button"
-            class="topic"
+            class="topic-row"
             :class="{ on: l.id === activeLecture?.id }"
-            @click="openLecture(l.id)"
           >
-            <span class="topic-title">{{ l.title }}</span>
-            <AppIcon v-if="lectureDone(l.id)" name="seen" :size="15" class="topic-done" />
-          </button>
+            <button type="button" class="topic" :disabled="ordering" @click="openLecture(l.id)">
+              <span class="topic-num muted">{{ i + 1 }}</span>
+              <span class="topic-title">{{ l.title }}</span>
+              <AppIcon v-if="lectureDone(l.id)" name="seen" :size="15" class="topic-done" />
+            </button>
+            <template v-if="ordering">
+              <button
+                type="button"
+                class="topic-move"
+                aria-label="выше"
+                :disabled="i === 0 || savingOrder"
+                @click="moveLecture(i, -1)"
+              >
+                <AppIcon name="up" :size="15" />
+              </button>
+              <button
+                type="button"
+                class="topic-move"
+                aria-label="ниже"
+                :disabled="i === lectures.length - 1 || savingOrder"
+                @click="moveLecture(i, 1)"
+              >
+                <AppIcon name="down" :size="15" />
+              </button>
+            </template>
+          </div>
           <p v-if="!lectures.length" class="side-empty muted">тем нет</p>
         </nav>
 
@@ -968,8 +1034,8 @@ onBeforeUnmount(() => {
 
 .reader-grid {
   display: grid;
-  grid-template-columns: 224px minmax(0, 1fr) 320px;
-  gap: var(--space-4);
+  grid-template-columns: 240px minmax(0, 1fr) 360px;
+  gap: var(--space-5);
   align-items: start;
 }
 
@@ -987,7 +1053,7 @@ onBeforeUnmount(() => {
   max-height: calc(100dvh - 6rem);
 }
 
-/* чат тянется на всю высоту экрана, чтобы поле ввода стояло внизу */
+/* чат фиксированной высоты: поле ввода всегда у нижнего края панели */
 .reader-chat {
   height: calc(100dvh - 6rem);
 }
@@ -1016,15 +1082,35 @@ onBeforeUnmount(() => {
 .topic-list {
   display: grid;
   gap: 1px;
+  align-content: start;
   overflow-y: auto;
+  overscroll-behavior: contain;
   min-height: 0;
+  flex: 1;
+}
+
+.topic-row {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  border-radius: var(--radius);
+}
+
+.topic-row:hover,
+.topic-row.on {
+  background: var(--surface);
+}
+
+.topic-row.on .topic {
+  color: var(--text);
 }
 
 .topic {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   min-height: 0;
   padding: 0.5rem 0.65rem;
   border: none;
@@ -1036,10 +1122,43 @@ onBeforeUnmount(() => {
   text-transform: lowercase;
 }
 
-.topic:hover,
-.topic.on {
-  background: var(--surface);
+.topic:hover {
+  background: transparent;
   color: var(--text);
+}
+
+.topic:disabled {
+  cursor: default;
+}
+
+.topic-num {
+  flex-shrink: 0;
+  min-width: 1.1rem;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.topic-move {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--muted);
+}
+
+.topic-move:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--surface2);
+}
+
+.topic-move:disabled {
+  opacity: 0.35;
 }
 
 .topic-title {
@@ -1279,9 +1398,12 @@ onBeforeUnmount(() => {
 
 /* ---------- чат ---------- */
 
+/* панель с рамкой: поле ввода прижато к её низу и не выглядит оторванным */
 .reader-chat {
-  border-left: 1px solid var(--border);
-  padding-left: var(--space-4);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
 }
 
 .chat-head {
@@ -1449,20 +1571,45 @@ onBeforeUnmount(() => {
     padding-bottom: calc(var(--control-h) + var(--space-8));
   }
 
+  .lecture-title {
+    font-size: 1.25rem;
+  }
+
+  /* 14pt на узком экране рвёт строки, читаем чуть мельче */
+  .lecture :deep(.markdown-body.doc) {
+    font-size: 12.5pt;
+  }
+
+  .lecture :deep(.markdown-body.doc p) {
+    text-indent: 1cm;
+  }
+
   .reader-topics {
     position: fixed;
     top: 0;
     bottom: 0;
     left: 0;
     z-index: 96;
-    width: min(84vw, 20rem);
+    width: min(86vw, 21rem);
     max-height: none;
     /* верх экрана занимает шапка сайта */
-    padding: calc(var(--layout-pad) + 3.4rem) var(--layout-pad) var(--layout-pad);
+    padding: calc(var(--layout-pad) + 3.4rem) var(--layout-pad)
+      max(var(--layout-pad), env(safe-area-inset-bottom));
     background: var(--bg);
     border-right: 1px solid var(--border);
+    border-radius: 0;
     transform: translateX(-110%);
     transition: transform var(--dur-3) var(--ease-snap);
+  }
+
+  .topic {
+    min-height: 2.75rem;
+    font-size: 0.95rem;
+  }
+
+  .topic-move {
+    width: 2.4rem;
+    height: 2.4rem;
   }
 
   .reader-topics.open {
@@ -1475,7 +1622,7 @@ onBeforeUnmount(() => {
     right: 0;
     bottom: 0;
     z-index: 96;
-    height: 88dvh;
+    height: 86dvh;
     max-height: none;
     padding: var(--space-3) var(--layout-pad)
       max(var(--space-3), env(safe-area-inset-bottom));

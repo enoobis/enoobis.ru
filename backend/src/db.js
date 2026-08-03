@@ -964,6 +964,25 @@ try {
 }
 
 try {
+  db.prepare("SELECT position FROM course_lectures LIMIT 1").get();
+} catch {
+  try {
+    db.exec("ALTER TABLE course_lectures ADD COLUMN position INTEGER NOT NULL DEFAULT 0");
+    /* существующие темы нумеруем в порядке создания */
+    db.exec(`
+      UPDATE course_lectures SET position = (
+        SELECT COUNT(*) FROM course_lectures older
+        WHERE older.course_id = course_lectures.course_id
+          AND (older.created_at < course_lectures.created_at
+            OR (older.created_at = course_lectures.created_at AND older.rowid < course_lectures.rowid))
+      )
+    `);
+  } catch {
+    // ignore
+  }
+}
+
+try {
   ensureShopCategoryTables();
 } catch {
   // ignore

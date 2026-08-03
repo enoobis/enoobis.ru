@@ -407,10 +407,10 @@ function attachmentsForSubmission(submissionId) {
 function lecturesFor(course) {
   const rows = all(
     `SELECT l.id, l.course_id, l.author_id, u.nickname as author_nickname,
-            l.title, l.body_text, l.video_url, l.created_at
+            l.title, l.body_text, l.video_url, l.created_at, l.position
      FROM course_lectures l JOIN users u ON u.id = l.author_id
      WHERE l.course_id = ?
-     ORDER BY l.created_at DESC, l.rowid DESC`,
+     ORDER BY l.position, l.created_at, l.rowid`,
     course.id,
   );
   return rows.map((r) => ({ ...r, attachments: attachmentsFor(r.id) }));
@@ -919,9 +919,14 @@ router.post("/courses/:id/lectures", authRequired, (req, res) => {
     return res.status(403).json({ error: "forbidden" });
   const id = uuidv4();
   const now = nowIso();
+  const nextPosition =
+    (get(
+      "SELECT MAX(position) as m FROM course_lectures WHERE course_id = ?",
+      access.course.id,
+    )?.m ?? -1) + 1;
   run(
-    `INSERT INTO course_lectures (id, course_id, author_id, title, body_text, video_url, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO course_lectures (id, course_id, author_id, title, body_text, video_url, created_at, position)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     id,
     access.course.id,
     req.user.id,
@@ -929,6 +934,7 @@ router.post("/courses/:id/lectures", authRequired, (req, res) => {
     String(req.body?.body_text ?? ""),
     String(req.body?.video_url ?? ""),
     now,
+    nextPosition,
   );
   const attachments = Array.isArray(req.body?.attachments) ? req.body.attachments : [];
   for (const att of attachments) {
@@ -1005,6 +1011,26 @@ router.patch("/courses/:id/lectures/:lid", authRequired, (req, res) => {
     req.params.lid,
   );
   return res.json({ ...row, attachments: attachmentsFor(req.params.lid) });
+});
+
+router.patch("/courses/:id/lectures-order", authRequired, (req, res) => {
+  const access = ensureCourseAccess(req.params.id, req.user);
+  if (access.error) return res.status(access.error).json({ error: "no access" });
+  if (!access.isTeacher && req.user.role !== "admin")
+    return res.status(403).json({ error: "forbidden" });
+
+  const ids = Array.isArray(req.body?.ids) ? req.body.ids.map((x) => String(x)) : [];
+  if (!ids.length) return res.status(400).json({ error: "ids required" });
+  for (const [i, lectureId] of ids.entries()) {
+    if (!lectureInCourse(access.course.id, lectureId)) continue;
+    run(
+      "UPDATE course_lectures SET position = ? WHERE id = ? AND course_id = ?",
+      i,
+      lectureId,
+      access.course.id,
+    );
+  }
+  return res.json({ ok: true });
 });
 
 /** удаляет задание вместе со сдачами и их файлами */
