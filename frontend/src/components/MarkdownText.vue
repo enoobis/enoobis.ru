@@ -14,11 +14,27 @@ const html = computed(() => renderMarkdown(props.text));
 .markdown-body {
   line-height: 1.7;
   min-width: 0;
+  overflow-wrap: break-word;
+}
+
+/* широкие таблицы не растягивают колонку */
+.markdown-body :deep(table) {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-size: 0.9em;
+}
+.markdown-body :deep(th),
+.markdown-body :deep(td) {
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--border);
+  text-align: left;
 }
 
 /* гост: times new roman 14pt, по ширине, красная строка 1.25 см, интервал 1.5 */
 .markdown-body.doc {
-  font-family: "Times New Roman", Times, serif;
+  font-family: "Times New Roman", Times, "Liberation Serif", "Tinos", serif;
   font-size: 14pt;
   line-height: 1.5;
   text-align: justify;

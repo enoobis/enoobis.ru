@@ -117,7 +117,28 @@ async function load() {
     err.value = errorText(e);
   } finally {
     loading.value = false;
+    void nextTick(measureReaderTop);
   }
+}
+
+const readerRef = ref<HTMLElement | null>(null);
+const mainRef = ref<HTMLElement | null>(null);
+
+/* высота читалки = экран минус её отступ сверху, замеряем по факту */
+function measureReaderTop() {
+  const el = readerRef.value;
+  if (!el) return;
+  const top = el.getBoundingClientRect().top + window.scrollY;
+  el.style.setProperty("--reader-top", `${Math.round(top) + 24}px`);
+}
+
+/* клавиатура телефона не должна прятать поле ввода чата */
+function syncKeyboardInset() {
+  const el = readerRef.value;
+  const vv = window.visualViewport;
+  if (!el || !vv) return;
+  const inset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+  el.style.setProperty("--kb", `${Math.round(inset)}px`);
 }
 
 function openLecture(id: string) {
@@ -125,6 +146,7 @@ function openLecture(id: string) {
   topicsOpen.value = false;
   editing.value = null;
   void router.replace({ query: { ...route.query, lecture: id } });
+  if (mainRef.value) mainRef.value.scrollTop = 0;
   window.scrollTo({ top: 0 });
 }
 
@@ -132,6 +154,7 @@ function openLecture(id: string) {
 
 const topicListRef = ref<HTMLElement | null>(null);
 const dragIndex = ref(-1);
+const landedId = ref("");
 const dragging = computed(() => dragIndex.value >= 0);
 
 let pressIndex = -1;
@@ -211,9 +234,15 @@ function onPointerMove(e: PointerEvent) {
 
 function onPointerUp() {
   const wasDragging = dragging.value;
+  const movedId = wasDragging ? lectures.value[dragIndex.value]?.id : "";
   dragIndex.value = -1;
   endPress();
-  if (wasDragging) void saveOrder();
+  if (!wasDragging) return;
+  landedId.value = movedId ?? "";
+  window.setTimeout(() => {
+    if (landedId.value === movedId) landedId.value = "";
+  }, 1000);
+  void saveOrder();
 }
 
 async function saveOrder() {
@@ -720,17 +749,24 @@ onMounted(() => {
   void load();
   void loadAiStatus();
   void loadChat();
+  void nextTick(measureReaderTop);
+  window.addEventListener("resize", measureReaderTop);
+  window.visualViewport?.addEventListener("resize", syncKeyboardInset);
+  window.visualViewport?.addEventListener("scroll", syncKeyboardInset);
 });
 
 onBeforeUnmount(() => {
   document.documentElement.classList.remove("course-reader");
   document.removeEventListener("keydown", onEscape);
+  window.removeEventListener("resize", measureReaderTop);
+  window.visualViewport?.removeEventListener("resize", syncKeyboardInset);
+  window.visualViewport?.removeEventListener("scroll", syncKeyboardInset);
   endPress();
 });
 </script>
 
 <template>
-  <section class="reader">
+  <section ref="readerRef" class="reader">
     <AppLoading v-if="loading && !classroom" class="page-empty" />
     <p v-else-if="err && !classroom" class="page-empty">{{ err }}</p>
 
@@ -758,7 +794,12 @@ onBeforeUnmount(() => {
             :key="l.id"
             type="button"
             class="topic topic-row"
-            :class="{ on: l.id === activeLecture?.id, held: dragIndex === i, movable: isTeacher }"
+            :class="{
+              on: l.id === activeLecture?.id,
+              held: dragIndex === i,
+              landed: l.id === landedId,
+              movable: isTeacher,
+            }"
             @pointerdown="onTopicPointerDown($event, i)"
             @click="onTopicClick(l.id)"
           >
@@ -776,7 +817,7 @@ onBeforeUnmount(() => {
       </aside>
 
       <!-- тема -->
-      <main class="reader-main">
+      <main ref="mainRef" class="reader-main">
         <div class="main-bar">
           <button
             type="button"
@@ -1087,30 +1128,29 @@ onBeforeUnmount(() => {
   width: 100%;
 }
 
+/* читалка занимает экран целиком: страница не скроллится, колонки не уезжают */
 .reader-grid {
   display: grid;
   grid-template-columns: 240px minmax(0, 1fr) 360px;
   gap: var(--space-5);
-  align-items: start;
+  height: calc(100dvh - var(--reader-top, 7rem));
+  min-height: 24rem;
 }
 
 .reader-topics,
 .reader-chat {
-  position: sticky;
-  top: 4.5rem;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
   min-width: 0;
+  height: 100%;
 }
 
-.reader-topics {
-  max-height: calc(100dvh - 6rem);
-}
-
-/* чат фиксированной высоты: поле ввода всегда у нижнего края панели */
-.reader-chat {
-  height: calc(100dvh - 6rem);
+.reader-main {
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: var(--space-2);
 }
 
 .side-head {
@@ -1170,14 +1210,37 @@ onBeforeUnmount(() => {
   cursor: grab;
 }
 
+/* поднятая тема — инверсия, видно куда она едет */
 .topic.held {
   cursor: grabbing;
-  background: var(--surface2);
-  color: var(--text);
+  background: var(--text);
+  color: var(--bg);
+}
+
+.topic.held .topic-num {
+  color: var(--bg);
+}
+
+/* куда приземлилась — гаснет за секунду */
+.topic.landed {
+  animation: topic-landed 1s var(--ease-out);
+}
+
+@keyframes topic-landed {
+  from {
+    background: var(--surface2);
+  }
+  to {
+    background: transparent;
+  }
 }
 
 .topic-list.dragging {
   user-select: none;
+}
+
+.topic-list.dragging .topic:not(.held) {
+  transition: transform var(--dur-2) var(--ease-out);
 }
 
 .topic-num {
@@ -1220,10 +1283,15 @@ onBeforeUnmount(() => {
 }
 
 .main-bar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: 0.4rem;
+  padding-bottom: var(--space-2);
   margin-bottom: var(--space-3);
+  background: var(--bg);
 }
 
 .main-bar-title {
@@ -1246,7 +1314,7 @@ onBeforeUnmount(() => {
 /* заголовок — часть документа, значит тот же гост-шрифт */
 .lecture-title {
   margin: 0;
-  font-family: "Times New Roman", Times, serif;
+  font-family: "Times New Roman", Times, "Liberation Serif", "Tinos", serif;
   font-size: 18pt;
   font-weight: 700;
   letter-spacing: 0;
@@ -1589,14 +1657,26 @@ onBeforeUnmount(() => {
 @media (max-width: 1024px) {
   .reader-grid {
     grid-template-columns: minmax(0, 1fr);
+    height: auto;
+    min-height: 0;
   }
 
   .only-narrow {
     display: inline-flex;
   }
 
+  /* на телефоне листаем страницу, а не колонку */
   .reader-main {
+    height: auto;
+    overflow-y: visible;
+    overflow-x: clip;
+    padding-right: 0;
     padding-bottom: calc(var(--control-h) + var(--space-8));
+  }
+
+  .main-bar {
+    position: static;
+    padding-bottom: 0;
   }
 
   .lecture-title {
@@ -1643,10 +1723,10 @@ onBeforeUnmount(() => {
     position: fixed;
     left: 0;
     right: 0;
-    bottom: 0;
+    bottom: var(--kb, 0px);
     z-index: 96;
     height: 86dvh;
-    max-height: none;
+    max-height: calc(100dvh - var(--kb, 0px) - 2.5rem);
     padding: var(--space-3) var(--layout-pad)
       max(var(--space-3), env(safe-area-inset-bottom));
     background: var(--bg);
