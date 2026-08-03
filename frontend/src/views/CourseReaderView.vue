@@ -137,8 +137,9 @@ function syncKeyboardInset() {
   const el = readerRef.value;
   const vv = window.visualViewport;
   if (!el || !vv) return;
-  const inset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
-  el.style.setProperty("--kb", `${Math.round(inset)}px`);
+  const inset = window.innerHeight - vv.height - vv.offsetTop;
+  /* меньше 120px — это схлопнувшаяся панель браузера, а не клавиатура */
+  el.style.setProperty("--kb", inset > 120 ? `${Math.round(inset)}px` : "0px");
 }
 
 function openLecture(id: string) {
@@ -1309,10 +1310,26 @@ onBeforeUnmount(() => {
   text-transform: lowercase;
 }
 
+/* без minmax(0,1fr) одна длинная ссылка растягивает колонку и режет весь текст */
+.lecture,
+.tasks,
+.task-body,
+.files,
+.edit-form,
+.chat-body,
+.topic-list {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .lecture {
   display: grid;
   gap: var(--space-4);
   min-width: 0;
+}
+
+.lecture :deep(a),
+.files a {
+  overflow-wrap: anywhere;
 }
 
 /* заголовок — часть документа, значит тот же гост-шрифт */
@@ -1728,12 +1745,13 @@ onBeforeUnmount(() => {
     position: fixed;
     left: 0;
     right: 0;
-    bottom: var(--kb, 0px);
+    bottom: 0;
     z-index: 96;
     height: 86dvh;
-    max-height: calc(100dvh - var(--kb, 0px) - 2.5rem);
+    max-height: calc(100dvh - 2.5rem);
+    /* шторка всегда прижата к низу, клавиатура поднимает только содержимое */
     padding: var(--space-3) var(--layout-pad)
-      max(var(--space-3), env(safe-area-inset-bottom));
+      calc(max(var(--space-3), env(safe-area-inset-bottom)) + var(--kb, 0px));
     background: var(--bg);
     border: 1px solid var(--border);
     border-bottom: none;
