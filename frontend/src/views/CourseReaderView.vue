@@ -1028,7 +1028,7 @@ onBeforeUnmount(() => {
         class="ask-bar only-narrow"
         @click="openChat"
       >
-        <span>что непонятно?</span>
+        <span>?</span>
         <AppIcon name="chat" :size="18" />
       </button>
     </div>
