@@ -2598,15 +2598,22 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 }
 
 @media (max-width: 760px) {
+  /* 3+2: все подписи целиком, без обрезки по краю */
   .course-tabs.filter-tabs {
-    display: flex;
     width: 100%;
-    overflow-x: auto;
-    flex-wrap: nowrap;
-    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    gap: 2px;
+    overflow: visible;
+    border-radius: calc(var(--radius) + 4px);
   }
   .course-tabs .filter-tab {
-    flex: 0 0 auto;
+    flex: 1 1 calc(33.333% - 2px);
+    min-width: calc(33.333% - 2px);
+    min-height: 2.4rem;
+    padding: 0.4rem 0.45rem;
+    font-size: 0.82rem;
   }
 }
 
