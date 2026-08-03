@@ -1132,6 +1132,8 @@ onBeforeUnmount(() => {
 .reader-grid {
   display: grid;
   grid-template-columns: 240px minmax(0, 1fr) 360px;
+  /* строка не должна расти под длинную тему, иначе колонки уезжают за экран */
+  grid-template-rows: minmax(0, 1fr);
   gap: var(--space-5);
   height: calc(100dvh - var(--reader-top, 7rem));
   min-height: 24rem;
@@ -1144,10 +1146,12 @@ onBeforeUnmount(() => {
   gap: var(--space-3);
   min-width: 0;
   height: 100%;
+  min-height: 0;
 }
 
 .reader-main {
   height: 100%;
+  min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
   padding-right: var(--space-2);
@@ -1523,7 +1527,7 @@ onBeforeUnmount(() => {
 
 .chat-body {
   flex: 1;
-  min-height: 12rem;
+  min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
   display: grid;
@@ -1657,6 +1661,7 @@ onBeforeUnmount(() => {
 @media (max-width: 1024px) {
   .reader-grid {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto;
     height: auto;
     min-height: 0;
   }
