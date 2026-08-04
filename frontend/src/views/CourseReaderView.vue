@@ -1007,7 +1007,7 @@ onBeforeUnmount(() => {
             v-model="chatInput"
             rows="1"
             :disabled="!ai?.enabled || chatBusy"
-            placeholder="что непонятно?"
+            placeholder="?"
             @keydown="onChatKeydown"
           />
           <button
