@@ -3000,16 +3000,18 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 }
 .course-menu-panel {
   position: absolute;
-  top: calc(100% + 0.3rem);
+  top: calc(100% + 0.25rem);
   left: 0;
   right: auto;
-  min-width: 12rem;
-  padding: 0.35rem;
+  min-width: 9.5rem;
+  width: max-content;
+  max-width: min(14rem, 70vw);
+  padding: 0.2rem;
   display: grid;
-  gap: 0.1rem;
+  gap: 0.05rem;
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: calc(var(--radius) + 4px);
+  border-radius: var(--radius);
   z-index: 20;
 }
 .course-menu--right .course-menu-panel {
@@ -3022,20 +3024,22 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 }
 .course-menu-item {
   width: 100%;
-  min-height: 2.4rem;
+  min-height: 0;
   margin: 0;
-  padding: 0.55rem 0.75rem;
+  padding: 0.4rem 0.6rem;
   text-align: left;
   text-transform: lowercase;
   font: inherit;
-  font-size: 0.9rem;
+  font-size: 0.82rem;
   font-weight: 500;
-  letter-spacing: -0.015em;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
   border: none;
-  border-radius: 10px;
+  border-radius: 8px;
   background: transparent;
   color: var(--text);
   cursor: pointer;
+  white-space: nowrap;
 }
 .course-menu-item:hover,
 .course-menu-item:focus-visible {
