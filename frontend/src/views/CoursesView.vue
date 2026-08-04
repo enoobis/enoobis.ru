@@ -361,29 +361,76 @@ function onCourseMenuOutside(ev: Event) {
   });
 }
 
-/* левая колонка — вправо, правая — влево; в одну колонку кнопка справа — всегда влево */
+function clearCourseMenuPanel(panel: HTMLElement) {
+  panel.style.position = "";
+  panel.style.top = "";
+  panel.style.left = "";
+  panel.style.right = "";
+  panel.style.width = "";
+  panel.style.height = "";
+  panel.style.minWidth = "";
+  panel.style.maxWidth = "";
+  panel.style.zIndex = "";
+}
+
+/* панель = ширина колонки × высота 3 карточек; с права → слева, с лева → справа */
 function placeCourseMenu(details: HTMLDetailsElement) {
-  details.classList.remove("course-menu--left", "course-menu--right");
-  if (!details.open) return;
-  const singleCol = window.matchMedia("(max-width: 719px)").matches;
-  if (singleCol) {
-    details.classList.add("course-menu--left");
+  details.classList.remove("course-menu--left", "course-menu--right", "course-menu--block");
+  const panel = details.querySelector(".course-menu-panel") as HTMLElement | null;
+  if (!panel) return;
+  if (!details.open) {
+    clearCourseMenuPanel(panel);
     return;
   }
-  const host = (details.closest(".course-card") ?? details) as HTMLElement;
-  const box = host.getBoundingClientRect();
-  const mid = (box.left + box.right) / 2;
-  if (mid >= window.innerWidth / 2) {
-    details.classList.add("course-menu--left");
-  } else {
-    details.classList.add("course-menu--right");
+
+  const grid = details.closest(".course-grid") as HTMLElement | null;
+  const card = details.closest(".course-card") as HTMLElement | null;
+  if (!grid || !card) {
+    /* меню в шапке курса — компактный дропдаун */
+    const box = details.getBoundingClientRect();
+    const mid = (box.left + box.right) / 2;
+    details.classList.add(mid >= window.innerWidth / 2 ? "course-menu--left" : "course-menu--right");
+    return;
   }
+
+  const cards = [...grid.querySelectorAll<HTMLElement>(":scope > .course-card")];
+  if (!cards.length) return;
+  const first = cards[0].getBoundingClientRect();
+  const gridRect = grid.getBoundingClientRect();
+  const gap = Number.parseFloat(getComputedStyle(grid).rowGap || getComputedStyle(grid).gap) || 10;
+  const colW = first.width;
+  const threeH = first.height * 3 + gap * 2;
+  const maxH = Math.max(first.height, window.innerHeight - gridRect.top - 12);
+  const height = Math.min(threeH, maxH);
+
+  const cardRect = card.getBoundingClientRect();
+  const cardMid = (cardRect.left + cardRect.right) / 2;
+  const singleCol = !window.matchMedia("(min-width: 720px)").matches;
+  /* с правой колонки — панель слева, с левой — справа; в одну колонку — на место списка */
+  const openOnLeft = singleCol || cardMid >= window.innerWidth / 2;
+  const left = singleCol || openOnLeft ? first.left : first.left + colW + gap;
+
+  details.classList.add("course-menu--block");
+  details.classList.add(openOnLeft ? "course-menu--left" : "course-menu--right");
+  panel.style.position = "fixed";
+  panel.style.top = `${Math.round(gridRect.top)}px`;
+  panel.style.left = `${Math.round(left)}px`;
+  panel.style.right = "auto";
+  panel.style.width = `${Math.round(colW)}px`;
+  panel.style.height = `${Math.round(height)}px`;
+  panel.style.minWidth = "0";
+  panel.style.maxWidth = "none";
+  panel.style.zIndex = "40";
 }
 
 function onCourseMenuToggle(ev: Event) {
   const el = ev.target;
   if (!(el instanceof HTMLDetailsElement) || !el.classList.contains("course-menu")) return;
   requestAnimationFrame(() => placeCourseMenu(el));
+}
+
+function onCourseMenuReposition() {
+  document.querySelectorAll<HTMLDetailsElement>("details.course-menu[open]").forEach(placeCourseMenu);
 }
 
 function onCreateIconChange(event: Event) {
@@ -497,6 +544,7 @@ onUnmounted(() => {
   document.removeEventListener("keydown", onDetailEscape);
   document.removeEventListener("pointerdown", onCourseMenuOutside);
   document.removeEventListener("toggle", onCourseMenuToggle, true);
+  window.removeEventListener("resize", onCourseMenuReposition);
   document.body.style.overflow = "";
 });
 
@@ -795,6 +843,7 @@ async function loadClassroom(courseId: string) {
 onMounted(() => {
   document.addEventListener("pointerdown", onCourseMenuOutside);
   document.addEventListener("toggle", onCourseMenuToggle, true);
+  window.addEventListener("resize", onCourseMenuReposition);
   void loadCourses();
 });
 
@@ -3013,15 +3062,43 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   border: 1px solid var(--border);
   border-radius: var(--radius);
   z-index: 20;
+  box-sizing: border-box;
 }
-.course-menu--right .course-menu-panel {
+.course-menu--right .course-menu-panel:not([style*="position: fixed"]) {
   left: 0;
   right: auto;
 }
-.course-menu--left .course-menu-panel {
+.course-menu--left .course-menu-panel:not([style*="position: fixed"]) {
   left: auto;
   right: 0;
 }
+
+/* большое меню: колонка × 3 карточки */
+.course-menu--block .course-menu-panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-content: stretch;
+  gap: 0.2rem;
+  padding: 0.85rem 1rem;
+  border-radius: calc(var(--radius) + 4px);
+  background: var(--surface);
+}
+.course-menu--block .course-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.85rem;
+  padding: 0.65rem 0.9rem;
+  font-size: 1.02rem;
+  text-align: center;
+  border-radius: 10px;
+  white-space: normal;
+}
+.course-menu--block .course-menu-sep {
+  margin: 0.35rem 0.5rem;
+}
+
 .course-menu-item {
   width: 100%;
   min-height: 0;
@@ -3055,6 +3132,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   height: 1px;
   margin: 0.2rem 0.35rem;
   background: var(--border);
+  flex-shrink: 0;
 }
 .course-menu-item--muted {
   color: var(--muted);
