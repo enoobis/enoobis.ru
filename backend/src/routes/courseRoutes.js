@@ -202,6 +202,30 @@ router.post("/courses", authRequired, (req, res) => {
   return res.json(courseToDto(get("SELECT * FROM courses WHERE id = ?", id), req.user.id));
 });
 
+router.patch("/courses/:id", authRequired, (req, res) => {
+  const c = get("SELECT * FROM courses WHERE id = ?", req.params.id);
+  if (!c) return res.status(404).json({ error: "not found" });
+  if (c.teacher_id !== req.user.id && req.user.role !== "admin") {
+    return res.status(403).json({ error: "forbidden" });
+  }
+  const title =
+    req.body?.title !== undefined ? String(req.body.title ?? "").trim() : String(c.title ?? "");
+  if (!title) return res.status(400).json({ error: "нужен заголовок" });
+  const description =
+    req.body?.description !== undefined
+      ? String(req.body.description ?? "")
+      : String(c.description ?? "");
+  run("UPDATE courses SET title = ?, description = ? WHERE id = ?", title, description, c.id);
+  const dto = courseToDto(get("SELECT * FROM courses WHERE id = ?", c.id), req.user.id);
+  const pinSet = new Set(getPinnedCourseIds(req.user.id));
+  const hiddenSet = new Set(getHiddenCourseIds(req.user.id));
+  return res.json({
+    ...dto,
+    is_pinned: pinSet.has(c.id),
+    is_hidden: hiddenSet.has(c.id),
+  });
+});
+
 router.post("/courses/:id/enroll", authRequired, (req, res) => {
   const c = get("SELECT * FROM courses WHERE id = ?", req.params.id);
   if (!c) return res.status(404).json({ error: "not found" });

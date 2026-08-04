@@ -25,6 +25,7 @@ import {
   setClosedStudents,
   submitAssignment,
   unenrollCourse,
+  updateCourse,
   uploadCourseIcon,
   uploadLectureAttachment,
   uploadSubmissionFile,
@@ -305,6 +306,61 @@ function canEditCourseIcon(c: Course) {
   return c.co_teachers?.some((ct) => ct.id === auth.user?.id) ?? false;
 }
 
+/** название и описание — только владелец или админ */
+function canEditCourseMeta(c: Course) {
+  if (!auth.token || !canTeach.value) return false;
+  return c.teacher_id === auth.user?.id || auth.role === "admin";
+}
+
+const editingCourseId = ref("");
+const editTitle = ref("");
+const editDescription = ref("");
+const editSaving = ref(false);
+
+function openEditCourse(c: Course, ev?: Event) {
+  if (ev) closeCourseMenu(ev);
+  if (!canEditCourseMeta(c)) return;
+  editingCourseId.value = c.id;
+  editTitle.value = c.title;
+  editDescription.value = c.description ?? "";
+}
+
+function closeEditCourse() {
+  editingCourseId.value = "";
+  editTitle.value = "";
+  editDescription.value = "";
+  editSaving.value = false;
+}
+
+async function saveEditCourse() {
+  if (!auth.token || !editingCourseId.value || editSaving.value) return;
+  const nextTitle = editTitle.value.trim();
+  if (!nextTitle) return;
+  editSaving.value = true;
+  err.value = "";
+  try {
+    await updateCourse(editingCourseId.value, auth.token, {
+      title: nextTitle,
+      description: editDescription.value,
+    });
+    const id = editingCourseId.value;
+    closeEditCourse();
+    await loadCourses();
+    if (classroom.value?.course.id === id) await loadClassroom(id);
+  } catch (e) {
+    err.value = e instanceof Error ? e.message : "ошибка";
+  } finally {
+    editSaving.value = false;
+  }
+}
+
+function onCourseMenuOutside(ev: Event) {
+  const t = ev.target as Node | null;
+  document.querySelectorAll("details.course-menu[open]").forEach((el) => {
+    if (!el.contains(t)) el.removeAttribute("open");
+  });
+}
+
 function onCreateIconChange(event: Event) {
   const input = event.target as HTMLInputElement;
   createIconFile.value = input.files?.[0] ?? null;
@@ -414,6 +470,7 @@ watch(activeAssignmentForGrading, (id) => {
 onUnmounted(() => {
   document.removeEventListener("keydown", onGradingEscape);
   document.removeEventListener("keydown", onDetailEscape);
+  document.removeEventListener("pointerdown", onCourseMenuOutside);
   document.body.style.overflow = "";
 });
 
@@ -709,7 +766,10 @@ async function loadClassroom(courseId: string) {
   }
 }
 
-onMounted(loadCourses);
+onMounted(() => {
+  document.addEventListener("pointerdown", onCourseMenuOutside);
+  void loadCourses();
+});
 
 watch(
   () => route.params.tab,
@@ -1427,6 +1487,14 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
                 </summary>
               <div class="course-menu-panel">
                 <button
+                  v-if="canEditCourseMeta(c)"
+                  type="button"
+                  class="course-menu-item"
+                  @click="openEditCourse(c, $event)"
+                >
+                  изменить
+                </button>
+                <button
                   v-if="c.is_open && !c.enrolled"
                   type="button"
                   class="course-menu-item"
@@ -1476,14 +1544,16 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
                 >
                   {{ c.icon_url ? "сменить иконку" : "добавить иконку" }}
                 </button>
-                <button
-                  v-if="canTeach && (c.teacher_id === auth.user?.id || auth.role === 'admin')"
-                  type="button"
-                  class="course-menu-item course-menu-item--danger"
-                  @click="onDeleteCourse(c.id, c.title); closeCourseMenu($event)"
-                >
-                  удалить курс
-                </button>
+                <template v-if="canEditCourseMeta(c)">
+                  <span class="course-menu-sep" aria-hidden="true" />
+                  <button
+                    type="button"
+                    class="course-menu-item course-menu-item--muted"
+                    @click="onDeleteCourse(c.id, c.title); closeCourseMenu($event)"
+                  >
+                    удалить курс
+                  </button>
+                </template>
               </div>
             </details>
                 </div>
@@ -1546,6 +1616,14 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
               </summary>
               <div class="course-menu-panel">
                 <button
+                  v-if="canEditCourseMeta(classroom.course)"
+                  type="button"
+                  class="course-menu-item"
+                  @click="openEditCourse(classroom.course, $event)"
+                >
+                  изменить
+                </button>
+                <button
                   type="button"
                   class="course-menu-item"
                   @click="onTogglePin(classroom.course); closeCourseMenu($event)"
@@ -1579,17 +1657,19 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
                 >
                   {{ classroom.course.icon_url ? "сменить иконку" : "добавить иконку" }}
                 </button>
-                <button
-                  v-if="isOwnerInCurrent"
-                  type="button"
-                  class="course-menu-item course-menu-item--danger"
-                  @click="
-                    onDeleteCourse(classroom.course.id, classroom.course.title);
-                    closeCourseMenu($event)
-                  "
-                >
-                  удалить курс
-                </button>
+                <template v-if="isOwnerInCurrent">
+                  <span class="course-menu-sep" aria-hidden="true" />
+                  <button
+                    type="button"
+                    class="course-menu-item course-menu-item--muted"
+                    @click="
+                      onDeleteCourse(classroom.course.id, classroom.course.title);
+                      closeCourseMenu($event)
+                    "
+                  >
+                    удалить курс
+                  </button>
+                </template>
               </div>
             </details>
           </div>
@@ -2373,6 +2453,20 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
     </template>
 
     <!-- модалки/доп секции -->
+    <div v-if="editingCourseId" class="form-card overlay">
+      <h3>курс</h3>
+      <input v-model="editTitle" placeholder="название" maxlength="200" />
+      <textarea v-model="editDescription" rows="3" placeholder="описание" maxlength="2000" />
+      <div class="row-actions">
+        <button type="button" :disabled="editSaving || !editTitle.trim()" @click="saveEditCourse">
+          {{ editSaving ? "…" : "сохранить" }}
+        </button>
+        <button type="button" class="secondary" :disabled="editSaving" @click="closeEditCourse">
+          отмена
+        </button>
+      </div>
+    </div>
+
     <div v-if="activeClosedId" class="form-card overlay">
       <h3>доступ</h3>
       <p class="muted small">uuid через пробел</p>
@@ -2871,44 +2965,62 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   cursor: pointer;
   color: var(--muted);
 }
+.course-menu-trigger:hover {
+  color: var(--text);
+}
 .course-menu-trigger::-webkit-details-marker {
   display: none;
 }
 .course-menu-panel {
   position: absolute;
   right: 0;
-  top: 100%;
-  margin-top: 0.2rem;
-  min-width: 10.5rem;
-  padding: 0.2rem;
+  top: calc(100% + 0.3rem);
+  min-width: 12rem;
+  padding: 0.35rem;
   display: grid;
-  gap: 0.05rem;
-  background: var(--surface);
+  gap: 0.1rem;
+  background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  z-index: 8;
+  border-radius: calc(var(--radius) + 4px);
+  z-index: 20;
 }
 .course-menu-item {
   width: 100%;
+  min-height: 2.4rem;
   margin: 0;
-  padding: 0.45rem 0.55rem;
+  padding: 0.55rem 0.75rem;
   text-align: left;
-  font-size: 0.82rem;
+  text-transform: lowercase;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 500;
+  letter-spacing: -0.015em;
   border: none;
-  border-radius: var(--radius);
+  border-radius: 10px;
   background: transparent;
   color: var(--text);
   cursor: pointer;
 }
-.course-menu-item:hover {
+.course-menu-item:hover,
+.course-menu-item:focus-visible {
   background: var(--surface2);
+  color: var(--text);
 }
-.course-menu-item--danger {
-  color: var(--danger);
+.course-menu-item:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
-.course-menu-item--danger:hover {
-  background: color-mix(in srgb, var(--danger) 12%, transparent);
-  color: var(--danger);
+.course-menu-sep {
+  display: block;
+  height: 1px;
+  margin: 0.2rem 0.35rem;
+  background: var(--border);
+}
+.course-menu-item--muted {
+  color: var(--muted);
+}
+.course-menu-item--muted:hover {
+  color: var(--text);
 }
 .dot {
   color: var(--muted);

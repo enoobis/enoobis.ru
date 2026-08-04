@@ -146,6 +146,18 @@ export function createCourse(
   });
 }
 
+export function updateCourse(
+  id: string,
+  token: string,
+  payload: { title?: string; description?: string },
+) {
+  return api<Course>(`/api/courses/${id}`, {
+    method: "PATCH",
+    token,
+    body: JSON.stringify(payload),
+  });
+}
+
 export function enrollCourse(id: string, token: string) {
   return api<{ ok: boolean }>(`/api/courses/${id}/enroll`, { method: "POST", token });
 }
