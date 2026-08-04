@@ -361,6 +361,30 @@ function onCourseMenuOutside(ev: Event) {
   });
 }
 
+/* слева — панель вправо, справа у края — влево */
+function placeCourseMenu(details: HTMLDetailsElement) {
+  details.classList.remove("course-menu--left", "course-menu--right");
+  if (!details.open) return;
+  const panel = details.querySelector(".course-menu-panel") as HTMLElement | null;
+  if (!panel) return;
+  const trigger = details.getBoundingClientRect();
+  const width = Math.max(panel.offsetWidth, 192);
+  const pad = 12;
+  const spaceRight = window.innerWidth - trigger.left - pad;
+  const spaceLeft = trigger.right - pad;
+  if (spaceRight < width && spaceLeft > spaceRight) {
+    details.classList.add("course-menu--left");
+  } else {
+    details.classList.add("course-menu--right");
+  }
+}
+
+function onCourseMenuToggle(ev: Event) {
+  const el = ev.target;
+  if (!(el instanceof HTMLDetailsElement) || !el.classList.contains("course-menu")) return;
+  requestAnimationFrame(() => placeCourseMenu(el));
+}
+
 function onCreateIconChange(event: Event) {
   const input = event.target as HTMLInputElement;
   createIconFile.value = input.files?.[0] ?? null;
@@ -471,6 +495,7 @@ onUnmounted(() => {
   document.removeEventListener("keydown", onGradingEscape);
   document.removeEventListener("keydown", onDetailEscape);
   document.removeEventListener("pointerdown", onCourseMenuOutside);
+  document.removeEventListener("toggle", onCourseMenuToggle, true);
   document.body.style.overflow = "";
 });
 
@@ -768,6 +793,7 @@ async function loadClassroom(courseId: string) {
 
 onMounted(() => {
   document.addEventListener("pointerdown", onCourseMenuOutside);
+  document.addEventListener("toggle", onCourseMenuToggle, true);
   void loadCourses();
 });
 
@@ -2973,8 +2999,9 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 }
 .course-menu-panel {
   position: absolute;
-  right: 0;
   top: calc(100% + 0.3rem);
+  left: 0;
+  right: auto;
   min-width: 12rem;
   padding: 0.35rem;
   display: grid;
@@ -2983,6 +3010,14 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   border: 1px solid var(--border);
   border-radius: calc(var(--radius) + 4px);
   z-index: 20;
+}
+.course-menu--right .course-menu-panel {
+  left: 0;
+  right: auto;
+}
+.course-menu--left .course-menu-panel {
+  left: auto;
+  right: 0;
 }
 .course-menu-item {
   width: 100%;
