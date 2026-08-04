@@ -395,20 +395,26 @@ function placeCourseMenu(details: HTMLDetailsElement) {
 
   const cards = [...grid.querySelectorAll<HTMLElement>(":scope > .course-card")];
   if (!cards.length) return;
-  const first = cards[0].getBoundingClientRect();
-  const third = cards[Math.min(2, cards.length - 1)].getBoundingClientRect();
-  const gap = Number.parseFloat(getComputedStyle(grid).columnGap || getComputedStyle(grid).gap) || 10;
-  const colW = first.width;
-  /* ровно от верха 1-й до низа 3-й карточки */
-  const top = first.top;
-  const height = third.bottom - first.top;
+
+  /* в 2 колонках DOM идёт рядами: 0 лев, 1 прав, 2 лев… — берём карточки одной колонки */
+  const rects = cards.map((el) => ({ el, r: el.getBoundingClientRect() }));
+  const leftColX = Math.min(...rects.map((c) => c.r.left));
+  const rightColX = Math.max(...rects.map((c) => c.r.left));
+  const leftCol = rects.filter((c) => Math.abs(c.r.left - leftColX) < 2);
+  const rightCol = rects.filter((c) => Math.abs(c.r.left - rightColX) < 2);
+  const measureCol = leftCol.length ? leftCol : rects;
+  const topCard = measureCol[0].r;
+  const thirdCard = measureCol[Math.min(2, measureCol.length - 1)].r;
+  const colW = topCard.width;
+  const top = topCard.top;
+  const height = thirdCard.bottom - topCard.top;
 
   const cardRect = card.getBoundingClientRect();
   const cardMid = (cardRect.left + cardRect.right) / 2;
-  const singleCol = !window.matchMedia("(min-width: 720px)").matches;
-  /* с правой колонки — панель слева, с левой — справа; в одну колонку — на место списка */
-  const openOnLeft = singleCol || cardMid >= window.innerWidth / 2;
-  const left = singleCol || openOnLeft ? first.left : first.left + colW + gap;
+  const singleCol = Math.abs(rightColX - leftColX) < 2;
+  /* с правой колонки — панель слева, с левой — справа */
+  const openOnLeft = singleCol || cardMid >= (leftColX + rightColX + colW) / 2;
+  const left = singleCol || openOnLeft ? leftColX : rightColX;
 
   details.classList.add("course-menu--block");
   details.classList.add(openOnLeft ? "course-menu--left" : "course-menu--right");
