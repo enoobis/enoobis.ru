@@ -396,12 +396,12 @@ function placeCourseMenu(details: HTMLDetailsElement) {
   const cards = [...grid.querySelectorAll<HTMLElement>(":scope > .course-card")];
   if (!cards.length) return;
   const first = cards[0].getBoundingClientRect();
-  const gridRect = grid.getBoundingClientRect();
-  const gap = Number.parseFloat(getComputedStyle(grid).rowGap || getComputedStyle(grid).gap) || 10;
+  const third = cards[Math.min(2, cards.length - 1)].getBoundingClientRect();
+  const gap = Number.parseFloat(getComputedStyle(grid).columnGap || getComputedStyle(grid).gap) || 10;
   const colW = first.width;
-  const threeH = first.height * 3 + gap * 2;
-  const maxH = Math.max(first.height, window.innerHeight - gridRect.top - 12);
-  const height = Math.min(threeH, maxH);
+  /* ровно от верха 1-й до низа 3-й карточки */
+  const top = first.top;
+  const height = third.bottom - first.top;
 
   const cardRect = card.getBoundingClientRect();
   const cardMid = (cardRect.left + cardRect.right) / 2;
@@ -413,7 +413,7 @@ function placeCourseMenu(details: HTMLDetailsElement) {
   details.classList.add("course-menu--block");
   details.classList.add(openOnLeft ? "course-menu--left" : "course-menu--right");
   panel.style.position = "fixed";
-  panel.style.top = `${Math.round(gridRect.top)}px`;
+  panel.style.top = `${Math.round(top)}px`;
   panel.style.left = `${Math.round(left)}px`;
   panel.style.right = "auto";
   panel.style.width = `${Math.round(colW)}px`;
@@ -3077,10 +3077,10 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 .course-menu--block .course-menu-panel {
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: space-evenly;
   align-content: stretch;
-  gap: 0.2rem;
-  padding: 0.85rem 1rem;
+  gap: 0.15rem;
+  padding: 1.1rem 1.25rem;
   border-radius: calc(var(--radius) + 4px);
   background: var(--surface);
 }
@@ -3088,15 +3088,20 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 2.85rem;
-  padding: 0.65rem 0.9rem;
-  font-size: 1.02rem;
+  flex: 1 1 0;
+  min-height: 3.1rem;
+  padding: 0.85rem 1rem;
+  font-size: 1.2rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
   text-align: center;
-  border-radius: 10px;
+  border-radius: 12px;
   white-space: normal;
 }
 .course-menu--block .course-menu-sep {
-  margin: 0.35rem 0.5rem;
+  flex: 0 0 auto;
+  margin: 0.15rem 0.75rem;
 }
 
 .course-menu-item {
