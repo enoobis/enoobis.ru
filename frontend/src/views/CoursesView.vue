@@ -361,12 +361,18 @@ function onCourseMenuOutside(ev: Event) {
   });
 }
 
-/* справа экрана — меню влево, слева — вправо */
+/* левая колонка — вправо, правая — влево; в одну колонку кнопка справа — всегда влево */
 function placeCourseMenu(details: HTMLDetailsElement) {
   details.classList.remove("course-menu--left", "course-menu--right");
   if (!details.open) return;
-  const trigger = details.getBoundingClientRect();
-  const mid = (trigger.left + trigger.right) / 2;
+  const singleCol = window.matchMedia("(max-width: 719px)").matches;
+  if (singleCol) {
+    details.classList.add("course-menu--left");
+    return;
+  }
+  const host = (details.closest(".course-card") ?? details) as HTMLElement;
+  const box = host.getBoundingClientRect();
+  const mid = (box.left + box.right) / 2;
   if (mid >= window.innerWidth / 2) {
     details.classList.add("course-menu--left");
   } else {
