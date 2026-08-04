@@ -361,10 +361,23 @@ function onCourseMenuOutside(ev: Event) {
   });
 }
 
-/* слева — панель вправо, справа у края — влево */
+function isCourseMenuSheet() {
+  return typeof window !== "undefined" && window.matchMedia("(max-width: 720px)").matches;
+}
+
+function syncCourseMenuScrollLock() {
+  const open = document.querySelector("details.course-menu[open]");
+  if (open && isCourseMenuSheet()) {
+    document.documentElement.style.overflow = "hidden";
+  } else {
+    document.documentElement.style.overflow = "";
+  }
+}
+
+/* на пк: слева — вправо, у правого края — влево; на телефоне — шторка */
 function placeCourseMenu(details: HTMLDetailsElement) {
   details.classList.remove("course-menu--left", "course-menu--right");
-  if (!details.open) return;
+  if (!details.open || isCourseMenuSheet()) return;
   const panel = details.querySelector(".course-menu-panel") as HTMLElement | null;
   if (!panel) return;
   const trigger = details.getBoundingClientRect();
@@ -382,7 +395,10 @@ function placeCourseMenu(details: HTMLDetailsElement) {
 function onCourseMenuToggle(ev: Event) {
   const el = ev.target;
   if (!(el instanceof HTMLDetailsElement) || !el.classList.contains("course-menu")) return;
-  requestAnimationFrame(() => placeCourseMenu(el));
+  requestAnimationFrame(() => {
+    placeCourseMenu(el);
+    syncCourseMenuScrollLock();
+  });
 }
 
 function onCreateIconChange(event: Event) {
@@ -496,6 +512,7 @@ onUnmounted(() => {
   document.removeEventListener("keydown", onDetailEscape);
   document.removeEventListener("pointerdown", onCourseMenuOutside);
   document.removeEventListener("toggle", onCourseMenuToggle, true);
+  document.documentElement.style.overflow = "";
   document.body.style.overflow = "";
 });
 
@@ -3057,6 +3074,59 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 .course-menu-item--muted:hover {
   color: var(--text);
 }
+
+@media (max-width: 720px) {
+  details.course-menu[open]::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 95;
+    background: var(--bg);
+  }
+  details.course-menu[open] .course-menu-panel {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: auto;
+    width: 100%;
+    min-width: 0;
+    max-height: min(88dvh, 36rem);
+    margin: 0;
+    padding: 0.85rem var(--layout-pad)
+      max(var(--space-4), env(safe-area-inset-bottom));
+    gap: 0.15rem;
+    border: 1px solid var(--border);
+    border-bottom: none;
+    border-radius: calc(var(--radius) + 8px) calc(var(--radius) + 8px) 0 0;
+    background: var(--bg);
+    z-index: 96;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  details.course-menu[open] .course-menu-panel::before {
+    content: "";
+    display: block;
+    width: 2.2rem;
+    height: 3px;
+    margin: 0 auto 0.55rem;
+    border-radius: var(--radius-pill);
+    background: var(--border);
+  }
+  .course-menu-item {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 3rem;
+    text-align: center;
+    font-size: 1.05rem;
+    padding: 0.75rem 1rem;
+  }
+  .course-menu-sep {
+    margin: 0.35rem 0.5rem;
+  }
+}
+
 .dot {
   color: var(--muted);
 }
