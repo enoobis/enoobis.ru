@@ -64,6 +64,7 @@ html:not([data-theme]) {
   --muted: #9a9a9a;
   --accent: #ffffff;
   --hover-surface: #1c1c1c;
+  --active-surface: #303030;
   --hover-border: #333333;
   --focus-border: #444444;
   --scrollbar: #2e2e2e;
@@ -80,6 +81,7 @@ html[data-theme="white"] {
   --muted: #6e6e6e;
   --accent: #141414;
   --hover-surface: #ebebeb;
+  --active-surface: #d8d8d8;
   --hover-border: #cccccc;
   --focus-border: #999999;
   --scrollbar: #c8c8c8;
@@ -96,6 +98,7 @@ html[data-theme="contrast"] {
   --muted: #c8c8c8;
   --accent: #ffffff;
   --hover-surface: #1a1a1a;
+  --active-surface: #383838;
   --hover-border: #ffffff;
   --focus-border: #ffffff;
   --scrollbar: #666666;
@@ -112,6 +115,7 @@ html[data-theme="contrast-white"] {
   --muted: #333333;
   --accent: #000000;
   --hover-surface: #eeeeee;
+  --active-surface: #d0d0d0;
   --hover-border: #000000;
   --focus-border: #000000;
   --scrollbar: #888888;
@@ -1169,6 +1173,14 @@ html[data-theme="contrast-white"] .nav {
 }
 .nav a.router-link-active {
   color: var(--text);
+}
+.nav .icon-btn.router-link-active,
+.nav .icon-btn.router-link-active:hover {
+  background: var(--active-surface);
+  color: var(--text);
+}
+.nav .icon-btn.router-link-active .app-icon {
+  opacity: 1;
 }
 .nav-link,
 .meta-item {
