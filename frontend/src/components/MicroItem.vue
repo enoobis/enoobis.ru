@@ -328,8 +328,8 @@ async function share() {
 }
 
 .avatar {
-  width: 36px;
-  height: 36px;
+  width: var(--avatar-md);
+  height: var(--avatar-md);
   border-radius: var(--avatar-radius);
   border: 1px solid var(--border);
   display: inline-flex;
@@ -417,6 +417,6 @@ header {
   margin-top: 0.3rem;
 }
 .small {
-  font-size: 0.78rem;
+  font-size: var(--text-sm);
 }
 </style>

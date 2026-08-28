@@ -361,7 +361,7 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.35rem;
-  font-size: 0.82rem;
+  font-size: var(--text-sm);
 }
 .pager {
   display: flex;

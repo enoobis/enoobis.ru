@@ -6,7 +6,8 @@ import path from "node:path";
 import { all, db, get, nowIso, run } from "./db.js";
 import { getJwtSecret, hashPassword } from "./auth.js";
 import { v4 as uuidv4 } from "uuid";
-import { saveIdenticon } from "./utils/identicon.js";
+import { isCurrentIdenticon, saveIdenticon } from "./utils/identicon.js";
+import { unlinkUploadUrl } from "./utils/uploadSafe.js";
 import { scheduleChatRetention } from "./utils/chatRetention.js";
 import { apiOriginGuard, corsOptions, rateLimit, securityHeaders } from "./utils/security.js";
 import authRoutes from "./routes/authRoutes.js";
@@ -111,6 +112,23 @@ function backfillIdenticons() {
   }
 }
 
+/** загруженные аватары всегда растровые, поэтому .svg — только сгенерированные */
+function refreshOutdatedIdenticons() {
+  const rows = all(
+    "SELECT id, nickname, avatar_url FROM users WHERE avatar_url LIKE '/uploads/avatars/%.svg'",
+  );
+  for (const u of rows) {
+    if (isCurrentIdenticon(u.avatar_url)) continue;
+    try {
+      const url = saveIdenticon(u.nickname || u.id, u.id);
+      run("UPDATE users SET avatar_url = ? WHERE id = ?", url, u.id);
+      unlinkUploadUrl(u.avatar_url, ["avatars"]);
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
 const port = Number(process.env.PORT ?? 3000);
 server.listen(port, async () => {
   db.prepare("SELECT 1").get();
@@ -121,6 +139,7 @@ server.listen(port, async () => {
   }
   try {
     backfillIdenticons();
+    refreshOutdatedIdenticons();
   } catch (e) {
     console.warn("identicon seed warn:", e?.message ?? e);
   }

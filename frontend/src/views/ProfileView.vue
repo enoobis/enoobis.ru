@@ -632,8 +632,8 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   padding-top: 0;
 }
 .head-with-cover .avatar-stack {
-  width: 80px;
-  height: 80px;
+  width: var(--avatar-lg);
+  height: var(--avatar-lg);
 }
 .head-with-cover .avatar-stack.framed .avatar,
 .head-with-cover .avatar-stack.framed .avatar.fallback {
@@ -644,8 +644,8 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
 }
 .avatar-stack {
   position: relative;
-  width: 64px;
-  height: 64px;
+  width: var(--avatar-lg);
+  height: var(--avatar-lg);
 }
 .avatar-stack .avatar {
   width: 100%;

@@ -1788,8 +1788,8 @@ onUnmounted(() => {
   background: var(--surface2);
 }
 .member-suggest-av {
-  width: 32px;
-  height: 32px;
+  width: var(--avatar-sm);
+  height: var(--avatar-sm);
   border-radius: var(--avatar-radius);
   border: 1px solid var(--border);
   overflow: hidden;
@@ -1871,8 +1871,8 @@ onUnmounted(() => {
 
 .avatar {
   position: relative;
-  width: 36px;
-  height: 36px;
+  width: var(--avatar-md);
+  height: var(--avatar-md);
   border-radius: var(--avatar-radius);
   border: 1px solid var(--border);
   background: var(--surface);
@@ -1887,9 +1887,9 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 .avatar.small {
-  width: 28px;
-  height: 28px;
-  font-size: 0.7rem;
+  width: var(--avatar-sm);
+  height: var(--avatar-sm);
+  font-size: 0.75rem;
 }
 .who-text {
   display: flex;

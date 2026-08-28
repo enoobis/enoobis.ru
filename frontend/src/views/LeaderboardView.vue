@@ -167,9 +167,9 @@ onMounted(load);
 }
 .user img,
 .ava {
-  width: 36px;
-  height: 36px;
-  border-radius: 999px;
+  width: var(--avatar-md);
+  height: var(--avatar-md);
+  border-radius: var(--avatar-radius);
   flex-shrink: 0;
   object-fit: cover;
 }

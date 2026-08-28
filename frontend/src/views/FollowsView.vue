@@ -204,8 +204,8 @@ useProfileOwnerThemeFromApi(nick);
 }
 .user img,
 .user .ava-fb {
-  width: 38px;
-  height: 38px;
+  width: var(--avatar-md);
+  height: var(--avatar-md);
   border-radius: var(--avatar-radius);
   border: 1px solid var(--border);
   object-fit: cover;
@@ -231,7 +231,7 @@ useProfileOwnerThemeFromApi(nick);
   text-overflow: ellipsis;
 }
 .small {
-  font-size: 0.78rem;
+  font-size: var(--text-sm);
 }
 .follow-btn {
   padding: 0.35rem 0.85rem;

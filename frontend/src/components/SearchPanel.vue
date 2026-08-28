@@ -414,8 +414,8 @@ onUnmounted(() => {
 }
 
 .avatar {
-  width: 36px;
-  height: 36px;
+  width: var(--avatar-md);
+  height: var(--avatar-md);
   border-radius: var(--avatar-radius);
   border: 1px solid var(--border);
   background: var(--surface);

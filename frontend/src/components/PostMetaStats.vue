@@ -10,7 +10,7 @@ withDefaults(
   { upCount: 0, downCount: 0, commentCount: 0 },
 );
 
-const ICON = 12;
+const ICON = 14;
 </script>
 
 <template>
@@ -45,12 +45,12 @@ const ICON = 12;
 }
 .nums {
   font-variant-numeric: tabular-nums;
-  font-size: 0.78rem;
+  font-size: var(--text-sm);
 }
 .sep {
   opacity: 0.45;
 }
 .stat > span:last-child {
-  font-size: 0.78rem;
+  font-size: var(--text-sm);
 }
 </style>

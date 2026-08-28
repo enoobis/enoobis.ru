@@ -776,15 +776,15 @@ function closeSettings() {
 
 .avatar-edit {
   position: relative;
-  width: 96px;
-  height: 96px;
+  width: var(--avatar-lg);
+  height: var(--avatar-lg);
 }
 
 .avatar-edit-img,
 .avatar-edit-placeholder {
-  width: 96px;
-  height: 96px;
-  border-radius: 50%;
+  width: var(--avatar-lg);
+  height: var(--avatar-lg);
+  border-radius: var(--avatar-radius);
   border: 1px solid var(--border);
   background: var(--surface2);
 }

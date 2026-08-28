@@ -1,11 +1,16 @@
 :root {
-  --radius: 14px;
+  --radius: 18px;
+  --radius-sm: 12px;
   --radius-pill: 999px;
-  --avatar-radius: 0;
+  --avatar-radius: 999px;
+  --avatar-sm: 32px;
+  --avatar-md: 44px;
+  --avatar-lg: 96px;
   --profile-head-gap: 1.5rem;
   --font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --mono: ui-monospace, "Cascadia Code", "Segoe UI Mono", monospace;
   --icon-size: 18px;
+  --text-sm: 0.86rem;
   --app-font-scale: 1;
   --danger: var(--text);
   --gold: var(--text);
@@ -367,7 +372,7 @@ input[type="file"] {
 input[type="file"]::file-selector-button {
   margin-right: 0.6rem;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-pill);
   background: var(--surface);
   color: var(--text);
   font-family: var(--font);
@@ -838,7 +843,7 @@ input[type="search"]::-webkit-search-cancel-button:hover {
   gap: 0.75rem;
   padding: 0.5rem 0.7rem;
   border: none;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--muted);
   font: inherit;
@@ -1142,7 +1147,7 @@ html[data-theme="contrast-white"] .nav {
 .nav a.nav-menu-link,
 .nav a.profile-menu-item {
   color: var(--text);
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   letter-spacing: -0.02em;
 }
 @media (max-width: 640px) {
@@ -1307,7 +1312,7 @@ h3 {
 
 .muted {
   color: var(--muted);
-  font-size: 0.88rem;
+  font-size: 0.9rem;
 }
 
 .grid-2 {
@@ -1322,9 +1327,9 @@ h3 {
 
 .badge {
   display: inline-block;
-  padding: 0.1rem 0.45rem;
-  border-radius: 999px;
-  font-size: 0.72rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: var(--radius-pill);
+  font-size: 0.78rem;
   font-weight: 500;
   background: transparent;
   border: 1px solid var(--border);

@@ -32,11 +32,11 @@ withDefaults(
   border-bottom: 1px solid var(--border);
 }
 .skeleton--feed .skeleton-row {
-  grid-template-columns: 36px 1fr;
+  grid-template-columns: var(--avatar-md) 1fr;
 }
 .skeleton-avatar {
-  width: 36px;
-  height: 36px;
+  width: var(--avatar-md);
+  height: var(--avatar-md);
   border-radius: var(--avatar-radius);
 }
 .skeleton-lines {
