@@ -1123,6 +1123,9 @@ html[data-theme="contrast-white"] .nav {
   }
 }
 
+.nav {
+  --icon-size: 21px;
+}
 .nav.nav--sheet-open {
   z-index: 110;
   overflow: visible;
