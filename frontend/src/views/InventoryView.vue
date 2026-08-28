@@ -280,11 +280,12 @@ onMounted(load);
 .avatar-wrap {
   position: relative;
 }
+/* превью — квадратное: круг обрезал бы часть рисунка */
 .avatar-img,
 .displacement-host.avatar-img {
   width: 80px;
   height: 80px;
-  border-radius: var(--avatar-radius);
+  border-radius: 0;
   border: 1px solid var(--border);
   display: block;
 }
