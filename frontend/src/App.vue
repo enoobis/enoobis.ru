@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
-import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
+import { RouterLink, RouterView, useRoute, useRouter, type RouteLocationNormalizedLoaded } from "vue-router";
 import { AnimatePresence, MotionConfig, motion } from "motion-v";
 import {
   pageActive,
@@ -28,6 +28,14 @@ let stopFilterTabsMotion: (() => void) | null = null;
 const route = useRoute();
 const onHome = computed(() => route.path === "/");
 const motionLite = useLiteMotion();
+
+/* вкладки курса живут в url, но это не новая страница — иначе весь экран дёргается */
+function pageMotionKey(rv: RouteLocationNormalizedLoaded) {
+  if (rv.name === "course-classroom") {
+    return `course/${String(rv.params.courseId ?? "")}`;
+  }
+  return rv.path;
+}
 
 const auth = useAuthStore();
 const chatStore = useChatStore();
@@ -820,10 +828,10 @@ function submitReaderPage() {
       </Transition>
     </Teleport>
     <RouterView v-slot="{ Component, route: rv }">
-      <component v-if="motionLite" :is="Component" :key="rv.path" class="page-motion-root" />
+      <component v-if="motionLite" :is="Component" :key="pageMotionKey(rv)" class="page-motion-root" />
       <AnimatePresence v-else mode="wait">
         <motion.div
-          :key="rv.path"
+          :key="pageMotionKey(rv)"
           class="page-motion-root"
           :initial="pageEnter"
           :animate="pageActive"

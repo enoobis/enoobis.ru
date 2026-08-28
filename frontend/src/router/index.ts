@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from "vue-router";
+import { createRouter, createWebHistory, type RouteLocationNormalized } from "vue-router";
 import { useAuthStore } from "../stores/auth";
 import { applyDocumentSeo } from "../utils/seo";
 import { clearProfileOwnerTheme, isProfileThemeRoute } from "../utils/preferences";
@@ -181,6 +181,14 @@ const router = createRouter({
   ],
 });
 
+function isClassroomTabSwitch(to: RouteLocationNormalized, from: RouteLocationNormalized) {
+  return (
+    to.name === "course-classroom" &&
+    from.name === "course-classroom" &&
+    to.params.courseId === from.params.courseId
+  );
+}
+
 router.beforeEach((to, from) => {
   const auth = useAuthStore();
   const path = to.path.toLowerCase();
@@ -205,13 +213,17 @@ router.beforeEach((to, from) => {
   if (to.meta.requiresWork && auth.role !== "master" && auth.role !== "admin") {
     return { name: "home" };
   }
-  if (typeof window !== "undefined" && to.fullPath !== from.fullPath) {
+  if (
+    typeof window !== "undefined" &&
+    to.fullPath !== from.fullPath &&
+    !isClassroomTabSwitch(to, from)
+  ) {
     window.dispatchEvent(new CustomEvent("enoobis:nav-start"));
   }
   return true;
 });
 
-router.afterEach((to) => {
+router.afterEach((to, from) => {
   if (to.name === "login" && typeof to.query.next === "string") {
     void router.replace({ path: "/login" });
   }
@@ -219,7 +231,7 @@ router.afterEach((to) => {
   if (!isProfileThemeRoute(to.path)) {
     clearProfileOwnerTheme();
   }
-  if (typeof window !== "undefined") {
+  if (typeof window !== "undefined" && !isClassroomTabSwitch(to, from)) {
     window.dispatchEvent(new CustomEvent("enoobis:nav-done"));
   }
 });
