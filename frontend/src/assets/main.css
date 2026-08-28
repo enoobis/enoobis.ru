@@ -65,6 +65,7 @@ html:not([data-theme]) {
   --muted: #9a9a9a;
   --accent: #ffffff;
   --hover-surface: #1c1c1c;
+  --nav-hover-surface: #242424;
   --active-surface: #303030;
   --hover-border: #333333;
   --focus-border: #444444;
@@ -82,6 +83,7 @@ html[data-theme="white"] {
   --muted: #6e6e6e;
   --accent: #141414;
   --hover-surface: #ebebeb;
+  --nav-hover-surface: #e4e4e4;
   --active-surface: #d8d8d8;
   --hover-border: #cccccc;
   --focus-border: #999999;
@@ -99,6 +101,7 @@ html[data-theme="contrast"] {
   --muted: #c8c8c8;
   --accent: #ffffff;
   --hover-surface: #1a1a1a;
+  --nav-hover-surface: #262626;
   --active-surface: #383838;
   --hover-border: #ffffff;
   --focus-border: #ffffff;
@@ -116,6 +119,7 @@ html[data-theme="contrast-white"] {
   --muted: #333333;
   --accent: #000000;
   --hover-surface: #eeeeee;
+  --nav-hover-surface: #e2e2e2;
   --active-surface: #d0d0d0;
   --hover-border: #000000;
   --focus-border: #000000;
@@ -1167,6 +1171,9 @@ html[data-theme="contrast-white"] .nav {
 .nav a:hover {
   color: var(--text);
   background: var(--surface);
+}
+.nav .icon-btn:hover {
+  background: var(--nav-hover-surface);
 }
 .nav a.nav-menu-link:hover,
 .nav a.profile-menu-item:hover {
