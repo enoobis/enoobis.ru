@@ -1899,7 +1899,7 @@ onUnmounted(() => {
 }
 .presence-label {
   color: var(--muted);
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   line-height: 1.2;
 }
 .avatar img {
@@ -1929,7 +1929,7 @@ onUnmounted(() => {
   text-overflow: ellipsis;
 }
 .time {
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   flex-shrink: 0;
 }
 .last {
@@ -1985,7 +1985,7 @@ onUnmounted(() => {
   line-height: 1;
 }
 .small {
-  font-size: 0.78rem;
+  font-size: var(--text-sm);
 }
 
 .thread {
@@ -2115,7 +2115,7 @@ onUnmounted(() => {
 }
 .msg-sender {
   flex-basis: 100%;
-  font-size: 0.74rem;
+  font-size: var(--text-xs);
   color: var(--muted);
   text-transform: lowercase;
   line-height: 1.2;
@@ -2133,7 +2133,7 @@ onUnmounted(() => {
   gap: 0.08rem;
 }
 .msg-reply-author {
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
 }
 .msg-reply-snippet {
   font-size: 0.8rem;
@@ -2152,7 +2152,7 @@ onUnmounted(() => {
 }
 .meta {
   margin-left: auto;
-  font-size: 0.68rem;
+  font-size: var(--text-xs);
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;

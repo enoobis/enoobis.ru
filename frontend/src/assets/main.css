@@ -11,6 +11,7 @@
   --mono: ui-monospace, "Cascadia Code", "Segoe UI Mono", monospace;
   --icon-size: 18px;
   --text-sm: 0.86rem;
+  --text-xs: 0.78rem;
   --app-font-scale: 1;
   --danger: var(--text);
   --gold: var(--text);
@@ -1264,6 +1265,13 @@ html[data-theme="contrast-white"] .nav {
 .icon-btn-sm:hover {
   background: var(--surface2);
   color: var(--text);
+}
+@media (pointer: coarse) {
+  .icon-btn-sm {
+    width: 40px;
+    height: 40px;
+    min-height: 40px;
+  }
 }
 
 label {
