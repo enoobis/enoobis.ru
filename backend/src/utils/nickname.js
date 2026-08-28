@@ -1,6 +1,6 @@
-const NICKNAME_RE = /^[A-Za-z0-9_.]{3,24}$/;
+const NICKNAME_RE = /^[A-Za-z]{3,24}$/;
 
-export const NICKNAME_RULE_TEXT = "3-24, латиница, не имя и не мат";
+export const NICKNAME_RULE_TEXT = "3-24 латинские буквы";
 
 const RESERVED = split(`
   admin administrator admins moderator moder mod mods staff official
@@ -215,8 +215,6 @@ function tokens(s) {
 export function nicknameError(raw) {
   const n = String(raw ?? "").trim();
   if (!NICKNAME_RE.test(n)) return NICKNAME_RULE_TEXT;
-  if (/^[._]|[._]$/.test(n) || /[._]{2,}/.test(n)) return "так нельзя";
-  if (/^\d+$/.test(n)) return "ник не может быть только цифрами";
 
   const low = n.toLowerCase();
   const core = lettersOnly(low);

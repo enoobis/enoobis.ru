@@ -551,6 +551,7 @@ function closeSettings() {
                 v-model="newNick"
                 placeholder="новый ник"
                 maxlength="24"
+                pattern="[A-Za-z]{3,24}"
                 :disabled="changingNick"
                 @input="onNickInput"
               />
