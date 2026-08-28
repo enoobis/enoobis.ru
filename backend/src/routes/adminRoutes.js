@@ -14,7 +14,7 @@ import { limitsFromAdminBody, limitsToJson, parseContentLimits } from "../utils/
 import { optimizeUploadedFile } from "../utils/imageOptimize.js";
 import { finalizeBlogPublish } from "../utils/blogPublish.js";
 import { ensureUserFollowsAdmins } from "../utils/adminFollow.js";
-import { isAdmin, isPanelStaff } from "../utils/roles.js";
+import { nicknameError } from "../utils/nickname.js";
 
 const router = express.Router();
 
@@ -172,8 +172,9 @@ router.patch("/admin/users/:id/profile", adminOnly, async (req, res) => {
   try {
     if (body.nickname !== undefined) {
       const nn = String(body.nickname).trim();
-      if (!/^[a-z0-9_.]{2,24}$/i.test(nn)) {
-        return res.status(400).json({ error: "bad nickname" });
+      const nickErr = nicknameError(nn);
+      if (nickErr) {
+        return res.status(400).json({ error: nickErr });
       }
       const taken = get(
         "SELECT 1 as v FROM users WHERE LOWER(nickname) = LOWER(?) AND id <> ?",

@@ -7,7 +7,7 @@ import { saveIdenticon } from "../utils/identicon.js";
 import { ensureUserFollowsAdmins } from "../utils/adminFollow.js";
 import { passwordPolicyError } from "../utils/passwordPolicy.js";
 import { rateLimit } from "../utils/security.js";
-import { isValidNickname, NICKNAME_RULE_TEXT } from "../utils/nickname.js";
+import { nicknameError } from "../utils/nickname.js";
 
 const router = express.Router();
 const loginLimit = rateLimit({ windowMs: 60_000, max: 20, keyPrefix: "login" });
@@ -34,8 +34,6 @@ function userPayload(row) {
   };
 }
 
-const validNickname = isValidNickname;
-
 router.post("/register", registerLimit, async (req, res) => {
   const { email = "", password = "", nickname = "", invite_code } = req.body ?? {};
   const normEmail = String(email).trim().toLowerCase();
@@ -43,8 +41,9 @@ router.post("/register", registerLimit, async (req, res) => {
   if (!normEmail || policyErr) {
     return res.status(400).json({ error: policyErr ?? "invalid_email" });
   }
-  if (!validNickname(nickname)) {
-    return res.status(400).json({ error: `nickname: ${NICKNAME_RULE_TEXT}` });
+  const nickErr = nicknameError(nickname);
+  if (nickErr) {
+    return res.status(400).json({ error: nickErr });
   }
 
   let role = "student";

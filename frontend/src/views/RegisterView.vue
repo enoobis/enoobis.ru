@@ -50,7 +50,7 @@ async function submit() {
   <section class="auth" data-reveal>
     <h1>регистрация</h1>
     <form @submit.prevent="submit">
-      <input v-model="nickname" placeholder="ник" required pattern="[A-Za-z0-9_]{3,32}" />
+      <input v-model="nickname" placeholder="ник" required pattern="[A-Za-z0-9_.]{3,24}" maxlength="24" autocomplete="username" />
       <input v-model="email" type="email" placeholder="email" required />
       <input v-model="password" type="password" placeholder="пароль" minlength="10" required />
       <button type="submit" class="primary" :disabled="loading">

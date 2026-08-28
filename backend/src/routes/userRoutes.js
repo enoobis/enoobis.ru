@@ -16,7 +16,7 @@ import {
 } from "../utils/achievements.js";
 import { buildModerationNotices, parseContentLimits } from "../utils/contentLimits.js";
 import { regenerateUserAvatar, sanitizeUserCosmetics } from "../utils/profileCosmetics.js";
-import { isValidNickname } from "../utils/nickname.js";
+import { nicknameError } from "../utils/nickname.js";
 import { isStaffRole } from "../utils/roles.js";
 import {
   guestMayViewProfile,
@@ -110,8 +110,9 @@ router.get("/me", authRequired, (req, res) => {
 router.get("/me/nickname/check", authRequired, (req, res) => {
   const requested = String(req.query.nickname ?? "").trim().toLowerCase();
   if (!requested) return res.json({ available: false, reason: "пустой ник" });
-  if (!isValidNickname(requested)) {
-    return res.json({ available: false, reason: "от 3 до 24 символов: буквы, цифры, _ и ." });
+  const nickErr = nicknameError(requested);
+  if (nickErr) {
+    return res.json({ available: false, reason: nickErr });
   }
   const me = get("SELECT nickname FROM users WHERE id = ?", req.user.id);
   if (me?.nickname?.toLowerCase() === requested) {
@@ -125,9 +126,8 @@ router.get("/me/nickname/check", authRequired, (req, res) => {
 router.post("/me/nickname", authRequired, (req, res) => {
   const requested = String(req.body?.nickname ?? "").trim();
   if (!requested) return res.status(400).json({ error: "пустой ник" });
-  if (!isValidNickname(requested)) {
-    return res.status(400).json({ error: "от 3 до 24 символов: буквы, цифры, _ и ." });
-  }
+  const nickErr = nicknameError(requested);
+  if (nickErr) return res.status(400).json({ error: nickErr });
   const me = get(
     "SELECT id, nickname, nickname_change_count FROM users WHERE id = ?",
     req.user.id,
