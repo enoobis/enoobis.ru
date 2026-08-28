@@ -11,8 +11,12 @@ import {
   voteMicro,
   type MicroPost,
 } from "../api/micro";
+import AnimatedNumber from "./AnimatedNumber.vue";
 import { useAuthStore } from "../stores/auth";
+import { usePop } from "../composables/usePop";
+import { haptic } from "../utils/haptics";
 import { toast, toastError, toastSuccess } from "../utils/toast";
+import { nextVoteState } from "../utils/voteState";
 import "../styles/post-actions.css";
 
 const ACT = 15;
@@ -35,6 +39,9 @@ const upCount = ref(props.post.up_count);
 const downCount = ref(props.post.down_count);
 const bookmarked = ref(!!props.post.bookmarked_by_me);
 const busy = ref(false);
+const { popped, pop } = usePop();
+let voteSeq = 0;
+let bookmarkSeq = 0;
 
 watch(
   () => props.post,
@@ -76,37 +83,59 @@ function formatAgo(iso: string) {
 }
 
 async function castVote(vote: 1 | -1) {
-  if (!auth.token || busy.value || isAuthor.value) return;
+  if (!auth.token || isAuthor.value) return;
+
+  const before = { my_vote: myVote.value, up_count: upCount.value, down_count: downCount.value };
+  const next = nextVoteState(before, vote);
+  myVote.value = next.my_vote;
+  upCount.value = next.up_count;
+  downCount.value = next.down_count;
+  pop(vote === 1 ? "up" : "down");
+  haptic("tap");
+
+  const seq = ++voteSeq;
   busy.value = true;
   try {
     const res = await voteMicro(props.post.id, auth.token, vote);
+    if (seq !== voteSeq) return;
     myVote.value = res.my_vote;
     upCount.value = res.up_count;
     downCount.value = res.down_count;
-  } catch {
-    /* ignore */
+  } catch (e) {
+    if (seq !== voteSeq) return;
+    myVote.value = before.my_vote;
+    upCount.value = before.up_count;
+    downCount.value = before.down_count;
+    toastError(e);
   } finally {
-    busy.value = false;
+    if (seq === voteSeq) busy.value = false;
   }
 }
 
 async function toggleBookmark() {
-  if (!auth.token || busy.value) return;
+  if (!auth.token) return;
+
+  const before = bookmarked.value;
+  bookmarked.value = !before;
+  pop("save");
+  haptic("toggle");
+
+  const seq = ++bookmarkSeq;
   busy.value = true;
   try {
-    if (bookmarked.value) {
+    if (before) {
       await unbookmarkMicro(props.post.id, auth.token);
-      bookmarked.value = false;
-      emit("unsaved", props.post.id);
+      if (seq === bookmarkSeq) emit("unsaved", props.post.id);
     } else {
       await bookmarkMicro(props.post.id, auth.token);
-      bookmarked.value = true;
-      toastSuccess("в закладках");
+      if (seq === bookmarkSeq) toastSuccess("в закладках");
     }
   } catch (e) {
+    if (seq !== bookmarkSeq) return;
+    bookmarked.value = before;
     toastError(e);
   } finally {
-    busy.value = false;
+    if (seq === bookmarkSeq) busy.value = false;
   }
 }
 
@@ -217,7 +246,7 @@ async function share() {
           <button
             class="act"
             type="button"
-            :class="{ on: myVote === 1 }"
+            :class="{ on: myVote === 1, pop: popped === 'up' }"
             :disabled="!auth.token || editing"
             title="вверх"
             @click="castVote(1)"
@@ -225,14 +254,14 @@ async function share() {
             <AppIcon name="voteUp" :size="ACT" />
           </button>
           <span v-if="upCount || downCount" class="vote-score">
-            <span v-if="upCount">{{ upCount }}</span>
+            <AnimatedNumber v-if="upCount" :value="upCount" />
             <span v-if="upCount && downCount" class="vote-sep">·</span>
-            <span v-if="downCount">{{ downCount }}</span>
+            <AnimatedNumber v-if="downCount" :value="downCount" />
           </span>
           <button
             class="act"
             type="button"
-            :class="{ on: myVote === -1 }"
+            :class="{ on: myVote === -1, pop: popped === 'down' }"
             :disabled="!auth.token || editing"
             title="вниз"
             @click="castVote(-1)"
@@ -257,7 +286,7 @@ async function share() {
           v-if="auth.token"
           class="act"
           type="button"
-          :class="{ on: bookmarked }"
+          :class="{ on: bookmarked, pop: popped === 'save' }"
           :title="bookmarked ? 'убрать из закладок' : 'в закладки'"
           @click="toggleBookmark"
         >

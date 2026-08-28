@@ -3,8 +3,9 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import PageHeader from "../components/PageHeader.vue";
 import AppIcon from "../components/AppIcon.vue";
-import AppLoading from "../components/AppLoading.vue";
+import AppSkeleton from "../components/AppSkeleton.vue";
 import PostMetaStats from "../components/PostMetaStats.vue";
+import PullToRefresh from "../components/PullToRefresh.vue";
 import {
   listPosts,
   listTags,
@@ -194,6 +195,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
+  <PullToRefresh :refresh="load">
   <section class="blog page-shell">
     <PageHeader title="блоги" />
 
@@ -270,9 +272,9 @@ onBeforeUnmount(() => {
     </div>
 
     <p v-if="err" class="error">{{ err }}</p>
-    <AppLoading v-else-if="loading && !sortedPosts.length" />
+    <AppSkeleton v-else-if="loading && !sortedPosts.length" :rows="6" />
     <template v-else>
-      <ul v-if="sortedPosts.length" class="post-list">
+      <ul v-if="sortedPosts.length" class="post-list stagger-list">
         <li v-for="p in sortedPosts" :key="p.id">
           <RouterLink :to="`/blogs/${p.id}`" class="post-title">
             <AppIcon v-if="p.is_pinned" name="pinned" :size="14" class="pin-mark" />
@@ -303,6 +305,7 @@ onBeforeUnmount(() => {
       </div>
     </template>
   </section>
+  </PullToRefresh>
 </template>
 
 <style scoped>

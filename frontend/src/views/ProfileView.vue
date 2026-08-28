@@ -9,6 +9,7 @@ import AppIcon from "../components/AppIcon.vue";
 import PostMetaStats from "../components/PostMetaStats.vue";
 import type { Achievement } from "../api/profile";
 import { useAuthStore } from "../stores/auth";
+import { haptic } from "../utils/haptics";
 import { renderMarkdown } from "../utils/markdown";
 import { useProfileOwnerThemeFromValue } from "../composables/useProfileOwnerTheme";
 type Profile = {
@@ -230,19 +231,21 @@ async function load() {
 
 async function toggleFollow() {
   if (!auth.token || !profile.value || followBusy.value) return;
+
+  const target = profile.value;
+  const wasFollowing = following.value;
+  const prevCount = target.followers_count;
+  following.value = !wasFollowing;
+  target.followers_count = wasFollowing ? Math.max(0, prevCount - 1) : prevCount + 1;
+  haptic("toggle");
+
   followBusy.value = true;
   try {
-    const path = `/api/profile/${profile.value.nickname}/follow`;
-    if (following.value) {
-      await api(path, { method: "DELETE", token: auth.token });
-      following.value = false;
-      profile.value.followers_count = Math.max(0, profile.value.followers_count - 1);
-    } else {
-      await api(path, { method: "POST", token: auth.token });
-      following.value = true;
-      profile.value.followers_count += 1;
-    }
+    const path = `/api/profile/${target.nickname}/follow`;
+    await api(path, { method: wasFollowing ? "DELETE" : "POST", token: auth.token });
   } catch (e) {
+    following.value = wasFollowing;
+    target.followers_count = prevCount;
     err.value = e instanceof Error ? e.message : "ошибка";
   } finally {
     followBusy.value = false;

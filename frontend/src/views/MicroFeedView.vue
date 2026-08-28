@@ -2,9 +2,10 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import PageHeader from "../components/PageHeader.vue";
-import AppLoading from "../components/AppLoading.vue";
+import AppSkeleton from "../components/AppSkeleton.vue";
 import MicroComposer from "../components/MicroComposer.vue";
 import MicroItem from "../components/MicroItem.vue";
+import PullToRefresh from "../components/PullToRefresh.vue";
 import { listMicro, type MicroPost } from "../api/micro";
 import { useAuthStore } from "../stores/auth";
 
@@ -119,6 +120,7 @@ onMounted(() => {
 </script>
 
 <template>
+  <PullToRefresh :refresh="load">
   <section class="feed page-shell">
     <PageHeader title="лента" />
 
@@ -156,7 +158,7 @@ onMounted(() => {
     </p>
 
     <p v-if="err" class="error">{{ err }}</p>
-    <AppLoading v-else-if="loading && !posts.length" class="page-empty" />
+    <AppSkeleton v-else-if="loading && !posts.length" variant="feed" :rows="4" />
     <p v-else-if="!loading && !posts.length" class="page-empty muted">{{ listEmptyLabel }}</p>
 
     <MicroItem
@@ -168,6 +170,7 @@ onMounted(() => {
       @updated="onUpdated"
     />
   </section>
+  </PullToRefresh>
 </template>
 
 <style scoped>

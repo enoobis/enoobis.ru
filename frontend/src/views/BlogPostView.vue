@@ -19,12 +19,16 @@ import {
   type BlogPost,
   type CommentItem,
 } from "../api/blog";
+import AnimatedNumber from "../components/AnimatedNumber.vue";
 import AppIcon from "../components/AppIcon.vue";
 import AppLoading from "../components/AppLoading.vue";
+import { usePop } from "../composables/usePop";
 import { useAuthStore } from "../stores/auth";
+import { haptic } from "../utils/haptics";
 import { renderMarkdown } from "../utils/markdown";
 import { addRecentPost, updateRecentPostProgress } from "../utils/recentPosts";
 import { toast, toastError, toastSuccess } from "../utils/toast";
+import { nextVoteState } from "../utils/voteState";
 import "../styles/post-actions.css";
 
 const ACT = 18;
@@ -46,6 +50,10 @@ const myState = ref({
 
 const postId = computed(() => String(route.params.id || ""));
 const renderedBody = computed(() => renderMarkdown(post.value?.body ?? ""));
+const { popped, pop } = usePop();
+const readProgress = ref(0);
+let voteSeq = 0;
+let bookmarkSeq = 0;
 
 const readingMinutes = computed(() => {
   const text = (post.value?.body ?? "").replace(/\s+/g, " ").trim();
@@ -107,6 +115,9 @@ function readingProgress() {
 }
 
 function persistProgress() {
+  const max = document.documentElement.scrollHeight - window.innerHeight;
+  readProgress.value =
+    max > 40 ? Math.min(100, Math.max(0, (window.scrollY / max) * 100)) : 0;
   if (!post.value) return;
   updateRecentPostProgress(post.value.id, readingProgress());
 }
@@ -118,33 +129,55 @@ const isPublished = computed(() => post.value?.status === "published");
 const needsReview = computed(() => isPending.value || isRecalled.value);
 
 async function castVote(vote: 1 | -1) {
-  if (!auth.token || !post.value || working.value || isAuthor.value) return;
-  working.value = true;
+  if (!auth.token || !post.value || isAuthor.value) return;
+
+  const target = post.value;
+  const before = {
+    my_vote: myState.value.my_vote,
+    up_count: target.up_count,
+    down_count: target.down_count,
+  };
+  const next = nextVoteState(before, vote);
+  post.value = { ...target, up_count: next.up_count, down_count: next.down_count, my_vote: next.my_vote };
+  myState.value = { ...myState.value, my_vote: next.my_vote };
+  pop(vote === 1 ? "up" : "down");
+  haptic("tap");
+
+  const seq = ++voteSeq;
   try {
-    const res = await votePost(post.value.id, auth.token, vote);
+    const res = await votePost(target.id, auth.token, vote);
+    if (seq !== voteSeq || !post.value) return;
     post.value = { ...post.value, up_count: res.up_count, down_count: res.down_count, my_vote: res.my_vote };
     myState.value = { ...myState.value, my_vote: res.my_vote };
   } catch (e) {
+    if (seq !== voteSeq || !post.value) return;
+    post.value = { ...post.value, ...before };
+    myState.value = { ...myState.value, my_vote: before.my_vote };
     err.value = e instanceof Error ? e.message : "ошибка";
-  } finally {
-    working.value = false;
   }
 }
 
 async function toggleBookmark() {
-  if (!auth.token || !post.value || working.value) return;
-  working.value = true;
+  if (!auth.token || !post.value) return;
+
+  const id = post.value.id;
+  const before = myState.value.bookmarked;
+  myState.value = { ...myState.value, bookmarked: !before };
+  pop("save");
+  haptic("toggle");
+
+  const seq = ++bookmarkSeq;
   try {
-    if (myState.value.bookmarked) {
-      await unbookmarkPost(post.value.id, auth.token);
+    if (before) {
+      await unbookmarkPost(id, auth.token);
     } else {
-      await bookmarkPost(post.value.id, auth.token);
+      await bookmarkPost(id, auth.token);
+      if (seq === bookmarkSeq) toastSuccess("в закладках");
     }
-    await load();
   } catch (e) {
+    if (seq !== bookmarkSeq) return;
+    myState.value = { ...myState.value, bookmarked: before };
     err.value = e instanceof Error ? e.message : "ошибка";
-  } finally {
-    working.value = false;
   }
 }
 
@@ -283,6 +316,9 @@ watch(() => route.params.id, load);
 
 <template>
   <article v-if="post" class="post">
+    <div v-if="readProgress > 0" class="read-progress" aria-hidden="true">
+      <span :style="{ width: `${readProgress}%` }" />
+    </div>
     <div class="post-actions post-actions--top post-actions--lg">
       <button class="act" type="button" aria-label="назад" title="назад" @click="goBack">
         <AppIcon name="back" :size="ACT" />
@@ -291,22 +327,34 @@ watch(() => route.params.id, load);
         v-if="auth.token && isPublished"
         class="act"
         type="button"
-        :class="{ on: myState.bookmarked }"
+        :class="{ on: myState.bookmarked, pop: popped === 'save' }"
         :title="myState.bookmarked ? 'убрать из закладок' : 'в закладки'"
         @click="toggleBookmark"
       >
         <AppIcon :name="myState.bookmarked ? 'bookmarked' : 'bookmark'" :size="ACT" />
       </button>
       <div v-if="auth.token && isPublished && !isAuthor" class="votes">
-        <button class="act" type="button" :class="{ on: myState.my_vote === 1 }" title="вверх" @click="castVote(1)">
+        <button
+          class="act"
+          type="button"
+          :class="{ on: myState.my_vote === 1, pop: popped === 'up' }"
+          title="вверх"
+          @click="castVote(1)"
+        >
           <AppIcon name="voteUp" :size="ACT" />
         </button>
         <span v-if="post.up_count || post.down_count" class="vote-score">
-          <span v-if="post.up_count">{{ post.up_count }}</span>
+          <AnimatedNumber v-if="post.up_count" :value="post.up_count" />
           <span v-if="post.up_count && post.down_count" class="vote-sep">·</span>
-          <span v-if="post.down_count">{{ post.down_count }}</span>
+          <AnimatedNumber v-if="post.down_count" :value="post.down_count" />
         </span>
-        <button class="act" type="button" :class="{ on: myState.my_vote === -1 }" title="вниз" @click="castVote(-1)">
+        <button
+          class="act"
+          type="button"
+          :class="{ on: myState.my_vote === -1, pop: popped === 'down' }"
+          title="вниз"
+          @click="castVote(-1)"
+        >
           <AppIcon name="voteDown" :size="ACT" />
         </button>
       </div>
@@ -436,6 +484,21 @@ watch(() => route.params.id, load);
 .post {
   max-width: 680px;
   margin: 0 auto;
+}
+.read-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  z-index: 90;
+  pointer-events: none;
+}
+.read-progress span {
+  display: block;
+  height: 100%;
+  background: var(--text);
+  transition: width 90ms linear;
 }
 h1 {
   font-size: 1.6rem;

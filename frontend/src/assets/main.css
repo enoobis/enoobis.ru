@@ -217,6 +217,7 @@ button,
     background var(--dur-2) var(--ease-out),
     border-color var(--dur-2) var(--ease-out),
     color var(--dur-2) var(--ease-out),
+    transform var(--dur-1) var(--ease-out),
     opacity var(--dur-1) var(--ease-out);
 }
 button:hover,
@@ -228,6 +229,34 @@ button:active,
 .btn:active {
   opacity: 0.72;
   transition-duration: var(--dur-1);
+}
+
+/* press squish — тактильный отклик; вкладки исключены, их подсветку двигает thumb */
+button:active:not(:disabled):not(.filter-tab):not(.content-tab),
+.btn:active:not(.filter-tab):not(.content-tab) {
+  transform: scale(0.97);
+}
+a.card:active,
+.card.interactive:active,
+.list-row:active {
+  transform: scale(0.995);
+}
+a.card,
+.card.interactive,
+.list-row {
+  transition:
+    border-color var(--dur-2) var(--ease-out),
+    background var(--dur-2) var(--ease-out),
+    transform var(--dur-1) var(--ease-out);
+}
+@media (prefers-reduced-motion: reduce) {
+  button:active,
+  .btn:active,
+  a.card:active,
+  .card.interactive:active,
+  .list-row:active {
+    transform: none;
+  }
 }
 button.primary,
 .btn.primary {
@@ -687,9 +716,30 @@ input[type="search"]::-webkit-search-cancel-button:hover {
 
 /* контентные вкладки: underline, как в профиле */
 .content-tabs {
+  position: relative;
   display: flex;
   margin: 0 0 1rem;
   border-bottom: 1px solid var(--border);
+}
+
+.content-tabs-thumb {
+  position: absolute;
+  left: 0;
+  bottom: -1px;
+  width: 0;
+  height: 2px;
+  background: var(--text);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    transform var(--dur-3) var(--ease-snap),
+    width var(--dur-3) var(--ease-snap),
+    opacity var(--dur-2) var(--ease-out);
+}
+
+.content-tabs--motion .content-tab.on::after,
+.content-tabs--motion .content-tab.router-link-active::after {
+  display: none;
 }
 
 .content-tab {
@@ -1443,6 +1493,49 @@ html[data-theme="contrast-white"] .glass {
 @keyframes skel-pulse {
   0%, 100% { opacity: 0.55; }
   50% { opacity: 1; }
+}
+
+/* skeleton block — monochrome sweep, used by AppSkeleton */
+.skel-block {
+  display: block;
+  position: relative;
+  overflow: hidden;
+  background: var(--surface2);
+  border-radius: 4px;
+}
+.skel-block::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--hover-surface) 45%,
+    var(--hover-surface) 55%,
+    transparent 100%
+  );
+  transform: translateX(-100%);
+  animation: skel-sweep 1.5s var(--ease-out) infinite;
+}
+@keyframes skel-sweep {
+  to { transform: translateX(100%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skel-block::after {
+    display: none;
+  }
+}
+
+/* pull-to-refresh ring */
+.ptr-ring {
+  width: 20px;
+  height: 20px;
+  border: 1.5px solid var(--border);
+  border-top-color: var(--text);
+  border-radius: 999px;
+}
+.ptr-ring.spin {
+  animation: spin 0.7s linear infinite;
 }
 
 /* spinner — small inline loader */

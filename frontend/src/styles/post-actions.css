@@ -7,6 +7,7 @@
 }
 
 .post-actions .act {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -24,6 +25,10 @@
   line-height: 1;
   flex-shrink: 0;
   cursor: pointer;
+  transition:
+    color var(--dur-2) var(--ease-out),
+    background var(--dur-2) var(--ease-out),
+    transform var(--dur-1) var(--ease-out);
 }
 
 .post-actions .act:hover:not(:disabled) {
@@ -31,8 +36,47 @@
   background: var(--surface);
 }
 
+.post-actions .act:active:not(:disabled) {
+  transform: scale(0.86);
+}
+
 .post-actions .act.on {
   color: var(--text);
+}
+
+/* pop — мгновенный отклик на голос/закладку */
+.post-actions .act.pop > :first-child {
+  animation: act-pop 420ms var(--ease-spring);
+}
+
+.post-actions .act.pop::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 999px;
+  border: 1px solid var(--text);
+  pointer-events: none;
+  animation: act-ring 460ms var(--ease-out) forwards;
+}
+
+@keyframes act-pop {
+  0% { transform: scale(1); }
+  38% { transform: scale(1.34); }
+  100% { transform: scale(1); }
+}
+
+@keyframes act-ring {
+  0% { transform: scale(0.55); opacity: 0.45; }
+  100% { transform: scale(1.85); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .post-actions .act:active:not(:disabled) {
+    transform: none;
+  }
+  .post-actions .act.pop::after {
+    display: none;
+  }
 }
 
 .post-actions .act.danger:hover:not(:disabled) {

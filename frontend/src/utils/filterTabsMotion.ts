@@ -1,36 +1,74 @@
+interface TabsKind {
+  /** класс контейнера */
+  root: string;
+  /** класс кнопки-вкладки */
+  tab: string;
+  /** класс бегунка */
+  thumb: string;
+  /** класс, включающий motion-режим на контейнере */
+  motion: string;
+  /** бегунок повторяет только ширину (underline) или ещё и высоту (pill) */
+  fullSize: boolean;
+}
+
+const KINDS: TabsKind[] = [
+  {
+    root: "filter-tabs",
+    tab: "filter-tab",
+    thumb: "filter-tabs-thumb",
+    motion: "filter-tabs--motion",
+    fullSize: true,
+  },
+  {
+    root: "content-tabs",
+    tab: "content-tab",
+    thumb: "content-tabs-thumb",
+    motion: "content-tabs--motion",
+    fullSize: false,
+  },
+];
+
 const enhanced = new WeakSet<HTMLElement>();
 const lastActive = new WeakMap<HTMLElement, HTMLElement>();
 
-function tabNodes(el: HTMLElement): HTMLElement[] {
+function tabNodes(el: HTMLElement, kind: TabsKind): HTMLElement[] {
   return Array.from(el.children).filter(
-    (n): n is HTMLElement =>
-      n instanceof HTMLElement && n.classList.contains("filter-tab"),
+    (n): n is HTMLElement => n instanceof HTMLElement && n.classList.contains(kind.tab),
   );
 }
 
-function ensureThumb(el: HTMLElement): HTMLElement {
-  let thumb = el.querySelector(":scope > .filter-tabs-thumb") as HTMLElement | null;
+function ensureThumb(el: HTMLElement, kind: TabsKind): HTMLElement {
+  let thumb = el.querySelector(`:scope > .${kind.thumb}`) as HTMLElement | null;
   if (!thumb) {
     thumb = document.createElement("span");
-    thumb.className = "filter-tabs-thumb";
+    thumb.className = kind.thumb;
     thumb.setAttribute("aria-hidden", "true");
     el.insertBefore(thumb, el.firstChild);
   }
   return thumb;
 }
 
-function syncThumb(el: HTMLElement) {
-  const thumb = ensureThumb(el);
-  const tabs = tabNodes(el);
+function isActive(t: HTMLElement): boolean {
+  return (
+    t.classList.contains("on") ||
+    t.classList.contains("router-link-active") ||
+    t.getAttribute("aria-selected") === "true"
+  );
+}
+
+function syncThumb(el: HTMLElement, kind: TabsKind) {
+  const thumb = ensureThumb(el, kind);
+  const tabs = tabNodes(el, kind);
   if (!tabs.length) {
     thumb.style.opacity = "0";
     return;
   }
 
-  const active =
-    tabs.find(
-      (t) => t.classList.contains("on") || t.getAttribute("aria-selected") === "true",
-    ) ?? tabs[0];
+  const active = tabs.find(isActive);
+  if (!active) {
+    thumb.style.opacity = "0";
+    return;
+  }
 
   const style = getComputedStyle(el);
   const borderL = parseFloat(style.borderLeftWidth) || 0;
@@ -41,8 +79,12 @@ function syncThumb(el: HTMLElement) {
   const y = ar.top - er.top - borderT + el.scrollTop;
 
   thumb.style.width = `${ar.width}px`;
-  thumb.style.height = `${ar.height}px`;
-  thumb.style.transform = `translate(${x}px, ${y}px)`;
+  if (kind.fullSize) {
+    thumb.style.height = `${ar.height}px`;
+    thumb.style.transform = `translate(${x}px, ${y}px)`;
+  } else {
+    thumb.style.transform = `translateX(${x}px)`;
+  }
   thumb.style.opacity = "1";
 
   if (active !== lastActive.get(el)) {
@@ -54,16 +96,16 @@ function syncThumb(el: HTMLElement) {
   }
 }
 
-function enhance(el: HTMLElement) {
+function enhance(el: HTMLElement, kind: TabsKind) {
   if (enhanced.has(el)) {
-    syncThumb(el);
+    syncThumb(el, kind);
     return;
   }
   enhanced.add(el);
-  el.classList.add("filter-tabs--motion");
-  ensureThumb(el);
+  el.classList.add(kind.motion);
+  ensureThumb(el, kind);
 
-  const sync = () => syncThumb(el);
+  const sync = () => syncThumb(el, kind);
   sync();
   requestAnimationFrame(sync);
 
@@ -80,21 +122,23 @@ function enhance(el: HTMLElement) {
 }
 
 function scan(root: ParentNode = document) {
-  root.querySelectorAll<HTMLElement>(".filter-tabs").forEach(enhance);
+  for (const kind of KINDS) {
+    root.querySelectorAll<HTMLElement>(`.${kind.root}`).forEach((el) => enhance(el, kind));
+  }
 }
 
-/** sliding pill for all .filter-tabs — works with existing markup */
+/** sliding indicator для .filter-tabs (pill) и .content-tabs (underline) */
 export function installFilterTabsMotion() {
   scan();
   const mo = new MutationObserver((mutations) => {
     for (const m of mutations) {
-      if (m.type === "childList") {
-        m.addedNodes.forEach((n) => {
-          if (!(n instanceof HTMLElement)) return;
-          if (n.classList.contains("filter-tabs")) enhance(n);
-          else scan(n);
-        });
-      }
+      if (m.type !== "childList") continue;
+      m.addedNodes.forEach((n) => {
+        if (!(n instanceof HTMLElement)) return;
+        const kind = KINDS.find((k) => n.classList.contains(k.root));
+        if (kind) enhance(n, kind);
+        else scan(n);
+      });
     }
   });
   mo.observe(document.body, { childList: true, subtree: true });
