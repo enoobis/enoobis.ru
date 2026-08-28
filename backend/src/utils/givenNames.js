@@ -886,6 +886,86 @@ export const GIVEN_NAMES_TEXT = `
   shakhnoza sofiia sulaymon umarjon volodymyr
   yevheniia yevhenii zaynab zeinab zhamila zhanargul
   zhamilya zhanuzak zhyldyzbek
+
+  rayhan rayhon rayhona raykhan raihan raihana reyhan
+  merim meerim meerimai aichurek aychurok aikanysh
+  adinai ainuska aisalkyn aiturgan aizhamal aizirek
+  ayzirek anarkul asylkan aygerim aygul aynura aysuluu
+  batma begaim bubusara burulcha chynarkul elzada
+  gulbara gulnur gulzada jainagul jamal janara jarkyn
+  jazgul jibek jyldyz kaliman karachach kymbat mahabat
+  nasyikat nazik nurjan roza saadat saikal saykal
+  suusar symbat tolgonai tumar umut venera zhainagul
+  zhanyl zuura aikokul aiperim asylzat begimay
+  cholponay gulaiym gulsana kaniyet kanyshay nurayim
+  nurila sanjargul seyil syrga uulzhan zhanargul
+  zhannat zharkyn zhazgul zhibek zhyldyz
+
+  abdyrahman akmat akylbek alymkul arstanbek atabek
+  azret baiaman baiel baktiyar bektemir bekzhan chubak
+  elmir emirlan esenaman iliyaz ishen jaanybek jalil
+  jetigen jolchu kachyke kamchybek kanybek kasym
+  kazybek kurmanbek mambet mederbek mirlanbek mukai
+  muratali myrzabek nurgazy nurkamil nurmat nurtai
+  orozaly osmon ryskeldi sadybakas sapar sarygul
+  seiitbek shailoobek sultanbek suyunbek talantbek
+  tashtanbek temirbek tilekmat toktogul toktosun
+  turatbek turdubek ubaidilla ulukbek urmatbek
+  usenbek zamirbek zhenish zhoodar zhanybek altynbek
+  bekmyrza doolot elebes esengul ismail jenishbek
+  kalybek karataev keneshbek kubat maksatbek melisbek
+  murzabek nurbolot nurmuhammad omurzak sagynbek
+  shermat syrgak tolubai tynystan uran zhaparbek
+
+  raikhangul raushangul aiganym aiym akbayan akmaral
+  aknur alua ansagan arailym asylzhan ayana bagila
+  balnur bibigul bibinur dinara diyara elnura gaukhar
+  gulbanu gulzhaina inkar kalamkas kamila karakoz
+  kulyash kunsulu madina makhabbat malika meruyert
+  moldir nazgul nazym nurbanu nurgul nurzhamal
+  saltanat sandugash sezim shynar sulushash tolkyn
+  ulbolsyn ulpan zhamal zhanargul zhaniya zhansaya
+  zhibek zhupar zeinep zere aisulu aizere aruzhan
+  aiazhan alina asem dana dilnaz elzada indira
+  kamshat karlygash laura madina saule tomiris
+
+  abzal adilbek akhmet aldiyar alibek amanat amir
+  arman arnur asylkhan azamat baurzhan berdibek
+  bekbolat damir daniyar didar diyas duman elaman
+  erasyl erbolat ermek ersultan esenzhol galym gani
+  ilyas iskander kairat kanysh karim kassym kuanysh
+  madiyar maksat marat meirzhan miras mukhtar nurali
+  nurdaulet nurgali nurmukhamed nursultan olzhas
+  ramazan rauan rustem sagynysh sanzhar serik
+  shyngys sultan talgat temirlan tolegen yeraly
+  yerkebulan zhalgas zhandos zhanibek zhaslan
+  zhomart aidos alikhan alisher altair amirkhan
+  aslan bagdat bekarys daulet dias erkin islam
+  kaisar kanat kuandyk madi nurbol rakhat sanat
+  sayan yerbol yernar yersultan zhanat
+
+  charos dilnura durdona elnora feruza gulasal
+  gulbahor gulnoza gulruh gulsanam hurshida
+  iroda kamola komila kumushbibi laylo madinabonu
+  mahliyo malohat mehriniso mohichehra mohira
+  muattar mubina mukhlisa munisa nafisa nargiza
+  navbahor nazokat nigora nilufar nozanin odina
+  ozoda parizod robiya sabohat sarvinoz sevara
+  sevinch shahnoza shahzoda shirin sitora surayo
+  tursunoy umida yulduz zarnigor zebiniso zilola
+  zuhra zulfiya zumrad
+
+  abror akbar alibek anvar asadbek aslbek avaz
+  azizbek bahodir bekzod bobomurod botir davronbek
+  doston elbek eldor erkinjon farhod farrux firdavs
+  gayrat hasan hikmat ibrohim ilhomjon islom
+  jahongir jasur javlon jonibek kamol kamronbek
+  laziz mirjalol muhiddin murod mustafo nodirbek
+  nurmuhammad odilbek otabek ozod parviz rahmat
+  ravshan rustambek sanjarbek sardorbek shavkat
+  sherzod shohjahon shohruh sirojbek sultonbek
+  temurbek tohirjon ulugbek umidbek umrbek zafarbek
+  zohidjon
 `;
 
 

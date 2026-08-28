@@ -14,6 +14,8 @@ const RESERVED = split(`
 
 const GIVEN_NAMES = split(GIVEN_NAMES_TEXT);
 
+const GIVEN_NAMES_FOLDED = new Set([...GIVEN_NAMES].map((n) => fold(n)));
+
 const PROFANE_STRONG = split(`
   fuck fck fuk fuxk fucc fuckin fucking
   shit sh1t
@@ -74,6 +76,28 @@ function lettersOnly(s) {
   return s.replace(/[^a-z]/g, "");
 }
 
+/** сводит варианты транслитерации к одной форме: merim = meerim, aygul = aigul, jyldyz = zhyldyz */
+function fold(s) {
+  return s
+    .replace(/^ye/, "e")
+    .replace(/^yi/, "i")
+    .replace(/^y/, "j")
+    .replace(/sch/g, "sh")
+    .replace(/zh/g, "j")
+    .replace(/kh/g, "h")
+    .replace(/gh/g, "g")
+    .replace(/ph/g, "f")
+    .replace(/ck/g, "k")
+    .replace(/ch/g, "\u0001")
+    .replace(/c/g, "k")
+    .replace(/\u0001/g, "ch")
+    .replace(/x/g, "ks")
+    .replace(/q/g, "k")
+    .replace(/w/g, "v")
+    .replace(/y/g, "i")
+    .replace(/(.)\1+/g, "$1");
+}
+
 function tokens(s) {
   return s.split(/[._]+/).filter(Boolean);
 }
@@ -95,7 +119,9 @@ export function nicknameError(raw) {
     return "этот ник занят системой";
   }
 
-  const nameHits = [core, core2, ...parts].filter((p) => p.length >= 3 && GIVEN_NAMES.has(p));
+  const nameHits = [core, core2, ...parts].filter(
+    (p) => p.length >= 3 && (GIVEN_NAMES.has(p) || GIVEN_NAMES_FOLDED.has(fold(p))),
+  );
   if (nameHits.length) return "это имя, выбери ник";
 
   const hay = `${low} ${core} ${core2} ${parts.join(" ")}`;
