@@ -171,6 +171,10 @@ async function loadCategories() {
   try {
     const r = await listCategories(auth.token);
     categories.value = r.items;
+    // категория существует, только пока в ней есть книги: иначе фильтр указывает в пустоту
+    if (activeCategory.value && !r.items.some((c) => c.category === activeCategory.value)) {
+      activeCategory.value = "";
+    }
   } catch {
     /* ignore */
   }
