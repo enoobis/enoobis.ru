@@ -14,6 +14,11 @@ import { LIBRARY_ALLOWED_MIMES, verifyLibraryBook, verifyRasterImage } from "../
 import { isRasterImageMimetype, optimizeUploadedFile } from "../utils/imageOptimize.js";
 import { contentDispositionAttachment, contentDispositionInline } from "../utils/contentDisposition.js";
 import { isStaffRole } from "../utils/roles.js";
+import {
+  LIBRARY_CATEGORY_MAX,
+  mergeLibraryCategoryCounts,
+  normalizeLibraryCategory,
+} from "../utils/libraryCategory.js";
 import { unlinkUploadUrl, UPLOAD_ROOT } from "../utils/uploadSafe.js";
 
 const router = express.Router();
@@ -108,7 +113,7 @@ const upload = multer({
 
 router.get("/library", authRequired, (req, res) => {
   const q = String(req.query?.q ?? "").trim().toLowerCase();
-  const category = String(req.query?.category ?? "").trim();
+  const category = normalizeLibraryCategory(req.query?.category);
   const sort = String(req.query?.sort ?? "new");
   let limit = parseInt(String(req.query?.limit ?? "20"), 10);
   let offset = parseInt(String(req.query?.offset ?? "0"), 10);
@@ -163,10 +168,9 @@ router.get("/library/categories", authRequired, (_req, res) => {
     `SELECT category, COUNT(*) AS count
      FROM library_books
      WHERE category != ''
-     GROUP BY category
-     ORDER BY category COLLATE NOCASE`,
+     GROUP BY category`,
   );
-  res.json({ items: rows });
+  res.json({ items: mergeLibraryCategoryCounts(rows) });
 });
 
 router.post("/library", authRequired, staffOnly, (req, res, next) => {
@@ -190,10 +194,14 @@ router.post("/library", authRequired, staffOnly, (req, res, next) => {
     const title = String(req.body?.title ?? "").trim().slice(0, 200);
     const author = String(req.body?.author ?? "").trim().slice(0, 200);
     const description = String(req.body?.description ?? "").trim().slice(0, 4000);
-    const category = String(req.body?.category ?? "").trim().slice(0, 80);
+    const category = normalizeLibraryCategory(req.body?.category);
     if (!title) {
       try { fs.unlinkSync(req.file.path); } catch { /* ignore */ }
       return res.status(400).json({ error: "title_required" });
+    }
+    if (category.length > LIBRARY_CATEGORY_MAX) {
+      try { fs.unlinkSync(req.file.path); } catch { /* ignore */ }
+      return res.status(400).json({ error: "category_too_long" });
     }
     const id = uuidv4();
     run(
@@ -257,8 +265,11 @@ router.patch("/library/:id", authRequired, staffOnly, (req, res) => {
   const title = String(req.body?.title ?? "").trim().slice(0, 200);
   const author = String(req.body?.author ?? "").trim().slice(0, 200);
   const description = String(req.body?.description ?? "").trim().slice(0, 4000);
-  const category = String(req.body?.category ?? "").trim().slice(0, 80);
+  const category = normalizeLibraryCategory(req.body?.category);
   if (!title) return res.status(400).json({ error: "title_required" });
+  if (category.length > LIBRARY_CATEGORY_MAX) {
+    return res.status(400).json({ error: "category_too_long" });
+  }
   if (req.user.role === "admin") {
     run(
       "UPDATE library_books SET title = ?, author = ?, description = ?, category = ?, uploaded_by = ? WHERE id = ?",

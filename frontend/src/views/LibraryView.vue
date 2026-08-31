@@ -94,6 +94,7 @@ function fmtUsed(bytes: number) {
 function describe(code: string) {
   if (code === "file_too_large") return "файл слишком большой";
   if (code === "title_required") return "нужно название";
+  if (code === "category_too_long") return "тема слишком длинная";
   if (code === "no_file") return "нужен файл";
   if (code === "read_only_pdf") return "чтение в браузере только для pdf";
   if (code === "invalid_file") return "файл не похож на pdf или epub";
@@ -461,13 +462,11 @@ onBeforeUnmount(() => {
 
       <form v-if="showForm && isStaff" class="form card" @submit.prevent="submit">
         <input v-model="newTitle" placeholder="название" maxlength="200" required />
-        <div class="form-row">
-          <input v-model="newAuthor" placeholder="автор" maxlength="200" />
-          <input v-model="newCategory" placeholder="категория" maxlength="80" list="cat-suggest" />
-          <datalist id="cat-suggest">
-            <option v-for="c in categories" :key="c.category" :value="c.category" />
-          </datalist>
-        </div>
+        <input v-model="newAuthor" placeholder="автор" maxlength="200" />
+        <input v-model="newCategory" placeholder="тема" maxlength="40" list="cat-suggest" />
+        <datalist id="cat-suggest">
+          <option v-for="c in categories" :key="c.category" :value="c.category" />
+        </datalist>
         <textarea v-model="newDescription" rows="3" placeholder="описание" maxlength="4000" />
         <label class="cover-add secondary">
           <input
@@ -613,13 +612,11 @@ onBeforeUnmount(() => {
             </header>
             <form class="edit-form" @submit.prevent="saveEdit">
               <input v-model="editTitle" placeholder="название" maxlength="200" required />
-              <div class="form-row">
-                <input v-model="editAuthor" placeholder="автор" maxlength="200" />
-                <input v-model="editCategory" placeholder="категория" maxlength="80" list="cat-suggest-edit" />
-                <datalist id="cat-suggest-edit">
-                  <option v-for="c in categories" :key="c.category" :value="c.category" />
-                </datalist>
-              </div>
+              <input v-model="editAuthor" placeholder="автор" maxlength="200" />
+              <input v-model="editCategory" placeholder="тема" maxlength="40" list="cat-suggest-edit" />
+              <datalist id="cat-suggest-edit">
+                <option v-for="c in categories" :key="c.category" :value="c.category" />
+              </datalist>
               <textarea v-model="editDescription" rows="3" placeholder="описание" maxlength="4000" />
               <div class="cover-edit">
                 <div class="cover-edit-row">
@@ -683,22 +680,10 @@ onBeforeUnmount(() => {
   gap: 0.5rem;
 }
 
-.form-row {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 0.5rem;
-}
-
 .actions {
   display: flex;
   gap: 0.4rem;
   justify-content: flex-end;
-}
-
-@media (max-width: 760px) {
-  .form-row {
-    grid-template-columns: 1fr;
-  }
 }
 
 .active-chips {

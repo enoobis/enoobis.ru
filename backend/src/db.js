@@ -2,6 +2,7 @@ import Database from "better-sqlite3";
 import { ensureShopCategoryTables } from "./utils/shopCategories.js";
 import { backfillAllUsersFollowAdmins } from "./utils/adminFollow.js";
 import { enforceAllTeachersStorageQuota } from "./utils/teacherStorageQuota.js";
+import { LIBRARY_CATEGORY_MAX, normalizeLibraryCategory } from "./utils/libraryCategory.js";
 
 const dbPath = process.env.DATABASE_FILE ?? "./edu.db";
 export const db = new Database(dbPath);
@@ -363,6 +364,20 @@ try {
   } catch {
     // ignore
   }
+}
+
+// одна тема расходилась на несколько из-за регистра, пробелов и точки на конце,
+// а вставленные в поле описания темой не были никогда
+try {
+  const rows = db.prepare("SELECT DISTINCT category FROM library_books WHERE category != ''").all();
+  const upd = db.prepare("UPDATE library_books SET category = ? WHERE category = ?");
+  for (const row of rows) {
+    const cleaned = normalizeLibraryCategory(row.category);
+    const next = cleaned.length > LIBRARY_CATEGORY_MAX ? "" : cleaned;
+    if (next !== row.category) upd.run(next, row.category);
+  }
+} catch (e) {
+  console.warn("migration library_books.category normalize:", e?.message ?? e);
 }
 
 try {
