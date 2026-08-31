@@ -15,6 +15,7 @@ import { optimizeUploadedFile } from "../utils/imageOptimize.js";
 import { finalizeBlogPublish } from "../utils/blogPublish.js";
 import { ensureUserFollowsAdmins } from "../utils/adminFollow.js";
 import { nicknameError } from "../utils/nickname.js";
+import { isAdmin, isPanelStaff } from "../utils/roles.js";
 
 const router = express.Router();
 
@@ -59,7 +60,7 @@ function uploadSingle(upload, field) {
   };
 }
 
-router.get("/admin/pending", (_req, res) => {
+router.get("/admin/pending", adminOnly, (_req, res) => {
   const rows = all(
     "SELECT id, email, nickname, role, created_at FROM users WHERE status = 'pending' ORDER BY created_at",
   );
