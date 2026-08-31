@@ -32,54 +32,39 @@ const html = computed(() => renderMarkdown(props.text));
   text-align: left;
 }
 
-/* гост: times new roman 14pt, по ширине, красная строка 1.25 см, интервал 1.5 */
+/* лекции — режим чтения: шрифт интерфейса, крупнее основного текста */
 .markdown-body.doc {
-  font-family: "Times New Roman", Times, "Liberation Serif", "Tinos", serif;
-  font-size: 14pt;
-  line-height: 1.5;
-  text-align: justify;
-  hyphens: auto;
+  font-size: 1.1rem;
+  line-height: 1.7;
 }
 .markdown-body.doc :deep(p) {
-  margin: 0;
-  text-indent: 1.25cm;
-}
-.markdown-body.doc :deep(p + p) {
-  margin-top: 0.2rem;
-}
-.markdown-body.doc :deep(li p),
-.markdown-body.doc :deep(blockquote p) {
-  text-indent: 0;
+  margin: 0 0 1rem;
 }
 .markdown-body.doc :deep(ul),
 .markdown-body.doc :deep(ol) {
-  padding-left: 1.25cm;
+  margin: 1rem 0;
+  padding-left: 1.4rem;
+}
+.markdown-body.doc :deep(li) {
+  margin: 0.35rem 0;
 }
 .markdown-body.doc :deep(h1),
 .markdown-body.doc :deep(h2),
 .markdown-body.doc :deep(h3) {
-  font-family: inherit;
-  font-weight: 700;
-  letter-spacing: 0;
-  text-align: left;
-  text-indent: 1.25cm;
-  margin: 1.4rem 0 0.6rem;
+  margin: 2rem 0 0.75rem;
 }
 .markdown-body.doc :deep(h1) {
-  font-size: 16pt;
+  font-size: 1.5rem;
 }
 .markdown-body.doc :deep(h2) {
-  font-size: 15pt;
+  font-size: 1.28rem;
 }
 .markdown-body.doc :deep(h3) {
-  font-size: 14pt;
+  font-size: 1.12rem;
 }
 .markdown-body.doc :deep(pre),
 .markdown-body.doc :deep(code) {
-  font-size: 0.85em;
-  text-align: left;
-  text-indent: 0;
-  hyphens: none;
+  font-size: 0.9em;
 }
 .markdown-body :deep(> *:first-child) {
   margin-top: 0;

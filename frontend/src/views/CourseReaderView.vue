@@ -1332,14 +1332,12 @@ onBeforeUnmount(() => {
   overflow-wrap: anywhere;
 }
 
-/* заголовок — часть документа, значит тот же гост-шрифт */
 .lecture-title {
   margin: 0;
-  font-family: "Times New Roman", Times, "Liberation Serif", "Tinos", serif;
-  font-size: 18pt;
-  font-weight: 700;
-  letter-spacing: 0;
-  line-height: 1.3;
+  font-size: 1.65rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
   text-transform: lowercase;
 }
 
@@ -1702,16 +1700,12 @@ onBeforeUnmount(() => {
   }
 
   .lecture-title {
-    font-size: 16pt;
+    font-size: 1.35rem;
   }
 
-  /* 14pt на узком экране рвёт строки, читаем чуть мельче */
+  /* на узком экране крупный кегль рвёт строки, читаем чуть мельче */
   .lecture :deep(.markdown-body.doc) {
-    font-size: 12.5pt;
-  }
-
-  .lecture :deep(.markdown-body.doc p) {
-    text-indent: 1cm;
+    font-size: 1.04rem;
   }
 
   .reader-topics {
