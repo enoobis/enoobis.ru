@@ -442,7 +442,7 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
     </div>
 
     <template v-if="tab === 'blog'">
-      <ul v-if="posts.length" class="post-list">
+      <ul v-if="posts.length" class="list post-list">
         <li v-for="p in posts" :key="p.id">
           <RouterLink :to="`/blogs/${p.id}`" class="post-title">{{ p.title }}</RouterLink>
           <p class="meta muted small">
@@ -865,13 +865,6 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   cursor: help;
 }
 
-.post-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: grid;
-  gap: 1rem;
-}
 .post-list li {
   display: grid;
   gap: 0.25rem;

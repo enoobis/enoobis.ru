@@ -24,6 +24,7 @@ import AppLoading from "../components/AppLoading.vue";
 import LibraryBookRow from "../components/LibraryBookRow.vue";
 import PageHeader from "../components/PageHeader.vue";
 import PdfReader from "../components/PdfReader.vue";
+import QuotaBar from "../components/QuotaBar.vue";
 
 const auth = useAuthStore();
 const route = useRoute();
@@ -444,16 +445,13 @@ onBeforeUnmount(() => {
     <div v-if="!auth.token" class="muted">войдите, чтобы видеть библиотеку</div>
 
     <template v-else>
-      <PageHeader title="библиотека">
+      <PageHeader title="библиотека" :meta="isStaff ? quotaMeta : undefined">
         <template v-if="isStaff && !showForm" #actions>
           <button type="button" @click="showForm = true">добавить</button>
         </template>
       </PageHeader>
 
-      <div v-if="isStaff" class="quota">
-        <div class="quota-bar"><span :style="{ width: usedPercent + '%' }" /></div>
-        <p class="quota-meta muted">{{ quotaMeta }}</p>
-      </div>
+      <QuotaBar v-if="isStaff" :percent="usedPercent" />
 
       <p v-if="err" class="error">{{ err }}</p>
 
@@ -497,6 +495,28 @@ onBeforeUnmount(() => {
       </form>
 
       <div class="filter-bar filter-bar--stack">
+        <div class="filter-tabs" role="tablist" aria-label="сортировка">
+          <button
+            type="button"
+            class="filter-tab"
+            :class="{ on: sort === 'new' }"
+            role="tab"
+            :aria-selected="sort === 'new'"
+            @click="sort = 'new'"
+          >
+            новые
+          </button>
+          <button
+            type="button"
+            class="filter-tab"
+            :class="{ on: sort === 'title' }"
+            role="tab"
+            :aria-selected="sort === 'title'"
+            @click="sort = 'title'"
+          >
+            по названию
+          </button>
+        </div>
         <div ref="categoryMenuRoot" class="filter-menu-wrap">
           <button
             type="button"
@@ -531,28 +551,6 @@ onBeforeUnmount(() => {
               <span class="muted small">{{ c.count }}</span>
             </button>
           </div>
-        </div>
-        <div class="filter-tabs" role="tablist" aria-label="сортировка">
-          <button
-            type="button"
-            class="filter-tab"
-            :class="{ on: sort === 'new' }"
-            role="tab"
-            :aria-selected="sort === 'new'"
-            @click="sort = 'new'"
-          >
-            новые
-          </button>
-          <button
-            type="button"
-            class="filter-tab"
-            :class="{ on: sort === 'title' }"
-            role="tab"
-            :aria-selected="sort === 'title'"
-            @click="sort = 'title'"
-          >
-            по названию
-          </button>
         </div>
       </div>
 
@@ -674,31 +672,6 @@ onBeforeUnmount(() => {
 .library {
   display: grid;
   gap: var(--space-4);
-}
-
-.quota {
-  display: grid;
-  gap: 0.4rem;
-  margin-top: -0.35rem;
-}
-
-.quota-bar {
-  height: 3px;
-  border-radius: 999px;
-  background: var(--surface2);
-  overflow: hidden;
-}
-
-.quota-bar > span {
-  display: block;
-  height: 100%;
-  background: var(--text);
-  transition: width var(--dur-2) var(--ease-out);
-}
-
-.quota-meta {
-  margin: 0;
-  font-size: 0.82rem;
 }
 
 .form {

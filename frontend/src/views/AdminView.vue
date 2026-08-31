@@ -1531,30 +1531,15 @@ async function approveBlog(id: string) {
 </template>
 
 <style scoped>
-.admin :deep(.page-head) {
-  margin-bottom: var(--space-4);
-}
 .admin-tabs {
   margin-bottom: var(--space-6);
 }
 .admin-users-search {
   margin-bottom: var(--space-4);
 }
-.list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: grid;
-  gap: 1.2rem;
-}
 .list li {
   display: grid;
   gap: 0.4rem;
-  padding-bottom: 1.2rem;
-  border-bottom: 1px solid var(--border);
-}
-.list li:last-child {
-  border-bottom: none;
 }
 .row-actions {
   display: flex;

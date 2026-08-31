@@ -250,13 +250,11 @@ button:active:not(:disabled):not(.filter-tab):not(.content-tab),
   transform: scale(0.97);
 }
 a.card:active,
-.card.interactive:active,
-.list-row:active {
+.card.interactive:active {
   transform: scale(0.995);
 }
 a.card,
-.card.interactive,
-.list-row {
+.card.interactive {
   transition:
     border-color var(--dur-2) var(--ease-out),
     background var(--dur-2) var(--ease-out),
@@ -266,8 +264,7 @@ a.card,
   button:active,
   .btn:active,
   a.card:active,
-  .card.interactive:active,
-  .list-row:active {
+  .card.interactive:active {
     transform: none;
   }
 }
@@ -901,28 +898,20 @@ input[type="search"]::-webkit-search-cancel-button:hover {
   text-align: center;
 }
 
-.list-panel .list {
+/* строки списков: разделитель вместо рамки — экран не дробится на карточки */
+.list {
   list-style: none;
   padding: 0;
   margin: 0;
-  display: grid;
-  gap: 0.5rem;
 }
 
-.list-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.75rem;
-  padding: 0.85rem 1rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-  transition: border-color var(--dur-2) var(--ease-out), background var(--dur-2) var(--ease-out);
+.list > li {
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border);
 }
 
-.list-row:hover {
-  border-color: var(--hover-border);
-  background: var(--surface2);
+.list > li:last-child {
+  border-bottom: none;
 }
 
 @media (max-width: 760px) {
@@ -1299,15 +1288,15 @@ figcaption {
 }
 
 .card,
-.list-row,
+.list > li,
 .page-shell {
   min-width: 0;
 }
 
 .card img,
 .card video,
-.list-row img,
-.list-row video {
+.list > li img,
+.list > li video {
   max-width: 100%;
 }
 

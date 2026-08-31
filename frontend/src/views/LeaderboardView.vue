@@ -113,9 +113,6 @@ onMounted(load);
 </template>
 
 <style scoped>
-.board :deep(.page-head) {
-  margin-bottom: 1rem;
-}
 .active-chips {
   display: flex;
   flex-wrap: wrap;
@@ -133,17 +130,10 @@ onMounted(load);
 .active-chip:hover {
   color: var(--text);
 }
-.list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
 .row {
   display: flex;
   align-items: center;
   gap: 0.65rem;
-  padding: 0.55rem 0;
-  border-bottom: 1px solid var(--border);
 }
 .row.top .rank {
   font-weight: 600;

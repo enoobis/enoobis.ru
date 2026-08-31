@@ -44,7 +44,7 @@ onMounted(load);
     <p v-if="err" class="error">{{ err }}</p>
     <AppLoading v-else-if="loading && !posts.length" class="page-empty" />
     <p v-else-if="!loading && !posts.length" class="page-empty muted">пусто</p>
-    <ul v-else class="post-list">
+    <ul v-else class="list post-list">
       <li v-for="p in posts" :key="p.id">
         <RouterLink :to="`/blogs/${p.id}`" class="post-title">{{ p.title }}</RouterLink>
         <p v-if="p.excerpt" class="excerpt muted">{{ p.excerpt }}</p>
@@ -67,16 +67,6 @@ onMounted(load);
 </template>
 
 <style scoped>
-.saved :deep(.page-head) {
-  margin-bottom: 0.6rem;
-}
-.post-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: grid;
-  gap: 1.6rem;
-}
 .post-list li {
   display: grid;
   gap: 0.3rem;

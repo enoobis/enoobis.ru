@@ -149,9 +149,6 @@ async function copy(text: string) {
   max-width: 640px;
   margin: 0 auto;
 }
-.invites :deep(.page-head) {
-  margin-bottom: 1rem;
-}
 .creator {
   display: grid;
   gap: 0.3rem;
@@ -179,20 +176,9 @@ async function copy(text: string) {
 .row button[type="submit"] {
   margin-left: auto;
 }
-.list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: grid;
-  gap: 0.6rem;
-}
 .list li {
   display: grid;
   gap: 0.35rem;
-  padding: 0.6rem 0.7rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
 }
 .head {
   display: flex;

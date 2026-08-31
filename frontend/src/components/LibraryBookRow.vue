@@ -81,10 +81,6 @@ const emit = defineEmits<{
   gap: 0.85rem;
   align-items: flex-start;
   min-width: 0;
-  padding: 0.85rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
   list-style: none;
 }
 

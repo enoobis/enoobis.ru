@@ -274,7 +274,7 @@ onBeforeUnmount(() => {
     <p v-if="err" class="error">{{ err }}</p>
     <AppSkeleton v-else-if="loading && !sortedPosts.length" :rows="6" />
     <template v-else>
-      <ul v-if="sortedPosts.length" class="post-list stagger-list">
+      <ul v-if="sortedPosts.length" class="list post-list stagger-list">
         <li v-for="p in sortedPosts" :key="p.id">
           <RouterLink :to="`/blogs/${p.id}`" class="post-title">
             <AppIcon v-if="p.is_pinned" name="pinned" :size="14" class="pin-mark" />
@@ -330,13 +330,6 @@ onBeforeUnmount(() => {
   border-style: dashed;
 }
 
-.post-list {
-  list-style: none;
-  padding: 0;
-  margin: 1rem 0 0;
-  display: grid;
-  gap: 1.6rem;
-}
 .post-list li {
   display: grid;
   gap: 0.3rem;

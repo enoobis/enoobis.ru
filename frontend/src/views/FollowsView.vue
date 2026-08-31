@@ -156,11 +156,8 @@ useProfileOwnerThemeFromApi(nick);
   max-width: 640px;
   margin: 0 auto;
 }
-.follows :deep(.page-head) {
-  margin-bottom: 0.8rem;
-}
 .tabs {
-  margin-bottom: 0.8rem;
+  margin-bottom: var(--space-4);
 }
 .tabs .filter-tab {
   gap: 0.35rem;
@@ -173,23 +170,11 @@ useProfileOwnerThemeFromApi(nick);
   color: var(--text);
 }
 
-.list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 0.2rem;
-}
 .row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.6rem;
-  padding: 0.5rem 0.4rem;
-  border-radius: var(--radius);
-}
-.row:hover {
-  background: var(--surface2);
 }
 .user {
   display: flex;

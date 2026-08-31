@@ -25,6 +25,7 @@ import AppIcon from "../components/AppIcon.vue";
 import AppLoading from "../components/AppLoading.vue";
 import PageHeader from "../components/PageHeader.vue";
 import PdfReader from "../components/PdfReader.vue";
+import QuotaBar from "../components/QuotaBar.vue";
 import { useAuthStore } from "../stores/auth";
 import { filePreviewKind } from "../utils/filePreview";
 import { toastError, toastSuccess } from "../utils/toast";
@@ -443,9 +444,7 @@ onBeforeUnmount(() => {
     <p v-if="!canBlogAndStorage" class="muted">нет доступа</p>
 
     <template v-else>
-      <div class="quota-bar-wrap">
-        <div class="quota-bar"><span :style="{ width: usedPercent + '%' }" /></div>
-      </div>
+      <QuotaBar :percent="usedPercent" />
 
       <div class="filter-bar filter-bar--stack">
         <div class="filter-tabs" role="tablist" aria-label="разделы">
@@ -664,24 +663,6 @@ onBeforeUnmount(() => {
   gap: var(--space-4);
 }
 
-.quota-bar-wrap {
-  margin: -0.35rem 0 0;
-}
-
-.quota-bar {
-  height: 3px;
-  border-radius: 999px;
-  background: var(--surface2);
-  overflow: hidden;
-}
-
-.quota-bar > span {
-  display: block;
-  height: 100%;
-  background: var(--text);
-  transition: width var(--dur-2) var(--ease-out);
-}
-
 .dropzone {
   display: flex;
   align-items: center;
@@ -788,23 +769,11 @@ onBeforeUnmount(() => {
   background: transparent;
 }
 
-.list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: grid;
-  gap: 0.45rem;
-}
-
 .item {
   display: flex;
   align-items: center;
   gap: 0.65rem;
   min-width: 0;
-  padding: 0.75rem 0.85rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
 }
 
 .info {

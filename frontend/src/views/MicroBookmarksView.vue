@@ -75,7 +75,4 @@ onMounted(load);
   display: grid;
   gap: 0;
 }
-.saved :deep(.page-head) {
-  margin-bottom: 0.6rem;
-}
 </style>

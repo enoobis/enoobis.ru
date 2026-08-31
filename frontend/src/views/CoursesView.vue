@@ -1972,7 +1972,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 
               <section v-if="assignmentsForLecture(selectedLecture.id).length" class="lecture-tasks">
                 <h3 class="section-label">задания</h3>
-                <ul class="task-list">
+                <ul class="list task-list">
                   <li
                     v-for="a in assignmentsForLecture(selectedLecture.id)"
                     :key="a.id"
@@ -2131,7 +2131,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
           </article>
         </template>
 
-        <ul v-else-if="filteredLectures.length" class="lecture-list">
+        <ul v-else-if="filteredLectures.length" class="list lecture-list">
           <li v-for="lec in filteredLectures" :key="lec.id">
             <button type="button" class="lecture-row" @click="openLecture(lec.id)">
               <span class="list-row-main">
@@ -2354,7 +2354,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
           </article>
         </template>
 
-        <ul v-else-if="filteredListAssignments.length" class="task-list">
+        <ul v-else-if="filteredListAssignments.length" class="list task-list">
           <li v-for="a in filteredListAssignments" :key="a.id">
             <button type="button" class="task-list-row" @click="openAssignmentDetail(a.id)">
               <span class="list-row-main">
@@ -2806,7 +2806,6 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   .lecture-row,
   .task-list-row {
     min-height: 44px;
-    padding: 0.72rem 0.7rem;
   }
   .lecture-row-side .muted.small {
     display: none;
@@ -2836,10 +2835,6 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   .lecture-detail.detail-panel,
   .task-detail.detail-panel {
     padding: 1rem 1.05rem;
-  }
-  .lecture-list,
-  .task-list {
-    gap: 0.35rem;
   }
 }
 
@@ -3353,13 +3348,9 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   overflow-wrap: anywhere;
 }
 
-.lecture-list,
-.task-list {
-  list-style: none;
-  margin: 0;
+.lecture-list > li,
+.task-list > li {
   padding: 0;
-  display: grid;
-  gap: 0.3rem;
 }
 
 .lecture-row,
@@ -3369,10 +3360,9 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   align-items: center;
   justify-content: space-between;
   gap: 0.65rem;
-  padding: 0.68rem 0.8rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
+  padding: var(--space-3) 0;
+  border: none;
+  background: transparent;
   color: var(--text);
   text-align: left;
   cursor: pointer;
@@ -3380,23 +3370,13 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   font: inherit;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: color var(--dur-2) var(--ease-out);
 }
-.lecture-row:hover,
-.task-list-row:hover {
-  background: var(--surface2);
-  border-color: var(--hover-border);
-}
-.task-list-row.open {
-  border-color: var(--focus-border);
-  background: var(--surface2);
-  border-bottom-left-radius: 0;
-  border-bottom-right-radius: 0;
-}
-.task-list-item .task-row {
-  border-top: none;
-  border-top-left-radius: 0;
-  border-top-right-radius: 0;
+
+/* строка плоская, поэтому на клик указывает шеврон, а не заливка */
+.lecture-row:hover .list-row-chevron,
+.task-list-row:hover .list-row-chevron {
+  color: var(--text);
 }
 
 .lecture-row-main {

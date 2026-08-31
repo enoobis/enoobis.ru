@@ -902,7 +902,7 @@ onUnmounted(() => {
 
 <template>
   <section class="chats">
-    <aside class="list" :class="{ hidden: activeId }">
+    <aside class="chat-list" :class="{ hidden: activeId }">
       <div class="list-head">
         <h2>чаты</h2>
         <button
@@ -1417,7 +1417,7 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
-.list {
+.chat-list {
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
@@ -2398,7 +2398,7 @@ onUnmounted(() => {
     height: calc(100dvh - 6.25rem);
     max-height: calc(100dvh - 6.25rem);
   }
-  .list.hidden {
+  .chat-list.hidden {
     display: none;
   }
   .thread.hidden {
@@ -2407,7 +2407,7 @@ onUnmounted(() => {
   .back {
     display: inline-flex;
   }
-  .list {
+  .chat-list {
     border-right: none;
   }
 }
