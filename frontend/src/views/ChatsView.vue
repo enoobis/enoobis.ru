@@ -939,8 +939,8 @@ onUnmounted(() => {
               <span class="nick">{{ c.other_nickname }}</span>
               <span class="time muted">{{ timeAgo(c.last_at) }}</span>
             </span>
-            <span class="last muted small">
-              <span v-if="c.last_from_me" class="muted">вы: </span>{{ c.last_body || "-" }}
+            <span v-if="c.last_body" class="last muted small">
+              <span v-if="c.last_from_me" class="muted">вы: </span>{{ c.last_body }}
             </span>
           </span>
         </div>
@@ -1684,7 +1684,7 @@ onUnmounted(() => {
 }
 .members-who {
   display: grid;
-  grid-template-columns: 32px 1fr;
+  grid-template-columns: var(--avatar-sm) 1fr;
   gap: 0.55rem;
   align-items: center;
   min-width: 0;
@@ -1777,7 +1777,7 @@ onUnmounted(() => {
 }
 .member-suggest li {
   display: grid;
-  grid-template-columns: 32px 1fr;
+  grid-template-columns: var(--avatar-sm) 1fr;
   gap: 0.55rem;
   align-items: center;
   padding: 0.5rem 0.65rem;
@@ -1852,12 +1852,12 @@ onUnmounted(() => {
 }
 .chat-row {
   display: grid;
-  grid-template-columns: 36px 1fr;
+  grid-template-columns: var(--avatar-md) 1fr;
   gap: 0.6rem;
   align-items: center;
   width: 100%;
   min-width: 0;
-  padding: 0.7rem 0.9rem;
+  padding: var(--space-3) 1rem;
   border: none;
   border-radius: 0;
   background: transparent;

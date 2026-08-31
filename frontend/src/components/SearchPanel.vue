@@ -390,7 +390,7 @@ onUnmounted(() => {
 }
 
 .result-row--user {
-  grid-template-columns: 36px 1fr;
+  grid-template-columns: var(--avatar-md) 1fr;
   align-items: center;
   gap: 0.6rem;
 }
