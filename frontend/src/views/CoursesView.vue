@@ -2712,13 +2712,13 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   background: var(--surface);
   border: 1px solid var(--border);
   color: var(--muted);
-  font-size: 0.82rem;
+  font-size: var(--text-xs);
 }
 .active-chip:hover {
   color: var(--text);
 }
 .small {
-  font-size: 0.8rem;
+  font-size: var(--text-xs);
 }
 
 .course-tabs {
@@ -2744,7 +2744,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 .panel-search {
   flex: 1;
   min-width: 0;
-  font-size: 0.92rem;
+  font-size: var(--text-sm);
 }
 .panel-toolbar-actions {
   display: flex;
@@ -2795,7 +2795,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
     min-width: calc(33.333% - 2px);
     min-height: 2.4rem;
     padding: 0.4rem 0.45rem;
-    font-size: 0.82rem;
+    font-size: var(--text-xs);
   }
 }
 
@@ -2853,7 +2853,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 }
 .list-row-title {
   font-weight: 500;
-  font-size: 0.95rem;
+  font-size: var(--text-md);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2890,7 +2890,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
   cursor: pointer;
 }
 
@@ -2972,7 +2972,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   gap: 0.5rem;
 }
 .course-icon-pick input[type="file"] {
-  font-size: 0.82rem;
+  font-size: var(--text-xs);
   max-width: 100%;
 }
 .course-card-head {
@@ -3026,10 +3026,9 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   flex-wrap: wrap;
 }
 .course-card-actions button {
-  padding: 0.3rem 0.7rem;
-  min-height: 0;
-  font-size: 0.82rem;
-  border-radius: var(--radius);
+  min-height: 36px;
+  padding: 0.4rem 0.9rem;
+  font-size: var(--text-sm);
 }
 .course-card--hidden {
   opacity: 0.52;
@@ -3196,7 +3195,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
   color: var(--muted);
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
 }
 .course-read-link:hover {
   color: var(--text);
@@ -3218,7 +3217,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   color: var(--muted);
   padding: 0.35rem 0.6rem 0.35rem 0;
   min-height: 2.25rem;
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
   cursor: pointer;
 }
 .back:hover {
@@ -3227,7 +3226,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 }
 
 .tab-count {
-  font-size: 0.72rem;
+  font-size: var(--text-2xs);
   color: var(--muted);
   background: var(--surface2);
   border-radius: var(--radius);
@@ -3261,7 +3260,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   border-radius: var(--radius);
   background: transparent;
   color: var(--muted);
-  font-size: 0.83rem;
+  font-size: var(--text-xs);
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
@@ -3286,7 +3285,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   padding: 0.3rem 0.5rem;
   border: 1px solid var(--border);
   border-radius: 8px;
-  font-size: 0.86rem;
+  font-size: var(--text-sm);
 }
 .ghost-x {
   background: transparent;
@@ -3297,7 +3296,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   width: 22px;
   height: 22px;
   border-radius: var(--radius);
-  font-size: 0.95rem;
+  font-size: var(--text-md);
   cursor: pointer;
   line-height: 1;
 }
@@ -3321,7 +3320,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   padding: 0;
   min-height: 0;
   color: var(--muted);
-  font-size: 0.88rem;
+  font-size: var(--text-sm);
   cursor: pointer;
   margin-bottom: 0.65rem;
 }
@@ -3387,7 +3386,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 .lecture-row-title,
 .task-list-title {
   font-weight: 500;
-  font-size: 0.95rem;
+  font-size: var(--text-md);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3399,7 +3398,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   flex-shrink: 0;
 }
 .row-badge {
-  font-size: 0.72rem;
+  font-size: var(--text-2xs);
   color: var(--muted);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -3420,7 +3419,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 
 .section-label {
   margin: 0.75rem 0 0.35rem;
-  font-size: 0.82rem;
+  font-size: var(--text-xs);
   font-weight: 500;
   color: var(--muted);
 }
@@ -3480,7 +3479,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   margin: 0;
   white-space: pre-wrap;
   line-height: 1.5;
-  font-size: 0.93rem;
+  font-size: var(--text-md);
 }
 
 .attach-list {
@@ -3495,7 +3494,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   padding: 0.45rem 0.6rem;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  font-size: 0.88rem;
+  font-size: var(--text-sm);
   background: var(--surface2);
 }
 .attach-list a:hover {
@@ -3532,10 +3531,6 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   gap: 0.4rem;
 }
 .lecture-add-task button.small {
-  padding: 0.25rem 0.7rem;
-  min-height: 0;
-  font-size: 0.8rem;
-  border-radius: var(--radius);
   align-self: flex-start;
 }
 
@@ -3567,10 +3562,9 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   align-items: center;
 }
 .row-actions button {
-  padding: 0.32rem 0.85rem;
-  min-height: 0;
-  font-size: 0.85rem;
-  border-radius: var(--radius);
+  min-height: 36px;
+  padding: 0.4rem 0.9rem;
+  font-size: var(--text-sm);
 }
 .row-remove {
   margin-left: auto;
@@ -3614,7 +3608,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 }
 .stream-comment p {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
 }
 .comment-form {
   display: grid;
@@ -3679,7 +3673,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   padding: 0.5rem 0.7rem;
   text-align: left;
   vertical-align: top;
-  font-size: 0.86rem;
+  font-size: var(--text-sm);
 }
 .gradebook-table th {
   font-weight: 500;
@@ -3695,7 +3689,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   border-radius: var(--radius);
   border: 1px solid var(--border);
   padding: 0.1rem 0.45rem;
-  font-size: 0.78rem;
+  font-size: var(--text-xs);
 }
 .grade-chip.ok {
   background: var(--surface2);
@@ -3843,7 +3837,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   text-align: left;
   cursor: pointer;
   color: var(--text);
-  font-size: 0.88rem;
+  font-size: var(--text-sm);
   min-height: 0;
 }
 .grade-picker-row:hover:not([disabled]) {

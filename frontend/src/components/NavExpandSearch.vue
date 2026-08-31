@@ -180,7 +180,7 @@ defineExpose({ focus: focusInput });
   padding: 0;
   min-height: 0;
   color: var(--text);
-  font-size: 0.92rem;
+  font-size: var(--text-sm);
 }
 
 .nav-search-expand__input:focus {

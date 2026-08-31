@@ -676,7 +676,7 @@ onBeforeUnmount(() => {
   background: var(--surface);
   color: var(--muted);
   font: inherit;
-  font-size: 0.94rem;
+  font-size: var(--text-md);
   font-weight: 500;
   text-transform: lowercase;
   cursor: pointer;
@@ -733,7 +733,7 @@ onBeforeUnmount(() => {
 .composer-head-actions button {
   min-height: 36px;
   padding: 0.35rem 0.75rem;
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
 }
 
 .composer input,
@@ -749,7 +749,7 @@ onBeforeUnmount(() => {
   flex: 1;
   min-width: 0;
   padding: 0.2rem 0;
-  font-size: 0.98rem;
+  font-size: var(--text-md);
   font-weight: 500;
 }
 
@@ -759,7 +759,7 @@ onBeforeUnmount(() => {
   max-height: 12rem;
   padding: 0.55rem 0 0.15rem;
   line-height: 1.5;
-  font-size: 0.94rem;
+  font-size: var(--text-md);
   color: var(--text);
 }
 
@@ -784,7 +784,7 @@ onBeforeUnmount(() => {
 }
 
 .name {
-  font-size: 0.95rem;
+  font-size: var(--text-md);
   font-weight: 500;
   letter-spacing: -0.015em;
   overflow: hidden;
@@ -793,7 +793,7 @@ onBeforeUnmount(() => {
 }
 
 .small {
-  font-size: 0.8rem;
+  font-size: var(--text-xs);
 }
 
 .actions {
@@ -825,7 +825,7 @@ onBeforeUnmount(() => {
 
 .shares h2 {
   margin: 0;
-  font-size: 0.95rem;
+  font-size: var(--text-md);
   font-weight: 600;
   letter-spacing: -0.015em;
 }

@@ -122,6 +122,6 @@ watch(id, load);
   text-align: center;
 }
 .small {
-  font-size: 0.82rem;
+  font-size: var(--text-xs);
 }
 </style>

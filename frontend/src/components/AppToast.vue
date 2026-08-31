@@ -70,7 +70,7 @@ onUnmounted(() => {
   min-width: 200px;
   max-width: 360px;
   pointer-events: auto;
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
   font-weight: 500;
   line-height: 1.35;
 }

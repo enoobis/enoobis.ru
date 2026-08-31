@@ -1477,7 +1477,7 @@ onUnmounted(() => {
   grid-template-columns: 36px 1fr 36px;
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.95rem;
+  font-size: var(--text-md);
   color: var(--text);
   text-transform: lowercase;
 }
@@ -1510,7 +1510,7 @@ onUnmounted(() => {
   border-radius: 999px;
   padding: 0.55rem 1rem;
   font: inherit;
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
   background: transparent;
   color: var(--text);
   width: 100%;
@@ -1533,7 +1533,7 @@ onUnmounted(() => {
   background: transparent;
   color: var(--text);
   font: inherit;
-  font-size: 0.88rem;
+  font-size: var(--text-sm);
   cursor: pointer;
   text-transform: lowercase;
 }
@@ -1595,7 +1595,7 @@ onUnmounted(() => {
   border-radius: 999px;
   padding: 0.55rem 1rem;
   font: inherit;
-  font-size: 0.92rem;
+  font-size: var(--text-sm);
   background: transparent;
   color: var(--text);
   text-align: left;
@@ -1632,7 +1632,7 @@ onUnmounted(() => {
   border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--bg, #000);
-  font-size: 0.84rem;
+  font-size: var(--text-xs);
   color: var(--text);
   text-transform: lowercase;
   flex-shrink: 0;
@@ -1646,7 +1646,7 @@ onUnmounted(() => {
   border-radius: 999px;
   background: transparent;
   color: var(--muted);
-  font-size: 0.95rem;
+  font-size: var(--text-md);
   line-height: 1;
   cursor: pointer;
 }
@@ -1658,7 +1658,7 @@ onUnmounted(() => {
   width: 100%;
   min-height: 40px;
   border-radius: 999px;
-  font-size: 0.88rem;
+  font-size: var(--text-sm);
 }
 .members-list {
   list-style: none;
@@ -1760,7 +1760,7 @@ onUnmounted(() => {
   background: transparent;
   padding: 0.25rem 0.35rem;
   font: inherit;
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
   color: var(--text);
 }
 .member-query:focus {
@@ -1796,7 +1796,7 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.72rem;
+  font-size: var(--text-2xs);
   color: var(--muted);
 }
 .member-suggest-av img {
@@ -1882,14 +1882,14 @@ onUnmounted(() => {
   overflow: hidden;
   color: var(--muted);
   font-weight: 500;
-  font-size: 0.78rem;
+  font-size: var(--text-xs);
   text-transform: lowercase;
   flex-shrink: 0;
 }
 .avatar.small {
   width: var(--avatar-sm);
   height: var(--avatar-sm);
-  font-size: 0.75rem;
+  font-size: var(--text-2xs);
 }
 .who-text {
   display: flex;
@@ -1922,7 +1922,7 @@ onUnmounted(() => {
 }
 .nick {
   color: var(--text);
-  font-size: 0.92rem;
+  font-size: var(--text-sm);
   text-transform: lowercase;
   white-space: nowrap;
   overflow: hidden;
@@ -1933,7 +1933,7 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 .last {
-  font-size: 0.82rem;
+  font-size: var(--text-xs);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1978,7 +1978,7 @@ onUnmounted(() => {
   background: var(--text);
   color: var(--bg, #000);
   border-radius: 999px;
-  font-size: 0.7rem;
+  font-size: var(--text-2xs);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2136,7 +2136,7 @@ onUnmounted(() => {
   font-size: var(--text-xs);
 }
 .msg-reply-snippet {
-  font-size: 0.8rem;
+  font-size: var(--text-xs);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   line-height: 1.35;
@@ -2145,7 +2145,7 @@ onUnmounted(() => {
   white-space: pre-wrap;
   word-wrap: break-word;
   overflow-wrap: anywhere;
-  font-size: 0.93rem;
+  font-size: var(--text-md);
   line-height: 1.4;
   flex: 1 1 auto;
   min-width: 0;
@@ -2203,7 +2203,7 @@ onUnmounted(() => {
   border-radius: 8px;
   padding: 0.4rem 0.6rem;
   font: inherit;
-  font-size: 0.92rem;
+  font-size: var(--text-sm);
   background: transparent;
   color: var(--text);
 }
@@ -2217,10 +2217,9 @@ onUnmounted(() => {
   justify-content: flex-end;
 }
 .edit-actions button {
-  padding: 0.25rem 0.7rem;
-  min-height: 0;
-  font-size: 0.78rem;
-  border-radius: 999px;
+  min-height: 36px;
+  padding: 0.4rem 0.9rem;
+  font-size: var(--text-sm);
 }
 .edit-actions .ghost {
   background: transparent;
@@ -2246,10 +2245,10 @@ onUnmounted(() => {
   gap: 0.12rem;
 }
 .reply-bar-who {
-  font-size: 0.75rem;
+  font-size: var(--text-2xs);
 }
 .reply-bar-snippet {
-  font-size: 0.82rem;
+  font-size: var(--text-xs);
   line-height: 1.35;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -2296,7 +2295,7 @@ onUnmounted(() => {
   border: none;
   background: rgba(0, 0, 0, 0.7);
   color: var(--text);
-  font-size: 0.95rem;
+  font-size: var(--text-md);
   line-height: 1;
   cursor: pointer;
 }
@@ -2337,7 +2336,7 @@ onUnmounted(() => {
   border-radius: 999px;
   padding: 0.55rem 1rem;
   font: inherit;
-  font-size: 0.92rem;
+  font-size: var(--text-sm);
   line-height: 1.4;
   background: transparent;
   color: var(--text);
@@ -2354,7 +2353,7 @@ onUnmounted(() => {
   padding: 0.4rem 1rem;
   min-height: 40px;
   border-radius: 999px;
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
 }
 
 .msg-img {

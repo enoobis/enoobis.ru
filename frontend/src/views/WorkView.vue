@@ -187,7 +187,7 @@ h1 {
 
 .lead {
   margin: 0 0 1rem;
-  font-size: 0.875rem;
+  font-size: var(--text-sm);
   line-height: 1.45;
 }
 
@@ -228,7 +228,7 @@ h1 {
 
 .ok {
   color: var(--muted);
-  font-size: 0.875rem;
+  font-size: var(--text-sm);
   margin: 0.75rem 0 0;
 }
 </style>

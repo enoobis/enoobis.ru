@@ -925,7 +925,7 @@ function submitReaderPage() {
 
 .nav-reader-title {
   font-weight: 600;
-  font-size: 0.95rem;
+  font-size: var(--text-md);
   text-transform: lowercase;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -956,7 +956,7 @@ function submitReaderPage() {
   background: var(--surface);
   color: var(--text);
   font: inherit;
-  font-size: 0.82rem;
+  font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
   text-align: center;
   -moz-appearance: textfield;
@@ -974,7 +974,7 @@ function submitReaderPage() {
 }
 
 .nav-reader-page-sep {
-  font-size: 0.82rem;
+  font-size: var(--text-xs);
   color: var(--muted);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -1277,7 +1277,7 @@ function submitReaderPage() {
   border-radius: 999px;
   background: var(--text);
   color: var(--bg, #000);
-  font-size: 0.62rem;
+  font-size: var(--text-2xs);
   font-weight: 600;
   display: inline-flex;
   align-items: center;
@@ -1324,7 +1324,7 @@ function submitReaderPage() {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.72rem;
+  font-size: var(--text-2xs);
   font-weight: 700;
   background: transparent;
   color: var(--muted);
@@ -1383,7 +1383,7 @@ function submitReaderPage() {
   color: var(--text);
   text-transform: lowercase;
   font: inherit;
-  font-size: 0.95rem;
+  font-size: var(--text-md);
   line-height: 1.35;
   cursor: pointer;
   text-decoration: none;
@@ -1418,7 +1418,7 @@ function submitReaderPage() {
   align-items: center;
   gap: 0.3rem;
   flex-shrink: 0;
-  font-size: 0.82rem;
+  font-size: var(--text-xs);
   font-weight: 600;
   color: var(--text);
 }
@@ -1436,7 +1436,7 @@ function submitReaderPage() {
   text-transform: lowercase;
 }
 .profile-menu-role {
-  font-size: 0.72rem;
+  font-size: var(--text-2xs);
   text-transform: lowercase;
 }
 
@@ -1461,7 +1461,7 @@ function submitReaderPage() {
   text-align: left;
   text-transform: lowercase;
   font: inherit;
-  font-size: 0.98rem;
+  font-size: var(--text-md);
   font-weight: 500;
   letter-spacing: -0.015em;
   line-height: 1.3;

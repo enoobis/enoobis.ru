@@ -161,7 +161,7 @@
   }
 
   .post-actions--lg .vote-score {
-    font-size: 0.85rem;
+    font-size: var(--text-sm);
     padding: 0 0.2rem;
   }
 }

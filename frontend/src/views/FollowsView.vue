@@ -163,7 +163,7 @@ useProfileOwnerThemeFromApi(nick);
   gap: 0.35rem;
 }
 .count {
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
   color: var(--muted);
 }
 .filter-tab.on .count {
@@ -199,7 +199,7 @@ useProfileOwnerThemeFromApi(nick);
   align-items: center;
   justify-content: center;
   color: var(--muted);
-  font-size: 0.78rem;
+  font-size: var(--text-xs);
   font-weight: 500;
   flex-shrink: 0;
 }
@@ -210,7 +210,7 @@ useProfileOwnerThemeFromApi(nick);
 }
 .names strong {
   font-weight: 500;
-  font-size: 0.92rem;
+  font-size: var(--text-sm);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -219,13 +219,9 @@ useProfileOwnerThemeFromApi(nick);
   font-size: var(--text-sm);
 }
 .follow-btn {
-  padding: 0.35rem 0.85rem;
-  border-radius: 999px;
-  font-size: 0.82rem;
   border: 1px solid var(--text);
   background: var(--text);
   color: var(--bg);
-  min-height: 0;
   flex-shrink: 0;
 }
 .follow-btn:hover {

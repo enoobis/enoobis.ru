@@ -507,20 +507,20 @@ h1 {
   margin-bottom: 0.5rem;
 }
 .meta {
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
   margin-bottom: 1.5rem;
 }
 .pending-note {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
   margin-bottom: 0.75rem;
 }
 .pending-approve {
   padding: 0.2rem 0.55rem;
   min-height: 28px;
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
 }
 .cover {
   width: 100%;
@@ -630,7 +630,7 @@ h1 {
   margin: 0.3rem 0;
 }
 .small {
-  font-size: 0.8rem;
+  font-size: var(--text-xs);
 }
 .comment-actions {
   display: flex;
@@ -643,7 +643,7 @@ h1 {
   color: var(--muted);
   padding: 0;
   min-height: 0;
-  font-size: 0.8rem;
+  font-size: var(--text-xs);
   text-transform: lowercase;
 }
 .link-btn:hover {

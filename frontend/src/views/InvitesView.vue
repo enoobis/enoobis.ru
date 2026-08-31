@@ -192,13 +192,13 @@ async function copy(text: string) {
   flex: 1;
   min-width: 0;
   font-family: var(--mono);
-  font-size: 0.78rem;
+  font-size: var(--text-xs);
   background: transparent;
 }
 .link-row .icon-btn {
   flex-shrink: 0;
 }
 .small {
-  font-size: 0.8rem;
+  font-size: var(--text-xs);
 }
 </style>

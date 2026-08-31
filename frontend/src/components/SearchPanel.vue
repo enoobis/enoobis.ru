@@ -425,7 +425,7 @@ onUnmounted(() => {
   overflow: hidden;
   color: var(--muted);
   font-weight: 600;
-  font-size: 0.78rem;
+  font-size: var(--text-xs);
 }
 
 .avatar img {
@@ -435,7 +435,7 @@ onUnmounted(() => {
 }
 
 .small {
-  font-size: 0.78rem;
+  font-size: var(--text-xs);
 }
 
 @media (max-width: 500px) {

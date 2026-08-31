@@ -100,7 +100,7 @@ import KineticText from "../components/KineticText.vue";
   flex-wrap: wrap;
   justify-content: center;
   gap: 0.2rem 0.8rem;
-  font-size: 0.95rem;
+  font-size: var(--text-md);
 }
 .alt-link {
   position: relative;

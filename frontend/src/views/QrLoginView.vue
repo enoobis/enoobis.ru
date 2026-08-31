@@ -362,7 +362,7 @@ h1 {
 
 .lead {
   margin: 0 0 1rem;
-  font-size: 0.875rem;
+  font-size: var(--text-sm);
   line-height: 1.45;
 }
 
@@ -386,7 +386,7 @@ h1 {
 
 .approve-text {
   margin: 0;
-  font-size: 0.9375rem;
+  font-size: var(--text-md);
 }
 
 .qr-wrap {
@@ -401,7 +401,7 @@ h1 {
 }
 
 .timer {
-  font-size: 0.8125rem;
+  font-size: var(--text-xs);
 }
 
 .scan-video {
@@ -415,7 +415,7 @@ h1 {
 .scan-label {
   display: grid;
   gap: 0.35rem;
-  font-size: 0.8125rem;
+  font-size: var(--text-xs);
   color: var(--muted);
 }
 
@@ -442,7 +442,7 @@ h1 {
   background: transparent;
   min-height: 0;
   color: var(--muted);
-  font-size: 0.8125rem;
+  font-size: var(--text-xs);
   text-decoration: underline;
   text-underline-offset: 3px;
 }
@@ -453,7 +453,7 @@ h1 {
 }
 
 .hint {
-  font-size: 0.8125rem;
+  font-size: var(--text-xs);
   margin-bottom: 0.75rem;
 }
 
@@ -463,7 +463,7 @@ h1 {
 
 .ok {
   color: var(--muted);
-  font-size: 0.875rem;
+  font-size: var(--text-sm);
   margin: 0.75rem 0 0;
 }
 </style>

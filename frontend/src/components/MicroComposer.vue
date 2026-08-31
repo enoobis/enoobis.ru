@@ -244,7 +244,7 @@ function onKeydown(e: KeyboardEvent) {
   background: var(--surface);
   color: var(--muted);
   font-weight: 500;
-  font-size: 0.78rem;
+  font-size: var(--text-xs);
   text-transform: lowercase;
 }
 .avatar img {
@@ -300,7 +300,7 @@ textarea:focus {
   background: rgba(0, 0, 0, 0.7);
   color: var(--text);
   border: none;
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
   line-height: 1;
 }
 .row {
@@ -336,7 +336,7 @@ button[type="button"]:not(.ghost):not(.remove) {
   padding: 0.4rem 0.95rem;
   min-height: 36px;
   border-radius: 999px;
-  font-size: 0.88rem;
+  font-size: var(--text-sm);
   font-weight: 600;
   background: var(--text);
   color: var(--bg);

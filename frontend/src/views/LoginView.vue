@@ -78,7 +78,7 @@ form button {
   align-items: center;
   justify-content: center;
   gap: 0.7rem;
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
   color: var(--muted);
 }
 .alt a {

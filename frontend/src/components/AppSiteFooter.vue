@@ -74,7 +74,7 @@ const links = computed(() =>
 
 .site-foot-link {
   color: var(--muted);
-  font-size: 0.82rem;
+  font-size: var(--text-xs);
   text-transform: lowercase;
   border-bottom: none;
 }
@@ -92,7 +92,7 @@ const links = computed(() =>
 
 .footer {
   margin: 0;
-  font-size: 0.62rem;
+  font-size: var(--text-2xs);
   letter-spacing: 0.12em;
   color: var(--muted);
   opacity: 0.12;

@@ -1556,18 +1556,18 @@ async function approveBlog(id: string) {
 }
 .report-target {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
 }
 .comment-excerpt {
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
 }
 .reason {
   margin: 0;
   color: var(--muted);
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
 }
 .small {
-  font-size: 0.8rem;
+  font-size: var(--text-xs);
 }
 strong {
   font-weight: 500;
@@ -1618,7 +1618,7 @@ strong {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   color: var(--text);
-  font-size: 0.875rem;
+  font-size: var(--text-sm);
 }
 .shop-edit-dialog.mod-modal {
   width: min(100%, 32rem);
@@ -1670,7 +1670,7 @@ strong {
 .mod-sec summary {
   cursor: pointer;
   color: var(--muted);
-  font-size: 0.875rem;
+  font-size: var(--text-sm);
   padding: 0.35rem 0;
   user-select: none;
 }
@@ -1783,7 +1783,7 @@ strong {
   border-bottom: 1px solid var(--border);
 }
 .invite-code {
-  font-size: 0.75rem;
+  font-size: var(--text-2xs);
   word-break: break-all;
 }
 .mod-invites {
@@ -1803,7 +1803,7 @@ strong {
   padding: 0.35rem 0.65rem;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
 }
 .file-label.secondary:hover {
   background: var(--surface);
@@ -1820,14 +1820,14 @@ strong {
 }
 .lim-title {
   grid-column: 1 / -1;
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
   color: var(--muted);
 }
 .lim-row {
   display: flex;
   align-items: center;
   gap: 0.35rem;
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
 }
 .lim-grow {
   grid-column: 1 / -1;
@@ -1890,7 +1890,7 @@ strong {
 }
 .shop-cats-manage summary {
   cursor: pointer;
-  font-size: 0.82rem;
+  font-size: var(--text-xs);
   color: var(--muted);
 }
 .shop-cats-list {
@@ -1940,7 +1940,7 @@ strong {
 }
 .cat-chip {
   font: inherit;
-  font-size: 0.82rem;
+  font-size: var(--text-xs);
   padding: 0.32rem 0.65rem;
   border-radius: 999px;
   border: 1px solid var(--border);
@@ -1984,7 +1984,7 @@ strong {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.65rem;
+  font-size: var(--text-2xs);
   overflow: hidden;
   text-overflow: ellipsis;
   padding: 0.15rem;
@@ -2002,7 +2002,7 @@ strong {
   border-radius: var(--radius);
   padding: 0.4rem 0.7rem;
   background: var(--surface2);
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
 }
 .btn-file.disabled {
   opacity: 0.5;
@@ -2041,7 +2041,7 @@ strong {
   gap: 0.15rem;
   flex: 1;
   min-width: 0;
-  font-size: 0.88rem;
+  font-size: var(--text-sm);
   overflow: hidden;
 }
 .shop-item-actions {

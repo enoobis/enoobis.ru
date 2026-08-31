@@ -1200,7 +1200,7 @@ onBeforeUnmount(() => {
   border-radius: var(--radius);
   background: transparent;
   color: var(--muted);
-  font-size: 0.88rem;
+  font-size: var(--text-sm);
   text-align: left;
   text-transform: lowercase;
 }
@@ -1251,7 +1251,7 @@ onBeforeUnmount(() => {
 .topic-num {
   flex-shrink: 0;
   min-width: 1.1rem;
-  font-size: 0.78rem;
+  font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
 }
 
@@ -1271,7 +1271,7 @@ onBeforeUnmount(() => {
 .side-empty {
   margin: 0;
   padding: 0.5rem 0.65rem;
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
 }
 
 .side-gen {
@@ -1306,7 +1306,7 @@ onBeforeUnmount(() => {
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--muted);
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
   text-transform: lowercase;
 }
 
@@ -1364,7 +1364,7 @@ onBeforeUnmount(() => {
 .edit-form textarea {
   line-height: 1.6;
   font-family: var(--mono);
-  font-size: 0.86rem;
+  font-size: var(--text-sm);
 }
 
 .edit-actions {
@@ -1391,7 +1391,7 @@ onBeforeUnmount(() => {
   background: none;
   color: var(--muted);
   font: inherit;
-  font-size: 0.82rem;
+  font-size: var(--text-xs);
   cursor: pointer;
 }
 
@@ -1405,7 +1405,7 @@ onBeforeUnmount(() => {
   padding: 0;
   display: grid;
   gap: 0.3rem;
-  font-size: 0.86rem;
+  font-size: var(--text-sm);
 }
 
 .files li {
@@ -1433,7 +1433,7 @@ onBeforeUnmount(() => {
 
 .tasks-title {
   margin: 0;
-  font-size: 0.82rem;
+  font-size: var(--text-xs);
   font-weight: 500;
   color: var(--muted);
   text-transform: lowercase;
@@ -1474,7 +1474,7 @@ onBeforeUnmount(() => {
 
 .task-score {
   flex-shrink: 0;
-  font-size: 0.82rem;
+  font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
 }
 
@@ -1486,7 +1486,7 @@ onBeforeUnmount(() => {
 
 .task-comment {
   margin: 0;
-  font-size: 0.86rem;
+  font-size: var(--text-sm);
 }
 
 .task-actions {
@@ -1503,7 +1503,7 @@ onBeforeUnmount(() => {
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
   color: var(--muted);
-  font-size: 0.86rem;
+  font-size: var(--text-sm);
   cursor: pointer;
 }
 
@@ -1533,7 +1533,7 @@ onBeforeUnmount(() => {
 }
 
 .chat-topic {
-  font-size: 0.75rem;
+  font-size: var(--text-2xs);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1548,12 +1548,12 @@ onBeforeUnmount(() => {
   display: grid;
   align-content: start;
   gap: 0.5rem;
-  font-size: 0.88rem;
+  font-size: var(--text-sm);
 }
 
 .chat-hint {
   margin: 0;
-  font-size: 0.82rem;
+  font-size: var(--text-xs);
 }
 
 .bubble {
@@ -1587,7 +1587,7 @@ onBeforeUnmount(() => {
   max-height: 8rem;
   resize: none;
   border-radius: var(--radius);
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
 }
 
 /* ---------- генерация ---------- */
@@ -1633,7 +1633,7 @@ onBeforeUnmount(() => {
   padding: var(--space-3);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  font-size: 0.88rem;
+  font-size: var(--text-sm);
 }
 
 .gen-progress {
@@ -1728,7 +1728,7 @@ onBeforeUnmount(() => {
 
   .topic {
     min-height: 2.75rem;
-    font-size: 0.95rem;
+    font-size: var(--text-md);
   }
 
   .reader-topics.open {
@@ -1774,7 +1774,7 @@ onBeforeUnmount(() => {
   }
 
   .chat-body {
-    font-size: 0.94rem;
+    font-size: var(--text-md);
   }
 
   .chat-form textarea {
@@ -1797,7 +1797,7 @@ onBeforeUnmount(() => {
     border-radius: var(--radius-pill);
     background: var(--surface);
     color: var(--muted);
-    font-size: 0.92rem;
+    font-size: var(--text-sm);
     text-transform: lowercase;
   }
 

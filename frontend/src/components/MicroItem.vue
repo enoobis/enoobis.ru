@@ -404,7 +404,7 @@ async function share() {
   color: var(--muted);
   font-weight: 500;
   text-transform: lowercase;
-  font-size: 0.78rem;
+  font-size: var(--text-xs);
   overflow: hidden;
 }
 .avatar img {
@@ -426,7 +426,7 @@ header {
 .author {
   color: var(--text);
   font-weight: 600;
-  font-size: 0.95rem;
+  font-size: var(--text-md);
   text-transform: lowercase;
 }
 .time {
@@ -486,7 +486,7 @@ header {
   margin: 0.1rem 0 0.5rem;
   word-wrap: break-word;
   line-height: 1.5;
-  font-size: 0.98rem;
+  font-size: var(--text-md);
 }
 
 /* глобальный hover на --surface почти не виден на чёрной теме */
@@ -511,7 +511,7 @@ header {
 }
 .edit textarea {
   resize: vertical;
-  font-size: 0.95rem;
+  font-size: var(--text-md);
   line-height: 1.5;
 }
 .edit-row {
@@ -523,7 +523,7 @@ header {
   padding: 0.3rem 0.7rem;
   min-height: 40px;
   border-radius: 999px;
-  font-size: 0.82rem;
+  font-size: var(--text-xs);
 }
 .ghost {
   background: transparent;

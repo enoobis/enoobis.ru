@@ -188,7 +188,7 @@ onBeforeUnmount(() => {
 .plain {
   white-space: pre-wrap;
   font-family: var(--mono, ui-monospace, monospace);
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
   margin: 0;
   border-top: 1px solid var(--border);
   padding-top: 0.85rem;

@@ -710,7 +710,7 @@ onBeforeUnmount(() => {
   background: var(--surface);
   border: 1px solid var(--border);
   color: var(--muted);
-  font-size: 0.82rem;
+  font-size: var(--text-xs);
 }
 
 .active-chip:hover {
@@ -801,7 +801,7 @@ onBeforeUnmount(() => {
 }
 
 .edit-head .muted {
-  font-size: 0.88rem;
+  font-size: var(--text-sm);
 }
 
 .edit-form {
@@ -829,7 +829,7 @@ onBeforeUnmount(() => {
   color: var(--danger);
   padding: 0.45rem 0.75rem;
   font: inherit;
-  font-size: 0.88rem;
+  font-size: var(--text-sm);
   cursor: pointer;
   text-transform: lowercase;
 }

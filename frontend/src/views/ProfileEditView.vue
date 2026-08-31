@@ -676,7 +676,7 @@ function closeSettings() {
   padding: 0;
   margin: 0 0 1rem;
   color: var(--danger);
-  font-size: 0.82rem;
+  font-size: var(--text-xs);
   line-height: 1.35;
 }
 .mod-notes li + li {
@@ -729,7 +729,7 @@ function closeSettings() {
   background: transparent;
   color: var(--muted);
   font: inherit;
-  font-size: 0.82rem;
+  font-size: var(--text-xs);
   padding: 0.4rem 0.65rem;
   border-radius: var(--radius-pill);
   white-space: nowrap;
@@ -830,7 +830,7 @@ function closeSettings() {
   background: transparent;
   color: var(--muted);
   font: inherit;
-  font-size: 0.78rem;
+  font-size: var(--text-xs);
   cursor: pointer;
   padding: 0.15rem 0.35rem;
 }
@@ -863,12 +863,12 @@ function closeSettings() {
 }
 
 .field-label {
-  font-size: 0.78rem;
+  font-size: var(--text-xs);
   color: var(--muted);
 }
 
 .field-count {
-  font-size: 0.74rem;
+  font-size: var(--text-2xs);
   font-variant-numeric: tabular-nums;
 }
 
@@ -936,7 +936,7 @@ function closeSettings() {
   content: "+";
   color: var(--muted);
   margin-right: 0.35rem;
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
   flex-shrink: 0;
 }
 
@@ -970,7 +970,7 @@ function closeSettings() {
   justify-self: start;
   min-height: 0;
   padding: 0.3rem 0.65rem;
-  font-size: 0.78rem;
+  font-size: var(--text-xs);
 }
 
 .socials-row {
@@ -1009,7 +1009,7 @@ function closeSettings() {
 
 .readme-input {
   font-family: var(--mono, ui-monospace, monospace);
-  font-size: 0.86rem;
+  font-size: var(--text-sm);
   line-height: 1.5;
 }
 
@@ -1023,7 +1023,7 @@ function closeSettings() {
   border-radius: var(--radius);
   padding: 0.85rem 1rem;
   line-height: 1.6;
-  font-size: 0.92rem;
+  font-size: var(--text-sm);
 }
 
 .readme-preview :deep(img),
@@ -1083,7 +1083,7 @@ function closeSettings() {
 }
 .theme-label {
   display: block;
-  font-size: 0.82rem;
+  font-size: var(--text-xs);
   margin-bottom: 0.45rem;
 }
 .theme-picker {
@@ -1129,7 +1129,7 @@ function closeSettings() {
   color: var(--text);
 }
 .small {
-  font-size: 0.82rem;
+  font-size: var(--text-xs);
 }
 
 .invite-list {
@@ -1145,7 +1145,7 @@ function closeSettings() {
 
 .invite-code {
   font-family: var(--mono);
-  font-size: 0.92rem;
+  font-size: var(--text-sm);
 }
 
 .invite-url {

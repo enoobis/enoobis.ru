@@ -644,7 +644,7 @@ onBeforeUnmount(() => {
 }
 
 .radius-label-text {
-  font-size: 0.82rem;
+  font-size: var(--text-xs);
   color: var(--muted);
 }
 
@@ -726,7 +726,7 @@ onBeforeUnmount(() => {
 
 .point-meta {
   margin: 0.15rem 0 0;
-  font-size: 0.82rem;
+  font-size: var(--text-xs);
 }
 
 .point-actions {
@@ -826,7 +826,7 @@ onBeforeUnmount(() => {
 }
 
 .range-label {
-  font-size: 0.88rem;
+  font-size: var(--text-sm);
   color: var(--text);
   text-align: center;
   text-transform: lowercase;
@@ -839,7 +839,7 @@ onBeforeUnmount(() => {
 
 .checkins-meta {
   margin: 0;
-  font-size: 0.75rem;
+  font-size: var(--text-2xs);
   line-height: 1.2;
 }
 
@@ -877,12 +877,12 @@ onBeforeUnmount(() => {
 .checkin-dist {
   flex-shrink: 0;
   font-variant-numeric: tabular-nums;
-  font-size: 0.82rem;
+  font-size: var(--text-xs);
 }
 
 .checkin-sub {
   margin: 0.2rem 0 0;
-  font-size: 0.82rem;
+  font-size: var(--text-xs);
 }
 
 :deep(.leaflet-control-zoom a) {

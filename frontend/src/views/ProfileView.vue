@@ -675,7 +675,7 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   padding: 0;
   margin: 0 0 1rem;
   color: var(--danger);
-  font-size: 0.82rem;
+  font-size: var(--text-xs);
   line-height: 1.35;
 }
 .mod-notes li + li {
@@ -715,7 +715,7 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
 }
 .info .muted {
   margin: 0.2rem 0;
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
 }
 .bio {
   margin-top: 0.6rem;
@@ -740,7 +740,7 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   padding: 0.5rem 1.1rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
   font-weight: 600;
   text-transform: lowercase;
   color: var(--text);
@@ -757,7 +757,7 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   padding: 1rem 1.2rem;
   margin: 0 0 1.2rem;
   line-height: 1.65;
-  font-size: 0.95rem;
+  font-size: var(--text-md);
 }
 .readme :deep(h1),
 .readme :deep(h2),
@@ -773,7 +773,7 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   font-size: 1.05rem;
 }
 .readme :deep(h3) {
-  font-size: 0.98rem;
+  font-size: var(--text-md);
 }
 .readme :deep(p) {
   margin: 0.4rem 0;
@@ -845,7 +845,7 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   gap: 0.3rem;
   text-transform: lowercase;
   letter-spacing: 0.06em;
-  font-size: 0.7rem;
+  font-size: var(--text-2xs);
   margin-bottom: 0.4rem;
 }
 .ach-list {
@@ -860,7 +860,7 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   padding: 0.2rem 0.6rem;
   border: 1px solid var(--border);
   border-radius: 999px;
-  font-size: 0.78rem;
+  font-size: var(--text-xs);
   color: var(--muted);
   cursor: help;
 }
@@ -884,7 +884,7 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   display: grid;
 }
 .small {
-  font-size: 0.82rem;
+  font-size: var(--text-xs);
 }
 @media (max-width: 760px) {
   .profile.on-wallpaper {

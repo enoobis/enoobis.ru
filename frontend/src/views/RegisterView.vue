@@ -91,7 +91,7 @@ form button {
 .alt {
   margin-top: 1.5rem;
   text-align: center;
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
   color: var(--muted);
 }
 .alt a {

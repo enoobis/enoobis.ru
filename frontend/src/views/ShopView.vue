@@ -342,7 +342,7 @@ watch(
 .displacement-host.avatar-img {
   width: 80px;
   height: 80px;
-  border-radius: 0;
+  border-radius: var(--avatar-radius);
   object-fit: cover;
   border: 1px solid var(--border);
   display: block;
@@ -354,7 +354,7 @@ watch(
   background: var(--surface2);
   border: 1px solid var(--border);
   border-radius: 4px;
-  font-size: 0.62rem;
+  font-size: var(--text-2xs);
   padding: 1px 4px;
   color: var(--muted);
   text-transform: lowercase;
@@ -399,7 +399,7 @@ watch(
 }
 .item-name {
   margin: 0;
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
   text-align: center;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -407,7 +407,7 @@ watch(
 }
 .stock-line {
   margin: 0;
-  font-size: 0.72rem;
+  font-size: var(--text-2xs);
   text-align: center;
 }
 .item-footer {
@@ -421,7 +421,7 @@ watch(
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
   color: var(--muted);
 }
 .shop-pages {
@@ -433,20 +433,20 @@ watch(
   padding-top: 0.25rem;
 }
 .shop-page-btn {
-  min-height: 0;
-  padding: 0.35rem 0.75rem;
-  font-size: 0.82rem;
+  min-height: 36px;
+  padding: 0.4rem 0.9rem;
+  font-size: var(--text-sm);
 }
 .shop-page-jump {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  font-size: 0.82rem;
+  font-size: var(--text-xs);
 }
 .shop-page-input {
   width: 2.75rem;
   font: inherit;
-  font-size: 0.82rem;
+  font-size: var(--text-xs);
   padding: 0.3rem 0.35rem;
   border: 1px solid var(--border);
   border-radius: var(--radius);

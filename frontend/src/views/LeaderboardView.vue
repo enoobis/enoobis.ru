@@ -125,7 +125,7 @@ onMounted(load);
   background: var(--surface);
   border: 1px solid var(--border);
   color: var(--muted);
-  font-size: 0.82rem;
+  font-size: var(--text-xs);
 }
 .active-chip:hover {
   color: var(--text);
@@ -168,7 +168,7 @@ onMounted(load);
   align-items: center;
   justify-content: center;
   background: var(--surface2);
-  font-size: 0.75rem;
+  font-size: var(--text-2xs);
   color: var(--muted);
 }
 .coins {

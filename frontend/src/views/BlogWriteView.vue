@@ -551,7 +551,7 @@ onBeforeUnmount(() => {
   padding: 0.3rem 0.55rem;
   min-height: 30px;
   font-weight: 500;
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
   text-transform: lowercase;
 }
 
@@ -740,7 +740,7 @@ onBeforeUnmount(() => {
   resize: vertical;
   padding: 0.5rem 1rem;
   font-family: var(--mono);
-  font-size: 0.92rem;
+  font-size: var(--text-sm);
   line-height: 1.7;
   color: var(--text);
 }
@@ -763,7 +763,7 @@ onBeforeUnmount(() => {
 
 .mode-split .markdown-preview {
   font-family: var(--mono);
-  font-size: 0.92rem;
+  font-size: var(--text-sm);
   line-height: 1.7;
 }
 
@@ -864,6 +864,6 @@ onBeforeUnmount(() => {
 }
 
 .small {
-  font-size: 0.8rem;
+  font-size: var(--text-xs);
 }
 </style>

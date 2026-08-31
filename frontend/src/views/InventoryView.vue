@@ -269,7 +269,7 @@ onMounted(load);
   background: var(--surface);
 }
 .kind {
-  font-size: 0.72rem;
+  font-size: var(--text-2xs);
 }
 .preview {
   min-height: 88px;
@@ -285,7 +285,7 @@ onMounted(load);
 .displacement-host.avatar-img {
   width: 80px;
   height: 80px;
-  border-radius: 0;
+  border-radius: var(--avatar-radius);
   border: 1px solid var(--border);
   display: block;
 }
@@ -296,7 +296,7 @@ onMounted(load);
   background: var(--surface2);
   border: 1px solid var(--border);
   border-radius: 4px;
-  font-size: 0.62rem;
+  font-size: var(--text-2xs);
   padding: 1px 4px;
   color: var(--muted);
   text-transform: lowercase;
@@ -354,7 +354,7 @@ onMounted(load);
 }
 .item-name {
   margin: 0;
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
   text-align: center;
   overflow: hidden;
   text-overflow: ellipsis;

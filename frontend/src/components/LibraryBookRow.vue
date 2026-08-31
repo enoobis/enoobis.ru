@@ -115,7 +115,7 @@ const emit = defineEmits<{
 }
 
 .title {
-  font-size: 0.98rem;
+  font-size: var(--text-md);
   font-weight: 500;
   letter-spacing: -0.015em;
   line-height: 1.3;
@@ -159,7 +159,7 @@ const emit = defineEmits<{
 }
 
 .small {
-  font-size: 0.8rem;
+  font-size: var(--text-xs);
 }
 
 @media (max-width: 520px) {
