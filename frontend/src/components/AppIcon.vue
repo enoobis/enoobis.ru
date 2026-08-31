@@ -31,6 +31,7 @@ import {
   MessageCircle,
   MessageSquare,
   Moon,
+  MoreHorizontal,
   Package,
   PenLine,
   Pencil,
@@ -87,6 +88,7 @@ export type AppIconName =
   | "edit"
   | "settings"
   | "menu"
+  | "more"
   | "play"
   | "sun"
   | "moon"
@@ -150,6 +152,7 @@ const icons: Record<AppIconName, Component> = {
   edit: Pencil,
   settings: Settings,
   menu: Menu,
+  more: MoreHorizontal,
   play: Play,
   sun: Sun,
   moon: Moon,

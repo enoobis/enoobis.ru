@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, onUnmounted, ref, watch } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import AppIcon from "./AppIcon.vue";
 import RichText from "./RichText.vue";
@@ -19,11 +19,12 @@ import { toast, toastError, toastSuccess } from "../utils/toast";
 import { nextVoteState } from "../utils/voteState";
 import "../styles/post-actions.css";
 
-const ACT = 15;
+const ACT = 17;
 
 const props = defineProps<{
   post: MicroPost;
   clickable?: boolean;
+  connected?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -70,6 +71,32 @@ const canEdit = computed(() => {
 const initials = computed(() => props.post.author_nickname.slice(0, 2));
 const authorAvatarBroken = ref(false);
 const timeAgo = computed(() => formatAgo(props.post.created_at));
+
+const menuOpen = ref(false);
+const hasMenu = computed(() => canEdit.value || canDelete.value);
+
+function closeMenu() {
+  menuOpen.value = false;
+}
+
+function onEsc(e: KeyboardEvent) {
+  if (e.key === "Escape") closeMenu();
+}
+
+watch(menuOpen, (open) => {
+  if (open) {
+    document.addEventListener("click", closeMenu);
+    document.addEventListener("keydown", onEsc);
+  } else {
+    document.removeEventListener("click", closeMenu);
+    document.removeEventListener("keydown", onEsc);
+  }
+});
+
+onUnmounted(() => {
+  document.removeEventListener("click", closeMenu);
+  document.removeEventListener("keydown", onEsc);
+});
 
 function formatAgo(iso: string) {
   const d = Date.parse(iso);
@@ -140,6 +167,7 @@ async function toggleBookmark() {
 }
 
 async function remove() {
+  closeMenu();
   if (!auth.token || !canDelete.value || busy.value) return;
   if (!confirm("удалить?")) return;
   busy.value = true;
@@ -159,6 +187,7 @@ function openDetail() {
 }
 
 function startEdit() {
+  closeMenu();
   draft.value = props.post.body;
   editing.value = true;
 }
@@ -200,23 +229,46 @@ async function share() {
 </script>
 
 <template>
-  <article class="item" :class="{ clickable: clickable && !editing }" @click="openDetail">
-    <RouterLink :to="`/u/${post.author_nickname}`" class="avatar" @click.stop>
-      <img
-        v-if="post.author_avatar && !authorAvatarBroken"
-        :src="post.author_avatar"
-        alt=""
-        @error="authorAvatarBroken = true"
-      />
-      <span v-else>{{ initials }}</span>
-    </RouterLink>
+  <article
+    class="item"
+    :class="{ clickable: clickable && !editing, connected }"
+    @click="openDetail"
+  >
+    <div class="rail">
+      <RouterLink :to="`/u/${post.author_nickname}`" class="avatar" @click.stop>
+        <img
+          v-if="post.author_avatar && !authorAvatarBroken"
+          :src="post.author_avatar"
+          alt=""
+          @error="authorAvatarBroken = true"
+        />
+        <span v-else>{{ initials }}</span>
+      </RouterLink>
+      <span v-if="connected" class="thread-line" aria-hidden="true" />
+    </div>
 
     <div class="content">
       <header>
         <RouterLink :to="`/u/${post.author_nickname}`" class="author" @click.stop>
           {{ post.author_nickname }}
         </RouterLink>
-        <span class="muted small">· {{ timeAgo }}</span>
+        <span class="time">{{ timeAgo }}</span>
+
+        <div v-if="hasMenu" class="more-wrap" @click.stop>
+          <button
+            class="more"
+            type="button"
+            :aria-expanded="menuOpen"
+            title="ещё"
+            @click="menuOpen = !menuOpen"
+          >
+            <AppIcon name="more" :size="16" />
+          </button>
+          <div v-if="menuOpen" class="menu">
+            <button v-if="canEdit" type="button" @click="startEdit">редактировать</button>
+            <button v-if="canDelete" type="button" @click="remove">удалить</button>
+          </div>
+        </div>
       </header>
 
       <div v-if="editing" class="edit" @click.stop>
@@ -295,18 +347,6 @@ async function share() {
         <button class="act" type="button" title="поделиться" @click="share">
           <AppIcon name="send" :size="ACT" />
         </button>
-        <button
-          v-if="canEdit && !editing"
-          class="act"
-          type="button"
-          title="редактировать"
-          @click="startEdit"
-        >
-          <AppIcon name="edit" :size="ACT" />
-        </button>
-        <button v-if="canDelete && !editing" class="act danger" type="button" title="удалить" @click="remove">
-          <AppIcon name="delete" :size="ACT" />
-        </button>
       </div>
     </div>
   </article>
@@ -315,10 +355,15 @@ async function share() {
 <style scoped>
 .item {
   display: grid;
-  grid-template-columns: 36px 1fr;
-  gap: 0.7rem;
+  grid-template-columns: var(--avatar-md) 1fr;
+  gap: 0.75rem;
   padding: 0.9rem 0;
   border-bottom: 1px solid var(--border);
+}
+/* пост продолжается ответами — линия ведёт дальше, разделителя нет */
+.item.connected {
+  padding-bottom: 0;
+  border-bottom: none;
 }
 .item.clickable {
   cursor: pointer;
@@ -327,9 +372,29 @@ async function share() {
   color: var(--text);
 }
 
+.rail {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+}
+/* выходит за пределы поста, чтобы линия не рвалась на отступе следующего */
+.thread-line {
+  position: absolute;
+  top: calc(var(--avatar-md) + 0.5rem);
+  bottom: -0.9rem;
+  left: 50%;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--hover-border);
+}
+
 .avatar {
   width: var(--avatar-md);
   height: var(--avatar-md);
+  flex: 0 0 var(--avatar-md);
   border-radius: var(--avatar-radius);
   border: 1px solid var(--border);
   display: inline-flex;
@@ -341,7 +406,6 @@ async function share() {
   text-transform: lowercase;
   font-size: 0.78rem;
   overflow: hidden;
-  flex: 0 0 36px;
 }
 .avatar img {
   width: 100%;
@@ -355,22 +419,79 @@ async function share() {
 }
 header {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 0.4rem;
-  margin-bottom: 0.2rem;
+  min-height: 1.75rem;
 }
 .author {
   color: var(--text);
-  font-weight: 500;
-  font-size: 0.92rem;
+  font-weight: 600;
+  font-size: 0.95rem;
   text-transform: lowercase;
+}
+.time {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.more-wrap {
+  position: relative;
+  margin-left: auto;
+}
+.more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  min-height: 0;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--muted);
+}
+.more:hover {
+  background: var(--hover-surface);
+  color: var(--text);
+}
+.menu {
+  position: absolute;
+  top: calc(100% + 0.25rem);
+  right: 0;
+  z-index: 20;
+  min-width: 9.5rem;
+  display: grid;
+  padding: 0.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.menu button {
+  width: 100%;
+  min-height: 2.25rem;
+  padding: 0.45rem 0.6rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font-size: var(--text-sm);
+  text-align: left;
+}
+.menu button:hover {
+  background: var(--surface2);
 }
 
 .body {
-  margin: 0.2rem 0 0.5rem;
+  margin: 0.1rem 0 0.5rem;
   word-wrap: break-word;
   line-height: 1.5;
-  font-size: 0.95rem;
+  font-size: 0.98rem;
+}
+
+/* глобальный hover на --surface почти не виден на чёрной теме */
+.post-actions .act:hover:not(:disabled) {
+  background: var(--hover-surface);
 }
 
 .image {
@@ -414,9 +535,7 @@ header {
 }
 
 .post-actions {
-  margin-top: 0.3rem;
-}
-.small {
-  font-size: var(--text-sm);
+  margin-top: 0.35rem;
+  gap: 0.15rem;
 }
 </style>

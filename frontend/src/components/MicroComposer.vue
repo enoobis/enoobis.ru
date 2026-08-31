@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, nextTick, ref } from "vue";
 import { createMicro, uploadMicroImage, type MicroPost } from "../api/micro";
 import { useAuthStore } from "../stores/auth";
+import { useSessionStore } from "../stores/session";
 
 const props = defineProps<{
   parentId?: string | null;
   placeholder?: string;
   autofocus?: boolean;
+  connected?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -14,6 +16,7 @@ const emit = defineEmits<{
 }>();
 
 const auth = useAuthStore();
+const session = useSessionStore();
 const body = ref("");
 const imageUrl = ref("");
 const sending = ref(false);
@@ -21,6 +24,26 @@ const uploading = ref(false);
 const dragOver = ref(false);
 const err = ref("");
 const fileInput = ref<HTMLInputElement | null>(null);
+const wrap = ref<HTMLElement | null>(null);
+const area = ref<HTMLTextAreaElement | null>(null);
+
+const expanded = ref(false);
+const open = computed(() => expanded.value || !!props.parentId);
+const initials = computed(() => (auth.nickname || "?").slice(0, 2));
+const avatarBroken = ref(false);
+
+function grow() {
+  const el = area.value;
+  if (!el) return;
+  el.style.height = "auto";
+  el.style.height = `${el.scrollHeight}px`;
+}
+
+function onFocusOut(e: FocusEvent) {
+  const next = e.relatedTarget as Node | null;
+  if (next && wrap.value?.contains(next)) return;
+  if (!body.value.trim() && !imageUrl.value) expanded.value = false;
+}
 
 const limit = 480;
 const remaining = computed(() => limit - body.value.length);
@@ -44,6 +67,8 @@ async function send() {
     });
     body.value = "";
     imageUrl.value = "";
+    expanded.value = false;
+    void nextTick(grow);
     emit("posted", post);
   } catch (e) {
     err.value = e instanceof Error ? e.message : "ошибка";
@@ -109,73 +134,141 @@ function onKeydown(e: KeyboardEvent) {
 
 <template>
   <div
+    ref="wrap"
     class="composer"
-    :class="{ drag: dragOver }"
+    :class="{ drag: dragOver, open, connected }"
     @dragover.prevent="dragOver = true"
     @dragleave="dragOver = false"
     @drop.prevent="onDrop"
+    @focusout="onFocusOut"
   >
-    <textarea
-      v-model="body"
-      :placeholder="placeholder ?? 'текст'"
-      rows="2"
-      :autofocus="autofocus"
-      :maxlength="limit"
-      @keydown="onKeydown"
-      @paste="onPaste"
-    />
-
-    <div v-if="imageUrl" class="preview">
-      <img :src="imageUrl" alt="" />
-      <button type="button" class="remove" title="убрать" @click="clearImage">×</button>
+    <div class="rail">
+      <span class="avatar">
+        <img
+          v-if="session.avatarUrl && !avatarBroken"
+          :src="session.avatarUrl"
+          alt=""
+          @error="avatarBroken = true"
+        />
+        <span v-else>{{ initials }}</span>
+      </span>
+      <span v-if="connected" class="thread-line" aria-hidden="true" />
     </div>
 
-    <div class="row">
-      <button class="ghost" type="button" :disabled="uploading" :title="'добавить картинку'" @click="onPick">
-        {{ uploading ? "загрузка…" : "+ картинка" }}
-      </button>
-      <input
-        ref="fileInput"
-        type="file"
-        accept="image/*"
-        hidden
-        @change="onFile"
+    <div class="field">
+      <textarea
+        ref="area"
+        v-model="body"
+        :placeholder="placeholder ?? 'что нового?'"
+        rows="1"
+        :autofocus="autofocus"
+        :maxlength="limit"
+        @focus="expanded = true"
+        @input="grow"
+        @keydown="onKeydown"
+        @paste="onPaste"
       />
-      <span class="counter muted small" :class="{ over: remaining < 0 }">{{ remaining }}</span>
-      <button type="button" :disabled="!canSend" @click="send">
-        {{ sending ? "…" : parentId ? "ответить" : "опубликовать" }}
-      </button>
+
+      <div v-if="imageUrl" class="preview">
+        <img :src="imageUrl" alt="" />
+        <button type="button" class="remove" title="убрать" @click="clearImage">×</button>
+      </div>
+
+      <div v-if="open" class="row">
+        <button class="ghost" type="button" :disabled="uploading" title="добавить картинку" @click="onPick">
+          {{ uploading ? "загрузка…" : "картинка" }}
+        </button>
+        <input
+          ref="fileInput"
+          type="file"
+          accept="image/*"
+          hidden
+          @change="onFile"
+        />
+        <span v-if="remaining < 60" class="counter" :class="{ over: remaining < 0 }">
+          {{ remaining }}
+        </span>
+        <button type="button" :disabled="!canSend" @click="send">
+          {{ sending ? "…" : parentId ? "ответить" : "опубликовать" }}
+        </button>
+      </div>
+      <p v-if="err" class="error small">{{ err }}</p>
     </div>
-    <p v-if="err" class="error small">{{ err }}</p>
   </div>
 </template>
 
 <style scoped>
 .composer {
   display: grid;
-  gap: 0.5rem;
-  padding: 0.6rem 0.85rem 0.7rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-  transition: border-color var(--dur-2) var(--ease-out), background 0.15s ease;
+  grid-template-columns: var(--avatar-md) 1fr;
+  gap: 0.75rem;
+  padding: 0.9rem 0;
+  border-bottom: 1px solid var(--border);
 }
-.composer:focus-within {
-  border-color: var(--focus-border);
+.composer.connected {
+  padding-bottom: 0;
+  border-bottom: none;
 }
 .composer.drag {
-  background: var(--surface2);
   outline: 1px dashed var(--text);
-  outline-offset: -2px;
+  outline-offset: 0.25rem;
+}
+
+.rail {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+}
+.thread-line {
+  position: absolute;
+  top: calc(var(--avatar-md) + 0.5rem);
+  bottom: -0.9rem;
+  left: 50%;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--hover-border);
+}
+.avatar {
+  width: var(--avatar-md);
+  height: var(--avatar-md);
+  flex: 0 0 var(--avatar-md);
+  border-radius: var(--avatar-radius);
+  border: 1px solid var(--border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: var(--surface);
+  color: var(--muted);
+  font-weight: 500;
+  font-size: 0.78rem;
+  text-transform: lowercase;
+}
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: var(--avatar-radius);
+}
+
+.field {
+  min-width: 0;
+  display: grid;
+  gap: 0.5rem;
+  align-content: start;
 }
 textarea {
   resize: none;
+  overflow: hidden;
   border: none;
   background: transparent;
-  padding: 0.35rem 0;
+  padding: 0;
   font-size: 1rem;
-  line-height: 1.5;
-  min-height: 2.75rem;
+  line-height: 1.6;
+  min-height: 1.75rem;
 }
 textarea::placeholder {
   color: var(--muted);
@@ -216,29 +309,28 @@ textarea:focus {
   gap: 0.6rem;
 }
 .ghost {
+  margin-right: auto;
   background: transparent;
   border: none;
-  color: var(--text);
-  opacity: 0.72;
+  color: var(--muted);
   padding: 0;
   min-height: 0;
-  font-size: 0.88rem;
+  font-size: var(--text-sm);
 }
 .ghost:hover:not(:disabled) {
   background: transparent;
   color: var(--text);
-  opacity: 1;
 }
 .counter {
-  margin-left: auto;
   color: var(--muted);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
 }
 .counter.over {
   color: var(--text);
-  opacity: 0.9;
 }
 .small {
-  font-size: 0.82rem;
+  font-size: var(--text-sm);
 }
 button[type="button"]:not(.ghost):not(.remove) {
   padding: 0.4rem 0.95rem;

@@ -79,11 +79,17 @@ watch(id, load);
     <AppLoading v-else-if="loading && !post" />
 
     <template v-else-if="post">
-      <MicroItem :post="post" @deleted="onPostDeleted" @updated="onPostUpdated" />
+      <MicroItem
+        :post="post"
+        :connected="auth.token ? true : replies.length > 0"
+        @deleted="onPostDeleted"
+        @updated="onPostUpdated"
+      />
 
       <MicroComposer
         v-if="auth.token"
         :parent-id="post.id"
+        :connected="replies.length > 0"
         placeholder="ответить"
         @posted="onReplyPosted"
       />

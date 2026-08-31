@@ -7,7 +7,7 @@
   --avatar-md: 44px;
   --avatar-lg: 96px;
   --profile-head-gap: 1.5rem;
-  --font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font: "Manrope Variable", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --mono: ui-monospace, "Cascadia Code", "Segoe UI Mono", monospace;
   --icon-size: 18px;
   --text-sm: 0.86rem;
@@ -142,7 +142,6 @@ body {
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  font-feature-settings: "ss01", "cv01", "cv11";
 }
 
 html {
