@@ -5,7 +5,6 @@ import AppIcon from "../components/AppIcon.vue";
 import AppLoading from "../components/AppLoading.vue";
 import MarkdownText from "../components/MarkdownText.vue";
 import {
-  createLecture,
   deleteAssignment,
   deleteLecture,
   getClassroom,
@@ -21,12 +20,9 @@ import {
 import {
   askCourseTutor,
   clearChatHistory,
-  generateCourseOutline,
-  generateLectureDraft,
   getAiStatus,
   getChatHistory,
   type AiChatMessage,
-  type AiLectureTask,
   type AiStatus,
 } from "../api/ai";
 import { useAuthStore } from "../stores/auth";
@@ -88,7 +84,6 @@ const chatOpen = ref(false);
 
 const lectures = computed(() => classroom.value?.lectures ?? []);
 const isTeacher = computed(() => classroom.value?.is_teacher === true);
-const canGenerate = computed(() => isTeacher.value && ai.value?.enabled && ai.value?.can_generate);
 
 const activeLecture = computed<Lecture | null>(
   () => lectures.value.find((l) => l.id === activeId.value) ?? lectures.value[0] ?? null,
@@ -504,243 +499,13 @@ async function clearChat() {
   }
 }
 
-/* ---------- генерация (преподаватель) ---------- */
-
-type GenMode = "course" | "lecture";
-
-const genOpen = ref(false);
-const genMode = ref<GenMode>("course");
-const genTopic = ref("");
-const genNotes = ref("");
-const genCount = ref(10);
-const genBusy = ref(false);
-const genErr = ref("");
-const genProgress = ref("");
-const genDraft = ref<{ title: string; body: string; task: AiLectureTask | null } | null>(null);
-
-function openGen() {
-  genOpen.value = true;
-  genErr.value = "";
-  genProgress.value = "";
-}
-
-function closeGen() {
-  if (genBusy.value) return;
-  genOpen.value = false;
-  genDraft.value = null;
-  genQueue.value = [];
-  genErr.value = "";
-  genProgress.value = "";
-}
-
-type Draft = { body: string; task: AiLectureTask | null };
-type DraftContext = { scope?: string; covered?: string[]; upcoming?: string[] };
-
-async function draftFor(
-  topic: string,
-  courseTitle: string,
-  ctx: DraftContext = {},
-): Promise<Draft> {
-  if (!auth.token) return { body: "", task: null };
-  const draft = await generateLectureDraft(auth.token, {
-    topic,
-    course_title: courseTitle,
-    notes: genNotes.value.trim() || undefined,
-    ...ctx,
-  });
-  return { body: draft.body, task: draft.task };
-}
-
-/* весь курс: программа -> темы по одной, каждая сохраняется сразу */
-
-type QueueItem = { title: string; summary: string; state: "wait" | "run" | "done" | "fail" };
-
-const genQueue = ref<QueueItem[]>([]);
-const genStop = ref(false);
-
-const genDone = computed(() => genQueue.value.filter((t) => t.state === "done").length);
-const genFailed = computed(() => genQueue.value.filter((t) => t.state === "fail").length);
-const genPct = computed(() =>
-  genQueue.value.length ? Math.round((genDone.value / genQueue.value.length) * 100) : 0,
-);
-const genStatus = computed(() => {
-  const total = genQueue.value.length;
-  if (!total) return genProgress.value;
-  const head = `${genDone.value} из ${total}`;
-  if (genProgress.value) return `${head} · ${genProgress.value}`;
-  if (genFailed.value) return `${head} · не вышло ${genFailed.value}`;
-  return `${head} · готово`;
-});
-
-function errCode(e: unknown): string {
-  return e instanceof Error ? e.message : "";
-}
-
-/** лимиты на минуту переживаем ожиданием, ключ и дневной лимит — нет */
-function isFatal(e: unknown): boolean {
-  return ["daily_limit", "ai_disabled", "ai_key_invalid", "ai_key_forbidden", "ai_region_blocked"].includes(
-    errCode(e),
-  );
-}
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-async function makeLecture(item: QueueItem, courseTitle: string, index: number) {
-  if (!auth.token || !classroom.value) return;
-  const draft = await draftFor(item.title, courseTitle, {
-    scope: item.summary || undefined,
-    covered: genQueue.value.slice(0, index).map((t) => t.title),
-    upcoming: genQueue.value.slice(index + 1).map((t) => t.title),
-  });
-  await createLecture(
-    classroom.value.course.id,
-    {
-      title: item.title,
-      body_text: draft.body,
-      video_url: "",
-      ...(draft.task ? { task: draft.task } : {}),
-    },
-    auth.token,
-  );
-}
-
-async function makeLectureWithRetry(item: QueueItem, courseTitle: string, index: number) {
-  for (let attempt = 0; ; attempt += 1) {
-    try {
-      await makeLecture(item, courseTitle, index);
-      return;
-    } catch (e) {
-      const code = errCode(e);
-      const throttled = code === "ai_rate_limited" || code === "too_many_requests";
-      if (!throttled || attempt >= 2 || genStop.value) throw e;
-      for (let left = 20; left > 0 && !genStop.value; left -= 1) {
-        genProgress.value = `лимит запросов, жду ${left} с`;
-        await sleep(1000);
-      }
-    }
-  }
-}
-
-async function runQueue() {
-  if (!classroom.value) return;
-  const courseTitle = classroom.value.course.title;
-  for (const [i, item] of genQueue.value.entries()) {
-    if (genStop.value) break;
-    if (item.state === "done") continue;
-    item.state = "run";
-    genProgress.value = item.title;
-    try {
-      await makeLectureWithRetry(item, courseTitle, i);
-      item.state = "done";
-      await load();
-    } catch (e) {
-      item.state = "fail";
-      if (isFatal(e)) {
-        genErr.value = errorText(e);
-        break;
-      }
-    }
-  }
-  genProgress.value = "";
-}
-
-async function generateWholeCourse() {
-  if (!auth.token || !classroom.value) return;
-  genStop.value = false;
-  genQueue.value = [];
-  genProgress.value = "составляю программу";
-  const outline = await generateCourseOutline(auth.token, {
-    title: classroom.value.course.title,
-    description: classroom.value.course.description,
-    count: genCount.value,
-    notes: genNotes.value.trim() || undefined,
-  });
-  if (!outline.topics.length) throw new Error("пустая программа");
-  genQueue.value = outline.topics.map((t) => ({
-    title: t.title,
-    summary: t.summary,
-    state: "wait",
-  }));
-  genProgress.value = "";
-  await runQueue();
-}
-
-async function retryFailed() {
-  if (genBusy.value) return;
-  genStop.value = false;
-  genErr.value = "";
-  for (const item of genQueue.value) if (item.state === "fail") item.state = "wait";
-  genBusy.value = true;
-  try {
-    await runQueue();
-  } finally {
-    genBusy.value = false;
-  }
-}
-
-async function runGenerate() {
-  if (!auth.token || !classroom.value || genBusy.value) return;
-  genBusy.value = true;
-  genErr.value = "";
-  try {
-    if (genMode.value === "course") {
-      await generateWholeCourse();
-    } else {
-      if (!genTopic.value.trim()) {
-        genErr.value = "нужна тема";
-        return;
-      }
-      const topic = genTopic.value.trim();
-      genProgress.value = "пишу тему";
-      const draft = await draftFor(topic, classroom.value.course.title, {
-        covered: lectures.value.map((l) => l.title),
-      });
-      genDraft.value = { title: topic, ...draft };
-      genProgress.value = "";
-    }
-  } catch (e) {
-    genErr.value = errorText(e);
-    genProgress.value = "";
-  } finally {
-    genBusy.value = false;
-  }
-}
-
-async function saveGenerated() {
-  if (!auth.token || !classroom.value || genBusy.value) return;
-  genBusy.value = true;
-  genErr.value = "";
-  try {
-    if (genDraft.value) {
-      await createLecture(
-        classroom.value.course.id,
-        {
-          title: genDraft.value.title,
-          body_text: genDraft.value.body,
-          video_url: "",
-          ...(genDraft.value.task ? { task: genDraft.value.task } : {}),
-        },
-        auth.token,
-      );
-    }
-    genOpen.value = false;
-    genDraft.value = null;
-    await load();
-  } catch (e) {
-    genErr.value = errorText(e);
-  } finally {
-    genBusy.value = false;
-  }
-}
-
 watch(activeId, () => {
   openTaskId.value = "";
 });
 
 function onEscape(e: KeyboardEvent) {
   if (e.key !== "Escape") return;
-  if (genOpen.value) closeGen();
-  else if (chatOpen.value) chatOpen.value = false;
+  if (chatOpen.value) chatOpen.value = false;
   else if (topicsOpen.value) topicsOpen.value = false;
 }
 
@@ -810,11 +575,6 @@ onBeforeUnmount(() => {
           </button>
           <p v-if="!lectures.length" class="side-empty muted">тем нет</p>
         </nav>
-
-        <button v-if="canGenerate" type="button" class="side-gen secondary" @click="openGen">
-          <AppIcon name="spark" :size="16" />
-          <span>сгенерировать</span>
-        </button>
       </aside>
 
       <!-- тема -->
@@ -1038,89 +798,6 @@ onBeforeUnmount(() => {
       class="panel-backdrop only-narrow"
       @click="topicsOpen = false; chatOpen = false"
     />
-
-    <Teleport to="body">
-      <div v-if="genOpen" class="gen-root" role="presentation">
-        <button type="button" class="gen-backdrop" aria-label="закрыть" @click="closeGen" />
-        <div class="gen-dialog" role="dialog" aria-modal="true" aria-label="генерация">
-          <div class="filter-tabs">
-            <button
-              type="button"
-              class="filter-tab"
-              :class="{ on: genMode === 'course' }"
-              @click="genMode = 'course'"
-            >
-              весь курс
-            </button>
-            <button
-              type="button"
-              class="filter-tab"
-              :class="{ on: genMode === 'lecture' }"
-              @click="genMode = 'lecture'"
-            >
-              одна тема
-            </button>
-          </div>
-
-          <label v-if="genMode === 'course'" class="gen-field">
-            <span class="muted small">минимум тем, больше можно</span>
-            <input v-model.number="genCount" type="number" min="3" max="40" />
-          </label>
-
-          <input v-else v-model="genTopic" placeholder="тема" />
-
-          <textarea
-            v-model="genNotes"
-            rows="4"
-            placeholder="что должно быть в курсе: темы, подтемы, требования"
-          />
-
-          <div v-if="genMode === 'lecture' && genDraft" class="gen-preview">
-            <MarkdownText :text="genDraft.body" variant="doc" />
-          </div>
-
-          <div v-if="genQueue.length" class="gen-progress">
-            <div class="gen-bar"><span :style="{ width: `${genPct}%` }" /></div>
-            <p class="muted small">{{ genStatus }}</p>
-          </div>
-          <p v-else-if="genProgress" class="muted small">{{ genProgress }}</p>
-          <p v-if="genErr" class="error">{{ genErr }}</p>
-
-          <div class="gen-actions">
-            <button
-              v-if="genMode === 'course' && genBusy"
-              type="button"
-              class="secondary"
-              @click="genStop = true"
-            >
-              {{ genStop ? "останавливаю…" : "стоп" }}
-            </button>
-            <button
-              v-else-if="genMode === 'course' && genFailed"
-              type="button"
-              class="secondary"
-              @click="retryFailed"
-            >
-              повторить {{ genFailed }}
-            </button>
-            <button v-else type="button" class="secondary" :disabled="genBusy" @click="runGenerate">
-              {{ genBusy ? "…" : genMode === "course" ? "создать курс" : "сгенерировать" }}
-            </button>
-            <button
-              v-if="genMode === 'lecture'"
-              type="button"
-              :disabled="genBusy || !genDraft"
-              @click="saveGenerated"
-            >
-              добавить
-            </button>
-            <button type="button" class="secondary" :disabled="genBusy" @click="closeGen">
-              закрыть
-            </button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
   </section>
 </template>
 
@@ -1272,14 +949,6 @@ onBeforeUnmount(() => {
   margin: 0;
   padding: 0.5rem 0.65rem;
   font-size: var(--text-sm);
-}
-
-.side-gen {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.4rem;
-  flex-shrink: 0;
 }
 
 .reader-main {
@@ -1588,79 +1257,6 @@ onBeforeUnmount(() => {
   resize: none;
   border-radius: var(--radius);
   font-size: var(--text-sm);
-}
-
-/* ---------- генерация ---------- */
-
-.gen-root {
-  position: fixed;
-  inset: 0;
-  z-index: 120;
-  display: grid;
-  place-items: center;
-  padding: var(--layout-pad);
-}
-
-.gen-backdrop {
-  position: absolute;
-  inset: 0;
-  border: none;
-  border-radius: 0;
-  background: rgba(0, 0, 0, 0.55);
-}
-
-.gen-dialog {
-  position: relative;
-  display: grid;
-  gap: var(--space-3);
-  width: min(100%, 34rem);
-  max-height: 85dvh;
-  overflow-y: auto;
-  padding: var(--space-5);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg);
-}
-
-.gen-field {
-  display: grid;
-  gap: 0.3rem;
-}
-
-.gen-preview {
-  max-height: 40dvh;
-  overflow-y: auto;
-  padding: var(--space-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  font-size: var(--text-sm);
-}
-
-.gen-progress {
-  display: grid;
-  gap: 0.4rem;
-}
-
-.gen-bar {
-  height: 2px;
-  background: var(--border);
-  overflow: hidden;
-}
-
-.gen-bar span {
-  display: block;
-  height: 100%;
-  background: var(--text);
-  transition: width var(--dur-3) var(--ease-out);
-}
-
-.gen-actions {
-  display: flex;
-  gap: 0.4rem;
-}
-
-.gen-actions > * {
-  flex: 1;
 }
 
 .only-narrow {

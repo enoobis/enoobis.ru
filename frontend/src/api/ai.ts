@@ -20,11 +20,6 @@ export type AiChatReply = {
   limit: number;
 };
 
-export type AiOutlineTopic = {
-  title: string;
-  summary: string;
-};
-
 export function getAiStatus(token: string) {
   return api<AiStatus>("/api/ai/status", { token });
 }
@@ -47,45 +42,4 @@ export function getChatHistory(token: string, courseId: string) {
 
 export function clearChatHistory(token: string, courseId: string) {
   return api<{ ok: true }>(`/api/ai/chat/${courseId}`, { method: "DELETE", token });
-}
-
-export function generateCourseOutline(
-  token: string,
-  payload: { title: string; description?: string; count?: number; notes?: string },
-) {
-  return api<{ topics: AiOutlineTopic[] }>("/api/ai/course-outline", {
-    method: "POST",
-    token,
-    body: JSON.stringify(payload),
-  });
-}
-
-export type AiLectureTask = {
-  title: string;
-  description: string;
-  max_points: number;
-};
-
-export type AiLectureDraft = {
-  title: string;
-  body: string;
-  task: AiLectureTask | null;
-};
-
-export function generateLectureDraft(
-  token: string,
-  payload: {
-    topic: string;
-    course_title?: string;
-    notes?: string;
-    scope?: string;
-    covered?: string[];
-    upcoming?: string[];
-  },
-) {
-  return api<AiLectureDraft>("/api/ai/lecture-draft", {
-    method: "POST",
-    token,
-    body: JSON.stringify(payload),
-  });
 }

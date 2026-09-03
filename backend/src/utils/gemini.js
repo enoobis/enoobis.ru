@@ -2,6 +2,9 @@ const DEFAULT_BASE = "https://generativelanguage.googleapis.com/v1beta";
 const DEFAULT_MODEL = "gemini-2.5-flash";
 /** если заданной модели нет — пробуем эти по очереди */
 const TEXT_FALLBACKS = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-2.0-flash"];
+/** чат тьютора: самая дешёвая линейка, 3.1-lite дороже в 3–4 раза */
+const CHAT_DEFAULT_MODEL = "gemini-2.5-flash-lite";
+const CHAT_FALLBACKS = ["gemini-2.5-flash-lite", "gemini-2.0-flash-lite", "gemini-2.0-flash"];
 
 export function geminiKey() {
   return process.env.GEMINI_API_KEY?.trim() ?? "";
@@ -18,6 +21,10 @@ export function geminiEnabled() {
 
 function textModel() {
   return process.env.GEMINI_MODEL?.trim() || DEFAULT_MODEL;
+}
+
+function chatModel() {
+  return process.env.GEMINI_CHAT_MODEL?.trim() || CHAT_DEFAULT_MODEL;
 }
 
 function modelChain(primary, fallbacks) {
@@ -117,7 +124,7 @@ function blockedDetail(payload) {
 }
 
 /**
- * @param {{ system?: string, messages: { role: "user" | "model", text: string }[], maxTokens?: number, json?: boolean, think?: boolean }} opts
+ * @param {{ system?: string, messages: { role: "user" | "model", text: string }[], maxTokens?: number, json?: boolean, think?: boolean, cheap?: boolean, temperature?: number }} opts
  * @returns {Promise<string>}
  */
 export async function geminiGenerate(opts) {
@@ -131,7 +138,7 @@ export async function geminiGenerate(opts) {
   const body = {
     contents,
     generationConfig: {
-      temperature: 0.7,
+      temperature: opts.temperature ?? 0.7,
       maxOutputTokens: opts.maxTokens ?? 1200,
       // 2.5 тратит maxOutputTokens на «мышление» и возвращает пустой ответ с MAX_TOKENS
       ...(opts.think ? {} : { thinkingConfig: { thinkingBudget: 0 } }),
@@ -140,7 +147,10 @@ export async function geminiGenerate(opts) {
   };
   if (opts.system) body.systemInstruction = { parts: [{ text: opts.system }] };
 
-  const data = await callWithFallback(modelChain(textModel(), TEXT_FALLBACKS), body, 60_000);
+  const models = opts.cheap
+    ? modelChain(chatModel(), CHAT_FALLBACKS)
+    : modelChain(textModel(), TEXT_FALLBACKS);
+  const data = await callWithFallback(models, body, 60_000);
   const parts = data?.candidates?.[0]?.content?.parts ?? [];
   const text = parts.map((p) => p?.text ?? "").join("").trim();
   if (!text) throw aiError("ai_empty", blockedDetail(data));

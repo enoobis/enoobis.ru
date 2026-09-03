@@ -10,7 +10,7 @@ if (!key) {
 }
 console.log(`ключ: ${key.slice(0, 6)}…${key.slice(-4)} (${key.length} символов)`);
 console.log(`endpoint: ${geminiBase()}`);
-console.log(`модель: ${process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash"}`);
+console.log(`чат: ${process.env.GEMINI_CHAT_MODEL?.trim() || "gemini-2.5-flash-lite"}`);
 
 const res = await fetch(`${geminiBase()}/models`, { headers: { "x-goog-api-key": key } });
 const raw = await res.text();
@@ -29,6 +29,7 @@ try {
   const text = await geminiGenerate({
     messages: [{ role: "user", text: "ответь одним словом: работает" }],
     maxTokens: 50,
+    cheap: true,
   });
   console.log(`\nтестовый ответ: ${text}`);
 } catch (e) {
