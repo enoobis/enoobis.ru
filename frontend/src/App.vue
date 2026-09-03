@@ -1428,18 +1428,19 @@ function submitReaderPage() {
   align-items: stretch;
 }
 .profile-menu-footer-btn {
-  flex: 1;
+  flex: 1 1 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
+  gap: 0.45rem;
   min-width: 0;
   min-height: 40px;
-  padding: 0.45rem 0.35rem;
+  padding: 0.45rem 0.6rem;
   border: none;
   border-radius: 0;
   background: transparent;
   color: var(--text);
+  text-align: left;
   text-transform: lowercase;
   font: inherit;
   font-size: var(--text-md);
@@ -1565,8 +1566,7 @@ function submitReaderPage() {
   /* выравнивание пунктов: фиксируем ширину текстового блока
      чтобы иконка подстраивалась одинаково для всех элементов */
   .nav-menu-root--mobile .nav-menu-link > span:last-child,
-  .nav-menu-root--mobile .profile-menu-item > span:last-child,
-  .nav-menu-root--mobile .profile-menu-footer-btn > span:last-child {
+  .nav-menu-root--mobile .profile-menu-item > span:last-child {
     min-width: 9rem;
   }
 
