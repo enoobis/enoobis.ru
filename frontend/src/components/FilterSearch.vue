@@ -26,6 +26,13 @@ function onInput(event: Event) {
   emit("input", value);
 }
 
+function onSearch(event: Event) {
+  const value = (event.target as HTMLInputElement).value;
+  emit("update:modelValue", value);
+  emit("input", value);
+  if (value.trim()) emit("enter");
+}
+
 onMounted(async () => {
   if (props.autofocus) {
     await nextTick();
@@ -43,9 +50,15 @@ defineExpose({ focus: () => inputEl.value?.focus() });
       ref="inputEl"
       :value="modelValue"
       type="search"
+      enterkeyhint="search"
+      autocomplete="off"
+      autocorrect="off"
+      autocapitalize="off"
+      spellcheck="false"
       :placeholder="placeholder"
       @input="onInput"
       @keydown.enter.prevent="emit('enter')"
+      @search.prevent="onSearch"
     />
     <slot />
   </div>

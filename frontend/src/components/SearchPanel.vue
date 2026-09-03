@@ -155,10 +155,15 @@ async function runGlobal() {
   }
 }
 
+function syncGlobalUrl() {
+  if (props.embedded) return;
+  const next = q.value.trim();
+  const current = typeof route.query.q === "string" ? route.query.q : "";
+  if (next === current) return;
+  router.replace({ query: next ? { q: next } : {} });
+}
+
 function onGlobalInput() {
-  if (!props.embedded) {
-    router.replace({ query: q.value.trim() ? { q: q.value.trim() } : {} });
-  }
   if (timer) clearTimeout(timer);
   timer = setTimeout(runGlobal, 250);
 }
@@ -168,22 +173,24 @@ function onInput() {
     if (timer) clearTimeout(timer);
     timer = null;
     if (scope.value === "global") {
-      if (!props.embedded) {
-        router.replace({ query: {} });
-      }
       void runGlobal();
       return;
     }
-    applyFeedSearch();
+    // на странице поиска не уходим с поля, пока человек ещё стирает запрос
+    if (props.embedded) applyFeedSearch();
     return;
   }
   if (scope.value === "global") onGlobalInput();
-  else onFeedInput();
+  else if (props.embedded) onFeedInput();
 }
 
 function onEnter() {
-  if (scope.value === "global") void runGlobal();
-  else applyFeedSearch();
+  if (scope.value === "global") {
+    syncGlobalUrl();
+    void runGlobal();
+    return;
+  }
+  applyFeedSearch();
 }
 
 async function loadBlogTags() {
