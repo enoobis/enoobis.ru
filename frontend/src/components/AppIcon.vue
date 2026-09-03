@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, type Component } from "vue";
 import {
+  AtSign,
   Ban,
   Bold,
   BookOpen,
@@ -30,7 +31,6 @@ import {
   LogOut,
   Menu,
   MessageCircle,
-  MessagesSquare,
   MessageSquare,
   Moon,
   MoreHorizontal,
@@ -46,8 +46,8 @@ import {
   Send,
   Settings,
   Shield,
-  ShoppingBag,
   Sparkles,
+  Store,
   Sun,
   Tag,
   Ticket,
@@ -132,7 +132,7 @@ export type AppIconName =
 const icons: Record<AppIconName, Component> = {
   home: House,
   blog: FileText,
-  micro: ShoppingBag,
+  micro: AtSign,
   courses: GraduationCap,
   library: BookOpen,
   invites: Ticket,
@@ -179,7 +179,7 @@ const icons: Record<AppIconName, Component> = {
   trophy: Trophy,
   leaderboard: Flame,
   inventory: Package,
-  shop: MessagesSquare,
+  shop: Store,
   bold: Bold,
   italic: Italic,
   code: Code,
