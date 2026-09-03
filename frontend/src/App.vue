@@ -1554,6 +1554,14 @@ function submitReaderPage() {
     margin-right: auto;
   }
 
+  /* выравнивание пунктов: фиксируем ширину текстового блока
+     чтобы иконка подстраивалась одинаково для всех элементов */
+  .nav-menu-root--mobile .nav-menu-link > span:last-child,
+  .nav-menu-root--mobile .profile-menu-item > span:last-child,
+  .nav-menu-root--mobile .profile-menu-footer-btn > span:last-child {
+    min-width: 9rem;
+  }
+
   .profile-trigger {
     width: 40px;
     height: 40px;
