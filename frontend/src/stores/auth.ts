@@ -61,6 +61,7 @@ export const useAuthStore = defineStore("auth", () => {
     password: string;
     nickname: string;
     invite_code?: string;
+    accepted_terms: boolean;
   }) {
     return api<{
       pending: boolean;

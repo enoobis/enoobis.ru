@@ -7,6 +7,7 @@ const email = ref("");
 const password = ref("");
 const nickname = ref("");
 const invite = ref("");
+const accepted = ref(false);
 const err = ref("");
 const ok = ref("");
 const loading = ref(false);
@@ -22,6 +23,10 @@ onMounted(() => {
 async function submit() {
   err.value = "";
   ok.value = "";
+  if (!accepted.value) {
+    err.value = "нужно принять соглашение";
+    return;
+  }
   loading.value = true;
   try {
     const r = await auth.register({
@@ -29,6 +34,7 @@ async function submit() {
       password: password.value,
       nickname: nickname.value,
       invite_code: invite.value.trim() || undefined,
+      accepted_terms: true,
     });
     if (r.pending) {
       ok.value = r.message ?? "заявка отправлена";
@@ -53,7 +59,18 @@ async function submit() {
       <input v-model="nickname" placeholder="ник" required pattern="[A-Za-z]{3,24}" maxlength="24" autocomplete="username" />
       <input v-model="email" type="email" placeholder="email" required />
       <input v-model="password" type="password" placeholder="пароль" minlength="10" required />
-      <button type="submit" class="primary" :disabled="loading">
+      <div class="terms">
+        <button
+          type="button"
+          class="secondary"
+          :class="{ on: accepted }"
+          @click="accepted = !accepted"
+        >
+          {{ accepted ? "принято" : "принять" }}
+        </button>
+        <RouterLink to="/agreement">пользовательское соглашение</RouterLink>
+      </div>
+      <button type="submit" class="primary" :disabled="loading || !accepted">
         <span v-if="!loading">создать</span>
         <span v-else class="spinner" aria-hidden="true" />
       </button>
@@ -84,9 +101,31 @@ form {
   display: grid;
   gap: 0.75rem;
 }
-form button {
-  margin-top: 0.6rem;
+form button.primary {
+  margin-top: 0.2rem;
   width: 100%;
+}
+.terms {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.2rem;
+}
+.terms button {
+  width: auto;
+  margin: 0;
+  flex-shrink: 0;
+}
+.terms button.on {
+  color: var(--text);
+  background: var(--surface);
+}
+.terms a {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+.terms a:hover {
+  color: var(--text);
 }
 .alt {
   margin-top: 1.5rem;

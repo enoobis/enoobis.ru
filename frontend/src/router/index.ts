@@ -99,6 +99,12 @@ const router = createRouter({
     { path: "/login", name: "login", component: LoginView },
     { path: "/register", name: "register", component: () => import("../views/RegisterView.vue") },
     {
+      path: "/agreement",
+      name: "agreement",
+      component: () => import("../views/TermsView.vue"),
+    },
+    { path: "/terms", redirect: "/agreement" },
+    {
       path: "/auth/qr",
       name: "qr-login",
       component: () => import("../views/QrLoginView.vue"),

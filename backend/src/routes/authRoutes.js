@@ -36,6 +36,9 @@ function userPayload(row) {
 
 router.post("/register", registerLimit, async (req, res) => {
   const { email = "", password = "", nickname = "", invite_code } = req.body ?? {};
+  if (req.body?.accepted_terms !== true) {
+    return res.status(400).json({ error: "нужно принять соглашение" });
+  }
   const normEmail = String(email).trim().toLowerCase();
   const policyErr = passwordPolicyError(password);
   if (!normEmail || policyErr) {
