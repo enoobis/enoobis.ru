@@ -40,6 +40,7 @@ const loading = ref(false);
 const err = ref("");
 
 const isStaff = computed(() => auth.isStaff);
+const isAdmin = computed(() => auth.isAdmin);
 
 const search = ref(typeof route.query.q === "string" ? route.query.q : "");
 const activeCategory = ref("");
@@ -450,13 +451,13 @@ onBeforeUnmount(() => {
     <div v-if="!auth.token" class="muted">войдите, чтобы видеть библиотеку</div>
 
     <template v-else>
-      <PageHeader title="библиотека" :meta="isStaff ? quotaMeta : undefined">
+      <PageHeader title="библиотека" :meta="isAdmin ? quotaMeta : undefined">
         <template v-if="isStaff && !showForm" #actions>
           <button type="button" @click="showForm = true">добавить</button>
         </template>
       </PageHeader>
 
-      <QuotaBar v-if="isStaff" :percent="usedPercent" />
+      <QuotaBar v-if="isAdmin" :percent="usedPercent" />
 
       <p v-if="err" class="error">{{ err }}</p>
 
