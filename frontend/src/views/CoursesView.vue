@@ -312,6 +312,7 @@ const editDescription = ref("");
 const editPrivate = ref(false);
 const editIconUrl = ref("");
 const editIconFile = ref<File | null>(null);
+const editIconInputRef = ref<HTMLInputElement | null>(null);
 const editSaving = ref(false);
 
 function openEditCourse(c: Course, ev?: Event) {
@@ -333,6 +334,10 @@ function closeEditCourse() {
   editIconUrl.value = "";
   editIconFile.value = null;
   editSaving.value = false;
+}
+
+function pickEditIcon() {
+  editIconInputRef.value?.click();
 }
 
 function onEditIconChange(event: Event) {
@@ -2474,44 +2479,52 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
       </template>
     </template>
 
-    <!-- модалки/доп секции -->
-    <div v-if="editingCourseId" class="form-card overlay">
-      <h3>курс</h3>
-      <input v-model="editTitle" placeholder="название" maxlength="200" />
-      <textarea v-model="editDescription" rows="3" placeholder="описание" maxlength="2000" />
-      <label class="course-icon-pick muted small">
-        <span>{{ editIconFile || editIconUrl ? "сменить иконку" : "добавить иконку" }}</span>
-        <input
-          type="file"
-          accept="image/jpeg,image/png,image/webp,image/gif"
-          @change="onEditIconChange"
-        />
-      </label>
-      <label class="check">
-        <input v-model="editPrivate" type="checkbox" />
-        <span>приватный</span>
-      </label>
-      <div class="row-actions">
-        <button type="button" :disabled="editSaving || !editTitle.trim()" @click="saveEditCourse">
-          {{ editSaving ? "…" : "сохранить" }}
-        </button>
-        <button type="button" class="secondary" :disabled="editSaving" @click="closeEditCourse">
-          отмена
-        </button>
+    <Teleport to="body">
+      <div v-if="editingCourseId" class="course-sheet-root" role="dialog" aria-modal="true" aria-label="курс">
+        <button type="button" class="course-sheet-backdrop" aria-label="закрыть" @click="closeEditCourse" />
+        <div class="course-sheet">
+          <h3>курс</h3>
+          <input v-model="editTitle" placeholder="название" maxlength="200" />
+          <textarea v-model="editDescription" rows="3" placeholder="описание" maxlength="2000" />
+          <input
+            ref="editIconInputRef"
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            class="course-icon-hidden"
+            @change="onEditIconChange"
+          />
+          <button type="button" class="secondary" @click="pickEditIcon">
+            {{ editIconFile ? editIconFile.name : editIconUrl ? "сменить иконку" : "добавить иконку" }}
+          </button>
+          <label class="check">
+            <input v-model="editPrivate" type="checkbox" />
+            <span>приватный</span>
+          </label>
+          <div class="row-actions">
+            <button type="button" :disabled="editSaving || !editTitle.trim()" @click="saveEditCourse">
+              {{ editSaving ? "…" : "сохранить" }}
+            </button>
+            <button type="button" class="secondary" :disabled="editSaving" @click="closeEditCourse">
+              отмена
+            </button>
+          </div>
+        </div>
       </div>
-    </div>
 
-    <div v-if="activeClosedId" class="form-card overlay">
-      <h3>доступ</h3>
-      <p class="muted small">uuid через пробел</p>
-      <textarea v-model="studentsDraft" rows="4" placeholder="uuid…" />
-      <div class="row-actions">
-        <button type="button" @click="saveClosedStudents">сохранить</button>
-        <button type="button" class="secondary" @click="activeClosedId = null">
-          отмена
-        </button>
+      <div v-if="activeClosedId" class="course-sheet-root" role="dialog" aria-modal="true" aria-label="доступ">
+        <button type="button" class="course-sheet-backdrop" aria-label="закрыть" @click="activeClosedId = null" />
+        <div class="course-sheet">
+          <h3>доступ</h3>
+          <textarea v-model="studentsDraft" rows="4" placeholder="uuid…" />
+          <div class="row-actions">
+            <button type="button" @click="saveClosedStudents">сохранить</button>
+            <button type="button" class="secondary" @click="activeClosedId = null">
+              отмена
+            </button>
+          </div>
+        </div>
       </div>
-    </div>
+    </Teleport>
 
     <Teleport to="body">
       <div
@@ -2835,8 +2848,48 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 .form-card textarea {
   width: 100%;
 }
-.form-card.overlay {
-  margin-top: 0.6rem;
+.course-sheet-root {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: var(--layout-pad);
+}
+.course-sheet-backdrop {
+  position: absolute;
+  inset: 0;
+  border: none;
+  border-radius: 0;
+  background: var(--bg);
+  opacity: 0.72;
+}
+.course-sheet {
+  position: relative;
+  display: grid;
+  gap: 0.55rem;
+  width: min(100%, 26rem);
+  padding: var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+.course-sheet h3 {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+.course-sheet input,
+.course-sheet textarea {
+  width: 100%;
+  resize: none;
+}
+.course-icon-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
 }
 .check {
   display: inline-flex;
