@@ -1062,7 +1062,15 @@ html.profile-wallpaper-desktop .layout {
   padding-right: 0;
 }
 html.course-reader .layout {
-  max-width: 1460px;
+  max-width: none;
+  width: 100%;
+}
+
+@media (min-width: 1025px) {
+  html.course-reader .layout {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
 }
 html.profile-wallpaper-desktop #app {
   position: relative;
