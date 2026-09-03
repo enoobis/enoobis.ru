@@ -3,6 +3,7 @@ import { computed, type Component } from "vue";
 import {
   Ban,
   Bold,
+  BookOpen,
   Bookmark,
   BriefcaseBusiness,
   ChevronLeft,
@@ -29,6 +30,7 @@ import {
   LogOut,
   Menu,
   MessageCircle,
+  MessagesSquare,
   MessageSquare,
   Moon,
   MoreHorizontal,
@@ -64,7 +66,9 @@ import {
 export type AppIconName =
   | "home"
   | "blog"
+  | "micro"
   | "courses"
+  | "library"
   | "invites"
   | "write"
   | "admin"
@@ -128,7 +132,9 @@ export type AppIconName =
 const icons: Record<AppIconName, Component> = {
   home: House,
   blog: FileText,
+  micro: MessagesSquare,
   courses: GraduationCap,
+  library: BookOpen,
   invites: Ticket,
   write: PenLine,
   admin: Shield,

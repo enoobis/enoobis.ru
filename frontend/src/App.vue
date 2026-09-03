@@ -595,16 +595,20 @@ function submitReaderPage() {
           aria-label="разделы"
         >
           <nav class="nav-menu-inner">
-            <RouterLink to="/blogs" class="nav-menu-link" @click="closeNavDrawer">блоги</RouterLink>
-            <RouterLink to="/microblogs" class="nav-menu-link" @click="closeNavDrawer">микроблоги</RouterLink>
+            <RouterLink to="/blogs" class="nav-menu-link" @click="closeNavDrawer">
+              <AppIcon name="blog" :size="22" /><span>блоги</span>
+            </RouterLink>
+            <RouterLink to="/microblogs" class="nav-menu-link" @click="closeNavDrawer">
+              <AppIcon name="micro" :size="22" /><span>микроблоги</span>
+            </RouterLink>
             <RouterLink v-if="auth.token" to="/courses" class="nav-menu-link" @click="closeNavDrawer">
-              курсы
+              <AppIcon name="courses" :size="22" /><span>курсы</span>
             </RouterLink>
             <RouterLink v-if="auth.token" to="/library" class="nav-menu-link" @click="closeNavDrawer">
-              библиотека
+              <AppIcon name="library" :size="22" /><span>библиотека</span>
             </RouterLink>
             <RouterLink v-if="auth.token" to="/shop" class="nav-menu-link" @click="closeNavDrawer">
-              магазин
+              <AppIcon name="shop" :size="22" /><span>магазин</span>
             </RouterLink>
             <RouterLink
               v-if="auth.isPanelStaff"
@@ -612,7 +616,8 @@ function submitReaderPage() {
               class="nav-menu-link"
               @click="closeNavDrawer"
             >
-              {{ auth.isModerator ? "модерация" : "админ" }}
+              <AppIcon name="admin" :size="22" />
+              <span>{{ auth.isModerator ? "модерация" : "админ" }}</span>
             </RouterLink>
           </nav>
         </div>
@@ -726,16 +731,20 @@ function submitReaderPage() {
             <span class="nav-menu-handle" aria-hidden="true" />
             <div class="nav-menu-sheet-body">
               <nav class="nav-menu-inner">
-                <RouterLink to="/blogs" class="nav-menu-link" @click="closeNavDrawer">блоги</RouterLink>
-                <RouterLink to="/microblogs" class="nav-menu-link" @click="closeNavDrawer">микроблоги</RouterLink>
+                <RouterLink to="/blogs" class="nav-menu-link" @click="closeNavDrawer">
+                  <AppIcon name="blog" :size="22" /><span>блоги</span>
+                </RouterLink>
+                <RouterLink to="/microblogs" class="nav-menu-link" @click="closeNavDrawer">
+                  <AppIcon name="micro" :size="22" /><span>микроблоги</span>
+                </RouterLink>
                 <RouterLink v-if="auth.token" to="/courses" class="nav-menu-link" @click="closeNavDrawer">
-                  курсы
+                  <AppIcon name="courses" :size="22" /><span>курсы</span>
                 </RouterLink>
                 <RouterLink v-if="auth.token" to="/library" class="nav-menu-link" @click="closeNavDrawer">
-                  библиотека
+                  <AppIcon name="library" :size="22" /><span>библиотека</span>
                 </RouterLink>
                 <RouterLink v-if="auth.token" to="/shop" class="nav-menu-link" @click="closeNavDrawer">
-                  магазин
+                  <AppIcon name="shop" :size="22" /><span>магазин</span>
                 </RouterLink>
                 <RouterLink
                   v-if="auth.isPanelStaff"
@@ -743,7 +752,8 @@ function submitReaderPage() {
                   class="nav-menu-link"
                   @click="closeNavDrawer"
                 >
-                  {{ auth.isModerator ? "модерация" : "админ" }}
+                  <AppIcon name="admin" :size="22" />
+                  <span>{{ auth.isModerator ? "модерация" : "админ" }}</span>
                 </RouterLink>
               </nav>
             </div>
@@ -1196,6 +1206,7 @@ function submitReaderPage() {
 .nav-menu-link {
   display: flex;
   align-items: center;
+  gap: 0.7rem;
   width: 100%;
   min-height: 44px;
   padding: 0.7rem 0.9rem;
@@ -1221,6 +1232,11 @@ function submitReaderPage() {
 .nav-menu-link.router-link-active {
   background: var(--surface2);
   font-weight: 600;
+}
+
+.nav-menu-link :deep(.app-icon) {
+  flex-shrink: 0;
+  opacity: 0.8;
 }
 
 .nav-menu-root--mobile .nav-menu-link {
