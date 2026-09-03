@@ -980,6 +980,16 @@ try {
 }
 
 try {
+  db.prepare("SELECT is_pinned FROM courses LIMIT 1").get();
+} catch {
+  try {
+    db.exec("ALTER TABLE courses ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0");
+  } catch {
+    // ignore
+  }
+}
+
+try {
   db.prepare("SELECT category FROM shop_items LIMIT 1").get();
 } catch {
   try {

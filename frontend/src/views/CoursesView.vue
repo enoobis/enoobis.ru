@@ -15,7 +15,6 @@ import {
   joinCourseByCode,
   getClassroom,
   setCoursePinned,
-  setCourseHidden,
   gradeSubmission,
   listAssignmentSubmissions,
   listCourses,
@@ -99,14 +98,9 @@ const courseSearchChip = computed(() => {
 const title = ref("");
 const description = ref("");
 const createIconFile = ref<File | null>(null);
-const iconFileInputRef = ref<HTMLInputElement | null>(null);
-const iconUploadCourseId = ref<string | null>(null);
-const iconUploading = ref(false);
 const isOpen = ref(true);
 const studentsDraft = ref("");
 const joinCode = ref("");
-const showHiddenCourses = ref(false);
-const hiddenCount = ref(0);
 const activeClosedId = ref<string | null>(null);
 
 const streamBody = ref("");
@@ -299,22 +293,24 @@ function courseInitial(title: string) {
   return ch ? ch.toLowerCase() : "?";
 }
 
-function canEditCourseIcon(c: Course) {
-  if (!auth.token || !canTeach.value) return false;
-  if (auth.role === "admin") return true;
-  if (c.teacher_id === auth.user?.id) return true;
-  return c.co_teachers?.some((ct) => ct.id === auth.user?.id) ?? false;
-}
-
-/** название и описание — только владелец или админ */
+/** название, описание, иконка, приватность — владелец или админ */
 function canEditCourseMeta(c: Course) {
   if (!auth.token || !canTeach.value) return false;
   return c.teacher_id === auth.user?.id || auth.role === "admin";
 }
 
+function canTogglePin(c: Course) {
+  if (auth.role === "admin") return true;
+  if (c.is_global_pinned) return false;
+  return !!c.enrolled;
+}
+
 const editingCourseId = ref("");
 const editTitle = ref("");
 const editDescription = ref("");
+const editPrivate = ref(false);
+const editIconUrl = ref("");
+const editIconFile = ref<File | null>(null);
 const editSaving = ref(false);
 
 function openEditCourse(c: Course, ev?: Event) {
@@ -323,13 +319,24 @@ function openEditCourse(c: Course, ev?: Event) {
   editingCourseId.value = c.id;
   editTitle.value = c.title;
   editDescription.value = c.description ?? "";
+  editPrivate.value = !c.is_open;
+  editIconUrl.value = c.icon_url ?? "";
+  editIconFile.value = null;
 }
 
 function closeEditCourse() {
   editingCourseId.value = "";
   editTitle.value = "";
   editDescription.value = "";
+  editPrivate.value = false;
+  editIconUrl.value = "";
+  editIconFile.value = null;
   editSaving.value = false;
+}
+
+function onEditIconChange(event: Event) {
+  const input = event.target as HTMLInputElement;
+  editIconFile.value = input.files?.[0] ?? null;
 }
 
 async function saveEditCourse() {
@@ -339,11 +346,15 @@ async function saveEditCourse() {
   editSaving.value = true;
   err.value = "";
   try {
-    await updateCourse(editingCourseId.value, auth.token, {
+    const id = editingCourseId.value;
+    await updateCourse(id, auth.token, {
       title: nextTitle,
       description: editDescription.value,
+      is_open: !editPrivate.value,
     });
-    const id = editingCourseId.value;
+    if (editIconFile.value) {
+      await uploadCourseIcon(id, editIconFile.value, auth.token);
+    }
     closeEditCourse();
     await loadCourses();
     if (classroom.value?.course.id === id) await loadClassroom(id);
@@ -478,33 +489,6 @@ function onCourseMenuReposition() {
 function onCreateIconChange(event: Event) {
   const input = event.target as HTMLInputElement;
   createIconFile.value = input.files?.[0] ?? null;
-}
-
-function openIconPicker(courseId: string) {
-  iconUploadCourseId.value = courseId;
-  iconFileInputRef.value?.click();
-}
-
-async function onIconFileSelected(event: Event) {
-  const input = event.target as HTMLInputElement;
-  const file = input.files?.[0];
-  const courseId = iconUploadCourseId.value;
-  input.value = "";
-  iconUploadCourseId.value = null;
-  if (!file || !courseId || !auth.token) return;
-  iconUploading.value = true;
-  err.value = "";
-  try {
-    await uploadCourseIcon(courseId, file, auth.token);
-    await loadCourses();
-    if (classroom.value?.course.id === courseId) {
-      await loadClassroom(courseId);
-    }
-  } catch (e) {
-    err.value = e instanceof Error ? e.message : "ошибка";
-  } finally {
-    iconUploading.value = false;
-  }
 }
 
 function closeCourse() {
@@ -851,11 +835,8 @@ async function loadCourses() {
   err.value = "";
   if (!auth.token) return;
   try {
-    const res = await listCourses(auth.token, {
-      include_hidden: showHiddenCourses.value,
-    });
+    const res = await listCourses(auth.token);
     courses.value = res.courses;
-    hiddenCount.value = res.hidden_count;
     const routeCourseId = typeof route.params.courseId === "string" ? route.params.courseId : "";
     if (routeCourseId) {
       selectedCourseId.value = routeCourseId;
@@ -1008,33 +989,6 @@ async function onTogglePin(c: Course) {
   } catch (e) {
     err.value = e instanceof Error ? e.message : "ошибка";
   }
-}
-
-async function onCourseHide(c: Course, hidden: boolean) {
-  if (!auth.token) return;
-  err.value = "";
-  try {
-    await setCourseHidden(c.id, hidden, auth.token);
-    if (classroom.value?.course.id === c.id && hidden) {
-      classroom.value = null;
-      selectedCourseId.value = "";
-      await router.replace({ name: "courses" }).catch(() => undefined);
-    }
-    await loadCourses();
-    if (classroom.value?.course.id === c.id) await loadClassroom(c.id);
-  } catch (e) {
-    err.value = e instanceof Error ? e.message : "ошибка";
-  }
-}
-
-function onMenuHideClick(c: Course) {
-  if (showHiddenCourses.value && (c.is_hidden ?? false)) void onCourseHide(c, false);
-  else void onCourseHide(c, true);
-}
-
-async function toggleShowHidden() {
-  showHiddenCourses.value = !showHiddenCourses.value;
-  await loadCourses();
 }
 
 async function onJoinByCode() {
@@ -1531,15 +1485,6 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
         >
           вступить
         </button>
-        <button
-          v-if="hiddenCount > 0"
-          type="button"
-          class="secondary"
-          :class="{ active: showHiddenCourses }"
-          @click="toggleShowHidden"
-        >
-          скрытые · {{ hiddenCount }}
-        </button>
       </div>
 
       <div v-if="courseSearchChip" class="active-chips">
@@ -1568,20 +1513,11 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
         </button>
       </div>
 
-      <input
-        ref="iconFileInputRef"
-        type="file"
-        accept="image/jpeg,image/png,image/webp,image/gif"
-        class="course-icon-file-input"
-        @change="onIconFileSelected"
-      />
-
       <div class="course-grid">
         <article
           v-for="c in filteredCourses"
           :key="c.id"
           class="course-card"
-          :class="{ 'course-card--hidden': c.is_hidden }"
           @click="openCourse(c.id)"
         >
           <div class="course-card-layout">
@@ -1623,21 +1559,12 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
                   записаться
                 </button>
                 <button
-                  v-if="c.enrolled"
+                  v-if="canTogglePin(c)"
                   type="button"
                   class="course-menu-item"
                   @click="onTogglePin(c); closeCourseMenu($event)"
                 >
                   {{ c.is_pinned ? "снять закреп" : "закрепить" }}
-                </button>
-                <button
-                  type="button"
-                  class="course-menu-item"
-                  @click="onMenuHideClick(c); closeCourseMenu($event)"
-                >
-                  {{
-                    showHiddenCourses && c.is_hidden ? "вернуть в список" : "скрыть из списка"
-                  }}
                 </button>
                 <button
                   v-if="canLeaveFromCourse(c)"
@@ -1654,15 +1581,6 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
                   @click="copyCourseCode(c, $event)"
                 >
                   копировать код
-                </button>
-                <button
-                  v-if="canEditCourseIcon(c)"
-                  type="button"
-                  class="course-menu-item"
-                  :disabled="iconUploading"
-                  @click="openIconPicker(c.id); closeCourseMenu($event)"
-                >
-                  {{ c.icon_url ? "сменить иконку" : "добавить иконку" }}
                 </button>
                 <template v-if="canEditCourseMeta(c)">
                   <span class="course-menu-sep" aria-hidden="true" />
@@ -1744,6 +1662,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
                   изменить
                 </button>
                 <button
+                  v-if="canTogglePin(classroom.course)"
                   type="button"
                   class="course-menu-item"
                   @click="onTogglePin(classroom.course); closeCourseMenu($event)"
@@ -1753,29 +1672,9 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
                 <button
                   type="button"
                   class="course-menu-item"
-                  @click="onMenuHideClick(classroom.course); closeCourseMenu($event)"
-                >
-                  {{
-                    showHiddenCourses && classroom.course.is_hidden
-                      ? "вернуть в список"
-                      : "скрыть из списка"
-                  }}
-                </button>
-                <button
-                  type="button"
-                  class="course-menu-item"
                   @click="copyCourseCode(classroom.course, $event)"
                 >
                   копировать код
-                </button>
-                <button
-                  v-if="canEditCourseIcon(classroom.course)"
-                  type="button"
-                  class="course-menu-item"
-                  :disabled="iconUploading"
-                  @click="openIconPicker(classroom.course.id); closeCourseMenu($event)"
-                >
-                  {{ classroom.course.icon_url ? "сменить иконку" : "добавить иконку" }}
                 </button>
                 <template v-if="isOwnerInCurrent">
                   <span class="course-menu-sep" aria-hidden="true" />
@@ -2577,6 +2476,18 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
       <h3>курс</h3>
       <input v-model="editTitle" placeholder="название" maxlength="200" />
       <textarea v-model="editDescription" rows="3" placeholder="описание" maxlength="2000" />
+      <label class="course-icon-pick muted small">
+        <span>{{ editIconFile || editIconUrl ? "сменить иконку" : "добавить иконку" }}</span>
+        <input
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/gif"
+          @change="onEditIconChange"
+        />
+      </label>
+      <label class="check">
+        <input v-model="editPrivate" type="checkbox" />
+        <span>приватный</span>
+      </label>
       <div class="row-actions">
         <button type="button" :disabled="editSaving || !editTitle.trim()" @click="saveEditCourse">
           {{ editSaving ? "…" : "сохранить" }}
@@ -2997,13 +2908,6 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   color: var(--muted);
   text-transform: lowercase;
 }
-.course-icon-file-input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
-}
 .course-icon-pick {
   display: flex;
   align-items: center;
@@ -3067,9 +2971,6 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   min-height: 36px;
   padding: 0.4rem 0.9rem;
   font-size: var(--text-sm);
-}
-.course-card--hidden {
-  opacity: 0.52;
 }
 .course-menu {
   position: relative;
