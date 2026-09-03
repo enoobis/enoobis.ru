@@ -1075,6 +1075,7 @@ function submitReaderPage() {
 .nav-menu-root--mobile {
   top: 0;
   align-items: flex-end;
+  --nav-sheet-h: min(70dvh, 36rem);
 }
 
 .nav-menu-sheet {
@@ -1138,21 +1139,30 @@ function submitReaderPage() {
 }
 
 .nav-menu-root--mobile .nav-menu-sheet {
-  width: min(100%, 28rem);
-  margin: 0 auto;
+  width: 100%;
+  max-width: none;
+  height: var(--nav-sheet-h);
+  max-height: var(--nav-sheet-h);
+  margin: 0;
   padding: 0.35rem 0.45rem calc(0.85rem + env(safe-area-inset-bottom, 0px));
   border: 1px solid var(--border);
   border-bottom: none;
   border-radius: 18px 18px 0 0;
   transform-origin: bottom center;
-  display: block;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   background: var(--bg);
 }
 
 .nav-menu-root--mobile .nav-menu-sheet-body {
-  overflow: visible;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
   padding: 0;
-  flex: none;
+  display: flex;
+  flex-direction: column;
 }
 
 .nav-header-sheet {
@@ -1160,7 +1170,7 @@ function submitReaderPage() {
 }
 
 .nav-menu-root--mobile .nav-header-sheet {
-  padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(0.85rem + env(safe-area-inset-bottom, 0px));
 }
 
 .nav-menu-handle {
@@ -1174,6 +1184,7 @@ function submitReaderPage() {
 
 .nav-menu-root--mobile .nav-menu-handle {
   display: block;
+  flex-shrink: 0;
 }
 
 .nav-menu-inner {
@@ -1214,10 +1225,10 @@ function submitReaderPage() {
 
 .nav-menu-root--mobile .nav-menu-link {
   min-height: 48px;
-  font-size: 1.08rem;
-  padding: 0.8rem 1rem;
-  justify-content: center;
-  text-align: center;
+  font-size: 1.05rem;
+  padding: 0.75rem 1rem;
+  justify-content: flex-start;
+  text-align: left;
 }
 
 .nav-menu-enter-active .nav-menu-sheet,
@@ -1445,6 +1456,10 @@ function submitReaderPage() {
   height: 1px;
   background: var(--border);
   margin: 0.3rem 0;
+}
+
+.nav-menu-root--mobile .profile-menu-sep {
+  margin-top: auto;
 }
 
 .profile-menu-item {
