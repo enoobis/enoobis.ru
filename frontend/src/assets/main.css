@@ -1550,18 +1550,6 @@ html[data-theme="contrast-white"] .glass {
   }
 }
 
-/* pull-to-refresh ring */
-.ptr-ring {
-  width: 20px;
-  height: 20px;
-  border: 1.5px solid var(--border);
-  border-top-color: var(--text);
-  border-radius: 999px;
-}
-.ptr-ring.spin {
-  animation: spin 0.7s linear infinite;
-}
-
 /* spinner — small inline loader */
 .spinner {
   width: 16px;

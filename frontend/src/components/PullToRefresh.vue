@@ -112,9 +112,13 @@ onUnmounted(() => {
         aria-hidden="true"
       >
         <span
-          class="ptr-ring"
-          :class="{ spin: refreshing }"
-          :style="{ transform: refreshing ? undefined : `scale(${0.6 + ratio * 0.4}) rotate(${ratio * 270}deg)` }"
+          class="spinner ptr-spinner"
+          :class="{ 'ptr-spinner--spin': refreshing }"
+          :style="
+            refreshing
+              ? undefined
+              : { transform: `scale(${0.6 + ratio * 0.4}) rotate(${ratio * 270}deg)` }
+          "
         />
       </div>
       <slot />
@@ -140,5 +144,15 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.ptr-spinner {
+  width: 20px;
+  height: 20px;
+  animation: none;
+}
+
+.ptr-spinner--spin {
+  animation: spin 0.7s linear infinite;
 }
 </style>
