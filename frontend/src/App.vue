@@ -1249,7 +1249,9 @@ function submitReaderPage() {
 
 .nav-menu-enter-active .nav-menu-sheet,
 .nav-menu-leave-active .nav-menu-sheet {
-  transition: opacity 0.16s ease;
+  transition:
+    opacity var(--dur-2) var(--ease-out),
+    transform var(--dur-3) var(--ease-out);
 }
 
 .nav-menu-enter-active.nav-menu-root,
@@ -1265,6 +1267,28 @@ function submitReaderPage() {
 .nav-menu-root--mobile.nav-menu-enter-from .nav-menu-sheet,
 .nav-menu-root--mobile.nav-menu-leave-to .nav-menu-sheet {
   transform: translateY(100%);
+  opacity: 0;
+}
+
+.nav-menu-handle {
+  transition:
+    opacity var(--dur-2) var(--ease-out),
+    transform var(--dur-3) var(--ease-out);
+  will-change: transform, opacity;
+}
+
+.nav-menu-root--mobile.nav-menu-enter-from .nav-menu-handle,
+.nav-menu-root--mobile.nav-menu-leave-to .nav-menu-handle {
+  opacity: 0;
+  transform: translateY(6px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-menu-enter-active .nav-menu-sheet,
+  .nav-menu-leave-active .nav-menu-sheet,
+  .nav-menu-handle {
+    transition: none;
+  }
 }
 
 .nav-menu-enter-from.nav-menu-root,
