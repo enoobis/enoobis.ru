@@ -394,7 +394,7 @@ function menuOffsetParentRect(el: HTMLElement): DOMRect {
 }
 
 function placeCourseMenu(details: HTMLDetailsElement) {
-  details.classList.remove("course-menu--left", "course-menu--right", "course-menu--block");
+  details.classList.remove("course-menu--left", "course-menu--right", "course-menu--block", "course-menu--cover");
   const panel = details.querySelector(".course-menu-panel") as HTMLElement | null;
   const trigger = details.querySelector(".course-menu-trigger") as HTMLElement | null;
   if (!panel) return;
@@ -404,17 +404,35 @@ function placeCourseMenu(details: HTMLDetailsElement) {
   }
 
   const pad = 8;
-  const box = trigger.getBoundingClientRect();
+  const card = details.closest(".course-card") as HTMLElement | null;
+  const origin = menuOffsetParentRect(panel);
   panel.style.position = "fixed";
   panel.style.zIndex = "80";
   panel.style.right = "auto";
+  panel.style.visibility = "hidden";
+
+  if (card) {
+    details.classList.add("course-menu--cover");
+    const r = card.getBoundingClientRect();
+    panel.style.top = `${Math.round(r.top - origin.top)}px`;
+    panel.style.left = `${Math.round(r.left - origin.left)}px`;
+    panel.style.width = `${Math.round(r.width)}px`;
+    panel.style.height = `${Math.round(r.height)}px`;
+    panel.style.minWidth = "0";
+    panel.style.maxWidth = "none";
+    panel.style.maxHeight = "none";
+    panel.style.overflowY = "auto";
+    panel.style.visibility = "";
+    return;
+  }
+
+  const box = trigger.getBoundingClientRect();
   panel.style.width = "";
   panel.style.height = "";
   panel.style.minWidth = "";
   panel.style.maxWidth = "";
   panel.style.top = "0px";
   panel.style.left = "0px";
-  panel.style.visibility = "hidden";
   panel.style.maxHeight = `${Math.round(window.innerHeight - pad * 2)}px`;
   panel.style.overflowY = "auto";
 
@@ -434,7 +452,6 @@ function placeCourseMenu(details: HTMLDetailsElement) {
   if (top + ph > window.innerHeight - pad) top = window.innerHeight - pad - ph;
   top = Math.max(pad, top);
 
-  const origin = menuOffsetParentRect(panel);
   panel.style.top = `${Math.round(top - origin.top)}px`;
   panel.style.left = `${Math.round(left - origin.left)}px`;
   panel.style.visibility = "";
@@ -3076,6 +3093,32 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   border-radius: var(--radius);
   z-index: 20;
   box-sizing: border-box;
+}
+
+.course-menu--cover .course-menu-panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.1rem;
+  padding: 0.65rem 0.75rem;
+  background: var(--bg);
+  border-radius: var(--radius);
+}
+
+.course-menu--cover .course-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1 1 0;
+  min-height: 2.5rem;
+  padding: 0.45rem 0.7rem;
+  font-size: var(--text-md);
+  text-align: center;
+  white-space: normal;
+}
+
+.course-menu--cover .course-menu-sep {
+  margin: 0.1rem 0.85rem;
 }
 
 .course-menu-item {
