@@ -379,6 +379,7 @@ function onCourseMenuOutside(ev: Event) {
 }
 
 function clearCourseMenuPanel(panel: HTMLElement) {
+  panel.classList.remove("course-menu-panel--in");
   panel.style.position = "";
   panel.style.top = "";
   panel.style.left = "";
@@ -391,6 +392,16 @@ function clearCourseMenuPanel(panel: HTMLElement) {
   panel.style.zIndex = "";
   panel.style.visibility = "";
   panel.style.overflowY = "";
+}
+
+function revealCourseMenu(panel: HTMLElement) {
+  panel.style.visibility = "";
+  if (panel.classList.contains("course-menu-panel--in")) return;
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      panel.classList.add("course-menu-panel--in");
+    });
+  });
 }
 
 function menuOffsetParentRect(el: HTMLElement): DOMRect {
@@ -447,7 +458,7 @@ function placeCourseMenu(details: HTMLDetailsElement) {
 
     panel.style.top = `${Math.round(top - origin.top)}px`;
     panel.style.left = `${Math.round(r.left - origin.left)}px`;
-    panel.style.visibility = "";
+    revealCourseMenu(panel);
     return;
   }
 
@@ -479,7 +490,7 @@ function placeCourseMenu(details: HTMLDetailsElement) {
 
   panel.style.top = `${Math.round(top - origin.top)}px`;
   panel.style.left = `${Math.round(left - origin.left)}px`;
-  panel.style.visibility = "";
+  revealCourseMenu(panel);
 }
 
 function onCourseMenuToggle(ev: Event) {
@@ -2480,6 +2491,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
     </template>
 
     <Teleport to="body">
+      <Transition name="course-sheet">
       <div v-if="editingCourseId" class="course-sheet-root" role="dialog" aria-modal="true" aria-label="курс">
         <button type="button" class="course-sheet-backdrop" aria-label="закрыть" @click="closeEditCourse" />
         <div class="course-sheet">
@@ -2510,7 +2522,9 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
           </div>
         </div>
       </div>
+      </Transition>
 
+      <Transition name="course-sheet">
       <div v-if="activeClosedId" class="course-sheet-root" role="dialog" aria-modal="true" aria-label="доступ">
         <button type="button" class="course-sheet-backdrop" aria-label="закрыть" @click="activeClosedId = null" />
         <div class="course-sheet">
@@ -2524,6 +2538,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
           </div>
         </div>
       </div>
+      </Transition>
     </Teleport>
 
     <Teleport to="body">
@@ -2874,6 +2889,31 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   border-radius: var(--radius);
   background: var(--bg);
 }
+.course-sheet-enter-active,
+.course-sheet-leave-active {
+  transition: opacity var(--dur-2) var(--ease-out);
+}
+.course-sheet-enter-active .course-sheet,
+.course-sheet-leave-active .course-sheet {
+  transition:
+    opacity var(--dur-2) var(--ease-out),
+    transform var(--dur-3) var(--ease-snap);
+}
+.course-sheet-enter-from,
+.course-sheet-leave-to {
+  opacity: 0;
+}
+.course-sheet-enter-from .course-sheet,
+.course-sheet-leave-to .course-sheet {
+  opacity: 0;
+  transform: translateY(8px) scale(0.98);
+}
+@media (pointer: coarse) {
+  .course-sheet-enter-from .course-sheet,
+  .course-sheet-leave-to .course-sheet {
+    transform: translateY(6px);
+  }
+}
 .course-sheet h3 {
   margin: 0;
   font-size: var(--text-md);
@@ -3058,6 +3098,15 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   border-radius: var(--radius);
   z-index: 20;
   box-sizing: border-box;
+  opacity: 0;
+  transform: translateY(-4px) scale(0.98);
+  transition:
+    opacity var(--dur-2) var(--ease-out),
+    transform var(--dur-3) var(--ease-snap);
+}
+.course-menu-panel--in {
+  opacity: 1;
+  transform: none;
 }
 
 .course-menu--cover .course-menu-panel {
@@ -3101,6 +3150,9 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   color: var(--text);
   cursor: pointer;
   white-space: nowrap;
+  transition:
+    background var(--dur-1) var(--ease-out),
+    color var(--dur-1) var(--ease-out);
 }
 .course-menu-item:hover,
 .course-menu-item:focus-visible {
