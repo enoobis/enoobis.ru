@@ -1543,6 +1543,17 @@ function submitReaderPage() {
     margin-right: 0;
   }
 
+  /* на телефоне центрируем правую группу иконок */
+  .nav-spacer {
+    flex: 0 0 auto;
+    padding: 0;
+  }
+
+  .nav-actions {
+    margin-left: auto;
+    margin-right: auto;
+  }
+
   .profile-trigger {
     width: 40px;
     height: 40px;
