@@ -1227,8 +1227,8 @@ function submitReaderPage() {
   min-height: 48px;
   font-size: 1.05rem;
   padding: 0.75rem 1rem;
-  justify-content: flex-start;
-  text-align: left;
+  justify-content: center;
+  text-align: center;
 }
 
 .nav-menu-enter-active .nav-menu-sheet,
@@ -1488,6 +1488,8 @@ function submitReaderPage() {
   padding: 0.75rem 1rem;
   min-height: 48px;
   font-size: 1.05rem;
+  justify-content: center;
+  text-align: center;
 }
 
 @media (max-width: 640px) {
