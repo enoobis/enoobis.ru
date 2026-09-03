@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import jsQR from "jsqr";
 import { extractWorkCode, workCheckin } from "../api/work";
 import { useAuthStore } from "../stores/auth";
@@ -9,6 +9,7 @@ import PageHeader from "../components/PageHeader.vue";
 
 const auth = useAuthStore();
 const route = useRoute();
+const router = useRouter();
 
 const err = ref("");
 const okMsg = ref("");
@@ -144,6 +145,10 @@ async function startCamera() {
 }
 
 onMounted(() => {
+  if (window.innerWidth > 640) {
+    void router.replace("/");
+    return;
+  }
   const fromUrl = String(route.query.c ?? "");
   if (fromUrl) {
     void checkin(fromUrl);

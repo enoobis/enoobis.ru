@@ -668,14 +668,6 @@ function submitReaderPage() {
           <RouterLink to="/me/edit" class="profile-menu-item" @click="closeProfileMenu">
             <AppIcon name="settings" :size="22" /><span>настройки</span>
           </RouterLink>
-          <RouterLink
-            v-if="auth.role === 'master' || auth.role === 'admin'"
-            to="/work"
-            class="profile-menu-item"
-            @click="closeProfileMenu"
-          >
-            <AppIcon name="briefcase" :size="22" /><span>работа</span>
-          </RouterLink>
           <span class="profile-menu-sep" />
           <div class="profile-menu-footer">
             <button class="profile-menu-footer-btn" type="button" @click="logoutFromMenu">
