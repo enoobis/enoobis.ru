@@ -155,7 +155,6 @@ onBeforeUnmount(stopCamera);
 <template>
   <section class="work-page card">
     <h1>работа</h1>
-    <p class="muted lead">отсканируйте qr на рабочей точке - отметка сработает только рядом с ней.</p>
 
     <div class="scan-pane">
       <video v-show="scanning" ref="videoEl" class="scan-video" playsinline muted />
@@ -178,22 +177,22 @@ onBeforeUnmount(stopCamera);
   max-width: 24rem;
   margin: 2rem auto;
   padding: 1.25rem;
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  gap: 1rem;
 }
 
 h1 {
   font-size: 1.25rem;
-  margin: 0 0 0.35rem;
-}
-
-.lead {
-  margin: 0 0 1rem;
-  font-size: var(--text-sm);
-  line-height: 1.45;
+  margin: 0;
 }
 
 .scan-pane {
   display: grid;
+  justify-items: center;
   gap: 0.75rem;
+  width: 100%;
 }
 
 .scan-video {
@@ -205,7 +204,7 @@ h1 {
 }
 
 .scan-pane button {
-  width: 100%;
+  width: auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
