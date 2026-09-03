@@ -68,7 +68,7 @@ async function submit() {
         >
           {{ accepted ? "принято" : "принять" }}
         </button>
-        <RouterLink to="/agreement">пользовательское соглашение</RouterLink>
+        <a href="/user-agreement.docx" download="user-agreement.docx">пользовательское соглашение</a>
       </div>
       <button type="submit" class="primary" :disabled="loading || !accepted">
         <span v-if="!loading">создать</span>
