@@ -132,7 +132,7 @@ export type AppIconName =
 const icons: Record<AppIconName, Component> = {
   home: House,
   blog: FileText,
-  micro: MessagesSquare,
+  micro: ShoppingBag,
   courses: GraduationCap,
   library: BookOpen,
   invites: Ticket,
@@ -179,7 +179,7 @@ const icons: Record<AppIconName, Component> = {
   trophy: Trophy,
   leaderboard: Flame,
   inventory: Package,
-  shop: ShoppingBag,
+  shop: MessagesSquare,
   bold: Bold,
   italic: Italic,
   code: Code,
