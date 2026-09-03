@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { usePageRefresh } from "../composables/usePageRefresh";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import {
   bookmarkPost,
@@ -300,6 +301,8 @@ async function togglePin() {
     working.value = false;
   }
 }
+
+usePageRefresh(load);
 
 onMounted(() => {
   window.addEventListener("scroll", persistProgress, { passive: true });

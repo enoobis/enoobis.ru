@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
+import { usePageRefresh } from "../composables/usePageRefresh";
 import {
   listShopItemsPage,
   SHOP_PAGE_SIZE,
@@ -133,6 +134,8 @@ async function onBuy(item: ShopItem) {
     busy.value = null;
   }
 }
+
+usePageRefresh(load);
 
 onMounted(() => {
   void load();

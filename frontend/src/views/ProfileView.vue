@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { usePageRefresh } from "../composables/usePageRefresh";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import { api } from "../api/http";
 import { listAuthorPosts, type BlogListItem } from "../api/blog";
@@ -265,6 +266,8 @@ const earnedAchievements = computed(() =>
 );
 
 const moderationNotices = computed(() => profile.value?.moderation_notices ?? []);
+
+usePageRefresh(load);
 
 onMounted(() => {
   syncWallpaperLayout();

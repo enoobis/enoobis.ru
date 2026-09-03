@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { usePageRefresh } from "../composables/usePageRefresh";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import PageHeader from "../components/PageHeader.vue";
 import AppIcon from "../components/AppIcon.vue";
 import AppSkeleton from "../components/AppSkeleton.vue";
 import PostMetaStats from "../components/PostMetaStats.vue";
-import PullToRefresh from "../components/PullToRefresh.vue";
 import {
   listPosts,
   listTags,
@@ -178,6 +178,8 @@ watch(
   { deep: true },
 );
 
+usePageRefresh(load);
+
 onMounted(() => {
   document.addEventListener("click", onDocumentClick);
   if (route.query.mode === "bookmarks") {
@@ -195,7 +197,6 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <PullToRefresh :refresh="load">
   <section class="blog page-shell">
     <PageHeader title="блоги" />
 
@@ -305,7 +306,6 @@ onBeforeUnmount(() => {
       </div>
     </template>
   </section>
-  </PullToRefresh>
 </template>
 
 <style scoped>

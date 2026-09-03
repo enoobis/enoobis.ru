@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { usePageRefresh } from "../composables/usePageRefresh";
 import {
   deleteFile,
   downloadFile,
@@ -418,6 +419,10 @@ function ttlLabel(expires_at: string | null) {
   const m = Math.floor(ms / 60000);
   return `${m} мин`;
 }
+
+usePageRefresh(async () => {
+  await Promise.all([loadFiles(), loadNotes(), loadShares()]);
+});
 
 onMounted(async () => {
   if (!canBlogAndStorage.value) return;

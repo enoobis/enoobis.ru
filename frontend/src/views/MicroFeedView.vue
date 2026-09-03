@@ -5,8 +5,8 @@ import PageHeader from "../components/PageHeader.vue";
 import AppLoading from "../components/AppLoading.vue";
 import MicroComposer from "../components/MicroComposer.vue";
 import MicroItem from "../components/MicroItem.vue";
-import PullToRefresh from "../components/PullToRefresh.vue";
 import { listMicro, type MicroPost } from "../api/micro";
+import { usePageRefresh } from "../composables/usePageRefresh";
 import { useAuthStore } from "../stores/auth";
 
 type Feed = "all" | "following";
@@ -113,6 +113,8 @@ watch(
   { deep: true },
 );
 
+usePageRefresh(load);
+
 onMounted(() => {
   syncFromRoute();
   void load();
@@ -120,7 +122,6 @@ onMounted(() => {
 </script>
 
 <template>
-  <PullToRefresh :refresh="load">
   <section class="feed page-shell">
     <PageHeader title="лента" />
 
@@ -170,7 +171,6 @@ onMounted(() => {
       @updated="onUpdated"
     />
   </section>
-  </PullToRefresh>
 </template>
 
 <style scoped>

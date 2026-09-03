@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { usePageRefresh } from "../composables/usePageRefresh";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import {
   addGroupMember,
@@ -872,6 +873,11 @@ watch(
   },
   { immediate: true },
 );
+
+usePageRefresh(async () => {
+  await loadChats();
+  if (activeId.value) await loadMessages(false);
+});
 
 onMounted(async () => {
   await loadChats();

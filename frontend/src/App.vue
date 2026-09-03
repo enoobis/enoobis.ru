@@ -22,6 +22,8 @@ import NavExpandSearch from "./components/NavExpandSearch.vue";
 import NavBurgerIcon from "./components/NavBurgerIcon.vue";
 import { pathUsesPageSearchFilter } from "./utils/searchScope";
 import { installFilterTabsMotion } from "./utils/filterTabsMotion";
+import PullToRefresh from "./components/PullToRefresh.vue";
+import { runPageRefresh } from "./composables/usePageRefresh";
 
 const router = useRouter();
 let stopFilterTabsMotion: (() => void) | null = null;
@@ -206,6 +208,18 @@ function onGlobalKey(event: KeyboardEvent) {
 
 function refreshPage() {
   window.location.reload();
+}
+
+const ptrDisabled = computed(
+  () =>
+    route.name === "course-reader" ||
+    reader.active ||
+    navDrawerOpen.value ||
+    profileMenuOpen.value,
+);
+
+async function onPullRefresh() {
+  await runPageRefresh();
 }
 
 function isSheetMobile() {
@@ -829,6 +843,7 @@ function submitReaderPage() {
         </div>
       </Transition>
     </Teleport>
+    <PullToRefresh :refresh="onPullRefresh" :disabled="ptrDisabled">
     <RouterView v-slot="{ Component, route: rv }">
       <component v-if="motionLite" :is="Component" :key="pageMotionKey(rv)" class="page-motion-root" />
       <AnimatePresence v-else mode="wait">
@@ -844,6 +859,7 @@ function submitReaderPage() {
         </motion.div>
       </AnimatePresence>
     </RouterView>
+    </PullToRefresh>
     <AppToast />
     <Teleport to="body">
       <div

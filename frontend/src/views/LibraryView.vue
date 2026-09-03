@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { usePageRefresh } from "../composables/usePageRefresh";
 import { useRoute, useRouter } from "vue-router";
 import {
   deleteBook,
@@ -408,6 +409,8 @@ function canManageBook(b: LibraryBook) {
   if (!(auth.role === "teacher")) return false;
   return b.uploaded_by === auth.user?.id;
 }
+
+usePageRefresh(() => load(true));
 
 onMounted(() => {
   document.addEventListener("click", onDocumentClick);

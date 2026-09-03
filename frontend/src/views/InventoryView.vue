@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import { usePageRefresh } from "../composables/usePageRefresh";
 import { RouterLink } from "vue-router";
 import { api } from "../api/http";
 import {
@@ -146,6 +147,7 @@ async function onCancel(a: OwnedShopItem) {
   }
 }
 
+usePageRefresh(load);
 onMounted(load);
 </script>
 

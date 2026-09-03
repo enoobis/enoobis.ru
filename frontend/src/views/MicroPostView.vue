@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
+import { usePageRefresh } from "../composables/usePageRefresh";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import MicroComposer from "../components/MicroComposer.vue";
 import AppLoading from "../components/AppLoading.vue";
@@ -64,6 +65,7 @@ function onReplyUpdated(updated: MicroPost) {
   replies.value = replies.value.map((r) => (r.id === updated.id ? updated : r));
 }
 
+usePageRefresh(load);
 onMounted(load);
 watch(id, load);
 </script>

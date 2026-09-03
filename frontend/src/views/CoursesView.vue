@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { usePageRefresh } from "../composables/usePageRefresh";
 import { useRoute, useRouter } from "vue-router";
 import {
   addCoTeacher,
@@ -863,6 +864,8 @@ async function loadClassroom(courseId: string) {
     err.value = e instanceof Error ? e.message : "ошибка";
   }
 }
+
+usePageRefresh(loadCourses);
 
 onMounted(() => {
   document.addEventListener("pointerdown", onCourseMenuOutside);

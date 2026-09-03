@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import { usePageRefresh } from "../composables/usePageRefresh";
 import { api } from "../api/http";
 import { useAuthStore } from "../stores/auth";
 import AppIcon from "../components/AppIcon.vue";
@@ -35,6 +36,7 @@ async function load() {
   }
 }
 
+usePageRefresh(load);
 onMounted(load);
 
 async function create() {

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
+import { usePageRefresh } from "../composables/usePageRefresh";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import AppIcon from "../components/AppIcon.vue";
 import AppLoading from "../components/AppLoading.vue";
@@ -60,6 +61,7 @@ watch(
   },
 );
 
+usePageRefresh(load);
 onMounted(load);
 </script>
 

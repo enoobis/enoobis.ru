@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
+import { usePageRefresh } from "../composables/usePageRefresh";
 import { useRouter } from "vue-router";
 import AppIcon from "../components/AppIcon.vue";
 import AppLoading from "../components/AppLoading.vue";
@@ -41,6 +42,7 @@ function onDeleted(id: string) {
   posts.value = posts.value.filter((p) => p.id !== id);
 }
 
+usePageRefresh(load);
 onMounted(load);
 </script>
 

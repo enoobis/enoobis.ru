@@ -33,9 +33,23 @@ function rubber(distance: number): number {
 const offset = computed(() => (refreshing.value ? props.threshold * 0.6 : pull.value));
 const ratio = computed(() => Math.min(1, offset.value / props.threshold));
 
+function pageScrollTop() {
+  return window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
+}
+
+function innerScrolled(target: EventTarget | null) {
+  let el = target instanceof Element ? target : null;
+  while (el && el !== document.documentElement) {
+    const { overflowY } = getComputedStyle(el);
+    if ((overflowY === "auto" || overflowY === "scroll") && el.scrollTop > 0) return true;
+    el = el.parentElement;
+  }
+  return false;
+}
+
 function onTouchStart(e: TouchEvent) {
   if (!canPull.value || refreshing.value || e.touches.length !== 1) return;
-  if (window.scrollY > 0) return;
+  if (pageScrollTop() > 0 || innerScrolled(e.target)) return;
   startY = e.touches[0].clientY;
   tracking = true;
   notified = false;
@@ -44,7 +58,7 @@ function onTouchStart(e: TouchEvent) {
 function onTouchMove(e: TouchEvent) {
   if (!tracking || refreshing.value) return;
   const delta = e.touches[0].clientY - startY;
-  if (delta <= 0 || window.scrollY > 0) {
+  if (delta <= 0 || pageScrollTop() > 0 || innerScrolled(e.target)) {
     reset();
     return;
   }
