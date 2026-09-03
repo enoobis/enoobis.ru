@@ -5,6 +5,7 @@ import jsQR from "jsqr";
 import { extractWorkCode, workCheckin } from "../api/work";
 import { useAuthStore } from "../stores/auth";
 import AppIcon from "../components/AppIcon.vue";
+import PageHeader from "../components/PageHeader.vue";
 
 const auth = useAuthStore();
 const route = useRoute();
@@ -153,10 +154,10 @@ onBeforeUnmount(stopCamera);
 </script>
 
 <template>
-  <section class="work-page card">
-    <h1>работа</h1>
+  <section class="work page-shell">
+    <PageHeader title="работа" />
 
-    <div class="scan-pane">
+    <div class="scan-stage">
       <video v-show="scanning" ref="videoEl" class="scan-video" playsinline muted />
       <button v-if="!scanning" type="button" class="primary" :disabled="busy" @click="startCamera">
         <AppIcon name="qr" :size="18" />
@@ -165,45 +166,38 @@ onBeforeUnmount(stopCamera);
       <button v-else type="button" class="secondary ghost" @click="stopCamera">
         выключить камеру
       </button>
+      <p v-if="err" class="error">{{ err }}</p>
+      <p v-if="okMsg" class="ok">{{ okMsg }}</p>
     </div>
-
-    <p v-if="err" class="error">{{ err }}</p>
-    <p v-if="okMsg" class="ok">{{ okMsg }}</p>
   </section>
 </template>
 
 <style scoped>
-.work-page {
-  max-width: 24rem;
-  margin: 2rem auto;
-  padding: 1.25rem;
-  display: grid;
-  justify-items: center;
-  text-align: center;
-  gap: 1rem;
+.work {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100dvh - var(--reader-top, 7rem));
 }
 
-h1 {
-  font-size: 1.25rem;
-  margin: 0;
-}
-
-.scan-pane {
+.scan-stage {
+  flex: 1;
   display: grid;
+  place-items: center;
+  align-content: center;
   justify-items: center;
   gap: 0.75rem;
-  width: 100%;
+  text-align: center;
 }
 
 .scan-video {
-  width: 100%;
+  width: min(100%, 22rem);
   max-height: 260px;
   border-radius: var(--radius);
   background: var(--surface2);
   object-fit: cover;
 }
 
-.scan-pane button {
+.scan-stage button {
   width: auto;
   display: inline-flex;
   align-items: center;
@@ -221,13 +215,13 @@ h1 {
   transform: none;
 }
 
-.error {
-  margin: 0.75rem 0 0;
+.error,
+.ok {
+  margin: 0;
 }
 
 .ok {
   color: var(--muted);
   font-size: var(--text-sm);
-  margin: 0.75rem 0 0;
 }
 </style>
