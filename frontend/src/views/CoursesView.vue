@@ -414,14 +414,22 @@ function placeCourseMenu(details: HTMLDetailsElement) {
   if (card) {
     details.classList.add("course-menu--cover");
     const r = card.getBoundingClientRect();
-    panel.style.top = `${Math.round(r.top - origin.top)}px`;
-    panel.style.left = `${Math.round(r.left - origin.left)}px`;
     panel.style.width = `${Math.round(r.width)}px`;
-    panel.style.height = `${Math.round(r.height)}px`;
+    panel.style.height = "auto";
     panel.style.minWidth = "0";
     panel.style.maxWidth = "none";
     panel.style.maxHeight = "none";
-    panel.style.overflowY = "auto";
+    panel.style.overflowY = "visible";
+    panel.style.top = "0px";
+    panel.style.left = "0px";
+
+    const ph = panel.offsetHeight;
+    let top = r.top;
+    if (top + ph > window.innerHeight - pad) top = window.innerHeight - pad - ph;
+    top = Math.max(pad, top);
+
+    panel.style.top = `${Math.round(top - origin.top)}px`;
+    panel.style.left = `${Math.round(r.left - origin.left)}px`;
     panel.style.visibility = "";
     return;
   }
@@ -3096,11 +3104,9 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 }
 
 .course-menu--cover .course-menu-panel {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 0.1rem;
-  padding: 0.65rem 0.75rem;
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.7rem 0.8rem;
   background: var(--bg);
   border-radius: var(--radius);
 }
@@ -3109,16 +3115,15 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   display: flex;
   align-items: center;
   justify-content: center;
-  flex: 1 1 0;
-  min-height: 2.5rem;
-  padding: 0.45rem 0.7rem;
+  min-height: 2.75rem;
+  padding: 0.55rem 0.85rem;
   font-size: var(--text-md);
   text-align: center;
   white-space: normal;
 }
 
 .course-menu--cover .course-menu-sep {
-  margin: 0.1rem 0.85rem;
+  margin: 0.15rem 1rem;
 }
 
 .course-menu-item {
