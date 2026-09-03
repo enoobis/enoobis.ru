@@ -300,9 +300,13 @@ onBeforeUnmount(() => {
       <p v-else class="page-empty muted">{{ listEmptyLabel }}</p>
 
       <div v-if="total > pageSize" class="pager muted">
-        <button class="link" type="button" :disabled="page === 1" @click="prev">←</button>
+        <button class="pager-btn" type="button" :disabled="page === 1" aria-label="назад" @click="prev">
+          <AppIcon name="back" :size="22" />
+        </button>
         <span>{{ page }}</span>
-        <button class="link" type="button" :disabled="page * pageSize >= total" @click="next">→</button>
+        <button class="pager-btn" type="button" :disabled="page * pageSize >= total" aria-label="вперёд" @click="next">
+          <AppIcon name="forward" :size="22" />
+        </button>
       </div>
     </template>
   </section>
@@ -360,20 +364,50 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 1rem;
+  gap: 0.75rem;
   margin-top: 2rem;
-  font-size: var(--text-sm);
+  font-size: var(--text-md);
 }
-.link {
-  background: transparent;
+.pager-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  min-height: 2.5rem;
+  padding: 0;
   border: none;
+  background: transparent;
   color: var(--muted);
-  padding: 0.2rem 0.4rem;
-  min-height: 0;
   cursor: pointer;
 }
-.link:hover:not(:disabled) {
+.pager-btn .app-icon {
+  width: 1.35rem;
+  height: 1.35rem;
+  flex-basis: 1.35rem;
+  transition:
+    opacity var(--dur-2) var(--ease-out),
+    transform var(--dur-2) var(--ease-snap);
+}
+.pager-btn:hover:not(:disabled),
+.pager-btn:focus-visible:not(:disabled) {
   color: var(--text);
   background: transparent;
+}
+.pager-btn:hover:not(:disabled) .app-icon,
+.pager-btn:focus-visible:not(:disabled) .app-icon {
+  opacity: 1;
+}
+.pager-btn:first-child:hover:not(:disabled) .app-icon,
+.pager-btn:first-child:focus-visible:not(:disabled) .app-icon {
+  transform: translateX(-3px);
+}
+.pager-btn:last-child:hover:not(:disabled) .app-icon,
+.pager-btn:last-child:focus-visible:not(:disabled) .app-icon {
+  transform: translateX(3px);
+}
+.pager-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 </style>

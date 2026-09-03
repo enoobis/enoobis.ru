@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { usePageRefresh } from "../composables/usePageRefresh";
-import { RouterLink } from "vue-router";
 import { api } from "../api/http";
 import {
   deleteOwnedShopItem,
@@ -18,6 +17,7 @@ import { toastError, toastSuccess } from "../utils/toast";
 import PageHeader from "../components/PageHeader.vue";
 import AppLoading from "../components/AppLoading.vue";
 import AppIcon from "../components/AppIcon.vue";
+import BackLink from "../components/BackLink.vue";
 import MotionCoinCount from "../components/MotionCoinCount.vue";
 import MotionStagger from "../components/MotionStagger.vue";
 import MotionStaggerItem from "../components/MotionStaggerItem.vue";
@@ -164,7 +164,7 @@ onMounted(load);
     <AppLoading v-if="loading && !items.length" class="page-empty" />
     <div v-else-if="!loading && !items.length" class="page-empty muted">
       <p>пусто</p>
-      <RouterLink to="/shop" class="to-shop">магазин →</RouterLink>
+      <BackLink to="/shop" forward class="to-shop">магазин</BackLink>
     </div>
     <MotionStagger v-if="items.length" :list-key="String(items.length)" class="grid">
       <MotionStaggerItem v-for="a in sortedItems" :key="a.id" class="item-card">
@@ -392,7 +392,6 @@ onMounted(load);
   color: var(--muted);
 }
 .to-shop {
-  display: inline-block;
-  margin-top: 0.5rem;
+  margin-top: 0.35rem;
 }
 </style>

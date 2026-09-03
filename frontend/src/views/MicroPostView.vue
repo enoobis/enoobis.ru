@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { usePageRefresh } from "../composables/usePageRefresh";
-import { RouterLink, useRoute, useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import MicroComposer from "../components/MicroComposer.vue";
 import AppLoading from "../components/AppLoading.vue";
+import BackLink from "../components/BackLink.vue";
 import MicroItem from "../components/MicroItem.vue";
 import { getMicro, type MicroPost } from "../api/micro";
 import { useAuthStore } from "../stores/auth";
@@ -72,10 +73,10 @@ watch(id, load);
 
 <template>
   <section class="thread">
-    <RouterLink v-if="isReply && post" :to="`/microblogs/${post.parent_id}`" class="back muted small">
-      ← к ветке
-    </RouterLink>
-    <RouterLink v-else to="/microblogs" class="back muted small">← лента</RouterLink>
+    <BackLink v-if="isReply && post" :to="`/microblogs/${post.parent_id}`" class="thread-back">
+      к ветке
+    </BackLink>
+    <BackLink v-else to="/microblogs" class="thread-back">лента</BackLink>
 
     <p v-if="err" class="error">{{ err }}</p>
     <AppLoading v-else-if="loading && !post" />
@@ -115,15 +116,11 @@ watch(id, load);
   max-width: 640px;
   margin: 0 auto;
 }
-.back {
-  display: inline-block;
-  margin-bottom: 0.6rem;
+.thread-back {
+  margin-bottom: 0.35rem;
 }
 .empty {
   margin-top: 1.5rem;
   text-align: center;
-}
-.small {
-  font-size: var(--text-xs);
 }
 </style>

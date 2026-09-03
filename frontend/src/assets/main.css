@@ -1210,8 +1210,58 @@ html[data-theme="contrast-white"] .nav {
 
 .icon-btn:hover .app-icon,
 .filter-icon-btn:hover .app-icon,
-.nav a:hover .app-icon {
+.nav a:hover .app-icon,
+.back-link:hover .app-icon {
   opacity: 1;
+}
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  min-height: 2.5rem;
+  margin: 0;
+  padding: 0.2rem 0;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--text-md);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  text-transform: lowercase;
+  cursor: pointer;
+  transition: color var(--dur-2) var(--ease-out);
+}
+.back-link .app-icon {
+  width: 1.35rem;
+  height: 1.35rem;
+  flex-basis: 1.35rem;
+  transition:
+    opacity var(--dur-2) var(--ease-out),
+    transform var(--dur-2) var(--ease-snap);
+}
+.back-link:hover,
+.back-link:focus-visible {
+  color: var(--text);
+  background: transparent;
+}
+.back-link:hover .app-icon,
+.back-link:focus-visible .app-icon {
+  transform: translateX(-3px);
+}
+.back-link--fwd:hover .app-icon,
+.back-link--fwd:focus-visible .app-icon {
+  transform: translateX(3px);
+}
+@media (pointer: coarse) {
+  .back-link:hover .app-icon,
+  .back-link:focus-visible .app-icon,
+  .back-link--fwd:hover .app-icon,
+  .back-link--fwd:focus-visible .app-icon {
+    transform: none;
+  }
 }
 .profile-menu-item:hover .app-icon,
 .nav-menu-link:hover .app-icon {

@@ -8,6 +8,7 @@ import {
   Bookmark,
   BriefcaseBusiness,
   ChevronLeft,
+  ChevronRight,
   Code,
   Contrast,
   Copy,
@@ -104,6 +105,7 @@ export type AppIconName =
   | "block"
   | "search"
   | "back"
+  | "forward"
   | "chat"
   | "folder"
   | "copy"
@@ -170,6 +172,7 @@ const icons: Record<AppIconName, Component> = {
   block: Ban,
   search: Search,
   back: ChevronLeft,
+  forward: ChevronRight,
   chat: MessageCircle,
   folder: Folder,
   copy: Copy,

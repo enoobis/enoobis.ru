@@ -38,6 +38,7 @@ import {
 } from "../api/courses";
 import AppIcon from "../components/AppIcon.vue";
 import AppLoading from "../components/AppLoading.vue";
+import BackLink from "../components/BackLink.vue";
 import PageHeader from "../components/PageHeader.vue";
 import FilterSearch from "../components/FilterSearch.vue";
 import { useAuthStore } from "../stores/auth";
@@ -1651,7 +1652,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
     <template v-else>
       <header class="course-head">
         <div class="course-head-top">
-          <button class="back" type="button" @click="closeCourse">← к курсам</button>
+          <BackLink @click="closeCourse">к курсам</BackLink>
           <div class="course-head-actions">
             <RouterLink
               :to="`/courses/${classroom.course.id}/learn`"
@@ -1842,7 +1843,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 
         <template v-if="selectedLecture">
           <article class="lecture-detail detail-panel">
-            <button type="button" class="detail-back" @click="closeLecture">← лекции</button>
+            <BackLink class="detail-back" @click="closeLecture">лекции</BackLink>
 
             <template v-if="editingLecture?.id === selectedLecture.id">
               <input v-model="editingLecture.title" placeholder="название" />
@@ -1907,14 +1908,13 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
                     allowfullscreen
                   />
                   <video v-else-if="ev.kind === 'video'" :src="ev.src" controls />
-                  <a
+                  <BackLink
                     v-else-if="ev.kind === 'link'"
                     :href="ev.href"
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    forward
                   >
-                    открыть видео →
-                  </a>
+                    открыть видео
+                  </BackLink>
                 </div>
               </template>
               <p v-if="selectedLecture.body_text" class="lecture-body">
@@ -1947,7 +1947,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
                           <span v-if="assignmentStatusLabel(a)"> · {{ assignmentStatusLabel(a) }}</span>
                         </span>
                       </span>
-                      <span class="list-row-chevron" aria-hidden="true">›</span>
+                      <AppIcon name="forward" :size="16" class="list-row-chevron" />
                     </button>
                     <div v-if="expandedTaskId === a.id" class="task-row">
                       <template v-if="editingAssignment?.id === a.id">
@@ -2099,7 +2099,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
                   {{ lectureTaskCount(lec.id) }} зад.
                 </span>
                 <span v-if="lectureOpenTaskCount(lec.id)" class="row-badge">не сдано</span>
-                <span class="list-row-chevron" aria-hidden="true">›</span>
+                <AppIcon name="forward" :size="16" class="list-row-chevron" />
               </span>
             </button>
           </li>
@@ -2181,7 +2181,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 
         <template v-if="selectedAssignment">
           <article class="task-detail detail-panel">
-            <button type="button" class="detail-back" @click="closeAssignmentDetail">← задания</button>
+            <BackLink class="detail-back" @click="closeAssignmentDetail">задания</BackLink>
 
             <template v-if="editingAssignment?.id === selectedAssignment.id">
               <input v-model="editingAssignment.title" placeholder="название" />
@@ -2322,7 +2322,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
               </span>
               <span class="lecture-row-side">
                 <span v-if="assignmentStatusLabel(a)" class="row-badge">{{ assignmentStatusLabel(a) }}</span>
-                <span class="list-row-chevron" aria-hidden="true">›</span>
+                <AppIcon name="forward" :size="16" class="list-row-chevron" />
               </span>
             </button>
           </li>
@@ -2846,9 +2846,13 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 .list-row-chevron {
   flex-shrink: 0;
   color: var(--muted);
-  font-size: 1.1rem;
-  line-height: 1;
-  margin-left: 0.25rem;
+  margin-left: 0.15rem;
+  width: 1.1rem;
+  height: 1.1rem;
+  flex-basis: 1.1rem;
+  transition:
+    color var(--dur-2) var(--ease-out),
+    transform var(--dur-2) var(--ease-snap);
 }
 
 .form-card {
@@ -3240,22 +3244,6 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   line-height: 1.25;
   overflow-wrap: anywhere;
 }
-.back {
-  display: inline-flex;
-  align-items: center;
-  background: transparent;
-  border: none;
-  color: var(--muted);
-  padding: 0.35rem 0.6rem 0.35rem 0;
-  min-height: 2.25rem;
-  font-size: var(--text-sm);
-  cursor: pointer;
-}
-.back:hover {
-  color: var(--text);
-  background: transparent;
-}
-
 .tab-count {
   font-size: var(--text-2xs);
   color: var(--muted);
@@ -3346,18 +3334,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 }
 
 .detail-back {
-  background: transparent;
-  border: none;
-  padding: 0;
-  min-height: 0;
-  color: var(--muted);
-  font-size: var(--text-sm);
-  cursor: pointer;
-  margin-bottom: 0.65rem;
-}
-.detail-back:hover {
-  color: var(--text);
-  background: transparent;
+  margin-bottom: 0.35rem;
 }
 
 .lecture-detail,
@@ -3407,6 +3384,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 .lecture-row:hover .list-row-chevron,
 .task-list-row:hover .list-row-chevron {
   color: var(--text);
+  transform: translateX(2px);
 }
 
 .lecture-row-main {

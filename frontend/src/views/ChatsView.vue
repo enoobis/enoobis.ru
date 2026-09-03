@@ -968,7 +968,9 @@ onUnmounted(() => {
     <main class="thread" :class="{ hidden: !activeId }">
       <template v-if="activeId">
         <header class="thread-head">
-          <button class="back" type="button" @click="router.replace({ name: 'chats' })">←</button>
+          <button class="back" type="button" aria-label="чаты" @click="router.replace({ name: 'chats' })">
+            <AppIcon name="back" :size="22" />
+          </button>
           <button v-if="groupInfo" type="button" class="who who--group" @click="openMembers">
             <span class="avatar small">
               <img v-if="groupInfo.avatar_url" :src="groupInfo.avatar_url" alt="" />
@@ -1205,7 +1207,7 @@ onUnmounted(() => {
               aria-label="назад"
               @click="switchComposeUser"
             >
-              ←
+              <AppIcon name="back" :size="20" />
             </button>
             <span v-else class="group-modal-spacer" aria-hidden="true" />
             <span>{{ composeMode === "group" ? "новая группа" : "новый чат" }}</span>
@@ -1495,6 +1497,9 @@ onUnmounted(() => {
   height: 36px;
 }
 .group-modal-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 36px;
   height: 36px;
   min-height: 36px;
@@ -1503,13 +1508,19 @@ onUnmounted(() => {
   border-radius: 999px;
   background: transparent;
   color: var(--muted);
-  font-size: 1rem;
-  line-height: 1;
   cursor: pointer;
+}
+.group-modal-back .app-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex-basis: 1.25rem;
 }
 .group-modal-back:hover {
   color: var(--text);
   background: var(--surface2);
+}
+.group-modal-back:hover .app-icon {
+  opacity: 1;
 }
 .compose-query {
   border: 1px solid var(--border);
@@ -2048,14 +2059,25 @@ onUnmounted(() => {
   border: none;
   border-radius: var(--radius-pill);
   color: var(--muted);
-  font-size: 1.1rem;
   padding: 0;
   margin-right: 0.1rem;
   flex-shrink: 0;
 }
+.back .app-icon {
+  width: 1.35rem;
+  height: 1.35rem;
+  flex-basis: 1.35rem;
+  transition:
+    opacity var(--dur-2) var(--ease-out),
+    transform var(--dur-2) var(--ease-snap);
+}
 .back:hover {
   color: var(--text);
   background: var(--surface2);
+}
+.back:hover .app-icon {
+  opacity: 1;
+  transform: translateX(-3px);
 }
 .who {
   display: flex;

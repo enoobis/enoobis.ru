@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { RouterLink } from "vue-router";
+import BackLink from "../components/BackLink.vue";
 </script>
 
 <template>
   <section class="nf">
     <h1>404</h1>
     <p class="muted">не найдено</p>
-    <RouterLink to="/" class="muted">на главную →</RouterLink>
+    <BackLink to="/" forward class="nf-back">на главную</BackLink>
   </section>
 </template>
 
@@ -22,5 +22,8 @@ h1 {
   font-size: 2.4rem;
   font-weight: 600;
   margin: 0;
+}
+.nf-back {
+  justify-self: center;
 }
 </style>
