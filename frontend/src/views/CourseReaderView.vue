@@ -1716,8 +1716,7 @@ onBeforeUnmount(() => {
     z-index: 96;
     width: min(86vw, 21rem);
     max-height: none;
-    /* верх экрана занимает шапка сайта */
-    padding: calc(var(--layout-pad) + 3.4rem) var(--layout-pad)
+    padding: var(--layout-pad) var(--layout-pad)
       max(var(--layout-pad), env(safe-area-inset-bottom));
     background: var(--bg);
     border-right: 1px solid var(--border);

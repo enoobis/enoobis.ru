@@ -1064,6 +1064,11 @@ html.profile-wallpaper-desktop .layout {
 html.course-reader .layout {
   max-width: none;
   width: 100%;
+  padding-top: 0.75rem;
+}
+
+html.course-reader .nav {
+  display: none;
 }
 
 @media (min-width: 1025px) {
