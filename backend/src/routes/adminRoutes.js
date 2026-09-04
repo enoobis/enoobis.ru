@@ -361,6 +361,7 @@ function purgeUserBlogAndMicro(userId) {
   if (commentIds.length) {
     const ch = commentIds.map(() => "?").join(",");
     run(`DELETE FROM blog_reports WHERE target_comment_id IN (${ch})`, ...commentIds);
+    run(`UPDATE blog_comments SET parent_comment_id = NULL WHERE parent_comment_id IN (${ch})`, ...commentIds);
     run(`DELETE FROM blog_comments WHERE id IN (${ch})`, ...commentIds);
   }
 
@@ -375,34 +376,91 @@ function purgeUserBlogAndMicro(userId) {
 }
 
 function purgeUserMicroposts(userId) {
+  const authorPostIds = all("SELECT id FROM microposts WHERE author_id = ?", userId).map((r) => r.id);
   const microImages = all(
     "SELECT image_url FROM microposts WHERE author_id = ? AND COALESCE(image_url, '') <> ''",
     userId,
   );
   for (const row of microImages) unlinkUploadUrl(row.image_url);
 
-  run(
-    "UPDATE users SET pinned_post_id = NULL, pinned_post_type = '' WHERE pinned_post_id IN (SELECT id FROM microposts WHERE author_id = ?)",
-    userId,
-  );
-  run(
-    "UPDATE microposts SET parent_id = NULL WHERE parent_id IN (SELECT id FROM microposts WHERE author_id = ?)",
-    userId,
-  );
-  const authorPostIds = all("SELECT id FROM microposts WHERE author_id = ?", userId).map((r) => r.id);
   if (authorPostIds.length) {
     const ph = authorPostIds.map(() => "?").join(",");
+    run(
+      `UPDATE users SET pinned_post_id = NULL, pinned_post_type = '' WHERE pinned_post_id IN (${ph})`,
+      ...authorPostIds,
+    );
+    run(`UPDATE microposts SET parent_id = NULL WHERE parent_id IN (${ph})`, ...authorPostIds);
     run(`DELETE FROM micropost_likes WHERE micropost_id IN (${ph}) OR user_id = ?`, ...authorPostIds, userId);
     run(
       `DELETE FROM micropost_bookmarks WHERE micropost_id IN (${ph}) OR user_id = ?`,
       ...authorPostIds,
       userId,
     );
+    run(`DELETE FROM microposts WHERE id IN (${ph})`, ...authorPostIds);
   } else {
     run("DELETE FROM micropost_likes WHERE user_id = ?", userId);
     run("DELETE FROM micropost_bookmarks WHERE user_id = ?", userId);
   }
-  run("DELETE FROM microposts WHERE author_id = ?", userId);
+}
+
+function hasTable(name) {
+  return Boolean(get("SELECT 1 AS v FROM sqlite_master WHERE type = 'table' AND name = ?", name));
+}
+
+function runIfTable(name, sql, ...params) {
+  if (!hasTable(name)) return;
+  run(sql, ...params);
+}
+
+function purgeUserChats(userId) {
+  run(
+    `UPDATE chat_messages SET reply_to_id = NULL
+     WHERE reply_to_id IN (SELECT id FROM chat_messages WHERE sender_id = ?)`,
+    userId,
+  );
+  run("DELETE FROM chat_messages WHERE sender_id = ?", userId);
+
+  const dropThreads = all(
+    `SELECT id FROM chat_threads
+     WHERE user_a_id = ? OR user_b_id = ? OR IFNULL(owner_id, '') = ?`,
+    userId,
+    userId,
+    userId,
+  ).map((r) => r.id);
+
+  runIfTable("chat_thread_members", "DELETE FROM chat_thread_members WHERE user_id = ?", userId);
+  run("DELETE FROM chat_thread_hidden WHERE user_id = ?", userId);
+
+  if (!dropThreads.length) return;
+  const ph = dropThreads.map(() => "?").join(",");
+  run(`DELETE FROM chat_thread_hidden WHERE thread_id IN (${ph})`, ...dropThreads);
+  runIfTable("chat_thread_members", `DELETE FROM chat_thread_members WHERE thread_id IN (${ph})`, ...dropThreads);
+  run(`DELETE FROM chat_messages WHERE thread_id IN (${ph})`, ...dropThreads);
+  run(`DELETE FROM chat_threads WHERE id IN (${ph})`, ...dropThreads);
+}
+
+function purgeUserExtras(userId) {
+  run("DELETE FROM course_stream_comments WHERE author_id = ?", userId);
+  run(
+    `DELETE FROM course_stream_comments
+     WHERE post_id IN (SELECT id FROM course_stream_posts WHERE author_id = ?)`,
+    userId,
+  );
+  run("DELETE FROM course_stream_posts WHERE author_id = ?", userId);
+
+  runIfTable("user_owned_shop_items", "DELETE FROM user_owned_shop_items WHERE user_id = ?", userId);
+  runIfTable("user_owned_avatars", "DELETE FROM user_owned_avatars WHERE user_id = ?", userId);
+  runIfTable("work_checkins", "DELETE FROM work_checkins WHERE user_id = ?", userId);
+  runIfTable("qr_login_codes", "DELETE FROM qr_login_codes WHERE user_id = ?", userId);
+  runIfTable("qr_login_requests", "DELETE FROM qr_login_requests WHERE user_id = ?", userId);
+  runIfTable("ai_usage", "DELETE FROM ai_usage WHERE user_id = ?", userId);
+  runIfTable("ai_chat_messages", "DELETE FROM ai_chat_messages WHERE user_id = ?", userId);
+  runIfTable(
+    "admin_audit_log",
+    "DELETE FROM admin_audit_log WHERE admin_id = ? OR target_id = ?",
+    userId,
+    userId,
+  );
 }
 
 function deleteUserFully(userId) {
@@ -441,19 +499,9 @@ function _deleteUserFullyBody(userId) {
 
   purgeUserBlogAndMicro(userId);
   purgeUserMicroposts(userId);
-
-  run(
-    "DELETE FROM chat_thread_hidden WHERE user_id = ? OR thread_id IN (SELECT id FROM chat_threads WHERE user_a_id = ? OR user_b_id = ?)",
-    userId,
-    userId,
-    userId,
-  );
-  run(
-    "DELETE FROM chat_messages WHERE thread_id IN (SELECT id FROM chat_threads WHERE user_a_id = ? OR user_b_id = ?)",
-    userId,
-    userId,
-  );
-  run("DELETE FROM chat_threads WHERE user_a_id = ? OR user_b_id = ?", userId, userId);
+  purgeUserChats(userId);
+  purgeUserExtras(userId);
+  run("UPDATE users SET pinned_post_id = NULL, pinned_post_type = '' WHERE id = ?", userId);
 
   run(
     "DELETE FROM user_follows WHERE follower_user_id = ? OR following_user_id = ?",
@@ -519,8 +567,8 @@ router.delete("/admin/users/:id", adminOnly, (req, res) => {
     logAdminAction(req.user.id, "user_delete", id);
     return res.json({ ok: true });
   } catch (e) {
-    if (process.env.NODE_ENV !== "production") console.error("admin delete user", e);
-    return res.status(500).json({ error: "internal error" });
+    console.error("admin delete user", e);
+    return res.status(500).json({ error: "не удалось удалить" });
   }
 });
 
