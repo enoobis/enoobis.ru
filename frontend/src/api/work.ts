@@ -98,6 +98,35 @@ export async function downloadWorkExport(
   URL.revokeObjectURL(url);
 }
 
+export type WorkSheetDay = {
+  n: number;
+  date: string;
+  done: boolean;
+};
+
+export type WorkSheetRow = {
+  nickname: string;
+  name: string;
+  marks: string[];
+};
+
+export type WorkSheet = {
+  days: WorkSheetDay[];
+  rows: WorkSheetRow[];
+};
+
+export function getWorkSheetLink(token: string) {
+  return api<{ token: string; path: string }>("/api/admin/work/sheet-link", { token });
+}
+
+export function getWorkSheet(sheetToken: string) {
+  return api<WorkSheet>(`/api/work/sheet/${sheetToken}`);
+}
+
+export function workSheetExportUrl(sheetToken: string) {
+  return `/api/work/sheet/${sheetToken}/export`;
+}
+
 export function workCheckin(token: string, body: { code: string; lat: number; lng: number }) {
   return api<CheckinResult>("/api/work/checkin", {
     method: "POST",

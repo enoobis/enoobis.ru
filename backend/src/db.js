@@ -1113,6 +1113,12 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_work_checkins_created ON work_checkins(created_at DESC);
   CREATE INDEX IF NOT EXISTS idx_work_checkins_user ON work_checkins(user_id);
 
+  CREATE TABLE IF NOT EXISTS work_sheet (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    token TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL
+  );
+
   CREATE TABLE IF NOT EXISTS ai_usage (
     user_id TEXT NOT NULL,
     day TEXT NOT NULL,

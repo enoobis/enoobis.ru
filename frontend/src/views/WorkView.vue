@@ -16,6 +16,9 @@ const okMsg = ref("");
 const scanning = ref(false);
 const busy = ref(false);
 const videoEl = ref<HTMLVideoElement | null>(null);
+let lastCode = "";
+let lastTryAt = 0;
+const RETRY_MS = 4000;
 
 let scanLoop: ReturnType<typeof setInterval> | null = null;
 let mediaStream: MediaStream | null = null;
@@ -56,9 +59,20 @@ function geoErrText(e: unknown) {
   return e instanceof Error ? e.message : "ошибка геолокации";
 }
 
+function checkinErrText(e: unknown) {
+  const msg = e instanceof Error ? e.message : "";
+  if (msg === "too_many_requests") return "подожди немного";
+  if (msg) return msg;
+  return geoErrText(e);
+}
+
 async function checkin(raw: string) {
   const code = extractWorkCode(raw);
   if (!code || !auth.token || busy.value) return;
+  const now = Date.now();
+  if (code === lastCode && now - lastTryAt < RETRY_MS) return;
+  lastCode = code;
+  lastTryAt = now;
   busy.value = true;
   err.value = "";
   okMsg.value = "";
@@ -72,7 +86,7 @@ async function checkin(raw: string) {
     okMsg.value = `отмечено · ${r.point_name}`;
     stopCamera();
   } catch (e) {
-    err.value = geoErrText(e);
+    err.value = checkinErrText(e);
   } finally {
     busy.value = false;
   }

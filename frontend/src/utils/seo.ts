@@ -15,10 +15,12 @@ function setMeta(name: string, content: string, attr: "name" | "property" = "nam
 export function applyDocumentSeo(
   title = DOC_TITLE,
   description = SITE_DESCRIPTION,
+  robots = "index, follow",
 ) {
   if (typeof document === "undefined") return;
   document.title = title;
   setMeta("description", description);
+  setMeta("robots", robots);
   setMeta("og:title", title, "property");
   setMeta("og:description", description, "property");
 }

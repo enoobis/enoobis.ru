@@ -147,6 +147,12 @@ const router = createRouter({
       meta: { requiresAuth: true, requiresWork: true },
     },
     {
+      path: "/w/:token",
+      name: "work-sheet",
+      component: () => import("../views/WorkSheetView.vue"),
+      meta: { noindex: true },
+    },
+    {
       path: PANEL_PATH,
       name: "panel",
       component: () => import("../views/AdminGateView.vue"),
@@ -234,7 +240,11 @@ router.afterEach((to, from) => {
   if (to.name === "login" && typeof to.query.next === "string") {
     void router.replace({ path: "/login" });
   }
-  applyDocumentSeo();
+  applyDocumentSeo(
+    undefined,
+    undefined,
+    to.meta.noindex ? "noindex, nofollow" : "index, follow",
+  );
   if (!isProfileThemeRoute(to.path)) {
     clearProfileOwnerTheme();
   }

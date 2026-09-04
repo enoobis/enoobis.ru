@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from "uuid";
 import { all, get, nowIso, run } from "../db.js";
 import { authRequired } from "../auth.js";
 import { rateLimit } from "../utils/security.js";
+import { buildWorkSheet, ensureSheetToken, sheetTokenValid } from "../utils/workSheet.js";
 
 const router = express.Router();
 
@@ -234,6 +235,35 @@ function styleExportSheet(ws, dateColCount) {
   }
 }
 
+router.get("/admin/work/sheet-link", authRequired, adminOnly, (_req, res) => {
+  const token = ensureSheetToken();
+  return res.json({ token, path: `/w/${token}` });
+});
+
+function writeSheetXlsx(res) {
+  const sheet = buildWorkSheet();
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet("отметки");
+  ws.addRow(["usernames", "name", ...sheet.days.map((d) => d.n)]);
+  ws.getColumn(1).width = 22;
+  ws.getColumn(2).width = 22;
+  sheet.days.forEach((_, i) => {
+    ws.getColumn(i + 3).width = 6;
+  });
+  for (const row of sheet.rows) {
+    ws.addRow([row.nickname, row.name, ...row.marks]);
+  }
+  styleExportSheet(ws, sheet.days.length + 1);
+  ws.views = [{ state: "frozen", ySplit: 1, xSplit: 2 }];
+  res.setHeader(
+    "Content-Type",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  );
+  res.setHeader("Content-Disposition", 'attachment; filename="checkins.xlsx"');
+  res.setHeader("X-Robots-Tag", "noindex, nofollow");
+  return wb.xlsx.write(res).then(() => res.end());
+}
+
 router.get("/admin/work/export", authRequired, adminOnly, async (req, res) => {
   const range = parseRange(req);
   if (!range) return res.status(400).json({ error: "bad range" });
@@ -287,11 +317,35 @@ router.get("/admin/work/export", authRequired, adminOnly, async (req, res) => {
 
 /* ---------- мастер: отметка ---------- */
 
+router.get(
+  "/work/sheet/:token",
+  rateLimit({ keyPrefix: "work_sheet", max: 60, windowMs: 60_000 }),
+  (req, res) => {
+    if (!sheetTokenValid(req.params.token)) return res.status(404).json({ error: "not found" });
+    res.setHeader("X-Robots-Tag", "noindex, nofollow");
+    return res.json(buildWorkSheet());
+  },
+);
+
+router.get(
+  "/work/sheet/:token/export",
+  rateLimit({ keyPrefix: "work_sheet_export", max: 20, windowMs: 60_000 }),
+  async (req, res) => {
+    if (!sheetTokenValid(req.params.token)) return res.status(404).json({ error: "not found" });
+    await writeSheetXlsx(res);
+  },
+);
+
 router.post(
   "/work/checkin",
-  rateLimit({ keyPrefix: "work_checkin", max: 12, windowMs: 60_000 }),
   authRequired,
   canCheckin,
+  rateLimit({
+    keyPrefix: "work_checkin",
+    max: 80,
+    windowMs: 10 * 60 * 1000,
+    keyFn: (req) => req.user.id,
+  }),
   (req, res) => {
     const code = String(req.body?.code ?? "").trim();
     if (!code) return res.status(400).json({ error: "нет кода" });

@@ -112,7 +112,7 @@ export function corsOptions() {
 const buckets = new Map();
 
 /**
- * @param {{ windowMs?: number, max?: number, keyPrefix?: string }} opts
+ * @param {{ windowMs?: number, max?: number, keyPrefix?: string, keyFn?: (req: import("express").Request) => string }} opts
  */
 export function rateLimit(opts = {}) {
   const windowMs = opts.windowMs ?? 60_000;
@@ -120,7 +120,8 @@ export function rateLimit(opts = {}) {
   const keyPrefix = opts.keyPrefix ?? "rl";
 
   return (req, res, next) => {
-    const key = `${keyPrefix}:${clientIp(req)}`;
+    const suffix = opts.keyFn ? opts.keyFn(req) : clientIp(req);
+    const key = `${keyPrefix}:${suffix}`;
     const now = Date.now();
     let entry = buckets.get(key);
     if (!entry || now >= entry.resetAt) {

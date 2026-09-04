@@ -1,22 +1,21 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { RouterLink } from "vue-router";
 import QRCode from "qrcode";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import {
   createWorkPoint,
   deleteWorkPoint,
-  downloadWorkExport,
-  listWorkCheckins,
+  getWorkSheetLink,
   listWorkPoints,
   updateWorkPoint,
   workQrUrl,
-  type WorkCheckin,
   type WorkPoint,
 } from "../api/work";
+import { toastSuccess } from "../utils/toast";
 import { useAuthStore } from "../stores/auth";
 import AppIcon from "../components/AppIcon.vue";
-import AppLoading from "./AppLoading.vue";
 
 const auth = useAuthStore();
 
@@ -53,9 +52,7 @@ function mapUsesDarkTiles(): boolean {
 }
 
 function mapTileUrl(): string {
-  return mapUsesDarkTiles()
-    ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-    : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+  return "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
 }
 
 function mapStrokeColor(): string {
@@ -253,152 +250,35 @@ function downloadQr() {
   a.click();
 }
 
-type Period = "week" | "month";
-const period = ref<Period>("month");
-const periodOffset = ref(0);
-const pointFilter = ref("");
-const pointMenuOpen = ref(false);
-const pointMenuRoot = ref<HTMLElement | null>(null);
-const checkins = ref<WorkCheckin[]>([]);
-const loadingCheckins = ref(false);
-const exporting = ref(false);
+const sheetPath = ref("");
+const mapDark = ref(mapUsesDarkTiles());
 
-function selectPointFilter(id: string) {
-  pointFilter.value = id;
-  pointMenuOpen.value = false;
-}
-
-function onDocumentClick(event: MouseEvent) {
-  if (!pointMenuOpen.value) return;
-  const target = event.target as HTMLElement | null;
-  const root = pointMenuRoot.value;
-  if (root && target && root.contains(target)) return;
-  pointMenuOpen.value = false;
-}
-
-const checkinsCountLabel = computed(() => {
-  const n = checkins.value.length;
-  if (n === 0) return "0 отметок";
-  const mod10 = n % 10;
-  const mod100 = n % 100;
-  let word = "отметок";
-  if (mod10 === 1 && mod100 !== 11) word = "отметка";
-  else if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) word = "отметки";
-  return `${n} ${word}`;
-});
-
-const pointFilterLabel = computed(() => {
-  if (!pointFilter.value) return "все точки";
-  return points.value.find((p) => p.id === pointFilter.value)?.name ?? "точка";
-});
-
-function rangeFor(p: Period, offset: number): { from: Date; to: Date } {
-  const now = new Date();
-  if (p === "week") {
-    const day = (now.getDay() + 6) % 7;
-    const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - day + offset * 7);
-    const next = new Date(monday);
-    next.setDate(monday.getDate() + 7);
-    return { from: monday, to: next };
-  }
-  const first = new Date(now.getFullYear(), now.getMonth() + offset, 1);
-  const next = new Date(now.getFullYear(), now.getMonth() + offset + 1, 1);
-  return { from: first, to: next };
-}
-
-const rangeLabel = computed(() => {
-  const { from, to } = rangeFor(period.value, periodOffset.value);
-  if (period.value === "week") {
-    const end = new Date(to);
-    end.setDate(end.getDate() - 1);
-    const fmt = (d: Date) => d.toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
-    return `${fmt(from)} - ${fmt(end)}`;
-  }
-  return from.toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
-});
-
-async function loadCheckins() {
-  if (!auth.token) return;
-  loadingCheckins.value = true;
-  err.value = "";
+async function copySheetLink() {
+  if (!sheetPath.value) return;
+  const url = `${window.location.origin}${sheetPath.value}`;
   try {
-    const { from, to } = rangeFor(period.value, periodOffset.value);
-    const r = await listWorkCheckins(
-      auth.token,
-      from.toISOString(),
-      to.toISOString(),
-      pointFilter.value || undefined,
-    );
-    checkins.value = r.items;
-  } catch (e) {
-    err.value = e instanceof Error ? e.message : "ошибка";
-  } finally {
-    loadingCheckins.value = false;
+    await navigator.clipboard.writeText(url);
+    toastSuccess("ссылка скопирована");
+  } catch {
+    err.value = "не скопировалось";
   }
-}
-
-watch([period, periodOffset, pointFilter], loadCheckins);
-
-function filterByPoint(p: WorkPoint) {
-  pointFilter.value = p.id;
-  pointMenuOpen.value = false;
-}
-
-function setPeriod(p: Period) {
-  period.value = p;
-  periodOffset.value = 0;
-}
-
-async function exportXlsx() {
-  if (!auth.token) return;
-  exporting.value = true;
-  try {
-    const { from, to } = rangeFor(period.value, periodOffset.value);
-    await downloadWorkExport(
-      auth.token,
-      from.toISOString(),
-      to.toISOString(),
-      pointFilter.value || undefined,
-    );
-  } catch (e) {
-    err.value = e instanceof Error ? e.message : "ошибка";
-  } finally {
-    exporting.value = false;
-  }
-}
-
-function checkinPersonLabel(c: WorkCheckin): string {
-  const name = c.full_name?.trim();
-  if (name && name.toLowerCase() !== c.nickname.toLowerCase()) {
-    return `${name} - ${c.nickname}`;
-  }
-  return name || c.nickname;
-}
-
-function fmtWorkDate(iso: string | Date) {
-  const d = iso instanceof Date ? iso : new Date(iso);
-  const day = String(d.getDate()).padStart(2, "0");
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  return `${day}.${month}.${d.getFullYear()}`;
-}
-
-function fmtWorkTime(iso: string | Date) {
-  const d = iso instanceof Date ? iso : new Date(iso);
-  return d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
 }
 
 onMounted(async () => {
-  document.addEventListener("click", onDocumentClick);
   if (!auth.token) return;
   try {
-    const r = await listWorkPoints(auth.token);
-    points.value = r.items;
+    const [pts, sheet] = await Promise.all([
+      listWorkPoints(auth.token),
+      getWorkSheetLink(auth.token),
+    ]);
+    points.value = pts.items;
+    sheetPath.value = sheet.path;
   } catch (e) {
     err.value = e instanceof Error ? e.message : "ошибка";
   }
-  await loadCheckins();
 
   themeObserver = new MutationObserver(() => {
+    mapDark.value = mapUsesDarkTiles();
     if (map) applyMapTiles();
   });
   themeObserver.observe(document.documentElement, {
@@ -408,7 +288,6 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
-  document.removeEventListener("click", onDocumentClick);
   themeObserver?.disconnect();
   themeObserver = null;
   destroyMap();
@@ -430,7 +309,7 @@ onBeforeUnmount(() => {
           <AppIcon name="close" :size="18" />
         </button>
       </div>
-      <div ref="mapEl" class="work-map" />
+      <div ref="mapEl" class="work-map" :class="{ 'work-map--dark': mapDark }" />
       <div v-if="createMode" class="work-new">
         <input v-model="newName" type="text" placeholder="название" />
         <label class="radius-label">
@@ -455,10 +334,7 @@ onBeforeUnmount(() => {
         <div class="point-main">
           <strong class="point-name">{{ p.name }}</strong>
           <p class="point-meta muted">
-            {{ p.radius_m }} м ·
-            <button type="button" class="checkins-link" @click="filterByPoint(p)">
-              {{ p.checkin_count ?? 0 }} отметок
-            </button>
+            {{ p.radius_m }} м · {{ p.checkin_count ?? 0 }} отметок
           </p>
         </div>
         <div class="point-actions">
@@ -490,106 +366,9 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <section class="checkins-panel">
-      <div class="filter-bar filter-bar--stack">
-        <div class="filter-tabs" role="tablist" aria-label="период">
-          <button
-            class="filter-tab"
-            :class="{ on: period === 'week' }"
-            type="button"
-            role="tab"
-            :aria-selected="period === 'week'"
-            @click="setPeriod('week')"
-          >
-            неделя
-          </button>
-          <button
-            class="filter-tab"
-            :class="{ on: period === 'month' }"
-            type="button"
-            role="tab"
-            :aria-selected="period === 'month'"
-            @click="setPeriod('month')"
-          >
-            месяц
-          </button>
-        </div>
-        <div v-if="points.length" ref="pointMenuRoot" class="filter-menu-wrap">
-          <button
-            type="button"
-            class="filter-trigger"
-            :class="{ on: pointMenuOpen || !!pointFilter }"
-            aria-haspopup="listbox"
-            :aria-expanded="pointMenuOpen"
-            @click.stop="pointMenuOpen = !pointMenuOpen"
-          >
-            <span>{{ pointFilterLabel }}</span>
-          </button>
-          <div v-if="pointMenuOpen" class="filter-menu" role="listbox">
-            <button
-              type="button"
-              class="filter-menu-opt"
-              :class="{ on: !pointFilter }"
-              role="option"
-              @click="selectPointFilter('')"
-            >
-              все точки
-            </button>
-            <button
-              v-for="p in points"
-              :key="p.id"
-              type="button"
-              class="filter-menu-opt"
-              :class="{ on: pointFilter === p.id }"
-              role="option"
-              @click="selectPointFilter(p.id)"
-            >
-              {{ p.name }}
-            </button>
-          </div>
-        </div>
-        <div class="checkins-range">
-          <button class="filter-icon-btn" type="button" aria-label="назад" @click="periodOffset--">
-            <AppIcon name="back" :size="18" />
-          </button>
-          <div class="checkins-range-mid">
-            <span class="range-label">{{ rangeLabel }}</span>
-            <span class="checkins-meta muted">{{ checkinsCountLabel }}</span>
-          </div>
-          <button
-            class="filter-icon-btn range-next"
-            type="button"
-            aria-label="вперёд"
-            :disabled="periodOffset >= 0"
-            @click="periodOffset++"
-          >
-            <AppIcon name="back" :size="18" />
-          </button>
-          <button
-            class="filter-icon-btn"
-            type="button"
-            aria-label="скачать excel"
-            :disabled="exporting || !checkins.length"
-            @click="exportXlsx"
-          >
-            <AppIcon name="download" :size="18" />
-          </button>
-        </div>
-      </div>
-
-      <AppLoading v-if="loadingCheckins" class="page-empty page-empty--tight" />
-      <p v-else-if="!checkins.length" class="page-empty page-empty--tight">пусто</p>
-      <ul v-else class="checkin-list">
-        <li v-for="c in checkins" :key="c.id" class="checkin-row">
-          <div class="checkin-top">
-            <span class="checkin-name">{{ checkinPersonLabel(c) }}</span>
-            <span class="checkin-dist muted">{{ c.distance_m }} м</span>
-          </div>
-          <p class="checkin-sub muted">
-            {{ fmtWorkDate(c.created_at) }} · {{ fmtWorkTime(c.created_at) }} · {{ c.point_name }}
-          </p>
-        </li>
-      </ul>
+    <section v-if="sheetPath" class="sheet-line">
+      <RouterLink :to="sheetPath">таблица</RouterLink>
+      <button type="button" class="secondary" @click="copySheetLink">копировать</button>
     </section>
   </div>
 </template>
@@ -627,6 +406,18 @@ onBeforeUnmount(() => {
   overflow: hidden;
   z-index: 0;
   background: var(--bg);
+}
+
+.work-map--dark :deep(.leaflet-tile-pane) {
+  filter: invert(1) grayscale(1);
+}
+
+.sheet-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
 }
 
 .work-new {
@@ -736,19 +527,6 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
 }
 
-.checkins-link {
-  padding: 0;
-  border: none;
-  background: none;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-}
-
-.checkins-link:hover {
-  color: var(--text);
-}
-
 .qr-modal {
   position: fixed;
   inset: 0;
@@ -790,99 +568,6 @@ onBeforeUnmount(() => {
 
 .qr-actions > * {
   flex: 1;
-}
-
-.checkins-panel {
-  display: grid;
-  gap: var(--space-3);
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--border);
-}
-
-.checkins-panel :deep(.filter-bar) {
-  margin-bottom: 0;
-}
-
-.checkins-range {
-  display: flex;
-  align-items: center;
-  gap: 0.15rem;
-  width: 100%;
-  min-height: var(--control-h);
-  padding: 0.15rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  background: var(--surface2);
-  box-sizing: border-box;
-}
-
-.checkins-range-mid {
-  flex: 1;
-  min-width: 0;
-  display: grid;
-  justify-items: center;
-  gap: 0.05rem;
-  padding: 0 0.25rem;
-}
-
-.range-label {
-  font-size: var(--text-sm);
-  color: var(--text);
-  text-align: center;
-  text-transform: lowercase;
-  line-height: 1.2;
-}
-
-.range-next :deep(.app-icon) {
-  transform: rotate(180deg);
-}
-
-.checkins-meta {
-  margin: 0;
-  font-size: var(--text-2xs);
-  line-height: 1.2;
-}
-
-.checkin-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.checkin-row {
-  padding: var(--space-3) 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.checkin-row:last-child {
-  border-bottom: none;
-}
-
-.checkin-top {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
-
-.checkin-name {
-  font-weight: 500;
-  letter-spacing: -0.015em;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.checkin-dist {
-  flex-shrink: 0;
-  font-variant-numeric: tabular-nums;
-  font-size: var(--text-xs);
-}
-
-.checkin-sub {
-  margin: 0.2rem 0 0;
-  font-size: var(--text-xs);
 }
 
 :deep(.leaflet-control-zoom a) {
