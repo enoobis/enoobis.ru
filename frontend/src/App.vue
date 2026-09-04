@@ -487,6 +487,7 @@ function submitReaderPage() {
       </RouterLink>
       <template v-if="!auth.token && !reader.active">
         <div class="nav-guest-links" data-nosnippet>
+          <RouterLink to="/news" class="nav-link"><span>новости</span></RouterLink>
           <RouterLink to="/blogs" class="nav-link"><span>блоги</span></RouterLink>
           <RouterLink to="/microblogs" class="nav-link"><span>микроблоги</span></RouterLink>
         </div>
@@ -609,6 +610,9 @@ function submitReaderPage() {
           aria-label="разделы"
         >
           <nav class="nav-menu-inner">
+            <RouterLink to="/news" class="nav-menu-link" @click="closeNavDrawer">
+              <AppIcon name="news" :size="22" /><span>новости</span>
+            </RouterLink>
             <RouterLink to="/blogs" class="nav-menu-link" @click="closeNavDrawer">
               <AppIcon name="blog" :size="22" /><span>блоги</span>
             </RouterLink>
@@ -737,6 +741,9 @@ function submitReaderPage() {
             <span class="nav-menu-handle" aria-hidden="true" />
             <div class="nav-menu-sheet-body">
               <nav class="nav-menu-inner">
+                <RouterLink to="/news" class="nav-menu-link" @click="closeNavDrawer">
+                  <AppIcon name="news" :size="22" /><span>новости</span>
+                </RouterLink>
                 <RouterLink to="/blogs" class="nav-menu-link" @click="closeNavDrawer">
                   <AppIcon name="blog" :size="22" /><span>блоги</span>
                 </RouterLink>

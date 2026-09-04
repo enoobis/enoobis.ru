@@ -16,6 +16,7 @@ export const UPLOAD_SUBDIRS = [
   "shop-items",
   "micro",
   "submissions",
+  "news",
 ];
 
 /**

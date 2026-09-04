@@ -4,6 +4,7 @@ import sharp from "sharp";
 
 const PRESETS = {
   blog: { maxWidth: 1920, maxHeight: 1920, quality: 82 },
+  news: { maxWidth: 1600, maxHeight: 1600, quality: 82 },
   micro: { maxWidth: 1200, maxHeight: 1200, quality: 80 },
   chat: { maxWidth: 1280, maxHeight: 1280, quality: 80 },
   avatar: { maxWidth: 512, maxHeight: 512, quality: 82 },

@@ -1131,4 +1131,17 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_ai_chat_thread
     ON ai_chat_messages(user_id, course_id, created_at);
+
+  CREATE TABLE IF NOT EXISTS news (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL,
+    image_url TEXT NOT NULL DEFAULT '',
+    source_url TEXT NOT NULL UNIQUE,
+    source_name TEXT NOT NULL DEFAULT '',
+    day TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_news_created ON news(created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_news_day ON news(day);
 `);

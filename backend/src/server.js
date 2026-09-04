@@ -9,6 +9,7 @@ import { v4 as uuidv4 } from "uuid";
 import { isCurrentIdenticon, saveIdenticon } from "./utils/identicon.js";
 import { unlinkUploadUrl } from "./utils/uploadSafe.js";
 import { scheduleChatRetention } from "./utils/chatRetention.js";
+import { scheduleNewsIngest } from "./utils/newsIngest.js";
 import { apiOriginGuard, corsOptions, rateLimit, securityHeaders } from "./utils/security.js";
 import authRoutes from "./routes/authRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
@@ -25,6 +26,7 @@ import libraryRoutes from "./routes/libraryRoutes.js";
 import shopRoutes from "./routes/shopRoutes.js";
 import workRoutes from "./routes/workRoutes.js";
 import aiRoutes from "./routes/aiRoutes.js";
+import newsRoutes from "./routes/newsRoutes.js";
 
 getJwtSecret();
 
@@ -54,6 +56,7 @@ app.use("/api", libraryRoutes);
 app.use("/api", shopRoutes);
 app.use("/api", workRoutes);
 app.use("/api", aiRoutes);
+app.use("/api", newsRoutes);
 app.use("/api", adminRoutes);
 
 app.use("/api", (req, res) => res.status(404).json({ error: "api not found" }));
@@ -152,6 +155,11 @@ server.listen(port, async () => {
     scheduleChatRetention();
   } catch (e) {
     console.warn("chat retention warn:", e?.message ?? e);
+  }
+  try {
+    scheduleNewsIngest();
+  } catch (e) {
+    console.warn("news ingest warn:", e?.message ?? e);
   }
   console.log(`JS backend listening on http://localhost:${port}`);
 });

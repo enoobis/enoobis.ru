@@ -35,6 +35,7 @@ import {
   MessageSquare,
   Moon,
   MoreHorizontal,
+  Newspaper,
   Package,
   PenLine,
   Pencil,
@@ -66,6 +67,7 @@ import {
 
 export type AppIconName =
   | "home"
+  | "news"
   | "blog"
   | "micro"
   | "courses"
@@ -133,6 +135,7 @@ export type AppIconName =
 
 const icons: Record<AppIconName, Component> = {
   home: House,
+  news: Newspaper,
   blog: FileText,
   micro: AtSign,
   courses: GraduationCap,

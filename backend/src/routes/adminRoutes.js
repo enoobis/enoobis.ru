@@ -13,6 +13,7 @@ import { saveIdenticon } from "../utils/identicon.js";
 import { limitsFromAdminBody, limitsToJson, parseContentLimits } from "../utils/contentLimits.js";
 import { optimizeUploadedFile } from "../utils/imageOptimize.js";
 import { finalizeBlogPublish } from "../utils/blogPublish.js";
+import { ingestDailyNews } from "../utils/newsIngest.js";
 import { ensureUserFollowsAdmins } from "../utils/adminFollow.js";
 import { nicknameError } from "../utils/nickname.js";
 import { isAdmin, isPanelStaff } from "../utils/roles.js";
@@ -719,6 +720,15 @@ router.post("/admin/blog/comments/:id/hide", (req, res) => {
 router.post("/admin/blog/comments/:id/restore", (req, res) => {
   run("UPDATE blog_comments SET status = 'visible' WHERE id = ?", req.params.id);
   return res.json({ ok: true });
+});
+
+router.post("/admin/news/run", async (_req, res) => {
+  try {
+    const result = await ingestDailyNews({ force: true });
+    return res.json(result);
+  } catch (e) {
+    return res.status(500).json({ error: e?.message ?? "news_failed" });
+  }
 });
 
 export default router;
