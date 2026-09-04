@@ -1150,4 +1150,15 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_news_created ON news(created_at DESC);
   CREATE INDEX IF NOT EXISTS idx_news_day ON news(day);
+
+  CREATE TABLE IF NOT EXISTS news_comments (
+    id TEXT PRIMARY KEY,
+    news_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    body TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (news_id) REFERENCES news(id),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_news_comments_news ON news_comments(news_id, created_at);
 `);

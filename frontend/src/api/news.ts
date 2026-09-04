@@ -25,3 +25,28 @@ export function getNews(id: string) {
 export function deleteNews(id: string, token: string) {
   return api<{ ok: true }>(`/api/news/${id}`, { method: "DELETE", token });
 }
+
+export type NewsComment = {
+  id: string;
+  news_id: string;
+  user_id: string;
+  author_nickname: string;
+  body: string;
+  created_at: string;
+};
+
+export function listNewsComments(newsId: string) {
+  return api<NewsComment[]>(`/api/news/${newsId}/comments`);
+}
+
+export function createNewsComment(newsId: string, token: string, body: string) {
+  return api<NewsComment>(`/api/news/${newsId}/comments`, {
+    method: "POST",
+    token,
+    body: JSON.stringify({ body }),
+  });
+}
+
+export function deleteNewsComment(id: string, token: string) {
+  return api<{ ok: true }>(`/api/news/comments/${id}`, { method: "DELETE", token });
+}

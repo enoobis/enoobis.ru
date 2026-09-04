@@ -452,6 +452,7 @@ function purgeUserExtras(userId) {
   runIfTable("user_owned_shop_items", "DELETE FROM user_owned_shop_items WHERE user_id = ?", userId);
   runIfTable("user_owned_avatars", "DELETE FROM user_owned_avatars WHERE user_id = ?", userId);
   runIfTable("work_checkins", "DELETE FROM work_checkins WHERE user_id = ?", userId);
+  runIfTable("news_comments", "DELETE FROM news_comments WHERE user_id = ?", userId);
   runIfTable("qr_login_codes", "DELETE FROM qr_login_codes WHERE user_id = ?", userId);
   runIfTable("qr_login_requests", "DELETE FROM qr_login_requests WHERE user_id = ?", userId);
   runIfTable("ai_usage", "DELETE FROM ai_usage WHERE user_id = ?", userId);
