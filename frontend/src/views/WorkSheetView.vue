@@ -12,6 +12,11 @@ const loading = ref(true);
 
 const token = () => String(route.params.token ?? "");
 
+function fmtDay(iso: string) {
+  const [y, m, d] = iso.split("-");
+  return y && m && d ? `${d}.${m}.${y}` : iso;
+}
+
 onMounted(async () => {
   try {
     sheet.value = await getWorkSheet(token());
@@ -46,14 +51,14 @@ onMounted(async () => {
           <tr>
             <th>usernames</th>
             <th>name</th>
-            <th v-for="d in sheet.days" :key="d.n">{{ d.n }}</th>
+            <th v-for="d in sheet.days" :key="d.date">{{ fmtDay(d.date) }}</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="row in sheet.rows" :key="row.nickname">
             <td>{{ row.nickname }}</td>
             <td>{{ row.name }}</td>
-            <td v-for="(m, i) in row.marks" :key="sheet.days[i].n">{{ m }}</td>
+            <td v-for="(m, i) in row.marks" :key="sheet.days[i].date">{{ m }}</td>
           </tr>
         </tbody>
       </table>
