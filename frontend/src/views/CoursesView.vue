@@ -3225,16 +3225,23 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 .course-read-link {
   display: inline-flex;
   align-items: center;
-  min-height: 2.25rem;
-  padding: 0.3rem 0.9rem;
-  border: 1px solid var(--border);
+  justify-content: center;
+  min-height: 2.5rem;
+  padding: 0.4rem 1.2rem;
+  border: 1px solid var(--text);
+  border-bottom-color: var(--text);
   border-radius: var(--radius-pill);
-  color: var(--muted);
-  font-size: var(--text-sm);
+  background: var(--text);
+  color: var(--bg);
+  font-size: var(--text-md);
+  font-weight: 600;
+  letter-spacing: -0.02em;
 }
-.course-read-link:hover {
-  color: var(--text);
-  border-color: var(--text);
+.course-read-link:hover,
+.course-read-link:focus-visible {
+  color: var(--bg);
+  background: var(--text);
+  opacity: 0.88;
   text-decoration: none;
 }
 .course-head h2 {
