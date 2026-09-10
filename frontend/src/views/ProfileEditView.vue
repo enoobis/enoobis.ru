@@ -67,6 +67,12 @@ const session = useSessionStore();
 const router = useRouter();
 const me = ref<Me | null>(null);
 const tab = ref<SettingsTab>("profile");
+const tabMenuOpen = ref(false);
+const tabMenuEl = ref<HTMLElement | null>(null);
+
+const tabLabel = computed(
+  () => SETTINGS_TABS.find((item) => item.id === tab.value)?.label ?? "профиль",
+);
 
 const bio = ref("");
 const readmeMd = ref("");
@@ -300,6 +306,7 @@ onMounted(async () => {
     avatarMsg.value = "";
     await loadInvites();
     document.addEventListener("visibilitychange", onMeVisibility);
+    document.addEventListener("click", onTabMenuDoc);
     void session.ensureMe(true);
   } catch (e) {
     err.value = e instanceof Error ? e.message : "ошибка";
@@ -308,6 +315,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   document.removeEventListener("visibilitychange", onMeVisibility);
+  document.removeEventListener("click", onTabMenuDoc);
   if (nickTimer) clearTimeout(nickTimer);
 });
 
@@ -406,24 +414,49 @@ function pickTheme(id: ThemeId) {
 function closeSettings() {
   router.push(`/u/${auth.nickname}`);
 }
+
+function onTabMenuDoc(e: MouseEvent) {
+  if (!tabMenuOpen.value) return;
+  const t = e.target as Node | null;
+  if (tabMenuEl.value?.contains(t)) return;
+  tabMenuOpen.value = false;
+}
+
+function pickTab(id: SettingsTab) {
+  tab.value = id;
+  tabMenuOpen.value = false;
+}
 </script>
 
 <template>
   <section v-if="me" class="settings-shell">
     <div class="settings card">
       <header class="settings-head">
-        <nav class="settings-tabs" aria-label="разделы">
+        <div ref="tabMenuEl" class="settings-title-wrap">
           <button
-            v-for="item in SETTINGS_TABS"
-            :key="item.id"
-            class="settings-tab"
-            :class="{ on: tab === item.id }"
+            class="settings-title"
             type="button"
-            @click="tab = item.id"
+            aria-haspopup="listbox"
+            :aria-expanded="tabMenuOpen"
+            @click.stop="tabMenuOpen = !tabMenuOpen"
           >
-            {{ item.label }}
+            {{ tabLabel }}
           </button>
-        </nav>
+          <div v-if="tabMenuOpen" class="settings-switch" role="listbox">
+            <button
+              v-for="item in SETTINGS_TABS"
+              :key="item.id"
+              class="settings-switch-item"
+              :class="{ on: tab === item.id }"
+              type="button"
+              role="option"
+              :aria-selected="tab === item.id"
+              @click="pickTab(item.id)"
+            >
+              {{ item.label }}
+            </button>
+          </div>
+        </div>
         <button class="icon-btn settings-close" type="button" aria-label="закрыть" @click="closeSettings">
           <AppIcon name="close" :size="18" />
         </button>
@@ -539,8 +572,6 @@ function closeSettings() {
       </template>
 
       <template v-else-if="tab === 'account'">
-        <h1>аккаунт</h1>
-
         <section class="nick-block">
           <h2>ник</h2>
           <p class="muted small">текущий: <strong>@{{ me.nickname }}</strong></p>
@@ -620,7 +651,6 @@ function closeSettings() {
       </template>
 
       <template v-else-if="tab === 'security'">
-        <h1>безопасность</h1>
         <p class="muted">смена пароля · минимум 8 символов</p>
         <div class="form-grid col-one">
           <label class="col-2">
@@ -640,7 +670,6 @@ function closeSettings() {
       </template>
 
       <template v-else-if="tab === 'invites'">
-        <h1>инвайты</h1>
         <AppLoading v-if="invitesLoading" />
         <p v-else-if="!invites.length" class="muted">пусто</p>
         <div v-else class="invite-list">
@@ -689,45 +718,71 @@ function closeSettings() {
 }
 
 .settings-head {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: start;
-  gap: 0.35rem 0.75rem;
-  margin-bottom: 1rem;
-  padding-bottom: 0.75rem;
-  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
 }
 
-.settings-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.15rem 1rem;
+.settings-title-wrap {
+  position: relative;
   min-width: 0;
 }
 
-.settings-tab {
+.settings-title {
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  padding: 0;
+  min-height: 0;
+  cursor: pointer;
+  text-transform: lowercase;
+}
+
+.settings-title:hover {
+  color: var(--text);
+  background: transparent;
+}
+
+.settings-switch {
+  position: absolute;
+  top: calc(100% + 0.7rem);
+  left: 0;
+  z-index: 4;
+  display: grid;
+  gap: 0.1rem;
+  min-width: 8rem;
+  background: var(--surface);
+}
+
+.settings-switch-item {
   border: 0;
   background: transparent;
   color: var(--muted);
   font: inherit;
-  font-size: var(--text-sm);
+  font-size: var(--text-md);
   font-weight: 500;
-  letter-spacing: -0.015em;
-  padding: 0.15rem 0;
+  letter-spacing: -0.02em;
+  text-align: left;
+  text-transform: lowercase;
+  padding: 0.4rem 0;
   min-height: 0;
-  border-radius: 0;
   cursor: pointer;
 }
 
-.settings-tab:hover,
-.settings-tab.on {
+.settings-switch-item.on,
+.settings-switch-item:hover {
   color: var(--text);
   background: transparent;
 }
 
 .settings-close {
-  margin-top: -0.2rem;
+  flex-shrink: 0;
 }
 
 .settings-body {
