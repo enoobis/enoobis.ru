@@ -1857,9 +1857,10 @@ onUnmounted(() => {
   padding: 0.2rem 0.4rem;
 }
 .list-head h2 {
-  font-size: 1.25rem;
+  font-size: 1.45rem;
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
   margin: 0;
   text-transform: lowercase;
   color: var(--text);
