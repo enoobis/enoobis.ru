@@ -412,20 +412,20 @@ function closeSettings() {
   <section v-if="me" class="settings-shell">
     <div class="settings card">
       <header class="settings-head">
-        <nav class="settings-tabs" aria-label="разделы">
+        <nav class="filter-tabs settings-tabs" aria-label="разделы">
           <button
             v-for="item in SETTINGS_TABS"
             :key="item.id"
-            class="settings-tab"
-            :class="{ active: tab === item.id }"
+            class="filter-tab"
+            :class="{ on: tab === item.id }"
             type="button"
             @click="tab = item.id"
           >
             {{ item.label }}
           </button>
         </nav>
-        <button class="settings-close secondary" type="button" aria-label="закрыть" @click="closeSettings">
-          <AppIcon name="close" />
+        <button class="icon-btn settings-close" type="button" aria-label="закрыть" @click="closeSettings">
+          <AppIcon name="close" :size="18" />
         </button>
       </header>
 
@@ -685,7 +685,6 @@ function closeSettings() {
 }
 
 .settings {
-  border-radius: 20px;
   padding: 0.85rem 1rem 1.25rem;
 }
 
@@ -699,56 +698,34 @@ function closeSettings() {
 }
 
 .settings-tabs {
-  display: flex;
-  gap: 0.2rem;
   flex: 1;
-  min-width: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-}
-
-.settings-tabs::-webkit-scrollbar {
-  display: none;
-}
-
-@media (max-width: 760px) {
-  .settings-tabs {
-    mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
-    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
-  }
-}
-
-.settings-tab {
-  flex-shrink: 0;
-  border: 0;
-  background: transparent;
-  color: var(--muted);
-  font: inherit;
-  font-size: var(--text-xs);
-  padding: 0.4rem 0.65rem;
-  border-radius: var(--radius-pill);
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.settings-tab:hover {
-  color: var(--text);
-}
-
-.settings-tab.active {
-  background: var(--surface2);
-  color: var(--text);
 }
 
 .settings-close {
   flex-shrink: 0;
-  min-height: 0;
-  width: 36px;
-  height: 36px;
-  padding: 0;
-  display: grid;
-  place-items: center;
+}
+
+@media (max-width: 760px) {
+  .settings-head {
+    flex-wrap: wrap;
+  }
+  .settings-close {
+    order: -1;
+    margin-left: auto;
+  }
+  .settings-tabs {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    overflow: visible;
+    border-radius: calc(var(--radius) + 4px);
+  }
+  .settings-tabs .filter-tab {
+    flex: 1 1 calc(50% - 2px);
+    min-width: calc(50% - 2px);
+    min-height: 2.4rem;
+    font-size: var(--text-xs);
+    white-space: normal;
+  }
 }
 
 .settings-body {
