@@ -53,10 +53,10 @@ function startDayKey() {
 export function buildWorkSheet() {
   const today = workDayKey();
   const days = enumerateDays(startDayKey(), today);
-  const masters = all(
+  const workers = all(
     `SELECT id, nickname, full_name
      FROM users
-     WHERE role = 'master' AND status = 'approved'
+     WHERE role IN ('master', 'admin') AND status = 'approved'
      ORDER BY nickname COLLATE NOCASE`,
   );
   const hits = all("SELECT user_id, created_at FROM work_checkins");
@@ -67,20 +67,17 @@ export function buildWorkSheet() {
     byUser.get(h.user_id).add(day);
   }
 
-  const rows = masters.map((u) => {
+  const rows = workers.map((u) => {
     const seen = byUser.get(u.id) ?? new Set();
     return {
       nickname: u.nickname,
       name: String(u.full_name ?? "").trim(),
-      marks: days.map((day) => {
-        if (day === today) return "";
-        return seen.has(day) ? "1" : "0";
-      }),
+      marks: days.map((day) => (seen.has(day) ? "1" : "0")),
     };
   });
 
   return {
-    days: days.map((date, i) => ({ n: i + 1, date, done: date !== today })),
+    days: days.map((date, i) => ({ n: i + 1, date, done: true })),
     rows,
   };
 }

@@ -244,11 +244,18 @@ function writeSheetXlsx(res) {
   const sheet = buildWorkSheet();
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet("отметки");
-  ws.addRow(["usernames", "name", ...sheet.days.map((d) => d.n)]);
+  ws.addRow([
+    "usernames",
+    "name",
+    ...sheet.days.map((d) => {
+      const [y, m, day] = String(d.date).split("-");
+      return y && m && day ? `${day}.${m}.${y}` : d.date;
+    }),
+  ]);
   ws.getColumn(1).width = 22;
   ws.getColumn(2).width = 22;
   sheet.days.forEach((_, i) => {
-    ws.getColumn(i + 3).width = 6;
+    ws.getColumn(i + 3).width = 12;
   });
   for (const row of sheet.rows) {
     ws.addRow([row.nickname, row.name, ...row.marks]);

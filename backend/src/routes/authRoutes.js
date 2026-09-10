@@ -35,19 +35,20 @@ function userPayload(row) {
 }
 
 router.post("/register", registerLimit, async (req, res) => {
-  const { email = "", password = "", nickname = "", invite_code } = req.body ?? {};
+  const { password = "", nickname = "", invite_code } = req.body ?? {};
   if (req.body?.accepted_terms !== true) {
     return res.status(400).json({ error: "нужно принять соглашение" });
   }
-  const normEmail = String(email).trim().toLowerCase();
+  const nick = String(nickname).trim();
   const policyErr = passwordPolicyError(password);
-  if (!normEmail || policyErr) {
-    return res.status(400).json({ error: policyErr ?? "invalid_email" });
+  if (policyErr) {
+    return res.status(400).json({ error: policyErr });
   }
-  const nickErr = nicknameError(nickname);
+  const nickErr = nicknameError(nick);
   if (nickErr) {
     return res.status(400).json({ error: nickErr });
   }
+  const placeholderEmail = `${nick.toLowerCase()}@users.local`;
 
   let role = "student";
   let status = "pending";
@@ -76,7 +77,7 @@ router.post("/register", registerLimit, async (req, res) => {
       const id = uuidv4();
       let avatarUrl = "";
       try {
-        avatarUrl = saveIdenticon(nickname, id);
+        avatarUrl = saveIdenticon(nick, id);
       } catch {
         avatarUrl = "";
       }
@@ -85,15 +86,15 @@ router.post("/register", registerLimit, async (req, res) => {
         (id, email, password_hash, nickname, role, status, bio, wallpaper_url, avatar_url, created_at)
         VALUES (?, ?, ?, ?, ?, ?, '', '', ?, ?)`,
         id,
-        normEmail,
+        placeholderEmail,
         hash,
-        nickname,
+        nick,
         role,
         status,
         avatarUrl,
         nowIso(),
       );
-      return { id, role, status, normEmail, nickname, avatarUrl };
+      return { id, role, status, email: placeholderEmail, nickname: nick, avatarUrl };
     })();
 
     ensureUserFollowsAdmins(created.id);
@@ -107,7 +108,7 @@ router.post("/register", registerLimit, async (req, res) => {
       token,
       user: {
         id: created.id,
-        email: created.normEmail,
+        email: created.email,
         nickname: created.nickname,
         role: created.role,
         status: "approved",
@@ -124,12 +125,19 @@ router.post("/register", registerLimit, async (req, res) => {
 });
 
 router.post("/login", loginLimit, async (req, res) => {
-  const { email = "", password = "" } = req.body ?? {};
-  const normEmail = String(email).trim().toLowerCase();
-  const row = get(
-    "SELECT id, email, nickname, role, status, password_hash, coins FROM users WHERE email = ?",
-    normEmail,
-  );
+  const login = String(req.body?.nickname ?? req.body?.email ?? "").trim();
+  const { password = "" } = req.body ?? {};
+  if (!login || !password) return res.status(401).json({ error: "unauthorized" });
+  const row =
+    get(
+      `SELECT id, email, nickname, role, status, password_hash, coins
+       FROM users WHERE nickname = ? COLLATE NOCASE`,
+      login,
+    ) ||
+    get(
+      "SELECT id, email, nickname, role, status, password_hash, coins FROM users WHERE email = ?",
+      login.toLowerCase(),
+    );
   if (!row) return res.status(401).json({ error: "unauthorized" });
   const ok = await verifyPassword(password, row.password_hash);
   if (!ok) return res.status(401).json({ error: "unauthorized" });

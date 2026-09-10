@@ -13,6 +13,6 @@ export function finalizeBlogPublish(postId, authorId) {
   );
   if (firstPublish) {
     awardAchievement(authorId, "first_blog");
-    run("UPDATE users SET coins = coins + 2 WHERE id = ?", authorId);
+    run("UPDATE users SET coins = coins + 200 WHERE id = ?", authorId);
   }
 }
