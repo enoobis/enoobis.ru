@@ -2,9 +2,8 @@
 import { nextTick, onUnmounted, ref, watch } from "vue";
 import { AnimatePresence, motion } from "motion-v";
 import AppIcon from "./AppIcon.vue";
+import { springSnappy } from "../utils/motionPresets";
 import { prefersReducedMotion } from "../utils/reducedMotion";
-
-const expandTween = { duration: 0.32, ease: [0.22, 1, 0.36, 1] as const };
 
 const open = defineModel<boolean>("open", { default: false });
 const query = defineModel<string>("query", { default: "" });
@@ -17,9 +16,8 @@ const triggerEl = ref<HTMLButtonElement | null>(null);
 const inputEl = ref<HTMLInputElement | null>(null);
 const fieldWidth = ref(46);
 const fieldTop = ref(0);
-const fieldRight = ref(0);
+const fieldLeft = ref(0);
 const collapsedWidth = ref(46);
-const pinSize = ref(46);
 const reduced = prefersReducedMotion();
 
 const leftGap = 16;
@@ -49,11 +47,10 @@ function syncLayout() {
   const barRect = bar.getBoundingClientRect();
   const leftEdge = leftNavRightEdge(bar, barRect.left + 12);
   collapsedWidth.value = triggerRect.width;
-  pinSize.value = triggerRect.width;
   const width = Math.max(collapsedWidth.value, triggerRect.right - leftEdge);
 
-  fieldTop.value = triggerRect.top;
-  fieldRight.value = document.documentElement.clientWidth - triggerRect.right;
+  fieldTop.value = triggerRect.top + triggerRect.height / 2;
+  fieldLeft.value = triggerRect.right;
   fieldWidth.value = width;
 }
 
@@ -104,12 +101,7 @@ defineExpose({ focus: focusInput });
           v-if="open"
           key="field"
           class="nav-search-expand__field"
-          :style="{
-            top: `${fieldTop}px`,
-            right: `${fieldRight}px`,
-            height: `${pinSize}px`,
-            '--pin-size': `${pinSize}px`,
-          }"
+          :style="{ top: `${fieldTop}px`, left: `${fieldLeft}px` }"
           :initial="reduced ? false : { width: collapsedWidth }"
           :animate="{ width: fieldWidth }"
           :exit="
@@ -117,7 +109,7 @@ defineExpose({ focus: focusInput });
               ? undefined
               : { width: collapsedWidth, opacity: 0, transition: { duration: 0.18 } }
           "
-          :transition="expandTween"
+          :transition="springSnappy"
         >
           <input
             ref="inputEl"
@@ -128,7 +120,6 @@ defineExpose({ focus: focusInput });
             autocomplete="off"
             @keydown.esc.stop="closeSearch"
           />
-          <span class="nav-search-expand__slot" aria-hidden="true" />
           <span class="nav-search-expand__icon" aria-hidden="true">
             <AppIcon name="search" :size="20" />
           </span>
@@ -161,14 +152,17 @@ defineExpose({ focus: focusInput });
 .nav-search-expand__field {
   position: fixed;
   z-index: 120;
+  translate: -100% -50%;
   display: flex;
   align-items: center;
+  height: var(--control-h);
   overflow: hidden;
   padding: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
   background: var(--surface);
   color: var(--muted);
+  transform-origin: right center;
 }
 
 .nav-search-expand__input {
@@ -191,22 +185,13 @@ defineExpose({ focus: focusInput });
   color: var(--muted);
 }
 
-.nav-search-expand__slot {
-  flex: 0 0 calc(var(--pin-size, var(--control-h)) - 2px);
-  width: calc(var(--pin-size, var(--control-h)) - 2px);
-  height: 1px;
-}
-
 .nav-search-expand__icon {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: calc(var(--pin-size, var(--control-h)) - 2px);
   display: grid;
   place-items: center;
+  flex-shrink: 0;
+  width: calc(var(--control-h) - 2px);
+  height: calc(var(--control-h) - 2px);
   color: var(--muted);
-  pointer-events: none;
 }
 
 .nav-search-trigger {
