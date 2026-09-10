@@ -412,11 +412,11 @@ function closeSettings() {
   <section v-if="me" class="settings-shell">
     <div class="settings card">
       <header class="settings-head">
-        <nav class="filter-tabs settings-tabs" aria-label="разделы">
+        <nav class="settings-tabs" aria-label="разделы">
           <button
             v-for="item in SETTINGS_TABS"
             :key="item.id"
-            class="filter-tab"
+            class="settings-tab"
             :class="{ on: tab === item.id }"
             type="button"
             @click="tab = item.id"
@@ -689,43 +689,45 @@ function closeSettings() {
 }
 
 .settings-head {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: start;
+  gap: 0.35rem 0.75rem;
   margin-bottom: 1rem;
   padding-bottom: 0.75rem;
   border-bottom: 1px solid var(--border);
 }
 
 .settings-tabs {
-  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.15rem 1rem;
+  min-width: 0;
+}
+
+.settings-tab {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  padding: 0.15rem 0;
+  min-height: 0;
+  border-radius: 0;
+  cursor: pointer;
+}
+
+.settings-tab:hover,
+.settings-tab.on {
+  color: var(--text);
+  background: transparent;
 }
 
 .settings-close {
-  flex-shrink: 0;
-}
-
-@media (max-width: 760px) {
-  .settings-head {
-    flex-wrap: wrap;
-  }
-  .settings-close {
-    order: -1;
-    margin-left: auto;
-  }
-  .settings-tabs {
-    flex: 1 1 100%;
-    flex-wrap: wrap;
-    overflow: visible;
-    border-radius: calc(var(--radius) + 4px);
-  }
-  .settings-tabs .filter-tab {
-    flex: 1 1 calc(50% - 2px);
-    min-width: calc(50% - 2px);
-    min-height: 2.4rem;
-    font-size: var(--text-xs);
-    white-space: normal;
-  }
+  margin-top: -0.2rem;
 }
 
 .settings-body {
