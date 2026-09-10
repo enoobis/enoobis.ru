@@ -1415,7 +1415,6 @@ onUnmounted(() => {
   display: grid;
   grid-template-columns: 320px 1fr;
   gap: 0;
-  border: 1px solid var(--border);
   /* сначала vh - старые браузеры; dvh - мобильный chrome без «обрезания» композера */
   height: calc(100vh - 8.75rem);
   max-height: calc(100vh - 8.75rem);
@@ -1426,19 +1425,18 @@ onUnmounted(() => {
 }
 
 .chat-list {
-  border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
   overflow-y: auto;
+  padding: 0 0.25rem 0.5rem;
 }
 .list-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.55rem 0.6rem 0.55rem 1rem;
-  border-bottom: 1px solid var(--border);
+  padding: 0.35rem 0.6rem 0.85rem 0.75rem;
   position: sticky;
   top: 0;
   background: var(--bg, #000);
@@ -1846,7 +1844,7 @@ onUnmounted(() => {
   display: grid;
   grid-template-columns: 1fr auto;
   align-items: stretch;
-  border-bottom: 1px solid var(--border);
+  border-radius: var(--radius);
   cursor: pointer;
   text-align: left;
   font: inherit;
@@ -2018,8 +2016,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 0.7rem;
-  padding: 0.65rem 1rem;
-  border-bottom: 1px solid var(--border);
+  padding: 0.35rem 0.25rem 0.85rem 0.5rem;
   flex-shrink: 0;
 }
 .thread-head-actions {
@@ -2256,7 +2253,6 @@ onUnmounted(() => {
 }
 
 .composer-wrap {
-  border-top: 1px solid var(--border);
   flex-shrink: 0;
 }
 .reply-bar {
@@ -2435,7 +2431,7 @@ onUnmounted(() => {
     display: inline-flex;
   }
   .chat-list {
-    border-right: none;
+    padding-inline: 0;
   }
 }
 </style>
