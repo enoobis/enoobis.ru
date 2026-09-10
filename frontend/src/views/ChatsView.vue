@@ -319,6 +319,7 @@ async function kickMember(m: ChatGroupMember) {
 }
 
 function openAddMember() {
+  threadMenuOpen.value = false;
   closeMembers();
   memberQuery.value = "";
   memberSuggestions.value = [];
@@ -417,10 +418,12 @@ const sending = ref(false);
 const loadingChats = ref(false);
 const loadingMessages = ref(false);
 const err = ref("");
-const messagesEnd = ref<HTMLElement | null>(null);
+const messagesBox = ref<HTMLElement | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
 const composerTextarea = ref<HTMLTextAreaElement | null>(null);
 const composerTall = ref(false);
+const threadMenuOpen = ref(false);
+const threadMenuEl = ref<HTMLElement | null>(null);
 const pendingFile = ref<File | null>(null);
 const pendingPreview = ref("");
 const lightboxUrl = ref("");
@@ -550,11 +553,13 @@ function clearReplyTarget() {
 }
 
 function removeCurrentChat() {
+  threadMenuOpen.value = false;
   const c = chats.value.find((x) => x.id === activeId.value);
   if (c) void removeChatFromList(c);
 }
 
 async function clearThreadHistory() {
+  threadMenuOpen.value = false;
   if (!auth.token || !activeId.value) return;
   if (!window.confirm("удалить все сообщения в этом чате? без восстановления.")) return;
   try {
@@ -595,7 +600,7 @@ async function loadMessages(scrollEnd = true) {
     otherAvatar.value = data.other?.avatar_url ?? "";
     if (scrollEnd) {
       await nextTick();
-      messagesEnd.value?.scrollIntoView({ block: "end" });
+      scrollMessagesEnd();
     }
     await markChatRead(chatId, auth.token);
     const c = chats.value.find((x) => x.id === chatId);
@@ -633,7 +638,7 @@ async function pollMessages() {
     if (data.items.length) {
       messages.value = [...messages.value, ...data.items];
       await nextTick();
-      messagesEnd.value?.scrollIntoView({ block: "end", behavior: "smooth" });
+      scrollMessagesEnd();
       await markChatRead(chatId, auth.token);
       void chatStore.refresh();
       void loadChats();
@@ -712,7 +717,7 @@ async function send() {
     replyTarget.value = null;
     clearPending();
     await nextTick();
-    messagesEnd.value?.scrollIntoView({ block: "end", behavior: "smooth" });
+    scrollMessagesEnd();
     void loadChats();
   } catch (e) {
     toastError(e);
@@ -784,7 +789,45 @@ function onEditKey(e: KeyboardEvent, m: ChatMessage) {
   }
 }
 
+const COMPOSER_MIN_H = 48;
 const COMPOSER_MAX_H = 220;
+
+function scrollMessagesEnd() {
+  const box = messagesBox.value;
+  if (!box) return;
+  box.scrollTop = box.scrollHeight;
+}
+
+function lockChatScroll() {
+  window.scrollTo(0, 0);
+  document.documentElement.scrollTop = 0;
+  document.body.scrollTop = 0;
+}
+
+function syncKeyboardInset() {
+  const vv = window.visualViewport;
+  if (!vv) return;
+  const inset = window.innerHeight - vv.height - vv.offsetTop;
+  document.documentElement.style.setProperty("--kb", inset > 80 ? `${Math.round(inset)}px` : "0px");
+  lockChatScroll();
+}
+
+function onComposerFocus() {
+  requestAnimationFrame(() => {
+    syncKeyboardInset();
+    scrollMessagesEnd();
+  });
+  window.setTimeout(() => {
+    syncKeyboardInset();
+    scrollMessagesEnd();
+  }, 280);
+}
+
+function onThreadMenuDoc(e: MouseEvent) {
+  const t = e.target as Node | null;
+  if (threadMenuEl.value?.contains(t)) return;
+  threadMenuOpen.value = false;
+}
 
 function onKey(e: KeyboardEvent) {
   if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
@@ -801,10 +844,10 @@ function adjustComposerHeight() {
   el.style.height = "0";
   void el.offsetHeight;
   const sh = el.scrollHeight;
-  const h = Math.min(Math.max(sh, 40), cap);
+  const h = Math.min(Math.max(sh, COMPOSER_MIN_H), cap);
   el.style.height = `${h}px`;
   el.style.overflowY = sh > cap ? "auto" : "hidden";
-  composerTall.value = sh > 52;
+  composerTall.value = sh > COMPOSER_MIN_H + 8;
 }
 
 function scheduleComposerResize() {
@@ -821,10 +864,19 @@ watch(
 watch(
   activeId,
   () => {
+    threadMenuOpen.value = false;
     scheduleComposerResize();
   },
   { flush: "post" },
 );
+
+watch(threadMenuOpen, (open) => {
+  if (open) {
+    document.addEventListener("click", onThreadMenuDoc);
+    return;
+  }
+  document.removeEventListener("click", onThreadMenuDoc);
+});
 
 function timeAgo(iso: string | null) {
   if (!iso) return "";
@@ -880,6 +932,10 @@ usePageRefresh(async () => {
 });
 
 onMounted(async () => {
+  document.documentElement.classList.add("chats-page");
+  window.visualViewport?.addEventListener("resize", syncKeyboardInset);
+  window.visualViewport?.addEventListener("scroll", syncKeyboardInset);
+  syncKeyboardInset();
   await loadChats();
   const id = typeof route.query.id === "string" ? route.query.id : "";
   if (id) {
@@ -892,6 +948,11 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  document.documentElement.classList.remove("chats-page");
+  document.documentElement.style.removeProperty("--kb");
+  window.visualViewport?.removeEventListener("resize", syncKeyboardInset);
+  window.visualViewport?.removeEventListener("scroll", syncKeyboardInset);
+  document.removeEventListener("click", onThreadMenuDoc);
   if (chatsTimer) clearInterval(chatsTimer);
   if (messagesTimer) clearInterval(messagesTimer);
   if (memberSearchTimer) clearTimeout(memberSearchTimer);
@@ -972,9 +1033,9 @@ onUnmounted(() => {
             <AppIcon name="back" :size="22" />
           </button>
           <button v-if="groupInfo" type="button" class="who who--group" @click="openMembers">
-            <span class="avatar small">
+            <span class="avatar">
               <img v-if="groupInfo.avatar_url" :src="groupInfo.avatar_url" alt="" />
-              <AppIcon v-else name="users" :size="13" />
+              <AppIcon v-else name="users" :size="16" />
             </span>
             <span class="who-text">
               <span>{{ groupInfo.title }}</span>
@@ -982,7 +1043,7 @@ onUnmounted(() => {
             </span>
           </button>
           <RouterLink v-else-if="otherNickname" :to="`/u/${otherNickname}`" class="who">
-            <span class="avatar small">
+            <span class="avatar">
               <img v-if="otherAvatar" :src="otherAvatar" alt="" />
               <span v-else>{{ otherNickname.slice(0, 2) }}</span>
             </span>
@@ -990,42 +1051,35 @@ onUnmounted(() => {
               <span>{{ otherNickname }}</span>
             </span>
           </RouterLink>
-          <span v-if="otherNickname || groupInfo" class="thread-head-actions">
-            <button
-              v-if="groupInfo"
-              type="button"
-              class="thread-act"
-              aria-label="добавить участника"
-              title="добавить участника"
-              @click="openAddMember"
-            >
-              <AppIcon name="register" :size="16" />
-            </button>
-            <button
-              v-if="!groupInfo || groupInfo.owner_id === auth.user?.id"
-              type="button"
-              class="thread-act"
-              aria-label="очистить переписку"
-              title="очистить переписку"
-              @click="clearThreadHistory"
-            >
-              <AppIcon name="clear" :size="16" />
-            </button>
+          <div v-if="otherNickname || groupInfo" ref="threadMenuEl" class="thread-menu">
             <button
               type="button"
               class="thread-act"
-              :aria-label="groupInfo ? 'выйти из группы' : 'убрать чат из списка'"
-              :title="groupInfo ? 'выйти из группы' : 'убрать чат'"
-              @click="removeCurrentChat"
+              aria-label="ещё"
+              :aria-expanded="threadMenuOpen"
+              @click.stop="threadMenuOpen = !threadMenuOpen"
             >
-              <AppIcon :name="groupInfo ? 'logout' : 'delete'" :size="16" />
+              <AppIcon name="more" :size="20" />
             </button>
-          </span>
+            <div v-if="threadMenuOpen" class="thread-menu-list">
+              <button v-if="groupInfo" type="button" @click="openAddMember">добавить</button>
+              <button
+                v-if="!groupInfo || groupInfo.owner_id === auth.user?.id"
+                type="button"
+                @click="clearThreadHistory"
+              >
+                очистить
+              </button>
+              <button type="button" @click="removeCurrentChat">
+                {{ groupInfo ? "выйти" : "убрать" }}
+              </button>
+            </div>
+          </div>
         </header>
 
-        <div class="messages">
-          <AppLoading v-if="loadingMessages && !messages.length" class="page-empty" />
-          <p v-else-if="!messages.length" class="page-empty muted">напишите первое сообщение</p>
+        <div ref="messagesBox" class="messages">
+          <AppLoading v-if="loadingMessages && !messages.length" class="page-empty center" />
+          <p v-else-if="!messages.length" class="page-empty muted center">напишите первое сообщение</p>
           <template v-for="row in messageRows" :key="row.id">
             <div v-if="row.kind === 'day'" class="day-mark muted small">
               {{ row.line }}
@@ -1135,7 +1189,6 @@ onUnmounted(() => {
               </span>
             </div>
           </template>
-          <div ref="messagesEnd" />
         </div>
 
         <div class="composer-wrap">
@@ -1161,7 +1214,7 @@ onUnmounted(() => {
               title="прикрепить"
               @click="pickFile"
             >
-              <AppIcon name="image" :size="18" />
+              <AppIcon name="image" :size="20" />
             </button>
             <input
               ref="fileInput"
@@ -1179,16 +1232,19 @@ onUnmounted(() => {
               placeholder="сообщение"
               :maxlength="4000"
               @keydown="onKey"
+              @focus="onComposerFocus"
               @input="scheduleComposerResize"
               @paste="onPaste"
               @compositionend="scheduleComposerResize"
             />
             <button
               type="button"
+              class="send"
               :disabled="sending || (!draft.trim() && !pendingFile)"
+              aria-label="отправить"
               @click="send"
             >
-              {{ sending ? "…" : "отправить" }}
+              <AppIcon name="send" :size="20" />
             </button>
           </div>
         </div>
@@ -1912,6 +1968,13 @@ onUnmounted(() => {
   gap: 0.05rem;
   min-width: 0;
 }
+.who-text > span:first-child {
+  font-size: var(--text-md);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .presence-label {
   color: var(--muted);
   font-size: var(--text-xs);
@@ -1937,7 +2000,7 @@ onUnmounted(() => {
 }
 .nick {
   color: var(--text);
-  font-size: var(--text-sm);
+  font-size: var(--text-md);
   text-transform: lowercase;
   white-space: nowrap;
   overflow: hidden;
@@ -2016,15 +2079,41 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 0.7rem;
-  padding: 0.35rem 0.25rem 0.85rem 0.5rem;
+  padding: 0.45rem 0.35rem 0.9rem 0.5rem;
   flex-shrink: 0;
 }
-.thread-head-actions {
+.thread-menu {
+  position: relative;
   margin-left: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
   flex-shrink: 0;
+}
+.thread-menu-list {
+  position: absolute;
+  top: calc(100% + 0.25rem);
+  right: 0;
+  z-index: 5;
+  min-width: 8.5rem;
+  padding: 0.25rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  display: grid;
+}
+.thread-menu-list button {
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-md);
+  text-align: left;
+  text-transform: lowercase;
+  padding: 0.55rem 0.7rem;
+  min-height: 42px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.thread-menu-list button:hover {
+  background: var(--surface2);
 }
 .thread-act {
   width: 40px;
@@ -2096,10 +2185,10 @@ onUnmounted(() => {
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
-  padding: 1rem;
+  padding: 1.1rem 1.15rem 1.25rem;
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 0.5rem;
 }
 .day-mark {
   text-align: center;
@@ -2119,16 +2208,16 @@ onUnmounted(() => {
   flex-direction: row-reverse;
 }
 .bubble {
-  max-width: 70%;
-  padding: 0.4rem 0.65rem 0.35rem;
+  max-width: min(36rem, 78%);
+  padding: 0.6rem 0.85rem 0.5rem;
   border: 1px solid var(--border);
-  border-radius: 14px;
-  border-bottom-left-radius: 4px;
+  border-radius: 16px;
+  border-bottom-left-radius: 5px;
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
-  column-gap: 0.5rem;
-  row-gap: 0.1rem;
+  column-gap: 0.55rem;
+  row-gap: 0.15rem;
 }
 .msg.me .bubble {
   background: var(--surface2);
@@ -2170,8 +2259,8 @@ onUnmounted(() => {
   white-space: pre-wrap;
   word-wrap: break-word;
   overflow-wrap: anywhere;
-  font-size: var(--text-md);
-  line-height: 1.4;
+  font-size: 1rem;
+  line-height: 1.45;
   flex: 1 1 auto;
   min-width: 0;
 }
@@ -2332,14 +2421,15 @@ onUnmounted(() => {
 .composer {
   display: grid;
   grid-template-columns: auto 1fr auto;
-  gap: 0.5rem;
-  padding: 0.7rem 1rem;
+  gap: 0.55rem;
+  padding: 0.75rem 1rem 1rem;
   align-items: end;
 }
-.attach {
-  width: 40px;
-  height: 40px;
-  min-height: 40px;
+.attach,
+.send {
+  width: 48px;
+  height: 48px;
+  min-height: 48px;
   padding: 0;
   border-radius: 999px;
   background: transparent;
@@ -2349,35 +2439,36 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
 }
-.attach:hover {
+.attach:hover,
+.send:hover:not(:disabled) {
   color: var(--text);
+}
+.send {
+  color: var(--text);
+}
+.send:disabled {
+  opacity: 0.35;
 }
 .composer .composer-ta {
   resize: none;
-  min-height: 40px;
+  min-height: 48px;
   max-height: 220px;
   border: 1px solid var(--border);
   border-radius: 999px;
-  padding: 0.55rem 1rem;
+  padding: 0.75rem 1.1rem;
   font: inherit;
-  font-size: var(--text-sm);
-  line-height: 1.4;
+  font-size: 1rem;
+  line-height: 1.45;
   background: transparent;
   color: var(--text);
   overflow-y: hidden;
 }
 .composer .composer-ta.composer-ta--tall {
-  border-radius: 14px;
+  border-radius: 16px;
 }
 .composer .composer-ta:focus {
   outline: none;
   border-color: var(--focus-border);
-}
-.composer button:not(.attach) {
-  padding: 0.4rem 1rem;
-  min-height: 40px;
-  border-radius: 999px;
-  font-size: var(--text-sm);
 }
 
 .msg-img {
@@ -2410,16 +2501,26 @@ onUnmounted(() => {
 @media (min-width: 761px) {
   .chats {
     min-height: 400px;
+    grid-template-columns: 340px 1fr;
+  }
+  .composer {
+    padding: 0.85rem 1.15rem 1.15rem;
+  }
+  .attach,
+  .send {
+    width: 52px;
+    height: 52px;
+    min-height: 52px;
+  }
+  .composer .composer-ta {
+    min-height: 52px;
+    padding: 0.85rem 1.2rem;
   }
 }
 
 @media (max-width: 760px) {
   .chats {
     grid-template-columns: 1fr;
-    height: calc(100vh - 6.25rem);
-    max-height: calc(100vh - 6.25rem);
-    height: calc(100dvh - 6.25rem);
-    max-height: calc(100dvh - 6.25rem);
   }
   .chat-list.hidden {
     display: none;
