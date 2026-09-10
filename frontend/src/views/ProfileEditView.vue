@@ -33,7 +33,6 @@ type Me = {
   language_preference: "ru" | "en";
   theme_preference: string;
   full_name: string;
-  website_url: string;
   social_links: SocialLink[];
   birthday: string;
   country: string;
@@ -41,7 +40,7 @@ type Me = {
   moderation_notices?: string[];
 };
 
-const MAX_NICK_CHANGES = 3;
+const MAX_NICK_CHANGES = 2;
 
 type InviteLink = {
   id: string;
@@ -80,7 +79,6 @@ const readmePreview = computed(() => renderMarkdown(readmeMd.value));
 const languagePreference = ref<"ru" | "en">("ru");
 const themePreference = ref<ThemeId>("black");
 const fullName = ref("");
-const websiteUrl = ref("");
 const socialLinks = ref<SocialLink[]>([]);
 const birthday = ref("");
 const country = ref("");
@@ -122,7 +120,7 @@ function applyMeMerge(oldMe: Me, fresh: Me) {
     themePreference.value = normalizeThemeId(fresh.theme_preference);
   }
   if (fullName.value === normStr(oldMe.full_name)) fullName.value = normStr(fresh.full_name);
-  if (websiteUrl.value === normStr(oldMe.website_url)) websiteUrl.value = normStr(fresh.website_url);
+  if (newNick.value === oldMe.nickname) newNick.value = fresh.nickname;
   if (birthday.value === normStr(oldMe.birthday)) birthday.value = normStr(fresh.birthday);
   if (country.value === normStr(oldMe.country)) country.value = normStr(fresh.country);
   if (normSocialJson(socialLinks.value) === normSocialJson(Array.isArray(oldMe.social_links) ? oldMe.social_links : [])) {
@@ -151,7 +149,7 @@ async function refreshMeFromServer() {
       languagePreference.value = fresh.language_preference;
       themePreference.value = normalizeThemeId(fresh.theme_preference);
       fullName.value = fresh.full_name ?? "";
-      websiteUrl.value = fresh.website_url ?? "";
+      newNick.value = fresh.nickname;
       socialLinks.value = Array.isArray(fresh.social_links) ? [...fresh.social_links] : [];
       birthday.value = fresh.birthday ?? "";
       country.value = fresh.country ?? "";
@@ -189,8 +187,9 @@ function onNickInput() {
   if (nickTimer) clearTimeout(nickTimer);
   const v = newNick.value.trim();
   if (!v) return;
+  if (me.value && v.toLowerCase() === me.value.nickname.toLowerCase()) return;
   nickStatus.value = "checking";
-  nickTimer = setTimeout(checkNick, 350);
+  nickTimer = setTimeout(() => void checkNick(), 350);
 }
 
 async function checkNick() {
@@ -208,7 +207,7 @@ async function checkNick() {
     if (newNick.value.trim() !== v) return;
     if (r.available) {
       nickStatus.value = "ok";
-      nickMessage.value = "ник свободен";
+      nickMessage.value = "";
     } else {
       nickStatus.value = "err";
       nickMessage.value = r.reason ?? "недоступен";
@@ -219,11 +218,19 @@ async function checkNick() {
   }
 }
 
-async function changeNickname() {
-  if (!auth.token || !me.value || changingNick.value) return;
-  if (nickChangesLeft.value <= 0) return;
-  if (nickStatus.value !== "ok") return;
-  err.value = "";
+async function applyNicknameIfChanged(): Promise<boolean> {
+  if (!auth.token || !me.value) return false;
+  const nick = newNick.value.trim();
+  if (!nick || nick.toLowerCase() === me.value.nickname.toLowerCase()) return true;
+  if (nickChangesLeft.value <= 0) {
+    err.value = "лимит смен ника исчерпан";
+    return false;
+  }
+  await checkNick();
+  if (nickStatus.value !== "ok") {
+    err.value = nickMessage.value || "ник недоступен";
+    return false;
+  }
   changingNick.value = true;
   try {
     const r = await api<{ nickname: string; changes_used: number; changes_left: number }>(
@@ -231,7 +238,7 @@ async function changeNickname() {
       {
         method: "POST",
         token: auth.token,
-        body: JSON.stringify({ nickname: newNick.value.trim() }),
+        body: JSON.stringify({ nickname: nick }),
       },
     );
     if (me.value) {
@@ -241,13 +248,14 @@ async function changeNickname() {
     if (auth.user) {
       auth.applySession(auth.token, { ...auth.user, nickname: r.nickname });
     }
-    newNick.value = "";
+    newNick.value = r.nickname;
     nickStatus.value = "idle";
     nickMessage.value = "";
-    toastSuccess("ник обновлён");
+    return true;
   } catch (e) {
     err.value = e instanceof Error ? e.message : "ошибка";
     toastError(e);
+    return false;
   } finally {
     changingNick.value = false;
   }
@@ -295,7 +303,7 @@ onMounted(async () => {
     languagePreference.value = me.value.language_preference;
     themePreference.value = normalizeThemeId(me.value.theme_preference);
     fullName.value = me.value.full_name ?? "";
-    websiteUrl.value = me.value.website_url ?? "";
+    newNick.value = me.value.nickname;
     socialLinks.value = Array.isArray(me.value.social_links) ? [...me.value.social_links] : [];
     birthday.value = me.value.birthday ?? "";
     country.value = me.value.country ?? "";
@@ -373,6 +381,8 @@ async function save() {
   err.value = "";
   saving.value = true;
   try {
+    const nickOk = await applyNicknameIfChanged();
+    if (!nickOk) return;
     await api("/api/me", {
       method: "PATCH",
       token: auth.token,
@@ -382,7 +392,6 @@ async function save() {
         language_preference: languagePreference.value,
         theme_preference: themePreference.value,
         full_name: fullName.value,
-        website_url: websiteUrl.value,
         social_links: socialLinks.value,
         birthday: birthday.value,
         country: country.value,
@@ -501,7 +510,15 @@ function pickTab(id: SettingsTab) {
             <div class="field-row">
               <label class="field">
                 <span class="field-label">ник</span>
-                <input class="field-input" :value="`@${me.nickname}`" disabled />
+                <input
+                  v-model="newNick"
+                  class="field-input"
+                  maxlength="24"
+                  autocomplete="off"
+                  :disabled="changingNick || nickChangesLeft <= 0"
+                  @input="onNickInput"
+                />
+                <span v-if="nickStatus === 'err' && nickMessage" class="field-count error">{{ nickMessage }}</span>
               </label>
               <label class="field">
                 <span class="field-label">имя</span>
@@ -521,14 +538,6 @@ function pickTab(id: SettingsTab) {
                 maxlength="680"
                 placeholder="расскажи о себе"
               />
-            </label>
-
-            <label class="field">
-              <span class="field-label">сайт</span>
-              <span class="field-icon-wrap">
-                <AppIcon name="link" :size="16" class="field-icon" />
-                <input v-model="websiteUrl" class="field-input field-input--icon" placeholder="https://" />
-              </span>
             </label>
 
             <details class="field-details readme-details">
@@ -572,43 +581,6 @@ function pickTab(id: SettingsTab) {
       </template>
 
       <template v-else-if="tab === 'account'">
-        <section class="nick-block">
-          <h2>ник</h2>
-          <p class="muted small">текущий: <strong>@{{ me.nickname }}</strong></p>
-          <p class="muted small">осталось смен: {{ nickChangesLeft }} из {{ MAX_NICK_CHANGES }}</p>
-          <template v-if="nickChangesLeft > 0">
-            <div class="nick-row">
-              <input
-                v-model="newNick"
-                placeholder="новый ник"
-                maxlength="24"
-                pattern="[A-Za-z]{3,24}"
-                :disabled="changingNick"
-                @input="onNickInput"
-              />
-              <button
-                type="button"
-                :disabled="changingNick || nickStatus !== 'ok'"
-                @click="changeNickname"
-              >
-                {{ changingNick ? "…" : "сменить" }}
-              </button>
-            </div>
-            <p
-              v-if="nickMessage"
-              class="small"
-              :class="{
-                'ok-msg': nickStatus === 'ok',
-                error: nickStatus === 'err',
-                muted: nickStatus === 'checking' || nickStatus === 'idle',
-              }"
-            >
-              {{ nickStatus === "checking" ? "проверка…" : nickMessage }}
-            </p>
-          </template>
-          <p v-else class="muted small">лимит смен исчерпан</p>
-        </section>
-
         <section class="theme-block">
           <span class="theme-label muted">тема</span>
           <div class="theme-picker">
@@ -928,24 +900,6 @@ function pickTab(id: SettingsTab) {
   line-height: 1.45;
 }
 
-.field-icon-wrap {
-  position: relative;
-  display: block;
-}
-
-.field-icon {
-  position: absolute;
-  left: 0.85rem;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--muted);
-  pointer-events: none;
-}
-
-.field-input--icon {
-  padding-left: 2.35rem;
-}
-
 .field-details {
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -1094,20 +1048,6 @@ function pickTab(id: SettingsTab) {
   color: var(--accent);
 }
 
-.nick-block {
-  display: grid;
-  gap: 0.4rem;
-  padding: 0.85rem;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--surface);
-  margin-bottom: 1rem;
-}
-.nick-block h2 {
-  margin: 0;
-  font-size: 1rem;
-  font-weight: 500;
-}
 .theme-block {
   margin-bottom: 1rem;
 }
@@ -1145,18 +1085,6 @@ function pickTab(id: SettingsTab) {
 .theme-opt[data-preview="contrast-white"] {
   background: #fff;
   box-shadow: inset 0 0 0 1px #000;
-}
-.nick-row {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-}
-.nick-row input {
-  flex: 1;
-  min-width: 0;
-}
-.ok-msg {
-  color: var(--text);
 }
 .small {
   font-size: var(--text-xs);

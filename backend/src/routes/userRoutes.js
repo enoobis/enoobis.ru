@@ -76,7 +76,7 @@ function buildMe(row) {
   };
 }
 
-const MAX_NICK_CHANGES = 3;
+const MAX_NICK_CHANGES = 2;
 
 const PASSIVE_COIN_EVERY_MS = 10 * 60 * 1000;
 const PASSIVE_COIN_AMOUNT = 5;
