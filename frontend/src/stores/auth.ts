@@ -46,10 +46,10 @@ export const useAuthStore = defineStore("auth", () => {
   const canBlogAndStorage = computed(() => isStaff.value || isModerator.value);
   const isPanelStaff = computed(() => isAdmin.value || isModerator.value);
 
-  async function login(email: string, password: string) {
+  async function login(nickname: string, password: string) {
     const r = await api<{ token: string; user: User }>("/api/login", {
       method: "POST",
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ nickname, password }),
     });
     token.value = r.token;
     user.value = r.user;
@@ -57,7 +57,6 @@ export const useAuthStore = defineStore("auth", () => {
   }
 
   async function register(payload: {
-    email: string;
     password: string;
     nickname: string;
     invite_code?: string;

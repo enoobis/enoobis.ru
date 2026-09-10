@@ -3,7 +3,6 @@ import { onMounted, ref } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "../stores/auth";
 
-const email = ref("");
 const password = ref("");
 const nickname = ref("");
 const invite = ref("");
@@ -30,7 +29,6 @@ async function submit() {
   loading.value = true;
   try {
     const r = await auth.register({
-      email: email.value,
       password: password.value,
       nickname: nickname.value,
       invite_code: invite.value.trim() || undefined,
@@ -57,8 +55,7 @@ async function submit() {
     <h1>регистрация</h1>
     <form @submit.prevent="submit">
       <input v-model="nickname" placeholder="ник" required pattern="[A-Za-z]{3,24}" maxlength="24" autocomplete="username" />
-      <input v-model="email" type="email" placeholder="email" required />
-      <input v-model="password" type="password" placeholder="пароль" minlength="10" required />
+      <input v-model="password" type="password" placeholder="пароль" minlength="10" required autocomplete="new-password" />
       <div class="terms">
         <button
           type="button"

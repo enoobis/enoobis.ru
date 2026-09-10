@@ -3,7 +3,7 @@ import { ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import { useAuthStore } from "../stores/auth";
 
-const email = ref("");
+const nickname = ref("");
 const password = ref("");
 const err = ref("");
 const loading = ref(false);
@@ -14,7 +14,7 @@ async function submit() {
   err.value = "";
   loading.value = true;
   try {
-    await auth.login(email.value, password.value);
+    await auth.login(nickname.value, password.value);
     await router.push("/courses");
   } catch (e) {
     err.value = e instanceof Error ? e.message : "ошибка";
@@ -28,7 +28,14 @@ async function submit() {
   <section class="auth" data-reveal>
     <h1>вход</h1>
     <form @submit.prevent="submit">
-      <input v-model="email" type="email" placeholder="email" required autocomplete="username" />
+      <input
+        v-model="nickname"
+        placeholder="ник"
+        required
+        pattern="[A-Za-z]{3,24}"
+        maxlength="24"
+        autocomplete="username"
+      />
       <input
         v-model="password"
         type="password"

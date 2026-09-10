@@ -596,10 +596,6 @@ function closeSettings() {
         </section>
 
         <div class="form-grid">
-          <label class="col-2">
-            <span>email</span>
-            <input :value="me.email" disabled />
-          </label>
           <label>
             <span>роль</span>
             <input :value="roleLabel" disabled />
