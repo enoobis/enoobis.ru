@@ -14,12 +14,12 @@ defineProps<{
 
 const triggerEl = ref<HTMLButtonElement | null>(null);
 const inputEl = ref<HTMLInputElement | null>(null);
-const fieldWidth = ref(44);
+const fieldWidth = ref(46);
 const fieldTop = ref(0);
-const fieldRight = ref(0);
+const fieldLeft = ref(0);
+const collapsedWidth = ref(46);
 const reduced = prefersReducedMotion();
 
-const collapsedWidth = 44;
 const leftGap = 16;
 
 function leftNavRightEdge(bar: HTMLElement, fallbackLeft: number) {
@@ -46,10 +46,11 @@ function syncLayout() {
   const triggerRect = trigger.getBoundingClientRect();
   const barRect = bar.getBoundingClientRect();
   const leftEdge = leftNavRightEdge(bar, barRect.left + 12);
-  const width = Math.max(collapsedWidth, triggerRect.right - leftEdge);
+  collapsedWidth.value = triggerRect.width;
+  const width = Math.max(collapsedWidth.value, triggerRect.right - leftEdge);
 
   fieldTop.value = triggerRect.top + triggerRect.height / 2;
-  fieldRight.value = window.innerWidth - triggerRect.right;
+  fieldLeft.value = triggerRect.right;
   fieldWidth.value = width;
 }
 
@@ -100,22 +101,13 @@ defineExpose({ focus: focusInput });
           v-if="open"
           key="field"
           class="nav-search-expand__field"
-          :style="{ top: `${fieldTop}px`, right: `${fieldRight}px` }"
-          :initial="
-            reduced
-              ? false
-              : { width: collapsedWidth, opacity: 0.65, filter: 'blur(8px)' }
-          "
-          :animate="{ width: fieldWidth, opacity: 1, filter: 'blur(0px)' }"
+          :style="{ top: `${fieldTop}px`, left: `${fieldLeft}px` }"
+          :initial="reduced ? false : { width: collapsedWidth }"
+          :animate="{ width: fieldWidth }"
           :exit="
             reduced
               ? undefined
-              : {
-                  width: collapsedWidth,
-                  opacity: 0,
-                  filter: 'blur(6px)',
-                  transition: { duration: 0.18 },
-                }
+              : { width: collapsedWidth, opacity: 0, transition: { duration: 0.18 } }
           "
           :transition="springSnappy"
         >
@@ -128,7 +120,9 @@ defineExpose({ focus: focusInput });
             autocomplete="off"
             @keydown.esc.stop="closeSearch"
           />
-          <AppIcon name="search" :size="18" class="nav-search-expand__icon" />
+          <span class="nav-search-expand__icon" aria-hidden="true">
+            <AppIcon name="search" :size="20" />
+          </span>
         </motion.div>
       </AnimatePresence>
     </Teleport>
@@ -158,13 +152,12 @@ defineExpose({ focus: focusInput });
 .nav-search-expand__field {
   position: fixed;
   z-index: 120;
-  translate: 0 -50%;
+  translate: -100% -50%;
   display: flex;
   align-items: center;
-  gap: 0.45rem;
   height: var(--control-h);
   overflow: hidden;
-  padding: 0 0.55rem 0 0.85rem;
+  padding: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
   background: var(--surface);
@@ -173,11 +166,12 @@ defineExpose({ focus: focusInput });
 }
 
 .nav-search-expand__input {
-  flex: 1;
+  flex: 1 1 0;
+  width: 0;
   min-width: 0;
   border: none;
   background: transparent;
-  padding: 0;
+  padding: 0 0 0 0.85rem;
   min-height: 0;
   color: var(--text);
   font-size: var(--text-sm);
@@ -192,7 +186,11 @@ defineExpose({ focus: focusInput });
 }
 
 .nav-search-expand__icon {
+  display: grid;
+  place-items: center;
   flex-shrink: 0;
+  width: calc(var(--control-h) - 2px);
+  height: calc(var(--control-h) - 2px);
   color: var(--muted);
 }
 
