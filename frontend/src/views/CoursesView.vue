@@ -39,6 +39,7 @@ import {
 import AppIcon from "../components/AppIcon.vue";
 import AppLoading from "../components/AppLoading.vue";
 import BackLink from "../components/BackLink.vue";
+import MarkdownText from "../components/MarkdownText.vue";
 import PageHeader from "../components/PageHeader.vue";
 import FilterSearch from "../components/FilterSearch.vue";
 import { useAuthStore } from "../stores/auth";
@@ -1917,9 +1918,12 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
                   </BackLink>
                 </div>
               </template>
-              <p v-if="selectedLecture.body_text" class="lecture-body">
-                {{ selectedLecture.body_text }}
-              </p>
+              <MarkdownText
+                v-if="selectedLecture.body_text"
+                class="lecture-body"
+                :text="selectedLecture.body_text"
+                variant="doc"
+              />
               <ul v-if="selectedLecture.attachments.length" class="attach-list">
                 <li v-for="att in selectedLecture.attachments" :key="att.id">
                   <a :href="att.url" target="_blank" rel="noopener noreferrer">{{ att.file_name }}</a>
@@ -3496,6 +3500,9 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   white-space: pre-wrap;
   line-height: 1.5;
   font-size: var(--text-md);
+}
+.lecture-body.markdown-body {
+  white-space: normal;
 }
 
 .attach-list {

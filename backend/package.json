@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
-    "check:gemini": "node scripts/check-gemini.js"
+    "check:gemini": "node scripts/check-gemini.js",
+    "seed:courses:build": "node scripts/buildCoursesSeed.js",
+    "seed:courses": "node scripts/applyCoursesSeed.js"
   },
   "dependencies": {
     "argon2": "^0.41.1",
