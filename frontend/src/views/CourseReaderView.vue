@@ -89,6 +89,20 @@ const activeLecture = computed<Lecture | null>(
   () => lectures.value.find((l) => l.id === activeId.value) ?? lectures.value[0] ?? null,
 );
 
+const activeIndex = computed(() =>
+  activeLecture.value ? lectures.value.findIndex((l) => l.id === activeLecture.value?.id) : -1,
+);
+
+const prevLecture = computed(() =>
+  activeIndex.value > 0 ? lectures.value[activeIndex.value - 1] ?? null : null,
+);
+
+const nextLecture = computed(() => {
+  const i = activeIndex.value;
+  if (i < 0 || i >= lectures.value.length - 1) return null;
+  return lectures.value[i + 1] ?? null;
+});
+
 function tasksFor(lectureId: string): Assignment[] {
   return (classroom.value?.assignments ?? []).filter((a) => a.lecture_id === lectureId);
 }
@@ -503,15 +517,29 @@ watch(activeId, () => {
   openTaskId.value = "";
 });
 
-function onEscape(e: KeyboardEvent) {
-  if (e.key !== "Escape") return;
-  if (chatOpen.value) chatOpen.value = false;
-  else if (topicsOpen.value) topicsOpen.value = false;
+function onReaderKey(e: KeyboardEvent) {
+  if (e.key === "Escape") {
+    if (chatOpen.value) chatOpen.value = false;
+    else if (topicsOpen.value) topicsOpen.value = false;
+    return;
+  }
+  const t = e.target as HTMLElement | null;
+  if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+  if (editing.value) return;
+  if (e.key === "ArrowLeft" && prevLecture.value) {
+    e.preventDefault();
+    openLecture(prevLecture.value.id);
+    return;
+  }
+  if (e.key === "ArrowRight" && nextLecture.value) {
+    e.preventDefault();
+    openLecture(nextLecture.value.id);
+  }
 }
 
 onMounted(() => {
   document.documentElement.classList.add("course-reader");
-  document.addEventListener("keydown", onEscape);
+  document.addEventListener("keydown", onReaderKey);
   void load();
   void loadAiStatus();
   void loadChat();
@@ -523,7 +551,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   document.documentElement.classList.remove("course-reader");
-  document.removeEventListener("keydown", onEscape);
+  document.removeEventListener("keydown", onReaderKey);
   window.removeEventListener("resize", measureReaderTop);
   window.visualViewport?.removeEventListener("resize", syncKeyboardInset);
   window.visualViewport?.removeEventListener("scroll", syncKeyboardInset);
@@ -536,7 +564,8 @@ onBeforeUnmount(() => {
     <AppLoading v-if="loading && !classroom" class="page-empty" />
     <p v-else-if="err && !classroom" class="page-empty">{{ err }}</p>
 
-    <div v-else-if="classroom" class="reader-grid">
+    <template v-else-if="classroom">
+    <div class="reader-grid">
       <!-- темы -->
       <aside class="reader-topics" :class="{ open: topicsOpen }">
         <header class="side-head">
@@ -589,6 +618,14 @@ onBeforeUnmount(() => {
             <AppIcon name="list" :size="18" />
           </button>
           <span class="main-bar-title">{{ activeLecture?.title ?? "" }}</span>
+          <button
+            type="button"
+            class="filter-icon-btn"
+            aria-label="чат"
+            @click="openChat"
+          >
+            <AppIcon name="chat" :size="17" />
+          </button>
           <button
             v-if="activeLecture && !editing"
             type="button"
@@ -712,10 +749,33 @@ onBeforeUnmount(() => {
               </div>
             </div>
           </section>
+
+          <nav v-if="prevLecture || nextLecture" class="lecture-nav">
+            <button
+              v-if="prevLecture"
+              type="button"
+              class="lecture-nav-btn"
+              @click="openLecture(prevLecture.id)"
+            >
+              <AppIcon name="back" :size="18" />
+              <span>{{ prevLecture.title }}</span>
+            </button>
+            <span v-else />
+            <button
+              v-if="nextLecture"
+              type="button"
+              class="lecture-nav-btn lecture-nav-btn--next"
+              @click="openLecture(nextLecture.id)"
+            >
+              <span>{{ nextLecture.title }}</span>
+              <AppIcon name="forward" :size="18" />
+            </button>
+          </nav>
         </article>
 
         <p v-else class="page-empty">тем нет</p>
       </main>
+    </div>
 
       <!-- чат -->
       <aside class="reader-chat" :class="{ open: chatOpen }">
@@ -738,7 +798,7 @@ onBeforeUnmount(() => {
           </button>
           <button
             type="button"
-            class="filter-icon-btn only-narrow"
+            class="filter-icon-btn"
             aria-label="закрыть"
             @click="chatOpen = false"
           >
@@ -791,13 +851,14 @@ onBeforeUnmount(() => {
         <span>?</span>
         <AppIcon name="chat" :size="18" />
       </button>
-    </div>
 
     <div
       v-if="topicsOpen || chatOpen"
-      class="panel-backdrop only-narrow"
+      class="panel-backdrop"
+      :class="{ 'only-narrow': !chatOpen }"
       @click="topicsOpen = false; chatOpen = false"
     />
+    </template>
   </section>
 </template>
 
@@ -809,10 +870,10 @@ onBeforeUnmount(() => {
 /* читалка занимает экран целиком: страница не скроллится, колонки не уезжают */
 .reader-grid {
   display: grid;
-  grid-template-columns: clamp(220px, 14vw, 280px) minmax(0, 1fr) clamp(300px, 22vw, 420px);
+  grid-template-columns: clamp(220px, 22vw, 300px) minmax(0, 1fr);
   /* строка не должна расти под длинную тему, иначе колонки уезжают за экран */
   grid-template-rows: minmax(0, 1fr);
-  gap: var(--space-5);
+  gap: var(--space-6);
   height: calc(100dvh - var(--reader-top, 7rem));
   min-height: 24rem;
 }
@@ -994,6 +1055,10 @@ onBeforeUnmount(() => {
   display: grid;
   gap: var(--space-4);
   min-width: 0;
+  max-width: 42rem;
+  width: 100%;
+  margin: 0 auto;
+  padding-bottom: var(--space-8);
 }
 
 .lecture :deep(a),
@@ -1008,6 +1073,48 @@ onBeforeUnmount(() => {
   letter-spacing: -0.02em;
   line-height: 1.25;
   text-transform: lowercase;
+}
+
+.lecture-nav {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.25rem;
+  padding-top: var(--space-8);
+}
+
+.lecture-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  max-width: 48%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  text-transform: lowercase;
+  cursor: pointer;
+}
+
+.lecture-nav-btn--next {
+  margin-left: auto;
+  text-align: right;
+}
+
+.lecture-nav-btn:hover {
+  color: var(--text);
+  background: transparent;
+}
+
+.lecture-nav-btn span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .lecture-video {
@@ -1182,12 +1289,25 @@ onBeforeUnmount(() => {
 
 /* ---------- чат ---------- */
 
-/* панель с рамкой: поле ввода прижато к её низу и не выглядит оторванным */
+/* панель чата — шторка, не третья колонка: чтение занимает экран */
 .reader-chat {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 96;
+  width: min(26rem, 92vw);
   padding: var(--space-3);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-right: none;
+  border-radius: var(--radius) 0 0 var(--radius);
   background: var(--bg);
+  transform: translateX(110%);
+  transition: transform var(--dur-3) var(--ease-snap);
+}
+
+.reader-chat.open {
+  transform: translateX(0);
 }
 
 .chat-head {
@@ -1267,6 +1387,14 @@ onBeforeUnmount(() => {
   display: none;
 }
 
+.panel-backdrop:not(.only-narrow) {
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: 94;
+  background: rgba(0, 0, 0, 0.45);
+}
+
 /* ---------- телефон: центр читается, чат в одно касание ---------- */
 
 @media (max-width: 1024px) {
@@ -1335,7 +1463,9 @@ onBeforeUnmount(() => {
     left: 0;
     right: 0;
     bottom: 0;
+    top: auto;
     z-index: 96;
+    width: auto;
     height: 86dvh;
     max-height: calc(100dvh - 2.5rem);
     /* шторка всегда прижата к низу, клавиатура поднимает только содержимое */

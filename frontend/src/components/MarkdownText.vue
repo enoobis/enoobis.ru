@@ -34,8 +34,8 @@ const html = computed(() => renderMarkdown(props.text));
 
 /* лекции — режим чтения: шрифт интерфейса, крупнее основного текста */
 .markdown-body.doc {
-  font-size: 1.1rem;
-  line-height: 1.7;
+  font-size: 1.12rem;
+  line-height: 1.75;
 }
 .markdown-body.doc :deep(p) {
   margin: 0 0 1rem;
