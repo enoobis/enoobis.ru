@@ -33,9 +33,14 @@ const shown = ref(false);
       :aria-pressed="shown"
       @click="shown = !shown"
     >
-      <Transition name="pass-icon" mode="out-in">
-        <AppIcon :key="shown ? 'on' : 'off'" :name="shown ? 'hidden' : 'seen'" :size="18" />
-      </Transition>
+      <span class="pass-icons" aria-hidden="true">
+        <span class="pass-ico pass-ico-off">
+          <AppIcon name="seen" :size="18" />
+        </span>
+        <span class="pass-ico pass-ico-on">
+          <AppIcon name="hidden" :size="18" />
+        </span>
+      </span>
     </button>
   </div>
 </template>
@@ -74,24 +79,29 @@ const shown = ref(false);
 .pass.shown .pass-toggle {
   color: var(--text);
 }
-.pass-icon-enter-active,
-.pass-icon-leave-active {
-  transition:
-    opacity var(--dur-1) var(--ease-out),
-    transform var(--dur-2) var(--ease-spring);
+.pass-icons {
+  position: relative;
+  width: 20px;
+  height: 20px;
 }
-.pass-icon-enter-from {
+.pass-ico {
+  position: absolute;
+  inset: 0;
   opacity: 0;
-  transform: scale(0.7);
+  transition: opacity var(--dur-1) linear;
 }
-.pass-icon-leave-to {
+.pass-ico-off {
+  opacity: 1;
+}
+.pass.shown .pass-ico-off {
   opacity: 0;
-  transform: scale(1.25);
+}
+.pass.shown .pass-ico-on {
+  opacity: 1;
 }
 @media (prefers-reduced-motion: reduce) {
   .pass-toggle,
-  .pass-icon-enter-active,
-  .pass-icon-leave-active {
+  .pass-ico {
     transition: none;
   }
 }
