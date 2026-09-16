@@ -980,10 +980,9 @@ onBeforeUnmount(() => {
 /* читалка занимает экран целиком: страница не скроллится, колонки не уезжают */
 .reader-grid {
   display: grid;
-  grid-template-columns: clamp(220px, 22vw, 300px) minmax(0, 1fr);
-  /* строка не должна расти под длинную тему, иначе колонки уезжают за экран */
+  grid-template-columns: 260px minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
-  gap: var(--space-6);
+  gap: 1.75rem;
   height: calc(100dvh - var(--reader-top, 7rem));
   min-height: 24rem;
 }
@@ -998,12 +997,17 @@ onBeforeUnmount(() => {
   min-height: 0;
 }
 
+.reader-topics {
+  padding-right: 0.75rem;
+  border-right: 1px solid var(--border);
+}
+
 .reader-main {
   height: 100%;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding-right: var(--space-2);
+  padding-right: 1.5rem;
 }
 
 .side-head {
@@ -1228,12 +1232,17 @@ onBeforeUnmount(() => {
 
 .lecture {
   display: grid;
-  gap: var(--space-4);
+  gap: var(--space-5);
   min-width: 0;
-  max-width: 42rem;
+  max-width: 62rem;
   width: 100%;
-  margin: 0 auto;
+  margin: 0;
   padding-bottom: var(--space-8);
+}
+
+.lecture :deep(.markdown-body.doc) {
+  font-size: 1.2rem;
+  line-height: 1.78;
 }
 
 .lecture :deep(a),
