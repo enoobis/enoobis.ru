@@ -2,7 +2,6 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { usePageRefresh } from "../composables/usePageRefresh";
 import { RouterLink, useRoute, useRouter } from "vue-router";
-import AppIcon from "../components/AppIcon.vue";
 import AppLoading from "../components/AppLoading.vue";
 import MotionStagger from "../components/MotionStagger.vue";
 import MotionStaggerItem from "../components/MotionStaggerItem.vue";
@@ -49,11 +48,6 @@ async function load() {
   }
 }
 
-function back() {
-  if (window.history.state?.back) router.back();
-  else router.push("/blogs");
-}
-
 watch(
   () => route.query.q,
   (v) => {
@@ -67,13 +61,7 @@ onMounted(load);
 
 <template>
   <section class="board page-shell">
-    <PageHeader title="лидерборд">
-      <template #back>
-        <button type="button" class="filter-icon-btn" aria-label="назад" @click="back">
-          <AppIcon name="back" :size="18" />
-        </button>
-      </template>
-    </PageHeader>
+    <PageHeader title="лидерборд" />
 
     <div v-if="activeChips.length" class="active-chips">
       <button
