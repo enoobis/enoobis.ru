@@ -902,7 +902,6 @@ usePageRefresh(async () => {
 });
 
 onMounted(async () => {
-  document.documentElement.classList.add("chats-wide");
   window.visualViewport?.addEventListener("resize", syncKeyboardInset);
   window.visualViewport?.addEventListener("scroll", syncKeyboardInset);
   syncKeyboardInset();
@@ -918,7 +917,6 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
-  document.documentElement.classList.remove("chats-wide");
   window.visualViewport?.removeEventListener("resize", syncKeyboardInset);
   window.visualViewport?.removeEventListener("scroll", syncKeyboardInset);
   document.documentElement.style.removeProperty("--kb");
