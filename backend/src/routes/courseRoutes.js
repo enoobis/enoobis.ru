@@ -11,6 +11,7 @@ import { assertAssignmentPatchField, assertLecturePatchField } from "../utils/sq
 import { unlinkUploadUrl } from "../utils/uploadSafe.js";
 import { assertSafeUploadExtension } from "../utils/security.js";
 import { isStaffRole } from "../utils/roles.js";
+import { categoryFromCode } from "../utils/courseCategory.js";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -130,7 +131,7 @@ function courseToDto(row, viewerId) {
     is_owner: !!isOwner,
     created_at: row.created_at,
     icon_url: row.icon_url ?? "",
-    category: row.category ?? "",
+    category: (row.category ?? "").trim() || categoryFromCode(row.course_code ?? ""),
     enrolled,
   };
 }

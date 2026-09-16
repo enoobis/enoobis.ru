@@ -12,7 +12,6 @@ const SEED_IMAGES = path.join(SEED_DIR, "images");
 const UPLOAD_ROOT = path.resolve(process.env.UPLOADS_DIR ?? path.join(BACKEND, "data/uploads"));
 const LECTURE_DIR = path.join(UPLOAD_ROOT, "course-lectures");
 const AUTHOR_NICK = process.env.COURSES_SEED_AUTHOR ?? "enoobis";
-const CODE_PREFIX = "MK-";
 const SEED_IMAGE_NAME = /^[0-9a-f]{40}\.[a-z0-9]+$/;
 
 function readSeed() {
@@ -47,6 +46,12 @@ function syncImages(usedNames) {
   return { copied, removed };
 }
 
+function collectImages(body, used) {
+  const re = /\/uploads\/course-lectures\/([^/\s)]+)/g;
+  let m;
+  while ((m = re.exec(body))) used.add(m[1]);
+}
+
 async function main() {
   const courses = readSeed();
   const { get, run, all, nowIso, db } = await import("../src/db.js");
@@ -61,56 +66,80 @@ async function main() {
   const now = nowIso();
   const usedImages = new Set();
   let lectureCount = 0;
+  let updated = 0;
+  let created = 0;
 
   const apply = db.transaction(() => {
-    for (const c of all("SELECT id FROM courses WHERE course_code LIKE ?", `${CODE_PREFIX}%`)) {
-      for (const l of all("SELECT id FROM course_lectures WHERE course_id = ?", c.id)) {
-        run("DELETE FROM course_lecture_attachments WHERE lecture_id = ?", l.id);
-      }
-      run("DELETE FROM course_lectures WHERE course_id = ?", c.id);
-      run("DELETE FROM course_students WHERE course_id = ?", c.id);
-      run("DELETE FROM course_co_teachers WHERE course_id = ?", c.id);
-      run("DELETE FROM user_favorite_courses WHERE course_id = ?", c.id);
-      run("DELETE FROM courses WHERE id = ?", c.id);
-    }
-
     for (const course of courses) {
-      const courseId = randomUUID();
-      run(
-        `INSERT INTO courses (id, teacher_id, title, description, is_open, created_at, course_code, category)
-         VALUES (?, ?, ?, '', 1, ?, ?, ?)`,
-        courseId,
-        author.id,
-        course.title,
-        now,
-        course.code,
-        course.category ?? "",
-      );
-      course.lectures.forEach((lecture, position) => {
+      const existing = get("SELECT id FROM courses WHERE course_code = ?", course.code);
+      const courseId = existing?.id ?? randomUUID();
+      if (existing) {
         run(
-          `INSERT INTO course_lectures (id, course_id, author_id, title, body_text, video_url, created_at, position, chapter)
-           VALUES (?, ?, ?, ?, ?, '', ?, ?, ?)`,
-          randomUUID(),
+          "UPDATE courses SET title = ?, category = ? WHERE id = ?",
+          course.title,
+          course.category ?? "",
+          courseId,
+        );
+        updated += 1;
+      } else {
+        run(
+          `INSERT INTO courses (id, teacher_id, title, description, is_open, created_at, course_code, category)
+           VALUES (?, ?, ?, '', 1, ?, ?, ?)`,
           courseId,
           author.id,
-          lecture.title,
-          lecture.body,
+          course.title,
           now,
-          position,
-          lecture.chapter ?? "",
+          course.code,
+          course.category ?? "",
         );
-        const re = /\/uploads\/course-lectures\/([^/\s)]+)/g;
-        let m;
-        while ((m = re.exec(lecture.body))) usedImages.add(m[1]);
+        created += 1;
+      }
+
+      const old = all(
+        "SELECT id FROM course_lectures WHERE course_id = ? ORDER BY position, created_at, rowid",
+        courseId,
+      );
+      course.lectures.forEach((lecture, position) => {
+        collectImages(lecture.body, usedImages);
         lectureCount += 1;
+        const prev = old[position];
+        if (prev) {
+          run(
+            `UPDATE course_lectures
+             SET title = ?, body_text = ?, chapter = ?, position = ?
+             WHERE id = ?`,
+            lecture.title,
+            lecture.body,
+            lecture.chapter ?? "",
+            position,
+            prev.id,
+          );
+        } else {
+          run(
+            `INSERT INTO course_lectures (id, course_id, author_id, title, body_text, video_url, created_at, position, chapter)
+             VALUES (?, ?, ?, ?, ?, '', ?, ?, ?)`,
+            randomUUID(),
+            courseId,
+            author.id,
+            lecture.title,
+            lecture.body,
+            now,
+            position,
+            lecture.chapter ?? "",
+          );
+        }
       });
+      for (const extra of old.slice(course.lectures.length)) {
+        run("DELETE FROM course_lecture_attachments WHERE lecture_id = ?", extra.id);
+        run("DELETE FROM course_lectures WHERE id = ?", extra.id);
+      }
     }
   });
   apply();
 
   const images = syncImages(usedImages);
   console.log(
-    `курсов: ${courses.length}, лекций: ${lectureCount}, картинок скопировано: ${images.copied}, удалено: ${images.removed}`,
+    `курсов новых: ${created}, обновлено: ${updated}, лекций: ${lectureCount}, картинок скопировано: ${images.copied}, удалено: ${images.removed}`,
   );
 }
 

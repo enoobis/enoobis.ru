@@ -43,6 +43,7 @@ import MarkdownText from "../components/MarkdownText.vue";
 import PageHeader from "../components/PageHeader.vue";
 import FilterSearch from "../components/FilterSearch.vue";
 import { useAuthStore } from "../stores/auth";
+import { categoryMatches, courseCategory } from "../utils/courseCategory";
 
 type Tab = "lectures" | "assignments" | "stream" | "people" | "grades";
 type GradebookCell = {
@@ -287,10 +288,16 @@ function roleLabel(role: string): string {
 
 const activeCategory = ref("");
 
+function courseListTitle(c: Course) {
+  const t = c.title.trim();
+  const cut = t.replace(/^руководство по (?:языку |фреймворку )?/, "");
+  return cut || t;
+}
+
 const categories = computed(() => {
   const counts = new Map<string, number>();
   for (const c of courses.value) {
-    const cat = (c.category ?? "").trim();
+    const cat = courseCategory(c);
     if (cat) counts.set(cat, (counts.get(cat) ?? 0) + 1);
   }
   const latin = (s: string) => (/^[a-z]/i.test(s) ? 0 : 1);
@@ -299,26 +306,27 @@ const categories = computed(() => {
     .sort((a, b) => latin(a.title) - latin(b.title) || a.title.localeCompare(b.title, "ru"));
 });
 
-/* поиск идёт по всем курсам, иначе видно только выбранную категорию */
+/* поиск — по названию и папке, не по тексту лекций */
 const filteredCourses = computed(() => {
   const q = courseQuery.value.trim().toLowerCase();
-  if (q) return courses.value.filter((c) => c.title.toLowerCase().includes(q));
+  if (q) {
+    return courses.value.filter((c) => {
+      const title = c.title.toLowerCase();
+      const short = courseListTitle(c).toLowerCase();
+      const cat = courseCategory(c);
+      return title.includes(q) || short.includes(q) || categoryMatches(cat, q);
+    });
+  }
   if (activeCategory.value)
     return courses.value
-      .filter((c) => (c.category ?? "").trim() === activeCategory.value)
+      .filter((c) => courseCategory(c) === activeCategory.value)
       .sort((a, b) => a.title.localeCompare(b.title, "ru"));
-  return courses.value.filter((c) => !(c.category ?? "").trim());
+  return courses.value.filter((c) => !courseCategory(c));
 });
 
 function courseInitial(title: string) {
   const ch = title.trim().charAt(0);
   return ch ? ch.toLowerCase() : "?";
-}
-
-function courseListTitle(c: Course) {
-  const t = c.title.trim();
-  const cut = t.replace(/^руководство по (?:языку |фреймворку )?/, "");
-  return cut || t;
 }
 
 function openCourseRead(id: string) {

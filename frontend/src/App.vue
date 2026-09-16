@@ -49,6 +49,7 @@ const profileMenuOpen = ref(false);
 const navDrawerOpen = ref(false);
 const searchOpen = ref(false);
 const searchQuery = ref("");
+let pageSearchTimer: ReturnType<typeof setTimeout> | null = null;
 const navEl = ref<HTMLElement | null>(null);
 
 const navProgress = ref(0);
@@ -403,6 +404,21 @@ watch(
     searchQuery.value = typeof q === "string" ? q : "";
   },
 );
+
+watch(searchQuery, (q) => {
+  if (!searchOpen.value) return;
+  if (route.path !== "/courses") return;
+  if (pageSearchTimer) clearTimeout(pageSearchTimer);
+  pageSearchTimer = setTimeout(() => {
+    const next = q.trim();
+    const current = typeof route.query.q === "string" ? route.query.q : "";
+    if (next === current) return;
+    const query = { ...route.query };
+    if (next) query.q = next;
+    else delete query.q;
+    void router.replace({ query });
+  }, 200);
+});
 
 watch(
   () => route.path,

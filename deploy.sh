@@ -61,6 +61,7 @@ EOF
 fi
 
 run_as_owner "cd \"$BACKEND\" && npm ci"
+run_as_owner "cd \"$BACKEND\" && node scripts/applyCoursesSeed.js"
 
 # на маленьких vps vite+vue-tsc часто падают с killed — swap и build:deploy без tsc
 if [[ ! -f /swapfile ]] && [[ $(swapon --show 2>/dev/null | wc -l) -lt 1 ]]; then

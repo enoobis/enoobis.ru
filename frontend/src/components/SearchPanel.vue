@@ -176,12 +176,11 @@ function onInput() {
       void runGlobal();
       return;
     }
-    // на странице поиска не уходим с поля, пока человек ещё стирает запрос
-    if (props.embedded) applyFeedSearch();
+    applyFeedSearch();
     return;
   }
   if (scope.value === "global") onGlobalInput();
-  else if (props.embedded) onFeedInput();
+  else onFeedInput();
 }
 
 function onEnter() {

@@ -1029,6 +1029,36 @@ try {
 }
 
 try {
+  db.exec(`
+    UPDATE courses SET category = CASE
+      WHEN course_code LIKE 'MK-PYTHON%' THEN 'python'
+      WHEN course_code LIKE 'MK-ASSEMBLE%' THEN 'ассемблер'
+      WHEN course_code LIKE 'MK-COMMON%' THEN 'общее'
+      WHEN course_code LIKE 'MK-VISUALBA%' THEN 'visual basic'
+      WHEN course_code LIKE 'MK-KOTLIN%' THEN 'kotlin'
+      WHEN course_code LIKE 'MK-NOSQL%' THEN 'nosql'
+      WHEN course_code LIKE 'MK-SHARP%' THEN 'c#'
+      WHEN course_code LIKE 'MK-SWIFT%' THEN 'swift'
+      WHEN course_code LIKE 'MK-DART%' THEN 'dart'
+      WHEN course_code LIKE 'MK-JAVA%' THEN 'java'
+      WHEN course_code LIKE 'MK-CPP%' THEN 'c++'
+      WHEN course_code LIKE 'MK-RUST%' THEN 'rust'
+      WHEN course_code LIKE 'MK-PHP%' THEN 'php'
+      WHEN course_code LIKE 'MK-SQL%' THEN 'sql'
+      WHEN course_code LIKE 'MK-WEB%' THEN 'веб'
+      WHEN course_code LIKE 'MK-OS-%' THEN 'операционные системы'
+      WHEN course_code LIKE 'MK-GO-%' THEN 'go'
+      WHEN course_code LIKE 'MK-F-%' THEN 'f#'
+      WHEN course_code LIKE 'MK-C-%' THEN 'c'
+      ELSE category
+    END
+    WHERE trim(category) = '' AND course_code LIKE 'MK-%'
+  `);
+} catch {
+  // ignore
+}
+
+try {
   db.prepare("SELECT chapter FROM course_lectures LIMIT 1").get();
 } catch {
   try {
