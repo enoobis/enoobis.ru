@@ -27,6 +27,7 @@ import {
 import { search, type SearchUser } from "../api/search";
 import AppIcon from "../components/AppIcon.vue";
 import AppLoading from "../components/AppLoading.vue";
+import PageHeader from "../components/PageHeader.vue";
 import { useAuthStore } from "../stores/auth";
 import { useChatStore } from "../stores/chat";
 import { toastError } from "../utils/toast";
@@ -936,17 +937,20 @@ onUnmounted(() => {
 <template>
   <section class="chats">
     <aside class="chat-list" :class="{ hidden: activeId }">
-      <div class="list-head">
-        <h2>чаты</h2>
-        <button
-          type="button"
-          class="list-head-act"
-          aria-label="новый чат"
-          title="новый чат"
-          @click="openCompose"
-        >
-          <AppIcon name="plus" :size="18" />
-        </button>
+      <div class="list-head page-shell">
+        <PageHeader title="чаты">
+          <template #actions>
+            <button
+              type="button"
+              class="list-head-act"
+              aria-label="новый чат"
+              title="новый чат"
+              @click="openCompose"
+            >
+              <AppIcon name="plus" :size="18" />
+            </button>
+          </template>
+        </PageHeader>
       </div>
       <AppLoading v-if="loadingChats && !chats.length" class="page-empty" />
       <p v-else-if="!chats.length" class="page-empty muted">пусто</p>
@@ -1461,14 +1465,14 @@ onUnmounted(() => {
   padding: 0 0.25rem 0.5rem;
 }
 .list-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.35rem 0.6rem 0.85rem 0.75rem;
   position: sticky;
   top: 0;
   background: var(--bg, #000);
   z-index: 1;
+  padding: 0 0.5rem 0.35rem 0.55rem;
+}
+.list-head :deep(.page-head) {
+  margin-bottom: 0;
 }
 .list-head-act {
   width: 36px;
@@ -1855,15 +1859,6 @@ onUnmounted(() => {
 }
 .member-hint {
   padding: 0.2rem 0.4rem;
-}
-.list-head h2 {
-  font-size: 1.45rem;
-  font-weight: 600;
-  letter-spacing: -0.03em;
-  line-height: 1.2;
-  margin: 0;
-  text-transform: lowercase;
-  color: var(--text);
 }
 .center {
   margin: auto;
