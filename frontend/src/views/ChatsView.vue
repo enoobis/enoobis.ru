@@ -1062,7 +1062,7 @@ onUnmounted(() => {
               {{ row.line }}
             </div>
             <div v-else class="msg" :class="{ me: row.m.from_me }">
-              <span class="bubble">
+              <span class="bubble" :class="{ editing: editingId === row.m.id }">
                 <RouterLink
                   v-if="isGroup && !row.m.from_me && row.m.sender_nickname"
                   :to="`/u/${row.m.sender_nickname}`"
@@ -2123,7 +2123,7 @@ onUnmounted(() => {
   padding: 1rem;
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 0.5rem;
 }
 .day-mark {
   text-align: center;
@@ -2143,21 +2143,23 @@ onUnmounted(() => {
   flex-direction: row-reverse;
 }
 .bubble {
-  max-width: 70%;
-  padding: 0.4rem 0.65rem 0.35rem;
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  border-bottom-left-radius: 4px;
+  max-width: min(70%, 34rem);
+  padding: 0.6rem 0.9rem;
+  border-radius: var(--radius);
+  background: var(--surface2);
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
-  column-gap: 0.5rem;
-  row-gap: 0.1rem;
+  column-gap: 0.65rem;
+  row-gap: 0.2rem;
 }
 .msg.me .bubble {
+  background: var(--text);
+  color: var(--bg);
+}
+.msg.me .bubble.editing {
   background: var(--surface2);
-  border-bottom-left-radius: 14px;
-  border-bottom-right-radius: 4px;
+  color: var(--text);
 }
 .bubble > .msg-img {
   flex-basis: 100%;
@@ -2175,11 +2177,16 @@ onUnmounted(() => {
 }
 .msg-reply {
   flex-basis: 100%;
-  border-left: 2px solid var(--border);
-  padding: 0.1rem 0 0.15rem 0.45rem;
-  margin-bottom: 0.15rem;
+  border-left: 2px solid currentColor;
+  padding: 0.1rem 0 0.15rem 0.5rem;
+  margin-bottom: 0.2rem;
   display: grid;
   gap: 0.08rem;
+  opacity: 0.75;
+}
+.msg.me .msg-reply,
+.msg.me .msg-sender {
+  color: var(--bg);
 }
 .msg-reply-author {
   font-size: var(--text-xs);
@@ -2194,25 +2201,29 @@ onUnmounted(() => {
   white-space: pre-wrap;
   word-wrap: break-word;
   overflow-wrap: anywhere;
-  font-size: var(--text-md);
-  line-height: 1.4;
+  font-size: 1rem;
+  line-height: 1.45;
   flex: 1 1 auto;
   min-width: 0;
 }
 .meta {
   margin-left: auto;
-  font-size: var(--text-xs);
+  font-size: var(--text-2xs);
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
   white-space: nowrap;
-  opacity: 0.7;
+  opacity: 0.6;
+}
+.msg.me .meta,
+.msg.me .meta .muted {
+  color: var(--bg);
 }
 .msg-seen {
   display: inline-flex;
   align-items: center;
   line-height: 0;
-  color: var(--muted);
+  color: inherit;
 }
 
 .msg-actions {
@@ -2407,7 +2418,7 @@ onUnmounted(() => {
 .msg-img {
   max-width: 100%;
   max-height: 280px;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   display: block;
   cursor: zoom-in;
 }
@@ -2456,6 +2467,9 @@ onUnmounted(() => {
   }
   .chat-list {
     padding-inline: 0;
+  }
+  .bubble {
+    max-width: 85%;
   }
 }
 </style>
