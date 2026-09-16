@@ -897,7 +897,7 @@ function submitReaderPage() {
   position: fixed;
   inset: 0;
   z-index: 1000;
-  background: var(--glass-bg, rgba(0, 0, 0, 0.95));
+  background: var(--glass-bg);
   -webkit-backdrop-filter: blur(var(--glass-blur));
   backdrop-filter: blur(var(--glass-blur));
   display: grid;
@@ -1081,7 +1081,7 @@ function submitReaderPage() {
 }
 
 .nav-menu-root--backdrop {
-  background: rgba(0, 0, 0, 0.35);
+  background: var(--overlay-soft);
   pointer-events: auto;
 }
 
@@ -1342,7 +1342,7 @@ function submitReaderPage() {
   padding: 0 3px;
   border-radius: 999px;
   background: var(--text);
-  color: var(--bg, #000);
+  color: var(--bg);
   font-size: var(--text-2xs);
   font-weight: 600;
   display: inline-flex;
@@ -1656,7 +1656,7 @@ html[data-theme="contrast-white"] .offline-overlay {
     background: var(--surface);
   }
   .offline-overlay {
-    background: rgba(0, 0, 0, 0.95);
+    background: var(--bg);
   }
 }
 
@@ -1672,7 +1672,7 @@ html[data-theme="contrast-white"] .offline-overlay {
   }
 
   .offline-overlay {
-    background: rgba(0, 0, 0, 0.92);
+    background: var(--bg);
   }
 }
 </style>

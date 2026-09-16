@@ -177,7 +177,7 @@ onBeforeUnmount(() => {
   max-height: 70vh;
   object-fit: contain;
   border-radius: var(--radius);
-  background: #000;
+  background: var(--media-bg);
 }
 
 .markdown-body {

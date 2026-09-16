@@ -1019,7 +1019,7 @@ function pickTab(id: SettingsTab) {
 }
 
 .readme-preview :deep(video) {
-  background: #000;
+  background: var(--media-bg);
 }
 
 .col-2 {

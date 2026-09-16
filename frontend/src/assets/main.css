@@ -20,6 +20,9 @@
   --danger: var(--text);
   --gold: var(--text);
   --glass-blur: 16px;
+  /* фото и видео смотрят на чёрном в любой теме */
+  --overlay-strong: rgba(0, 0, 0, 0.92);
+  --media-bg: #000;
   --layout-pad: 1.25rem;
   --control-h: 46px;
   --input-pad-y: 0.72rem;
@@ -75,6 +78,8 @@ html:not([data-theme]) {
   --focus-border: #444444;
   --scrollbar: #2e2e2e;
   --glass-bg: rgba(15, 15, 15, 0.72);
+  --overlay: rgba(0, 0, 0, 0.72);
+  --overlay-soft: rgba(0, 0, 0, 0.45);
   color-scheme: dark;
 }
 
@@ -93,6 +98,8 @@ html[data-theme="white"] {
   --focus-border: #999999;
   --scrollbar: #c8c8c8;
   --glass-bg: rgba(255, 255, 255, 0.72);
+  --overlay: rgba(0, 0, 0, 0.5);
+  --overlay-soft: rgba(0, 0, 0, 0.3);
   color-scheme: light;
 }
 
@@ -111,6 +118,8 @@ html[data-theme="contrast"] {
   --focus-border: #ffffff;
   --scrollbar: #666666;
   --glass-bg: #000000;
+  --overlay: rgba(0, 0, 0, 0.88);
+  --overlay-soft: rgba(0, 0, 0, 0.6);
   color-scheme: dark;
 }
 
@@ -129,6 +138,8 @@ html[data-theme="contrast-white"] {
   --focus-border: #000000;
   --scrollbar: #888888;
   --glass-bg: #ffffff;
+  --overlay: rgba(0, 0, 0, 0.6);
+  --overlay-soft: rgba(0, 0, 0, 0.35);
   color-scheme: light;
 }
 

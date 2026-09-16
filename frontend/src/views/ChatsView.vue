@@ -1467,7 +1467,7 @@ onUnmounted(() => {
 .list-head {
   position: sticky;
   top: 0;
-  background: var(--bg, #000);
+  background: var(--bg);
   z-index: 1;
   padding: 0 0.5rem 0.35rem 0.55rem;
 }
@@ -1496,7 +1496,7 @@ onUnmounted(() => {
   position: fixed;
   inset: 0;
   z-index: 300;
-  background: rgba(0, 0, 0, 0.72);
+  background: var(--overlay);
   display: grid;
   place-items: center;
   padding: 1rem;
@@ -1505,7 +1505,7 @@ onUnmounted(() => {
   width: min(420px, 100%);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--bg, #000);
+  background: var(--bg);
   padding: 1rem;
   display: grid;
   gap: 0.75rem;
@@ -1678,7 +1678,7 @@ onUnmounted(() => {
   padding: 0.22rem 0.35rem 0.22rem 0.28rem;
   border: 1px solid var(--border);
   border-radius: 999px;
-  background: var(--bg, #000);
+  background: var(--bg);
   font-size: var(--text-xs);
   color: var(--text);
   text-transform: lowercase;
@@ -2015,7 +2015,7 @@ onUnmounted(() => {
   height: 18px;
   padding: 0 5px;
   background: var(--text);
-  color: var(--bg, #000);
+  color: var(--bg);
   border-radius: 999px;
   font-size: var(--text-2xs);
   display: inline-flex;
@@ -2340,8 +2340,8 @@ onUnmounted(() => {
   min-height: 22px;
   padding: 0;
   border-radius: 999px;
-  border: none;
-  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid var(--border);
+  background: var(--surface);
   color: var(--text);
   font-size: var(--text-md);
   line-height: 1;
@@ -2418,7 +2418,7 @@ onUnmounted(() => {
 .lightbox {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.92);
+  background: var(--overlay-strong);
   display: grid;
   place-items: center;
   z-index: 200;

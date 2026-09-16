@@ -557,7 +557,7 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
 }
 .profile.on-wallpaper {
   --profile-wide: min(calc(880px - 2rem), calc(100vw - 2 * var(--layout-pad, 1rem)));
-  --profile-steam-bg: rgba(8, 9, 12, 0.55);
+  --profile-steam-bg: rgba(0, 0, 0, 0.55);
   --profile-steam-border: rgba(255, 255, 255, 0.12);
   --profile-steam-line: rgba(255, 255, 255, 0.1);
   --profile-steam-blur: 22px;
@@ -800,7 +800,7 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   max-width: 100%;
   border-radius: var(--radius);
   margin: 0.6rem 0;
-  background: #000;
+  background: var(--media-bg);
 }
 .readme :deep(a) {
   color: var(--text);

@@ -838,7 +838,7 @@ onBeforeUnmount(() => {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--overlay);
   display: grid;
   place-items: center;
   z-index: 100;
@@ -885,7 +885,7 @@ onBeforeUnmount(() => {
   display: grid;
   place-items: center;
   padding: 1rem;
-  background: rgba(0, 0, 0, 0.72);
+  background: var(--overlay-strong);
 }
 
 .media-dialog {
@@ -908,7 +908,7 @@ onBeforeUnmount(() => {
   max-height: calc(90vh - 5rem);
   object-fit: contain;
   border-radius: var(--radius);
-  background: #000;
+  background: var(--media-bg);
 }
 
 .media-close {

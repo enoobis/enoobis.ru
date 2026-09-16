@@ -534,7 +534,7 @@ onBeforeUnmount(() => {
   display: grid;
   place-items: center;
   padding: var(--layout-pad);
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--overlay);
 }
 
 .qr-card {
@@ -590,8 +590,8 @@ onBeforeUnmount(() => {
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: var(--text, #fafafa);
-  border: 3px solid var(--bg, #141414);
+  background: var(--text);
+  border: 3px solid var(--bg);
   box-sizing: border-box;
 }
 </style>

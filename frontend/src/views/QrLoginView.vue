@@ -80,6 +80,11 @@ function describeErr(code: string) {
   return code || "ошибка";
 }
 
+function themeColor(name: "--text" | "--bg") {
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return v || (name === "--text" ? "#f5f5f5" : "#0a0a0a");
+}
+
 async function refreshQr() {
   issuing.value = true;
   err.value = "";
@@ -90,7 +95,7 @@ async function refreshQr() {
     qrDataUrl.value = await QRCode.toDataURL(url, {
       width: 220,
       margin: 1,
-      color: { dark: "#fafafa", light: "#141414" },
+      color: { dark: themeColor("--text"), light: themeColor("--bg") },
     });
     expiresIn.value = r.expires_in;
     clearTimers();
@@ -397,7 +402,7 @@ h1 {
 
 .qr-wrap img {
   border-radius: var(--radius);
-  background: var(--surface2);
+  background: var(--bg);
 }
 
 .timer {

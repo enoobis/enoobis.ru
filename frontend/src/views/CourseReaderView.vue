@@ -1392,7 +1392,7 @@ onBeforeUnmount(() => {
   position: fixed;
   inset: 0;
   z-index: 94;
-  background: rgba(0, 0, 0, 0.45);
+  background: var(--overlay-soft);
 }
 
 /* ---------- телефон: центр читается, чат в одно касание ---------- */
@@ -1531,7 +1531,7 @@ onBeforeUnmount(() => {
     position: fixed;
     inset: 0;
     z-index: 94;
-    background: rgba(0, 0, 0, 0.45);
+    background: var(--overlay-soft);
   }
 }
 

@@ -727,7 +727,7 @@ onBeforeUnmount(() => {
 }
 
 .editor-pane.drag-over {
-  outline: 1px dashed #444;
+  outline: 1px dashed var(--hover-border);
   outline-offset: -4px;
 }
 
@@ -800,14 +800,14 @@ onBeforeUnmount(() => {
   margin: 0.5rem 0;
 }
 .markdown-preview :deep(code) {
-  background: #131313;
+  background: var(--surface2);
   padding: 0.1rem 0.35rem;
   border-radius: 6px;
   font-family: var(--mono);
   font-size: 0.9em;
 }
 .markdown-preview :deep(pre) {
-  background: #0d0d0d;
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 0.8rem 0.9rem;

@@ -297,9 +297,9 @@ textarea:focus {
   min-height: 22px;
   padding: 0;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.7);
+  background: var(--surface);
   color: var(--text);
-  border: none;
+  border: 1px solid var(--border);
   font-size: var(--text-sm);
   line-height: 1;
 }

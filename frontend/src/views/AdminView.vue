@@ -2065,7 +2065,7 @@ strong {
   margin: 0;
   padding: 0;
   border: none;
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--overlay);
   cursor: pointer;
 }
 .shop-edit-dialog {
