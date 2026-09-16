@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
+import PasswordInput from "../components/PasswordInput.vue";
 import { useAuthStore } from "../stores/auth";
 
 const nickname = ref("");
@@ -36,12 +37,11 @@ async function submit() {
         maxlength="24"
         autocomplete="username"
       />
-      <input
+      <PasswordInput
         v-model="password"
-        type="password"
         placeholder="пароль"
-        required
         autocomplete="current-password"
+        required
       />
       <button type="submit" class="primary" :disabled="loading">
         <span v-if="!loading">войти</span>

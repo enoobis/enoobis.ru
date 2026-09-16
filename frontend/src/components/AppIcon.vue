@@ -15,6 +15,7 @@ import {
   Download,
   Eraser,
   Eye,
+  EyeOff,
   FileText,
   Filter,
   Flame,
@@ -127,6 +128,7 @@ export type AppIconName =
   | "link"
   | "seen"
   | "reply"
+  | "hidden"
   | "clear"
   | "qr"
   | "briefcase"
@@ -194,6 +196,7 @@ const icons: Record<AppIconName, Component> = {
   quote: Quote,
   link: Link,
   seen: Eye,
+  hidden: EyeOff,
   reply: Reply,
   clear: Eraser,
   qr: QrCode,
