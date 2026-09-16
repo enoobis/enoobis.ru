@@ -172,23 +172,14 @@ const filteredLectures = computed(() => {
   if (!classroom.value) return [];
   const q = lectureQuery.value.trim().toLowerCase();
   if (!q) return classroom.value.lectures;
-  return classroom.value.lectures.filter(
-    (l) => l.title.toLowerCase().includes(q) || l.body_text.toLowerCase().includes(q),
-  );
+  return classroom.value.lectures.filter((l) => l.title.toLowerCase().includes(q));
 });
 
 const filteredListAssignments = computed(() => {
   const q = assignmentQuery.value.trim().toLowerCase();
   const list = visibleCourseAssignments.value;
   if (!q) return list;
-  return list.filter((a) => {
-    const lectureTitle = lectureTitleForAssignment(a)?.toLowerCase() ?? "";
-    return (
-      a.title.toLowerCase().includes(q) ||
-      a.description.toLowerCase().includes(q) ||
-      lectureTitle.includes(q)
-    );
-  });
+  return list.filter((a) => a.title.toLowerCase().includes(q));
 });
 
 const addTaskForLectureId = ref<string | null>(null);
@@ -284,11 +275,7 @@ function roleLabel(role: string): string {
 const filteredCourses = computed(() => {
   const q = courseQuery.value.trim().toLowerCase();
   if (!q) return courses.value;
-  return courses.value.filter(
-    (c) =>
-      c.title.toLowerCase().includes(q) ||
-      c.teacher_nickname.toLowerCase().includes(q),
-  );
+  return courses.value.filter((c) => c.title.toLowerCase().includes(q));
 });
 
 function courseInitial(title: string) {
@@ -3763,7 +3750,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
   position: absolute;
   inset: 0;
   margin: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--overlay);
   cursor: pointer;
 }
 .grade-modal {
