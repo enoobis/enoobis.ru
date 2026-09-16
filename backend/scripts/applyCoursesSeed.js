@@ -77,18 +77,19 @@ async function main() {
     for (const course of courses) {
       const courseId = randomUUID();
       run(
-        `INSERT INTO courses (id, teacher_id, title, description, is_open, created_at, course_code)
-         VALUES (?, ?, ?, '', 1, ?, ?)`,
+        `INSERT INTO courses (id, teacher_id, title, description, is_open, created_at, course_code, category)
+         VALUES (?, ?, ?, '', 1, ?, ?, ?)`,
         courseId,
         author.id,
         course.title,
         now,
         course.code,
+        course.category ?? "",
       );
       course.lectures.forEach((lecture, position) => {
         run(
-          `INSERT INTO course_lectures (id, course_id, author_id, title, body_text, video_url, created_at, position)
-           VALUES (?, ?, ?, ?, ?, '', ?, ?)`,
+          `INSERT INTO course_lectures (id, course_id, author_id, title, body_text, video_url, created_at, position, chapter)
+           VALUES (?, ?, ?, ?, ?, '', ?, ?, ?)`,
           randomUUID(),
           courseId,
           author.id,
@@ -96,6 +97,7 @@ async function main() {
           lecture.body,
           now,
           position,
+          lecture.chapter ?? "",
         );
         const re = /\/uploads\/course-lectures\/([^/\s)]+)/g;
         let m;

@@ -175,6 +175,19 @@ const filteredLectures = computed(() => {
   return classroom.value.lectures.filter((l) => l.title.toLowerCase().includes(q));
 });
 
+/* при поиске главы мешают: показываем плоский список найденного */
+const lectureGroups = computed(() => {
+  const groups: { title: string; lectures: Lecture[] }[] = [];
+  const grouped = !lectureQuery.value.trim();
+  for (const l of filteredLectures.value) {
+    const title = grouped ? (l.chapter ?? "").trim() : "";
+    const last = groups[groups.length - 1];
+    if (last && last.title === title) last.lectures.push(l);
+    else groups.push({ title, lectures: [l] });
+  }
+  return groups;
+});
+
 const filteredListAssignments = computed(() => {
   const q = assignmentQuery.value.trim().toLowerCase();
   const list = visibleCourseAssignments.value;
@@ -272,15 +285,44 @@ function roleLabel(role: string): string {
   return role;
 }
 
+const activeCategory = ref("");
+
+const categories = computed(() => {
+  const counts = new Map<string, number>();
+  for (const c of courses.value) {
+    const cat = (c.category ?? "").trim();
+    if (cat) counts.set(cat, (counts.get(cat) ?? 0) + 1);
+  }
+  const latin = (s: string) => (/^[a-z]/i.test(s) ? 0 : 1);
+  return [...counts]
+    .map(([title, count]) => ({ title, count }))
+    .sort((a, b) => latin(a.title) - latin(b.title) || a.title.localeCompare(b.title, "ru"));
+});
+
+/* поиск идёт по всем курсам, иначе видно только выбранную категорию */
 const filteredCourses = computed(() => {
   const q = courseQuery.value.trim().toLowerCase();
-  if (!q) return courses.value;
-  return courses.value.filter((c) => c.title.toLowerCase().includes(q));
+  if (q) return courses.value.filter((c) => c.title.toLowerCase().includes(q));
+  if (activeCategory.value)
+    return courses.value
+      .filter((c) => (c.category ?? "").trim() === activeCategory.value)
+      .sort((a, b) => a.title.localeCompare(b.title, "ru"));
+  return courses.value.filter((c) => !(c.category ?? "").trim());
 });
 
 function courseInitial(title: string) {
   const ch = title.trim().charAt(0);
   return ch ? ch.toLowerCase() : "?";
+}
+
+function courseListTitle(c: Course) {
+  const t = c.title.trim();
+  const cut = t.replace(/^руководство по (?:языку |фреймворку )?/, "");
+  return cut || t;
+}
+
+function openCourseRead(id: string) {
+  void router.push(`/courses/${id}/learn`);
 }
 
 /** название, описание, иконка, приватность — владелец или админ */
@@ -1521,7 +1563,32 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
         </button>
       </div>
 
-      <div class="course-grid">
+      <template v-if="!courseQuery.trim()">
+        <ul v-if="!activeCategory && categories.length" class="list category-list">
+          <li v-for="cat in categories" :key="cat.title">
+            <button type="button" class="lecture-row" @click="activeCategory = cat.title">
+              <span class="list-row-title">{{ cat.title }}</span>
+              <span class="list-row-meta muted small">{{ cat.count }}</span>
+            </button>
+          </li>
+        </ul>
+        <BackLink v-else-if="activeCategory" @click="activeCategory = ''">
+          {{ activeCategory }}
+        </BackLink>
+      </template>
+
+      <ul
+        v-if="activeCategory || courseQuery.trim()"
+        class="list category-list"
+      >
+        <li v-for="c in filteredCourses" :key="c.id">
+          <button type="button" class="lecture-row" @click="openCourseRead(c.id)">
+            <span class="list-row-title">{{ courseListTitle(c) }}</span>
+          </button>
+        </li>
+      </ul>
+
+      <div v-else class="course-grid">
         <article
           v-for="c in filteredCourses"
           :key="c.id"
@@ -1631,7 +1698,10 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
           </div>
         </article>
       </div>
-      <p v-if="!filteredCourses.length" class="page-empty muted">
+      <p
+        v-if="!filteredCourses.length && (courseQuery.trim() || activeCategory || !categories.length)"
+        class="page-empty muted"
+      >
         {{ courseQuery ? "ничего не найдено" : "пусто" }}
       </p>
     </template>
@@ -2079,7 +2149,9 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
         </template>
 
         <ul v-else-if="filteredLectures.length" class="list lecture-list">
-          <li v-for="lec in filteredLectures" :key="lec.id">
+          <template v-for="(group, gi) in lectureGroups" :key="group.title || gi">
+          <li v-if="group.title" class="lecture-chapter">{{ group.title }}</li>
+          <li v-for="lec in group.lectures" :key="lec.id">
             <button type="button" class="lecture-row" @click="openLecture(lec.id)">
               <span class="list-row-main">
                 <span class="list-row-title">{{ lec.title }}</span>
@@ -2094,6 +2166,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
               </span>
             </button>
           </li>
+          </template>
         </ul>
         <p v-if="!classroom.lectures.length" class="page-empty muted">
           {{ isTeacherInCurrent ? "опубликуйте первую лекцию" : "лекций пока нет" }}
@@ -3354,8 +3427,17 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 }
 
 .lecture-list > li,
+.category-list > li,
 .task-list > li {
   padding: 0;
+}
+
+.lecture-chapter {
+  padding: var(--space-4) 0 0.35rem;
+  border-bottom: none;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  text-transform: lowercase;
 }
 
 .lecture-row,

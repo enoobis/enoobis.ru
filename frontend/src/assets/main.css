@@ -1085,6 +1085,11 @@ html.course-reader .nav {
   display: none;
 }
 
+/* закрытая шторка чата уезжает за край — без clip страница получает боковой скролл */
+html.course-reader body {
+  overflow-x: clip;
+}
+
 @media (min-width: 1025px) {
   html.course-reader .layout {
     padding-left: 1.5rem;

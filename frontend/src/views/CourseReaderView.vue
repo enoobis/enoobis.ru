@@ -86,8 +86,33 @@ const lectures = computed(() => classroom.value?.lectures ?? []);
 const isTeacher = computed(() => classroom.value?.is_teacher === true);
 
 const activeLecture = computed<Lecture | null>(
-  () => lectures.value.find((l) => l.id === activeId.value) ?? lectures.value[0] ?? null,
+  () => lectures.value.find((l) => l.id === activeId.value) ?? null,
 );
+
+type Chapter = { title: string; offset: number; lectures: Lecture[] };
+
+/* главы идут подряд, поэтому режем плоский список по смене chapter */
+const chapters = computed<Chapter[]>(() => {
+  const out: Chapter[] = [];
+  lectures.value.forEach((l, i) => {
+    const title = (l.chapter ?? "").trim();
+    const last = out[out.length - 1];
+    if (last && last.title === title) last.lectures.push(l);
+    else out.push({ title, offset: i, lectures: [l] });
+  });
+  return out;
+});
+
+const activeChapter = computed(() => (activeLecture.value?.chapter ?? "").trim());
+const openChapter = ref("");
+
+function toggleChapter(title: string) {
+  openChapter.value = openChapter.value === title ? "" : title;
+}
+
+watch(activeChapter, (title) => {
+  if (title) openChapter.value = title;
+});
 
 const activeIndex = computed(() =>
   activeLecture.value ? lectures.value.findIndex((l) => l.id === activeLecture.value?.id) : -1,
@@ -121,7 +146,8 @@ async function load() {
     classroom.value = await getClassroom(courseId.value, auth.token);
     const wanted = String(route.query.lecture ?? "");
     const exists = classroom.value.lectures.some((l) => l.id === wanted);
-    activeId.value = exists ? wanted : (classroom.value.lectures[0]?.id ?? "");
+    activeId.value = exists ? wanted : "";
+    openChapter.value = activeChapter.value;
   } catch (e) {
     err.value = errorText(e);
   } finally {
@@ -151,30 +177,49 @@ function syncKeyboardInset() {
   el.style.setProperty("--kb", inset > 120 ? `${Math.round(inset)}px` : "0px");
 }
 
+function scrollMainTop() {
+  if (mainRef.value) mainRef.value.scrollTop = 0;
+  window.scrollTo({ top: 0 });
+}
+
 function openLecture(id: string) {
   activeId.value = id;
   topicsOpen.value = false;
   editing.value = null;
   void router.replace({ query: { ...route.query, lecture: id } });
-  if (mainRef.value) mainRef.value.scrollTop = 0;
-  window.scrollTo({ top: 0 });
+  scrollMainTop();
+}
+
+function openContents() {
+  activeId.value = "";
+  topicsOpen.value = false;
+  editing.value = null;
+  openChapter.value = "";
+  void router.replace({ query: { ...route.query, lecture: undefined } });
+  scrollMainTop();
 }
 
 /* ---------- перетаскивание тем (преподаватель) ---------- */
 
 const topicListRef = ref<HTMLElement | null>(null);
 const dragIndex = ref(-1);
+const dragChapter = ref(-1);
 const landedId = ref("");
 const dragging = computed(() => dragIndex.value >= 0);
 
 let pressIndex = -1;
+let pressChapter = -1;
 let pressY = 0;
 let pressTimer = 0;
 let orderBefore: string[] = [];
 let dragged = false;
 
+/* порядок меняем только внутри главы: иначе тема уезжает в чужой раздел */
 function rowTops(): number[] {
-  const rows = topicListRef.value?.querySelectorAll<HTMLElement>(".topic-row") ?? [];
+  const rows =
+    topicListRef.value?.querySelectorAll<HTMLElement>(
+      `.topic-row[data-chapter="${dragChapter.value}"]`,
+    ) ?? [];
   return Array.from(rows).map((el) => {
     const r = el.getBoundingClientRect();
     return r.top + r.height / 2;
@@ -185,8 +230,9 @@ function blockTouchScroll(e: TouchEvent) {
   if (dragging.value) e.preventDefault();
 }
 
-function beginDrag(index: number) {
+function beginDrag(index: number, chapter: number) {
   dragIndex.value = index;
+  dragChapter.value = chapter;
   dragged = true;
   orderBefore = lectures.value.map((l) => l.id);
   document.addEventListener("touchmove", blockTouchScroll, { passive: false });
@@ -195,15 +241,17 @@ function beginDrag(index: number) {
 function endPress() {
   window.clearTimeout(pressTimer);
   pressIndex = -1;
+  pressChapter = -1;
   window.removeEventListener("pointermove", onPointerMove);
   window.removeEventListener("pointerup", onPointerUp);
   window.removeEventListener("pointercancel", onPointerUp);
   document.removeEventListener("touchmove", blockTouchScroll);
 }
 
-function onTopicPointerDown(e: PointerEvent, index: number) {
+function onTopicPointerDown(e: PointerEvent, index: number, chapter: number) {
   if (!isTeacher.value || e.button > 0) return;
   pressIndex = index;
+  pressChapter = chapter;
   pressY = e.clientY;
   dragged = false;
   window.addEventListener("pointermove", onPointerMove);
@@ -212,7 +260,7 @@ function onTopicPointerDown(e: PointerEvent, index: number) {
   /* палец: тянем после удержания, чтобы список можно было листать */
   if (e.pointerType !== "mouse") {
     pressTimer = window.setTimeout(() => {
-      if (pressIndex >= 0) beginDrag(pressIndex);
+      if (pressIndex >= 0) beginDrag(pressIndex, pressChapter);
     }, 280);
   }
 }
@@ -227,25 +275,28 @@ function onPointerMove(e: PointerEvent) {
       endPress();
       return;
     }
-    beginDrag(pressIndex);
+    beginDrag(pressIndex, pressChapter);
   }
 
+  const offset = chapters.value[dragChapter.value]?.offset ?? 0;
   const tops = rowTops();
   let to = tops.findIndex((mid) => e.clientY < mid);
   if (to < 0) to = tops.length - 1;
-  if (to === dragIndex.value) return;
+  if (to < 0 || to === dragIndex.value) return;
 
   const list = [...lectures.value];
-  const [moved] = list.splice(dragIndex.value, 1);
-  list.splice(to, 0, moved);
+  const [moved] = list.splice(offset + dragIndex.value, 1);
+  list.splice(offset + to, 0, moved);
   classroom.value = { ...classroom.value, lectures: list };
   dragIndex.value = to;
 }
 
 function onPointerUp() {
   const wasDragging = dragging.value;
-  const movedId = wasDragging ? lectures.value[dragIndex.value]?.id : "";
+  const offset = chapters.value[dragChapter.value]?.offset ?? 0;
+  const movedId = wasDragging ? lectures.value[offset + dragIndex.value]?.id : "";
   dragIndex.value = -1;
+  dragChapter.value = -1;
   endPress();
   if (!wasDragging) return;
   landedId.value = movedId ?? "";
@@ -517,6 +568,19 @@ watch(activeId, () => {
   openTaskId.value = "";
 });
 
+watch(courseId, () => {
+  void load();
+  void loadChat();
+});
+
+watch(
+  () => String(route.query.lecture ?? ""),
+  (id) => {
+    if (id === activeId.value) return;
+    activeId.value = id;
+  },
+);
+
 function onReaderKey(e: KeyboardEvent) {
   if (e.key === "Escape") {
     if (chatOpen.value) chatOpen.value = false;
@@ -572,7 +636,9 @@ onBeforeUnmount(() => {
           <button type="button" class="filter-icon-btn" aria-label="к курсу" @click="exitReader">
             <AppIcon name="back" :size="18" />
           </button>
-          <span class="side-title">{{ classroom.course.title }}</span>
+          <button type="button" class="side-title side-title-btn" @click="openContents">
+            {{ classroom.course.title }}
+          </button>
           <button
             type="button"
             class="filter-icon-btn only-narrow"
@@ -584,24 +650,44 @@ onBeforeUnmount(() => {
         </header>
 
         <nav ref="topicListRef" class="topic-list" :class="{ dragging }">
-          <button
-            v-for="(l, i) in lectures"
-            :key="l.id"
-            type="button"
-            class="topic topic-row"
-            :class="{
-              on: l.id === activeLecture?.id,
-              held: dragIndex === i,
-              landed: l.id === landedId,
-              movable: isTeacher,
-            }"
-            @pointerdown="onTopicPointerDown($event, i)"
-            @click="onTopicClick(l.id)"
-          >
-            <span class="topic-num muted">{{ i + 1 }}</span>
-            <span class="topic-title">{{ l.title }}</span>
-            <AppIcon v-if="lectureDone(l.id)" name="seen" :size="15" class="topic-done" />
-          </button>
+          <template v-for="(ch, ci) in chapters" :key="ch.title || ci">
+            <button
+              v-if="ch.title"
+              type="button"
+              class="chapter"
+              :class="{ on: ch.title === activeChapter }"
+              @click="toggleChapter(ch.title)"
+            >
+              <AppIcon
+                name="forward"
+                :size="14"
+                class="chapter-chev"
+                :class="{ open: openChapter === ch.title }"
+              />
+              <span class="topic-title">{{ ch.title }}</span>
+            </button>
+
+            <button
+              v-for="(l, li) in !ch.title || openChapter === ch.title ? ch.lectures : []"
+              :key="l.id"
+              type="button"
+              class="topic topic-row"
+              :class="{
+                on: l.id === activeLecture?.id,
+                held: dragChapter === ci && dragIndex === li,
+                landed: l.id === landedId,
+                movable: isTeacher,
+                nested: !!ch.title,
+              }"
+              :data-chapter="ci"
+              @pointerdown="onTopicPointerDown($event, li, ci)"
+              @click="onTopicClick(l.id)"
+            >
+              <span class="topic-num muted">{{ li + 1 }}</span>
+              <span class="topic-title">{{ l.title }}</span>
+              <AppIcon v-if="lectureDone(l.id)" name="seen" :size="15" class="topic-done" />
+            </button>
+          </template>
           <p v-if="!lectures.length" class="side-empty muted">тем нет</p>
         </nav>
       </aside>
@@ -617,7 +703,7 @@ onBeforeUnmount(() => {
           >
             <AppIcon name="list" :size="18" />
           </button>
-          <span class="main-bar-title">{{ activeLecture?.title ?? "" }}</span>
+          <span class="main-bar-title">{{ activeLecture?.title ?? "содержание" }}</span>
           <button
             type="button"
             class="filter-icon-btn"
@@ -750,7 +836,7 @@ onBeforeUnmount(() => {
             </div>
           </section>
 
-          <nav v-if="prevLecture || nextLecture" class="lecture-nav">
+          <nav class="lecture-nav">
             <button
               v-if="prevLecture"
               type="button"
@@ -761,6 +847,9 @@ onBeforeUnmount(() => {
               <span>{{ prevLecture.title }}</span>
             </button>
             <span v-else />
+            <button type="button" class="lecture-nav-home" @click="openContents">
+              содержание
+            </button>
             <button
               v-if="nextLecture"
               type="button"
@@ -770,7 +859,28 @@ onBeforeUnmount(() => {
               <span>{{ nextLecture.title }}</span>
               <AppIcon name="forward" :size="18" />
             </button>
+            <span v-else />
           </nav>
+        </article>
+
+        <article v-else-if="lectures.length" class="lecture contents">
+          <h1 class="lecture-title">{{ classroom.course.title }}</h1>
+          <button type="button" class="contents-start" @click="openLecture(lectures[0].id)">
+            читать
+          </button>
+          <section v-for="(ch, ci) in chapters" :key="ch.title || ci" class="contents-chapter">
+            <h2 v-if="ch.title" class="contents-chapter-title">{{ ch.title }}</h2>
+            <button
+              v-for="l in ch.lectures"
+              :key="l.id"
+              type="button"
+              class="contents-topic"
+              @click="openLecture(l.id)"
+            >
+              <span class="topic-title">{{ l.title }}</span>
+              <AppIcon v-if="lectureDone(l.id)" name="seen" :size="15" class="topic-done" />
+            </button>
+          </section>
         </article>
 
         <p v-else class="page-empty">тем нет</p>
@@ -915,6 +1025,71 @@ onBeforeUnmount(() => {
 
 .reader-topics .side-title {
   flex: 1;
+}
+
+.side-title-btn {
+  padding: 0;
+  min-height: 0;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+
+.side-title-btn:hover {
+  background: transparent;
+  color: var(--muted);
+}
+
+.chapter {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+  min-height: 0;
+  padding: 0.55rem 0.5rem;
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text);
+  font-size: var(--text-sm);
+  text-align: left;
+  text-transform: lowercase;
+}
+
+.chapter:hover {
+  background: var(--surface);
+}
+
+.chapter.on {
+  font-weight: 500;
+}
+
+.chapter-chev {
+  flex-shrink: 0;
+  color: var(--muted);
+  transition: transform var(--dur-2) var(--ease-out);
+}
+
+.chapter-chev.open {
+  transform: rotate(90deg);
+}
+
+/* название главы длинное: лучше две строки, чем многоточие */
+.chapter .topic-title {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  line-height: 1.3;
+}
+
+.topic.nested {
+  padding-left: 1.6rem;
 }
 
 .topic-list {
@@ -1076,11 +1251,28 @@ onBeforeUnmount(() => {
 }
 
 .lecture-nav {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1.25rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 1rem;
   padding-top: var(--space-8);
+}
+
+.lecture-nav-home {
+  padding: 0;
+  min-height: 0;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-transform: lowercase;
+  cursor: pointer;
+}
+
+.lecture-nav-home:hover {
+  background: transparent;
+  color: var(--text);
 }
 
 .lecture-nav-btn {
@@ -1088,7 +1280,6 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 0.4rem;
   min-width: 0;
-  max-width: 48%;
   padding: 0;
   border: none;
   background: transparent;
@@ -1101,7 +1292,8 @@ onBeforeUnmount(() => {
 }
 
 .lecture-nav-btn--next {
-  margin-left: auto;
+  justify-self: end;
+  margin-left: 0;
   text-align: right;
 }
 
@@ -1115,6 +1307,52 @@ onBeforeUnmount(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* ---------- содержание курса ---------- */
+
+.contents {
+  gap: var(--space-6);
+}
+
+.contents-start {
+  justify-self: start;
+  padding: 0.6rem 1.4rem;
+  border-radius: var(--radius-pill);
+}
+
+.contents-chapter {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.contents-chapter-title {
+  margin: 0 0 0.35rem;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--muted);
+  text-transform: lowercase;
+}
+
+.contents-topic {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  min-height: 0;
+  padding: 0.5rem 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: var(--text-md);
+  text-align: left;
+  text-transform: lowercase;
+}
+
+.contents-topic:hover {
+  background: transparent;
+  color: var(--muted);
 }
 
 .lecture-video {
@@ -1532,6 +1770,27 @@ onBeforeUnmount(() => {
     inset: 0;
     z-index: 94;
     background: var(--overlay-soft);
+  }
+}
+
+/* на телефоне три колонки не влезают: «содержание» уходит под стрелки */
+@media (max-width: 640px) {
+  .lecture-nav {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    row-gap: 1.25rem;
+  }
+
+  .lecture-nav > :first-child {
+    grid-area: 1 / 1;
+  }
+
+  .lecture-nav > :last-child {
+    grid-area: 1 / 2;
+  }
+
+  .lecture-nav-home {
+    grid-area: 2 / 1 / 3 / 3;
+    justify-self: center;
   }
 }
 

@@ -20,6 +20,7 @@ export type Course = {
   is_pinned?: boolean;
   is_global_pinned?: boolean;
   icon_url?: string;
+  category?: string;
 };
 
 export type CourseListResponse = {
@@ -115,6 +116,7 @@ export type Lecture = {
   body_text: string;
   video_url: string;
   created_at: string;
+  chapter?: string;
   attachments: LectureAttachment[];
 };
 

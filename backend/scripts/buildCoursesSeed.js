@@ -47,6 +47,32 @@ const IMAGE_EXT = {
   ".png@v=1": ".png",
 };
 
+/* верхняя папка дампа = категория каталога курсов */
+const CATEGORY = {
+  ai: "ai",
+  assembler: "ассемблер",
+  c: "c",
+  common: "общее",
+  cpp: "c++",
+  dart: "dart",
+  f: "f#",
+  go: "go",
+  hosting: "хостинг",
+  java: "java",
+  js: "javascript",
+  kotlin: "kotlin",
+  nosql: "nosql",
+  os: "операционные системы",
+  php: "php",
+  python: "python",
+  rust: "rust",
+  sharp: "c#",
+  sql: "sql",
+  swift: "swift",
+  visualbasic: "visual basic",
+  web: "веб",
+};
+
 function walkIndexFiles(dir, acc = []) {
   let entries = [];
   try {
@@ -176,19 +202,24 @@ function parseToc(html) {
   const seen = new Set();
   const out = [];
   const re = /<a href="([^"]+\.php\.html)"[^>]*>([\s\S]*?)<\/a>/gi;
+  let chapter = "";
   let m;
   while ((m = re.exec(block))) {
     const href = m[1].replace(/\\/g, "/").split("#")[0];
     if (!href || /^(https?:)?\/\//i.test(href)) continue;
     const title = lowerTitle(stripTags(m[2]));
-    if (!title || /^глава\s+\d/i.test(title)) continue;
+    if (!title) continue;
+    if (/^глава\s+\d/i.test(title)) {
+      chapter = title;
+      continue;
+    }
     if (seen.has(href)) {
       const prev = out.find((x) => x.href === href);
       if (prev) prev.title = title;
       continue;
     }
     seen.add(href);
-    out.push({ href, title });
+    out.push({ href, title, chapter });
   }
   return out;
 }
@@ -270,8 +301,18 @@ function htmlToMd(html, { dir, copyImage }) {
   s = s.replace(/<h2[^>]*>([\s\S]*?)<\/h2>/gi, (_m, t) => `\n\n## ${stripTags(t)}\n\n`);
   s = s.replace(/<h4[^>]*>([\s\S]*?)<\/h4>/gi, (_m, t) => `\n\n#### ${stripTags(t)}\n\n`);
   s = s.replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, (_m, t) => {
-    const inner = t.replace(/<p[^>]*>/gi, "").replace(/<\/p>/gi, "").trim();
-    return `\n- ${stripTags(inner)}`;
+    const codes = [];
+    const inner = t
+      .replace(/<p[^>]*>/gi, "")
+      .replace(/<\/p>/gi, " ")
+      .replace(/<code[^>]*>([\s\S]*?)<\/code>/gi, (_c, code) => ` \`${stripTags(code)}\` `)
+      .replace(/\u0000(\d+)\u0000/g, (ph) => {
+        codes.push(ph);
+        return "";
+      });
+    const line = `\n- ${stripTags(inner)}`;
+    /* внутри пункта списка fence не работает, поэтому код выносим за список */
+    return codes.length ? `${line}\n\n${codes.join("\n\n")}\n\n` : line;
   });
   s = s.replace(/<\/?ul[^>]*>/gi, "\n");
   s = s.replace(/<\/?ol[^>]*>/gi, "\n");
@@ -321,7 +362,9 @@ function collectCourses() {
     const dir = path.dirname(indexPath);
     const title = indexTitle(html, path.basename(dir));
     if (!title) continue;
-    courses.push({ dir, rel, title, code: courseCode(rel), lessons });
+    const top = rel.replace(/\\/g, "/").split("/")[0].toLowerCase();
+    const category = CATEGORY[top] ?? top;
+    courses.push({ dir, rel, title, category, code: courseCode(rel), lessons });
   }
   return courses.sort((a, b) => a.code.localeCompare(b.code));
 }
@@ -348,15 +391,20 @@ function main() {
         lesson.title ||
         lowerTitle(stripTags(raw.match(/<h2>([\s\S]*?)<\/h2>/i)?.[1] ?? ""));
       if (!title || !body) continue;
-      lectures.push({ title, body });
+      lectures.push({ title, chapter: lesson.chapter ?? "", body });
     }
     if (!lectures.length) continue;
     const lines = lectures.map((l) => JSON.stringify(l)).join(",\n  ");
     fs.writeFileSync(
       path.join(SEED_LECTURES, `${course.code}.json`),
-      `{"code":${JSON.stringify(course.code)},"title":${JSON.stringify(course.title)},"lectures":[\n  ${lines}\n]}\n`,
+      `{"code":${JSON.stringify(course.code)},"title":${JSON.stringify(course.title)},"category":${JSON.stringify(course.category)},"lectures":[\n  ${lines}\n]}\n`,
     );
-    index.push({ code: course.code, title: course.title, lectures: lectures.length });
+    index.push({
+      code: course.code,
+      title: course.title,
+      category: course.category,
+      lectures: lectures.length,
+    });
     total += lectures.length;
   }
   fs.writeFileSync(

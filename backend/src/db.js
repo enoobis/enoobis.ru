@@ -1019,6 +1019,26 @@ try {
 }
 
 try {
+  db.prepare("SELECT category FROM courses LIMIT 1").get();
+} catch {
+  try {
+    db.exec("ALTER TABLE courses ADD COLUMN category TEXT NOT NULL DEFAULT ''");
+  } catch {
+    // ignore
+  }
+}
+
+try {
+  db.prepare("SELECT chapter FROM course_lectures LIMIT 1").get();
+} catch {
+  try {
+    db.exec("ALTER TABLE course_lectures ADD COLUMN chapter TEXT NOT NULL DEFAULT ''");
+  } catch {
+    // ignore
+  }
+}
+
+try {
   ensureShopCategoryTables();
 } catch {
   // ignore
