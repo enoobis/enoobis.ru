@@ -35,10 +35,10 @@ const shown = ref(false);
     >
       <span class="pass-icons" aria-hidden="true">
         <span class="pass-ico pass-ico-off">
-          <AppIcon name="seen" :size="18" />
+          <AppIcon name="seen" :size="16" />
         </span>
         <span class="pass-ico pass-ico-on">
-          <AppIcon name="hidden" :size="18" />
+          <AppIcon name="hidden" :size="16" />
         </span>
       </span>
     </button>
@@ -49,32 +49,32 @@ const shown = ref(false);
 .pass {
   position: relative;
   display: flex;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
 }
 .pass input {
-  padding-right: calc(var(--input-pad-x) + 1.9rem);
+  padding-right: 2.6rem;
 }
 .pass-toggle {
   position: absolute;
-  top: 50%;
-  right: 0.45rem;
-  transform: translateY(-50%);
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  padding: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 2.6rem;
+  height: auto;
   min-height: 0;
+  padding: 0;
   border: 0;
-  border-radius: var(--radius-pill);
+  border-radius: 0;
   background: transparent;
   color: var(--muted);
-  transition:
-    color var(--dur-2) var(--ease-out),
-    background var(--dur-2) var(--ease-out);
+  display: grid;
+  place-items: center;
+  transition: color var(--dur-2) var(--ease-out);
 }
 .pass-toggle:hover {
   color: var(--text);
-  background: var(--hover-surface);
+  background: transparent;
 }
 .pass.shown .pass-toggle {
   color: var(--text);
