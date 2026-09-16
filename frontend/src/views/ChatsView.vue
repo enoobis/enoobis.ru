@@ -902,6 +902,7 @@ usePageRefresh(async () => {
 });
 
 onMounted(async () => {
+  document.documentElement.classList.add("chats-wide");
   window.visualViewport?.addEventListener("resize", syncKeyboardInset);
   window.visualViewport?.addEventListener("scroll", syncKeyboardInset);
   syncKeyboardInset();
@@ -917,6 +918,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  document.documentElement.classList.remove("chats-wide");
   window.visualViewport?.removeEventListener("resize", syncKeyboardInset);
   window.visualViewport?.removeEventListener("scroll", syncKeyboardInset);
   document.documentElement.style.removeProperty("--kb");
@@ -1054,7 +1056,7 @@ onUnmounted(() => {
           </span>
         </header>
 
-        <div ref="messagesBox" class="messages">
+        <div ref="messagesBox" class="messages" :class="{ empty: !messages.length }">
           <AppLoading v-if="loadingMessages && !messages.length" class="page-empty" />
           <p v-else-if="!messages.length" class="page-empty muted">напишите первое сообщение</p>
           <template v-for="row in messageRows" :key="row.id">
@@ -1201,31 +1203,33 @@ onUnmounted(() => {
               hidden
               @change="onFileChange"
             />
-            <textarea
-              ref="composerTextarea"
-              v-model="draft"
-              class="composer-ta"
-              :class="{ 'composer-ta--tall': composerTall }"
-              rows="1"
-              placeholder="сообщение"
-              :maxlength="4000"
-              @keydown="onKey"
-              @focus="onComposerFocus"
-              @input="scheduleComposerResize"
-              @paste="onPaste"
-              @compositionend="scheduleComposerResize"
-            />
-            <button
-              type="button"
-              :disabled="sending || (!draft.trim() && !pendingFile)"
-              @click="send"
-            >
-              {{ sending ? "…" : "отправить" }}
-            </button>
+            <div class="composer-field" :class="{ tall: composerTall }">
+              <textarea
+                ref="composerTextarea"
+                v-model="draft"
+                class="composer-ta"
+                rows="1"
+                placeholder="сообщение"
+                :maxlength="4000"
+                @keydown="onKey"
+                @focus="onComposerFocus"
+                @input="scheduleComposerResize"
+                @paste="onPaste"
+                @compositionend="scheduleComposerResize"
+              />
+              <button
+                type="button"
+                class="composer-send"
+                :disabled="sending || (!draft.trim() && !pendingFile)"
+                aria-label="отправить"
+                @click="send"
+              >
+                <AppIcon name="send" :size="18" />
+              </button>
+            </div>
           </div>
         </div>
       </template>
-      <p v-else class="page-empty muted center">выберите чат слева</p>
     </main>
 
     <Teleport to="body">
@@ -1860,9 +1864,6 @@ onUnmounted(() => {
 .member-hint {
   padding: 0.2rem 0.4rem;
 }
-.center {
-  margin: auto;
-}
 
 .chat-row-outer {
   display: grid;
@@ -2125,6 +2126,9 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 0.5rem;
 }
+.messages.empty {
+  justify-content: center;
+}
 .day-mark {
   text-align: center;
   padding: 0.35rem 0 0.05rem;
@@ -2289,6 +2293,8 @@ onUnmounted(() => {
 
 .composer-wrap {
   flex-shrink: 0;
+  width: 100%;
+  min-width: 0;
 }
 .reply-bar {
   display: flex;
@@ -2365,54 +2371,89 @@ onUnmounted(() => {
   inset: -8px;
 }
 .composer {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 0.5rem;
-  padding: 0.7rem 1rem;
-  align-items: end;
+  display: flex;
+  align-items: flex-end;
+  gap: 0.45rem;
+  width: 100%;
+  min-width: 0;
+  padding: 0.55rem 0.75rem 0.85rem;
 }
 .attach {
-  width: 40px;
-  height: 40px;
-  min-height: 40px;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
   padding: 0;
   border-radius: 999px;
   background: transparent;
-  border: 1px solid var(--border);
+  border: none;
   color: var(--muted);
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 .attach:hover {
   color: var(--text);
+  background: var(--surface2);
+}
+.composer-field {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: flex-end;
+  gap: 0.15rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  padding: 0.15rem 0.2rem 0.15rem 0.35rem;
+}
+.composer-field.tall {
+  border-radius: var(--radius);
+}
+.composer-field:focus-within {
+  border-color: var(--focus-border);
 }
 .composer .composer-ta {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
   resize: none;
   min-height: 40px;
   max-height: 220px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 0.55rem 1rem;
+  border: none;
+  border-radius: 0;
+  padding: 0.6rem 0.55rem;
   font: inherit;
-  font-size: var(--text-sm);
+  font-size: var(--text-md);
   line-height: 1.4;
   background: transparent;
   color: var(--text);
   overflow-y: hidden;
 }
-.composer .composer-ta.composer-ta--tall {
-  border-radius: 14px;
-}
 .composer .composer-ta:focus {
   outline: none;
-  border-color: var(--focus-border);
+  border-color: transparent;
 }
-.composer button:not(.attach) {
-  padding: 0.4rem 1rem;
+.composer-send {
+  width: 40px;
+  height: 40px;
   min-height: 40px;
+  padding: 0;
+  border: none;
   border-radius: 999px;
-  font-size: var(--text-sm);
+  background: transparent;
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.composer-send:hover:not(:disabled) {
+  background: var(--hover-surface);
+}
+.composer-send:disabled {
+  color: var(--muted);
+  opacity: 0.45;
 }
 
 .msg-img {

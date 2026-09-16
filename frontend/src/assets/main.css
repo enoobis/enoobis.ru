@@ -1081,6 +1081,11 @@ html.course-reader .layout {
   padding-top: 0.75rem;
 }
 
+html.chats-wide .layout {
+  max-width: none;
+  width: 100%;
+}
+
 html.course-reader .nav {
   display: none;
 }
