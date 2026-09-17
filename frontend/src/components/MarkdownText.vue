@@ -3,7 +3,17 @@ import { computed } from "vue";
 import { renderMarkdown } from "../utils/markdown";
 
 const props = defineProps<{ text: string; variant?: "doc" }>();
-const html = computed(() => renderMarkdown(props.text));
+
+/* пустые строки между пунктами списка → «рыхлый» список с <p> внутри li */
+function tightenLists(md: string): string {
+  return md
+    .replace(/\r\n/g, "\n")
+    .replace(/(\n(?:[-*]|\d+\.) [^\n]*)\n{2,}(?=(?:[-*]|\d+\.) )/g, "$1\n");
+}
+
+const html = computed(() =>
+  renderMarkdown(props.variant === "doc" ? tightenLists(props.text) : props.text),
+);
 </script>
 
 <template>
@@ -32,35 +42,42 @@ const html = computed(() => renderMarkdown(props.text));
   text-align: left;
 }
 
-/* лекции — режим чтения: шрифт интерфейса, крупнее основного текста */
+/* лекции — как учебник: плотнее, без дыр между пунктами */
 .markdown-body.doc {
-  font-size: 1.12rem;
-  line-height: 1.75;
+  font-size: 1.05rem;
+  line-height: 1.55;
 }
 .markdown-body.doc :deep(p) {
-  margin: 0 0 1rem;
+  margin: 0 0 0.65em;
 }
 .markdown-body.doc :deep(ul),
 .markdown-body.doc :deep(ol) {
-  margin: 1rem 0;
-  padding-left: 1.4rem;
+  margin: 0.55em 0;
+  padding-left: 1.25rem;
 }
 .markdown-body.doc :deep(li) {
-  margin: 0.35rem 0;
+  margin: 0.12em 0;
+}
+.markdown-body.doc :deep(li p) {
+  margin: 0;
+}
+.markdown-body.doc :deep(li ul),
+.markdown-body.doc :deep(li ol) {
+  margin: 0.2em 0;
 }
 .markdown-body.doc :deep(h1),
 .markdown-body.doc :deep(h2),
 .markdown-body.doc :deep(h3) {
-  margin: 2rem 0 0.75rem;
+  margin: 1.25rem 0 0.4rem;
 }
 .markdown-body.doc :deep(h1) {
-  font-size: 1.5rem;
+  font-size: 1.35rem;
 }
 .markdown-body.doc :deep(h2) {
-  font-size: 1.28rem;
+  font-size: 1.18rem;
 }
 .markdown-body.doc :deep(h3) {
-  font-size: 1.12rem;
+  font-size: 1.05rem;
 }
 .markdown-body.doc :deep(pre),
 .markdown-body.doc :deep(code) {

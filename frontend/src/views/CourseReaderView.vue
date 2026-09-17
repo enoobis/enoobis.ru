@@ -1320,17 +1320,17 @@ onBeforeUnmount(() => {
 
 .lecture {
   display: grid;
-  gap: var(--space-5);
+  gap: 0.85rem;
   min-width: 0;
-  max-width: 62rem;
+  max-width: 46rem;
   width: 100%;
   margin: 0;
   padding-bottom: var(--space-8);
 }
 
 .lecture :deep(.markdown-body.doc) {
-  font-size: 1.2rem;
-  line-height: 1.78;
+  font-size: 1.06rem;
+  line-height: 1.55;
 }
 
 .lecture :deep(a),
@@ -1340,7 +1340,7 @@ onBeforeUnmount(() => {
 
 .lecture-title {
   margin: 0;
-  font-size: 1.65rem;
+  font-size: 1.45rem;
   font-weight: 600;
   letter-spacing: -0.02em;
   line-height: 1.25;
