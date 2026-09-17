@@ -1069,6 +1069,16 @@ try {
 }
 
 try {
+  db.prepare("SELECT book FROM course_lectures LIMIT 1").get();
+} catch {
+  try {
+    db.exec("ALTER TABLE course_lectures ADD COLUMN book TEXT NOT NULL DEFAULT ''");
+  } catch {
+    // ignore
+  }
+}
+
+try {
   ensureShopCategoryTables();
 } catch {
   // ignore

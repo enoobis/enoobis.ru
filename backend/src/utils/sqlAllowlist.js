@@ -50,7 +50,7 @@ export function assertAssignmentPatchField(field) {
   if (!ASSIGNMENT_PATCH_FIELDS.has(field)) throw new Error("invalid field");
 }
 
-const LECTURE_PATCH_FIELDS = new Set(["title", "body_text", "video_url", "chapter"]);
+const LECTURE_PATCH_FIELDS = new Set(["title", "body_text", "video_url", "chapter", "book"]);
 
 /**
  * @param {string} field

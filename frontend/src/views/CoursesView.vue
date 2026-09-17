@@ -181,7 +181,9 @@ const lectureGroups = computed(() => {
   const groups: { title: string; lectures: Lecture[] }[] = [];
   const grouped = !lectureQuery.value.trim();
   for (const l of filteredLectures.value) {
-    const title = grouped ? (l.chapter ?? "").trim() : "";
+    const book = grouped ? (l.book ?? "").trim() : "";
+    const chapter = grouped ? (l.chapter ?? "").trim() : "";
+    const title = [book, chapter].filter(Boolean).join(" · ");
     const last = groups[groups.length - 1];
     if (last && last.title === title) last.lectures.push(l);
     else groups.push({ title, lectures: [l] });
@@ -314,7 +316,8 @@ const filteredCourses = computed(() => {
       const title = c.title.toLowerCase();
       const short = courseListTitle(c).toLowerCase();
       const cat = courseCategory(c);
-      return title.includes(q) || short.includes(q) || categoryMatches(cat, q);
+      const desc = (c.description ?? "").toLowerCase();
+      return title.includes(q) || short.includes(q) || desc.includes(q) || categoryMatches(cat, q);
     });
   }
   if (activeCategory.value)
@@ -331,6 +334,15 @@ function courseInitial(title: string) {
 
 function openCourseRead(id: string) {
   void router.push(`/courses/${id}/learn`);
+}
+
+function openCategory(title: string) {
+  const list = courses.value.filter((c) => courseCategory(c) === title);
+  if (list.length === 1) {
+    openCourseRead(list[0].id);
+    return;
+  }
+  activeCategory.value = title;
 }
 
 /** название, описание, иконка, приватность — владелец или админ */
@@ -1574,9 +1586,8 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
       <template v-if="!courseQuery.trim()">
         <ul v-if="!activeCategory && categories.length" class="list category-list">
           <li v-for="cat in categories" :key="cat.title">
-            <button type="button" class="lecture-row" @click="activeCategory = cat.title">
+            <button type="button" class="lecture-row" @click="openCategory(cat.title)">
               <span class="list-row-title">{{ cat.title }}</span>
-              <span class="list-row-meta muted small">{{ cat.count }}</span>
             </button>
           </li>
         </ul>

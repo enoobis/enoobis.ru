@@ -429,7 +429,7 @@ function attachmentsForSubmission(submissionId) {
 function lecturesFor(course) {
   const rows = all(
     `SELECT l.id, l.course_id, l.author_id, u.nickname as author_nickname,
-            l.title, l.body_text, l.video_url, l.created_at, l.position, l.chapter
+            l.title, l.body_text, l.video_url, l.created_at, l.position, l.chapter, l.book
      FROM course_lectures l JOIN users u ON u.id = l.author_id
      WHERE l.course_id = ?
      ORDER BY l.position, l.created_at, l.rowid`,
@@ -925,8 +925,8 @@ router.post("/courses/:id/lectures", authRequired, (req, res) => {
       access.course.id,
     )?.m ?? -1) + 1;
   run(
-    `INSERT INTO course_lectures (id, course_id, author_id, title, body_text, video_url, created_at, position, chapter)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO course_lectures (id, course_id, author_id, title, body_text, video_url, created_at, position, chapter, book)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     id,
     access.course.id,
     req.user.id,
@@ -936,6 +936,7 @@ router.post("/courses/:id/lectures", authRequired, (req, res) => {
     now,
     nextPosition,
     String(req.body?.chapter ?? ""),
+    String(req.body?.book ?? ""),
   );
   const attachments = Array.isArray(req.body?.attachments) ? req.body.attachments : [];
   for (const att of attachments) {
@@ -965,7 +966,7 @@ router.post("/courses/:id/lectures", authRequired, (req, res) => {
   }
   const row = get(
     `SELECT l.id, l.course_id, l.author_id, u.nickname as author_nickname,
-            l.title, l.body_text, l.video_url, l.created_at, l.position, l.chapter
+            l.title, l.body_text, l.video_url, l.created_at, l.position, l.chapter, l.book
      FROM course_lectures l JOIN users u ON u.id = l.author_id WHERE l.id = ?`,
     id,
   );
@@ -980,7 +981,7 @@ router.patch("/courses/:id/lectures/:lid", authRequired, (req, res) => {
   if (!lectureInCourse(req.params.id, req.params.lid)) {
     return res.status(404).json({ error: "not found" });
   }
-  const fields = ["title", "body_text", "video_url", "chapter"];
+  const fields = ["title", "body_text", "video_url", "chapter", "book"];
   for (const f of fields) {
     if (req.body[f] !== undefined) {
       assertLecturePatchField(f);
@@ -1007,7 +1008,7 @@ router.patch("/courses/:id/lectures/:lid", authRequired, (req, res) => {
   }
   const row = get(
     `SELECT l.id, l.course_id, l.author_id, u.nickname as author_nickname,
-            l.title, l.body_text, l.video_url, l.created_at, l.position, l.chapter
+            l.title, l.body_text, l.video_url, l.created_at, l.position, l.chapter, l.book
      FROM course_lectures l JOIN users u ON u.id = l.author_id WHERE l.id = ?`,
     req.params.lid,
   );

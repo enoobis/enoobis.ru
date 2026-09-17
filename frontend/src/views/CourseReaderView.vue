@@ -89,29 +89,68 @@ const activeLecture = computed<Lecture | null>(
   () => lectures.value.find((l) => l.id === activeId.value) ?? null,
 );
 
-type Chapter = { title: string; offset: number; lectures: Lecture[] };
+type Chapter = { title: string; book: string; offset: number; lectures: Lecture[] };
 
-/* главы идут подряд, поэтому режем плоский список по смене chapter */
+/* главы идут подряд, поэтому режем плоский список по смене book+chapter */
 const chapters = computed<Chapter[]>(() => {
   const out: Chapter[] = [];
   lectures.value.forEach((l, i) => {
+    const book = (l.book ?? "").trim();
     const title = (l.chapter ?? "").trim();
     const last = out[out.length - 1];
-    if (last && last.title === title) last.lectures.push(l);
-    else out.push({ title, offset: i, lectures: [l] });
+    if (last && last.book === book && last.title === title) last.lectures.push(l);
+    else out.push({ title, book, offset: i, lectures: [l] });
   });
   return out;
 });
 
+const hasBooks = computed(() => chapters.value.some((c) => c.book));
 const activeChapter = computed(() => (activeLecture.value?.chapter ?? "").trim());
+const activeBook = computed(() => (activeLecture.value?.book ?? "").trim());
 const openChapter = ref("");
+const openBook = ref("");
 
 function toggleChapter(title: string) {
   openChapter.value = openChapter.value === title ? "" : title;
 }
 
+function toggleBook(title: string) {
+  if (openBook.value === title) {
+    openBook.value = "";
+    return;
+  }
+  openBook.value = title;
+  const first = chapters.value.find((c) => c.book === title);
+  if (first?.title) openChapter.value = first.title;
+}
+
+function isBookStart(ci: number): boolean {
+  const ch = chapters.value[ci];
+  if (!ch?.book) return false;
+  return chapters.value[ci - 1]?.book !== ch.book;
+}
+
+function bookOpen(book: string): boolean {
+  if (!hasBooks.value || !book) return true;
+  return openBook.value === book;
+}
+
 watch(activeChapter, (title) => {
   if (title) openChapter.value = title;
+});
+
+watch(activeBook, (title) => {
+  if (title) openBook.value = title;
+});
+
+const contentBooks = computed(() => {
+  const out: { title: string; chapters: Chapter[] }[] = [];
+  for (const ch of chapters.value) {
+    const last = out[out.length - 1];
+    if (last && last.title === ch.book) last.chapters.push(ch);
+    else out.push({ title: ch.book, chapters: [ch] });
+  }
+  return out;
 });
 
 const activeIndex = computed(() =>
@@ -650,12 +689,29 @@ onBeforeUnmount(() => {
         </header>
 
         <nav ref="topicListRef" class="topic-list" :class="{ dragging }">
-          <template v-for="(ch, ci) in chapters" :key="ch.title || ci">
+          <template v-for="(ch, ci) in chapters" :key="`${ch.book}:${ch.title}:${ci}`">
+            <button
+              v-if="hasBooks && isBookStart(ci)"
+              type="button"
+              class="book"
+              :class="{ on: ch.book === activeBook }"
+              @click="toggleBook(ch.book)"
+            >
+              <AppIcon
+                name="forward"
+                :size="14"
+                class="chapter-chev"
+                :class="{ open: openBook === ch.book }"
+              />
+              <span class="topic-title">{{ ch.book }}</span>
+            </button>
+
+            <template v-if="bookOpen(ch.book)">
             <button
               v-if="ch.title"
               type="button"
               class="chapter"
-              :class="{ on: ch.title === activeChapter }"
+              :class="{ on: ch.title === activeChapter && ch.book === activeBook, nested: hasBooks }"
               @click="toggleChapter(ch.title)"
             >
               <AppIcon
@@ -687,6 +743,7 @@ onBeforeUnmount(() => {
               <span class="topic-title">{{ l.title }}</span>
               <AppIcon v-if="lectureDone(l.id)" name="seen" :size="15" class="topic-done" />
             </button>
+            </template>
           </template>
           <p v-if="!lectures.length" class="side-empty muted">тем нет</p>
         </nav>
@@ -868,18 +925,21 @@ onBeforeUnmount(() => {
           <button type="button" class="contents-start" @click="openLecture(lectures[0].id)">
             читать
           </button>
-          <section v-for="(ch, ci) in chapters" :key="ch.title || ci" class="contents-chapter">
-            <h2 v-if="ch.title" class="contents-chapter-title">{{ ch.title }}</h2>
-            <button
-              v-for="l in ch.lectures"
-              :key="l.id"
-              type="button"
-              class="contents-topic"
-              @click="openLecture(l.id)"
-            >
-              <span class="topic-title">{{ l.title }}</span>
-              <AppIcon v-if="lectureDone(l.id)" name="seen" :size="15" class="topic-done" />
-            </button>
+          <section v-for="(book, bi) in contentBooks" :key="book.title || bi" class="contents-book">
+            <h2 v-if="book.title" class="contents-book-title">{{ book.title }}</h2>
+            <section v-for="(ch, ci) in book.chapters" :key="ch.title || ci" class="contents-chapter">
+              <h3 v-if="ch.title" class="contents-chapter-title">{{ ch.title }}</h3>
+              <button
+                v-for="l in ch.lectures"
+                :key="l.id"
+                type="button"
+                class="contents-topic"
+                @click="openLecture(l.id)"
+              >
+                <span class="topic-title">{{ l.title }}</span>
+                <AppIcon v-if="lectureDone(l.id)" name="seen" :size="15" class="topic-done" />
+              </button>
+            </section>
           </section>
         </article>
 
@@ -1064,10 +1124,34 @@ onBeforeUnmount(() => {
   text-transform: lowercase;
 }
 
+.book {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+  min-height: 0;
+  margin-top: 0.5rem;
+  padding: 0.55rem 0.5rem;
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-align: left;
+  text-transform: lowercase;
+}
+
+.book:first-child {
+  margin-top: 0;
+}
+
+.book:hover,
 .chapter:hover {
   background: var(--surface);
 }
 
+.book.on,
 .chapter.on {
   font-weight: 500;
 }
@@ -1094,6 +1178,10 @@ onBeforeUnmount(() => {
 
 .topic.nested {
   padding-left: 1.6rem;
+}
+
+.chapter.nested {
+  padding-left: 1.1rem;
 }
 
 .topic-list {
@@ -1328,6 +1416,22 @@ onBeforeUnmount(() => {
   justify-self: start;
   padding: 0.6rem 1.4rem;
   border-radius: var(--radius-pill);
+}
+
+.contents-book {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.contents-book-title {
+  margin: 1.2rem 0 0;
+  font-size: 1.02rem;
+  font-weight: 500;
+  text-transform: lowercase;
+}
+
+.contents-book:first-child .contents-book-title {
+  margin-top: 0;
 }
 
 .contents-chapter {

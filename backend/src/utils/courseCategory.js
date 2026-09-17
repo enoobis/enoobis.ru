@@ -14,10 +14,13 @@ const PREFIX = [
   ["MK-PHP", "php"],
   ["MK-SQL", "sql"],
   ["MK-WEB", "веб"],
-  ["MK-OS-", "операционные системы"],
-  ["MK-GO-", "go"],
-  ["MK-F-", "f#"],
-  ["MK-C-", "c"],
+  ["MK-OS", "операционные системы"],
+  ["MK-GO", "go"],
+  ["MK-F", "f#"],
+  ["MK-JS", "javascript"],
+  ["MK-AI", "ai"],
+  ["MK-HOSTING", "хостинг"],
+  ["MK-C", "c"],
 ];
 
 export function categoryFromCode(code) {

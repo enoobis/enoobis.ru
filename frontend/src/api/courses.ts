@@ -117,6 +117,7 @@ export type Lecture = {
   video_url: string;
   created_at: string;
   chapter?: string;
+  book?: string;
   attachments: LectureAttachment[];
 };
 
