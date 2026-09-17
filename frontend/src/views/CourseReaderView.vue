@@ -921,25 +921,29 @@ onBeforeUnmount(() => {
         </article>
 
         <article v-else-if="lectures.length" class="lecture contents">
-          <h1 class="lecture-title">{{ classroom.course.title }}</h1>
-          <button type="button" class="contents-start" @click="openLecture(lectures[0].id)">
-            читать
-          </button>
+          <header class="contents-head">
+            <h1 class="lecture-title">{{ classroom.course.title }}</h1>
+            <button type="button" class="contents-start" @click="openLecture(lectures[0].id)">
+              читать
+            </button>
+          </header>
           <section v-for="(book, bi) in contentBooks" :key="book.title || bi" class="contents-book">
             <h2 v-if="book.title" class="contents-book-title">{{ book.title }}</h2>
-            <section v-for="(ch, ci) in book.chapters" :key="ch.title || ci" class="contents-chapter">
-              <h3 v-if="ch.title" class="contents-chapter-title">{{ ch.title }}</h3>
-              <button
-                v-for="l in ch.lectures"
-                :key="l.id"
-                type="button"
-                class="contents-topic"
-                @click="openLecture(l.id)"
-              >
-                <span class="topic-title">{{ l.title }}</span>
-                <AppIcon v-if="lectureDone(l.id)" name="seen" :size="15" class="topic-done" />
-              </button>
-            </section>
+            <div class="contents-chapters">
+              <section v-for="(ch, ci) in book.chapters" :key="ch.title || ci" class="contents-chapter">
+                <h3 v-if="ch.title" class="contents-chapter-title">{{ ch.title }}</h3>
+                <button
+                  v-for="l in ch.lectures"
+                  :key="l.id"
+                  type="button"
+                  class="contents-topic"
+                  @click="openLecture(l.id)"
+                >
+                  <span class="topic-title">{{ l.title }}</span>
+                  <AppIcon v-if="lectureDone(l.id)" name="seen" :size="15" class="topic-done" />
+                </button>
+              </section>
+            </div>
           </section>
         </article>
 
@@ -1408,39 +1412,67 @@ onBeforeUnmount(() => {
 
 /* ---------- содержание курса ---------- */
 
-.contents {
-  gap: var(--space-6);
+.lecture.contents {
+  max-width: 100%;
+  gap: 1.5rem;
+}
+
+.contents-head {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
 }
 
 .contents-start {
-  justify-self: start;
-  padding: 0.6rem 1.4rem;
+  padding: 0.45rem 1.1rem;
   border-radius: var(--radius-pill);
 }
 
 .contents-book {
   display: grid;
-  gap: 0.75rem;
+  gap: 0.85rem;
 }
 
 .contents-book-title {
-  margin: 1.2rem 0 0;
-  font-size: 1.02rem;
+  margin: 0;
+  font-size: 1.05rem;
   font-weight: 500;
   text-transform: lowercase;
 }
 
-.contents-book:first-child .contents-book-title {
-  margin-top: 0;
+.contents-chapters {
+  display: grid;
+  gap: 1rem 2rem;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 1100px) {
+  .contents-chapters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1600px) {
+  .contents-chapters {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 2200px) {
+  .contents-chapters {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 .contents-chapter {
   display: grid;
-  gap: 0.1rem;
+  align-content: start;
+  gap: 0.05rem;
 }
 
 .contents-chapter-title {
-  margin: 0 0 0.35rem;
+  margin: 0 0 0.3rem;
   font-size: var(--text-sm);
   font-weight: 500;
   color: var(--muted);
@@ -1453,7 +1485,7 @@ onBeforeUnmount(() => {
   gap: 0.5rem;
   width: 100%;
   min-height: 0;
-  padding: 0.5rem 0;
+  padding: 0.28rem 0;
   border: none;
   border-radius: 0;
   background: transparent;
