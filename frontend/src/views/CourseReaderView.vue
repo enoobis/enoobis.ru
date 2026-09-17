@@ -1433,7 +1433,7 @@ onBeforeUnmount(() => {
 .contents-book {
   display: grid;
   gap: 0.9rem;
-  padding-top: 1.35rem;
+  padding-top: 2.5rem;
   border-top: 1px solid var(--border);
 }
 
