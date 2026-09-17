@@ -1450,27 +1450,28 @@ onBeforeUnmount(() => {
 }
 
 .contents-chapters {
-  columns: 1;
-  column-gap: 2.5rem;
+  display: grid;
+  gap: 1.15rem 2.5rem;
+  grid-template-columns: 1fr;
+  align-items: start;
 }
 
 @media (min-width: 1100px) {
   .contents-chapters {
-    columns: 2;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (min-width: 1800px) {
   .contents-chapters {
-    columns: 3;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
 .contents-chapter {
   display: grid;
   gap: 0.04rem;
-  margin: 0 0 1.15rem;
-  break-inside: avoid;
+  margin: 0;
 }
 
 .contents-chapter-title {
