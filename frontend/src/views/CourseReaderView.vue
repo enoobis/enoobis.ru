@@ -933,12 +933,13 @@ onBeforeUnmount(() => {
               <section v-for="(ch, ci) in book.chapters" :key="ch.title || ci" class="contents-chapter">
                 <h3 v-if="ch.title" class="contents-chapter-title">{{ ch.title }}</h3>
                 <button
-                  v-for="l in ch.lectures"
+                  v-for="(l, n) in ch.lectures"
                   :key="l.id"
                   type="button"
                   class="contents-topic"
                   @click="openLecture(l.id)"
                 >
+                  <span class="contents-num muted">{{ n + 1 }}</span>
                   <span class="topic-title">{{ l.title }}</span>
                   <AppIcon v-if="lectureDone(l.id)" name="seen" :size="15" class="topic-done" />
                 </button>
@@ -1431,48 +1432,49 @@ onBeforeUnmount(() => {
 
 .contents-book {
   display: grid;
-  gap: 0.85rem;
+  gap: 0.9rem;
+  padding-top: 1.35rem;
+  border-top: 1px solid var(--border);
+}
+
+.contents-book:first-of-type {
+  padding-top: 0;
+  border-top: none;
 }
 
 .contents-book-title {
   margin: 0;
-  font-size: 1.05rem;
+  font-size: 1.12rem;
   font-weight: 500;
   text-transform: lowercase;
 }
 
 .contents-chapters {
-  display: grid;
-  gap: 1rem 2rem;
-  grid-template-columns: 1fr;
+  columns: 1;
+  column-gap: 2.5rem;
 }
 
 @media (min-width: 1100px) {
   .contents-chapters {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    columns: 2;
   }
 }
 
-@media (min-width: 1600px) {
+@media (min-width: 1800px) {
   .contents-chapters {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-@media (min-width: 2200px) {
-  .contents-chapters {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    columns: 3;
   }
 }
 
 .contents-chapter {
   display: grid;
-  align-content: start;
-  gap: 0.05rem;
+  gap: 0.04rem;
+  margin: 0 0 1.15rem;
+  break-inside: avoid;
 }
 
 .contents-chapter-title {
-  margin: 0 0 0.3rem;
+  margin: 0 0 0.35rem;
   font-size: var(--text-sm);
   font-weight: 500;
   color: var(--muted);
@@ -1482,10 +1484,10 @@ onBeforeUnmount(() => {
 .contents-topic {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.45rem;
   width: 100%;
   min-height: 0;
-  padding: 0.28rem 0;
+  padding: 0.22rem 0;
   border: none;
   border-radius: 0;
   background: transparent;
@@ -1493,6 +1495,13 @@ onBeforeUnmount(() => {
   font-size: var(--text-md);
   text-align: left;
   text-transform: lowercase;
+}
+
+.contents-num {
+  flex-shrink: 0;
+  width: 1.15rem;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
 }
 
 .contents-topic:hover {
