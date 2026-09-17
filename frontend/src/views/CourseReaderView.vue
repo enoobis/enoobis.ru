@@ -106,42 +106,11 @@ const chapters = computed<Chapter[]>(() => {
 
 const hasBooks = computed(() => chapters.value.some((c) => c.book));
 const activeChapter = computed(() => (activeLecture.value?.chapter ?? "").trim());
-const activeBook = computed(() => (activeLecture.value?.book ?? "").trim());
 const openChapter = ref("");
-const openBook = ref("");
 
 function toggleChapter(title: string) {
   openChapter.value = openChapter.value === title ? "" : title;
 }
-
-function toggleBook(title: string) {
-  if (openBook.value === title) {
-    openBook.value = "";
-    return;
-  }
-  openBook.value = title;
-  const first = chapters.value.find((c) => c.book === title);
-  if (first?.title) openChapter.value = first.title;
-}
-
-function isBookStart(ci: number): boolean {
-  const ch = chapters.value[ci];
-  if (!ch?.book) return false;
-  return chapters.value[ci - 1]?.book !== ch.book;
-}
-
-function bookOpen(book: string): boolean {
-  if (!hasBooks.value || !book) return true;
-  return openBook.value === book;
-}
-
-watch(activeChapter, (title) => {
-  if (title) openChapter.value = title;
-});
-
-watch(activeBook, (title) => {
-  if (title) openBook.value = title;
-});
 
 const contentBooks = computed(() => {
   const out: { title: string; chapters: Chapter[] }[] = [];
@@ -151,6 +120,46 @@ const contentBooks = computed(() => {
     else out.push({ title: ch.book, chapters: [ch] });
   }
   return out;
+});
+
+function queryString(name: string): string {
+  const q = route.query[name];
+  const raw = Array.isArray(q) ? q[0] : q;
+  return typeof raw === "string" ? raw : "";
+}
+
+const currentBook = computed(() => {
+  if (!hasBooks.value) return "";
+  const fromLec = (activeLecture.value?.book ?? "").trim();
+  if (fromLec) return fromLec;
+  const wanted = queryString("book");
+  if (!wanted) return "";
+  return contentBooks.value.find((b) => b.title === wanted)?.title ?? "";
+});
+
+const currentBookEntry = computed(
+  () => contentBooks.value.find((b) => b.title === currentBook.value) ?? null,
+);
+
+const bookLectures = computed(() => {
+  if (!currentBook.value) return lectures.value;
+  return lectures.value.filter((l) => (l.book ?? "").trim() === currentBook.value);
+});
+
+const contentsChapters = computed(() => currentBookEntry.value?.chapters ?? chapters.value);
+
+watch(activeChapter, (title) => {
+  if (title) openChapter.value = title;
+});
+
+watch(currentBook, (title) => {
+  if (activeId.value) return;
+  if (!title) {
+    openChapter.value = "";
+    return;
+  }
+  const first = chapters.value.find((c) => c.book === title);
+  if (first?.title) openChapter.value = first.title;
 });
 
 const activeIndex = computed(() =>
@@ -186,7 +195,7 @@ async function load() {
     const wanted = String(route.query.lecture ?? "");
     const exists = classroom.value.lectures.some((l) => l.id === wanted);
     activeId.value = exists ? wanted : "";
-    openChapter.value = activeChapter.value;
+    if (activeChapter.value) openChapter.value = activeChapter.value;
   } catch (e) {
     err.value = errorText(e);
   } finally {
@@ -222,10 +231,25 @@ function scrollMainTop() {
 }
 
 function openLecture(id: string) {
+  const lec = lectures.value.find((l) => l.id === id);
+  const book = (lec?.book ?? "").trim();
   activeId.value = id;
   topicsOpen.value = false;
   editing.value = null;
-  void router.replace({ query: { ...route.query, lecture: id } });
+  const q: Record<string, string> = { lecture: id };
+  if (book) q.book = book;
+  void router.replace({ query: q });
+  scrollMainTop();
+}
+
+function openBook(title: string) {
+  activeId.value = "";
+  topicsOpen.value = false;
+  editing.value = null;
+  openChapter.value = "";
+  const first = chapters.value.find((c) => c.book === title);
+  if (first?.title) openChapter.value = first.title;
+  void router.replace({ query: { book: title } });
   scrollMainTop();
 }
 
@@ -234,8 +258,16 @@ function openContents() {
   topicsOpen.value = false;
   editing.value = null;
   openChapter.value = "";
-  void router.replace({ query: { ...route.query, lecture: undefined } });
+  void router.replace({ query: {} });
   scrollMainTop();
+}
+
+function onSideTitleClick() {
+  if (activeId.value && currentBook.value) {
+    openBook(currentBook.value);
+    return;
+  }
+  openContents();
 }
 
 /* ---------- перетаскивание тем (преподаватель) ---------- */
@@ -495,7 +527,8 @@ async function removeLecture() {
     await deleteLecture(classroom.value.course.id, editing.value.id, auth.token);
     editing.value = null;
     activeId.value = "";
-    void router.replace({ query: { ...route.query, lecture: undefined } });
+    const book = queryString("book");
+    void router.replace({ query: book ? { book } : {} });
     await load();
   } catch (e) {
     err.value = errorText(e);
@@ -675,8 +708,8 @@ onBeforeUnmount(() => {
           <button type="button" class="filter-icon-btn" aria-label="к курсу" @click="exitReader">
             <AppIcon name="back" :size="18" />
           </button>
-          <button type="button" class="side-title side-title-btn" @click="openContents">
-            {{ classroom.course.title }}
+          <button type="button" class="side-title side-title-btn" @click="onSideTitleClick">
+            {{ activeLecture && currentBook ? currentBook : classroom.course.title }}
           </button>
           <button
             type="button"
@@ -689,29 +722,25 @@ onBeforeUnmount(() => {
         </header>
 
         <nav ref="topicListRef" class="topic-list" :class="{ dragging }">
-          <template v-for="(ch, ci) in chapters" :key="`${ch.book}:${ch.title}:${ci}`">
+          <template v-if="hasBooks && !currentBook">
             <button
-              v-if="hasBooks && isBookStart(ci)"
+              v-for="b in contentBooks"
+              :key="b.title"
+              v-show="b.title"
               type="button"
               class="book"
-              :class="{ on: ch.book === activeBook }"
-              @click="toggleBook(ch.book)"
+              @click="openBook(b.title)"
             >
-              <AppIcon
-                name="forward"
-                :size="14"
-                class="chapter-chev"
-                :class="{ open: openBook === ch.book }"
-              />
-              <span class="topic-title">{{ ch.book }}</span>
+              <span class="topic-title">{{ b.title }}</span>
             </button>
-
-            <template v-if="bookOpen(ch.book)">
+          </template>
+          <template v-for="(ch, ci) in chapters" :key="`${ch.book}:${ch.title}:${ci}`">
+            <template v-if="!hasBooks || (currentBook && ch.book === currentBook)">
             <button
               v-if="ch.title"
               type="button"
               class="chapter"
-              :class="{ on: ch.title === activeChapter && ch.book === activeBook, nested: hasBooks }"
+              :class="{ on: ch.title === activeChapter && ch.book === currentBook, nested: hasBooks }"
               @click="toggleChapter(ch.title)"
             >
               <AppIcon
@@ -760,7 +789,7 @@ onBeforeUnmount(() => {
           >
             <AppIcon name="list" :size="18" />
           </button>
-          <span class="main-bar-title">{{ activeLecture?.title ?? "содержание" }}</span>
+          <span class="main-bar-title">{{ (activeLecture?.title ?? currentBook) || "содержание" }}</span>
           <button
             type="button"
             class="filter-icon-btn"
@@ -904,7 +933,7 @@ onBeforeUnmount(() => {
               <span>{{ prevLecture.title }}</span>
             </button>
             <span v-else />
-            <button type="button" class="lecture-nav-home" @click="openContents">
+            <button type="button" class="lecture-nav-home" @click="currentBook ? openBook(currentBook) : openContents()">
               содержание
             </button>
             <button
@@ -920,32 +949,54 @@ onBeforeUnmount(() => {
           </nav>
         </article>
 
+        <article v-else-if="hasBooks && !currentBook" class="lecture contents">
+          <h1 class="lecture-title">{{ classroom.course.title }}</h1>
+          <div class="book-index">
+            <button
+              v-for="b in contentBooks"
+              :key="b.title"
+              v-show="b.title"
+              type="button"
+              class="book-index-item"
+              @click="openBook(b.title)"
+            >
+              {{ b.title }}
+            </button>
+          </div>
+        </article>
+
         <article v-else-if="lectures.length" class="lecture contents">
           <header class="contents-head">
-            <h1 class="lecture-title">{{ classroom.course.title }}</h1>
-            <button type="button" class="contents-start" @click="openLecture(lectures[0].id)">
+            <h1 class="lecture-title">{{ currentBook || classroom.course.title }}</h1>
+            <button
+              v-if="bookLectures[0]"
+              type="button"
+              class="contents-start"
+              @click="openLecture(bookLectures[0].id)"
+            >
               читать
             </button>
           </header>
-          <section v-for="(book, bi) in contentBooks" :key="book.title || bi" class="contents-book">
-            <h2 v-if="book.title" class="contents-book-title">{{ book.title }}</h2>
-            <div class="contents-chapters">
-              <section v-for="(ch, ci) in book.chapters" :key="ch.title || ci" class="contents-chapter">
-                <h3 v-if="ch.title" class="contents-chapter-title">{{ ch.title }}</h3>
-                <button
-                  v-for="(l, n) in ch.lectures"
-                  :key="l.id"
-                  type="button"
-                  class="contents-topic"
-                  @click="openLecture(l.id)"
-                >
-                  <span class="contents-num muted">{{ n + 1 }}</span>
-                  <span class="topic-title">{{ l.title }}</span>
-                  <AppIcon v-if="lectureDone(l.id)" name="seen" :size="15" class="topic-done" />
-                </button>
-              </section>
-            </div>
-          </section>
+          <div class="contents-chapters">
+            <section
+              v-for="(ch, ci) in contentsChapters"
+              :key="ch.title || ci"
+              class="contents-chapter"
+            >
+              <h3 v-if="ch.title" class="contents-chapter-title">{{ ch.title }}</h3>
+              <button
+                v-for="(l, n) in ch.lectures"
+                :key="l.id"
+                type="button"
+                class="contents-topic"
+                @click="openLecture(l.id)"
+              >
+                <span class="contents-num muted">{{ n + 1 }}</span>
+                <span class="topic-title">{{ l.title }}</span>
+                <AppIcon v-if="lectureDone(l.id)" name="seen" :size="15" class="topic-done" />
+              </button>
+            </section>
+          </div>
         </article>
 
         <p v-else class="page-empty">тем нет</p>
@@ -953,7 +1004,7 @@ onBeforeUnmount(() => {
     </div>
 
       <!-- чат -->
-      <aside class="reader-chat" :class="{ open: chatOpen }">
+      <aside class="reader-chat" :class="{ open: chatOpen }" :inert="!chatOpen">
         <header class="side-head chat-head">
           <span class="chat-grabber only-narrow" aria-hidden="true" />
           <div class="chat-titles">
@@ -1430,23 +1481,36 @@ onBeforeUnmount(() => {
   border-radius: var(--radius-pill);
 }
 
-.contents-book {
+.book-index {
   display: grid;
-  gap: 0.9rem;
-  padding-top: 2.5rem;
-  border-top: 1px solid var(--border);
+  gap: 0.1rem;
 }
 
-.contents-book:first-of-type {
-  padding-top: 0;
-  border-top: none;
+@media (min-width: 1100px) {
+  .book-index {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.1rem 3rem;
+  }
 }
 
-.contents-book-title {
-  margin: 0;
-  font-size: 1.12rem;
-  font-weight: 500;
+.book-index-item {
+  display: block;
+  width: 100%;
+  min-height: 0;
+  padding: 0.5rem 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-md);
+  text-align: left;
   text-transform: lowercase;
+}
+
+.book-index-item:hover {
+  background: transparent;
+  color: var(--muted);
 }
 
 .contents-chapters {
@@ -1697,10 +1761,12 @@ onBeforeUnmount(() => {
   background: var(--bg);
   transform: translateX(110%);
   transition: transform var(--dur-3) var(--ease-snap);
+  pointer-events: none;
 }
 
 .reader-chat.open {
   transform: translateX(0);
+  pointer-events: auto;
 }
 
 .chat-head {
@@ -1840,6 +1906,7 @@ onBeforeUnmount(() => {
     border-radius: 0;
     transform: translateX(-110%);
     transition: transform var(--dur-3) var(--ease-snap);
+    pointer-events: none;
   }
 
   .topic {
@@ -1849,6 +1916,7 @@ onBeforeUnmount(() => {
 
   .reader-topics.open {
     transform: translateX(0);
+    pointer-events: auto;
   }
 
   .reader-chat {
@@ -1874,6 +1942,7 @@ onBeforeUnmount(() => {
 
   .reader-chat.open {
     transform: translateY(0);
+    pointer-events: auto;
   }
 
   .chat-grabber {
