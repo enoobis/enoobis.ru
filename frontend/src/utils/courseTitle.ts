@@ -1,37 +1,10 @@
+import { COURSE_TITLE_WORDS as WORDS } from "./courseTitleWords";
+
 const SUFFIX = /^(ие|ия|ий|ый|ое|ая|ые|ами|ями|ах|ях|ом|ем|ой|ев|ов|ть|ти|ять|ить|ать|еть|ние|ции|ция|сть|ся|сь|и|е|я)$/i;
-
-const GLUE = [
-  "переопределение",
-  "многопоточность",
-  "асинхронность",
-  "исключений",
-  "перечисления",
-  "операторов",
-  "оператора",
-  "оператор",
-  "обработка",
-  "расширения",
-  "коллекции",
-  "протоколом",
-  "протокола",
-  "файловой",
-  "файловои",
-  "системой",
-  "системы",
-  "обобщения",
-  "matching",
-  "generics",
-  "pattern",
-  "класса",
-  "работа",
-  "глава",
-  "http",
-].sort((a, b) => b.length - a.length);
-
 const FAKE_NUM: Record<string, string> = { b: "6", в: "6", "/": "7" };
 
 function hasBrokenBits(s: string): boolean {
-  return /(?:^|[\s.])[а-яё](?:\s+[а-яёа-я]{1,2})+(?=[\s.]|$)/i.test(s)
+  return /(?:^|[\s.])[а-яё](?:\s+[а-яё]{1,2})+(?=[\s.]|$)/i.test(s)
     || /[а-яё]{4,}\s+(ие|ия|ять|ить|ать|еть|и|е|я)(?:\s|$|[.,!?])/i.test(s);
 }
 
@@ -48,7 +21,12 @@ function joinRun(run: string): string {
     for (let k = 2; k <= max; k += 1) {
       concat += words[i + k - 1];
       const pieces = words.slice(i + 1, i + k);
-      if (pieces.every((p) => SUFFIX.test(p)) && concat.length >= 5) take = k;
+      if (pieces.every((p) => SUFFIX.test(p)) && concat.length >= 5) {
+        const prevOk = WORDS.has(words[i].toLowerCase());
+        const nextOk = Boolean(words[i + k] && WORDS.has(words[i + k].toLowerCase()));
+        const glueAnd = pieces.length === 1 && /^[ис]$/i.test(pieces[0]) && prevOk && nextOk;
+        if (!glueAnd) take = k;
+      }
       if (
         /^[св]$/i.test(words[i]) &&
         k >= 3 &&
@@ -66,7 +44,7 @@ function joinRun(run: string): string {
 }
 
 export function healBrokenWords(raw: string): string {
-  const text = String(raw ?? "");
+  const text = String(raw ?? "").replace(/y(?=[а-яё])/gi, "у");
   if (!text) return "";
   return text.replace(/(```[\s\S]*?```)|(`[^`]+`)|([^`]+)/g, (all, fence, inline, prose) => {
     if (fence || inline) return all;
@@ -74,67 +52,39 @@ export function healBrokenWords(raw: string): string {
   });
 }
 
-function splitGlued(s: string): string {
-  const lower = s.toLowerCase();
+function segmentToken(token: string): string {
+  let t = token;
+  const low0 = t.toLowerCase();
+  if (t.length >= 5 && low0[0] === low0[1] && WORDS.has(low0.slice(1))) t = t.slice(1);
+  const low = t.toLowerCase();
+  if (WORDS.has(low) || t.length < 6) return t;
   const parts: string[] = [];
   let i = 0;
-  while (i < s.length) {
-    if (/\s/.test(s[i])) {
-      i += 1;
-      continue;
+  while (i < t.length) {
+    let best = 0;
+    for (let j = t.length; j > i; j -= 1) {
+      const w = low.slice(i, j);
+      const min = w === "и" || w === "с" ? 1 : 2;
+      if (j - i >= min && WORDS.has(w)) {
+        best = j - i;
+        break;
+      }
     }
-    if (s[i] === ".") {
-      parts.push(".");
-      i += 1;
-      continue;
-    }
-    if (/\d/.test(s[i])) {
-      const start = i;
-      while (i < s.length && /\d/.test(s[i])) i += 1;
-      parts.push(s.slice(start, i));
-      continue;
-    }
-    const hit = GLUE.find((w) => w.length >= 4 && lower.startsWith(w, i));
-    if (hit) {
-      parts.push(s.slice(i, i + hit.length));
-      i += hit.length;
-      continue;
-    }
-    let j = i + 1;
-    while (j < s.length && s[j] !== "." && !/\s/.test(s[j])) {
-      if (GLUE.some((w) => w.length >= 4 && lower.startsWith(w, j))) break;
-      if (/\d/.test(s[j])) break;
-      j += 1;
-    }
-    parts.push(s.slice(i, j));
-    i = j;
+    if (!best) return token;
+    parts.push(t.slice(i, i + best));
+    i += best;
   }
-  let out = "";
-  for (const p of parts) {
-    if (p === ".") {
-      out += ".";
-      continue;
-    }
-    if (!out) out = p;
-    else if (out.endsWith(".")) out += ` ${p}`;
-    else out += ` ${p}`;
-  }
-  return out.replace(/файловои/gi, "файловой").replace(/\s+/g, " ").trim();
+  return parts.length > 1 ? parts.join(" ") : t;
 }
 
 export function prettyCourseTitle(raw: string): string {
   let s = String(raw ?? "").replace(/\s+/g, " ").trim();
   if (!s) return "";
   s = s.replace(/y(?=[а-яё])/gi, "у");
-  if (/^глава/i.test(s)) {
-    s = s.replace(/^глава(?=\S)/i, "глава ");
-    s = s.replace(/^глава\s*([bв/])\./i, (_, ch: string) => `глава ${FAKE_NUM[ch] ?? ch}.`);
-    s = s.replace(/^(глава\s+\d+)\.(?=\S)/i, "$1. ");
-    const rest = s.replace(/^глава\s+\d+\.\s*/i, "");
-    if (rest && !/\s/.test(rest)) return s.replace(rest, splitGlued(rest));
-    return s;
-  }
-  if (!/\s/.test(s) && /[а-яё]{8,}/i.test(s)) return splitGlued(s);
-  if (hasBrokenBits(s)) return healBrokenWords(s);
-  return s;
+  s = s.replace(/^глава(?=\S)/i, "глава ");
+  s = s.replace(/^глава\s*([bв/])\./i, (_, ch: string) => `глава ${FAKE_NUM[ch] ?? ch}.`);
+  s = s.replace(/^(глава\s+\d+)\.(?=\S)/i, "$1. ");
+  s = s.replace(/[А-Яа-яЁё]{6,}/g, segmentToken);
+  if (hasBrokenBits(s)) s = healBrokenWords(s);
+  return s.replace(/\s+/g, " ").trim();
 }
