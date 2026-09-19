@@ -12,6 +12,7 @@ import { unlinkUploadUrl } from "../utils/uploadSafe.js";
 import { assertSafeUploadExtension } from "../utils/security.js";
 import { isStaffRole } from "../utils/roles.js";
 import { categoryFromCode } from "../utils/courseCategory.js";
+import { prettyCourseTitle } from "../utils/courseTitle.js";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -435,7 +436,12 @@ function lecturesFor(course) {
      ORDER BY l.position, l.created_at, l.rowid`,
     course.id,
   );
-  return rows.map((r) => ({ ...r, attachments: attachmentsFor(r.id) }));
+  return rows.map((r) => ({
+    ...r,
+    title: prettyCourseTitle(r.title),
+    chapter: prettyCourseTitle(r.chapter),
+    attachments: attachmentsFor(r.id),
+  }));
 }
 
 function assignmentsFor(course, viewerId) {

@@ -44,6 +44,7 @@ import PageHeader from "../components/PageHeader.vue";
 import FilterSearch from "../components/FilterSearch.vue";
 import { useAuthStore } from "../stores/auth";
 import { categoryMatches, courseCategory } from "../utils/courseCategory";
+import { prettyCourseTitle } from "../utils/courseTitle";
 
 type Tab = "lectures" | "assignments" | "stream" | "people" | "grades";
 type GradebookCell = {
@@ -182,7 +183,7 @@ const lectureGroups = computed(() => {
   const grouped = !lectureQuery.value.trim();
   for (const l of filteredLectures.value) {
     const book = grouped ? (l.book ?? "").trim() : "";
-    const chapter = grouped ? (l.chapter ?? "").trim() : "";
+    const chapter = grouped ? prettyCourseTitle((l.chapter ?? "").trim()) : "";
     const title = [book, chapter].filter(Boolean).join(" · ");
     const last = groups[groups.length - 1];
     if (last && last.title === title) last.lectures.push(l);
@@ -2173,7 +2174,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
           <li v-for="lec in group.lectures" :key="lec.id">
             <button type="button" class="lecture-row" @click="openLecture(lec.id)">
               <span class="list-row-main">
-                <span class="list-row-title">{{ lec.title }}</span>
+                <span class="list-row-title">{{ prettyCourseTitle(lec.title) }}</span>
                 <span class="list-row-meta muted small">{{ formatCourseDate(lec.created_at) }}</span>
               </span>
               <span class="lecture-row-side">

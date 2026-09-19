@@ -26,6 +26,7 @@ import {
   type AiStatus,
 } from "../api/ai";
 import { useAuthStore } from "../stores/auth";
+import { prettyCourseTitle } from "../utils/courseTitle";
 
 type VideoEmbed =
   | { kind: "iframe"; src: string }
@@ -96,7 +97,7 @@ const chapters = computed<Chapter[]>(() => {
   const out: Chapter[] = [];
   lectures.value.forEach((l, i) => {
     const book = (l.book ?? "").trim();
-    const title = (l.chapter ?? "").trim();
+    const title = prettyCourseTitle((l.chapter ?? "").trim());
     const last = out[out.length - 1];
     if (last && last.book === book && last.title === title) last.lectures.push(l);
     else out.push({ title, book, offset: i, lectures: [l] });
@@ -105,7 +106,7 @@ const chapters = computed<Chapter[]>(() => {
 });
 
 const hasBooks = computed(() => chapters.value.some((c) => c.book));
-const activeChapter = computed(() => (activeLecture.value?.chapter ?? "").trim());
+const activeChapter = computed(() => prettyCourseTitle((activeLecture.value?.chapter ?? "").trim()));
 const openChapter = ref("");
 
 function toggleChapter(title: string) {
@@ -769,7 +770,7 @@ onBeforeUnmount(() => {
               @click="onTopicClick(l.id)"
             >
               <span class="topic-num muted">{{ li + 1 }}</span>
-              <span class="topic-title">{{ l.title }}</span>
+              <span class="topic-title">{{ prettyCourseTitle(l.title) }}</span>
               <AppIcon v-if="lectureDone(l.id)" name="seen" :size="15" class="topic-done" />
             </button>
             </template>
@@ -789,7 +790,7 @@ onBeforeUnmount(() => {
           >
             <AppIcon name="list" :size="18" />
           </button>
-          <span class="main-bar-title">{{ (activeLecture?.title ?? currentBook) || "содержание" }}</span>
+          <span class="main-bar-title">{{ prettyCourseTitle(activeLecture?.title ?? currentBook) || "содержание" }}</span>
           <button
             type="button"
             class="filter-icon-btn"
@@ -983,7 +984,7 @@ onBeforeUnmount(() => {
               :key="ch.title || ci"
               class="contents-chapter"
             >
-              <h3 v-if="ch.title" class="contents-chapter-title">{{ ch.title }}</h3>
+              <h3 v-if="ch.title" class="contents-chapter-title">{{ prettyCourseTitle(ch.title) }}</h3>
               <button
                 v-for="(l, n) in ch.lectures"
                 :key="l.id"
@@ -992,7 +993,7 @@ onBeforeUnmount(() => {
                 @click="openLecture(l.id)"
               >
                 <span class="contents-num muted">{{ n + 1 }}</span>
-                <span class="topic-title">{{ l.title }}</span>
+                <span class="topic-title">{{ prettyCourseTitle(l.title) }}</span>
                 <AppIcon v-if="lectureDone(l.id)" name="seen" :size="15" class="topic-done" />
               </button>
             </section>
@@ -1225,11 +1226,12 @@ onBeforeUnmount(() => {
 /* название главы длинное: лучше две строки, чем многоточие */
 .chapter .topic-title {
   white-space: normal;
+  overflow-wrap: break-word;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   line-clamp: 2;
-  line-height: 1.3;
+  line-height: 1.35;
 }
 
 .topic.nested {

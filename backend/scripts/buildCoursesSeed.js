@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { isChapterHeading, prettyCourseTitle } from "../src/utils/courseTitle.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const BACKEND = path.resolve(HERE, "..");
@@ -207,9 +208,9 @@ function parseToc(html) {
   while ((m = re.exec(block))) {
     const href = m[1].replace(/\\/g, "/").split("#")[0];
     if (!href || /^(https?:)?\/\//i.test(href)) continue;
-    const title = lowerTitle(stripTags(m[2]));
+    const title = prettyCourseTitle(lowerTitle(stripTags(m[2])));
     if (!title) continue;
-    if (/^глава\s+\d/i.test(title)) {
+    if (isChapterHeading(title)) {
       chapter = title;
       continue;
     }
@@ -391,7 +392,11 @@ function main() {
         lesson.title ||
         lowerTitle(stripTags(raw.match(/<h2>([\s\S]*?)<\/h2>/i)?.[1] ?? ""));
       if (!title || !body) continue;
-      lectures.push({ title, chapter: lesson.chapter ?? "", body });
+      lectures.push({
+        title: prettyCourseTitle(title),
+        chapter: prettyCourseTitle(lesson.chapter ?? ""),
+        body,
+      });
     }
     if (!lectures.length) continue;
     const lines = lectures.map((l) => JSON.stringify(l)).join(",\n  ");

@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { prettyCourseTitle } from "../src/utils/courseTitle.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const BACKEND = path.resolve(HERE, "..");
@@ -98,8 +99,8 @@ function mergeByLanguage(files) {
       const name = bookTitle(book.title);
       for (const lecture of book.lectures ?? []) {
         lectures.push({
-          title: lecture.title,
-          chapter: lecture.chapter ?? "",
+          title: prettyCourseTitle(lecture.title),
+          chapter: prettyCourseTitle(lecture.chapter ?? ""),
           book: name,
           body: lecture.body,
         });
