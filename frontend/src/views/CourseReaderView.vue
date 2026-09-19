@@ -1227,6 +1227,7 @@ onBeforeUnmount(() => {
 .chapter .topic-title {
   white-space: normal;
   overflow-wrap: break-word;
+  word-spacing: 0.12em;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
