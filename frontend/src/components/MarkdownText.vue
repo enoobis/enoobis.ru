@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { renderMarkdown } from "../utils/markdown";
+import { healBrokenWords } from "../utils/courseTitle";
 
 const props = defineProps<{ text: string; variant?: "doc" }>();
 
@@ -11,9 +12,10 @@ function tightenLists(md: string): string {
     .replace(/(\n(?:[-*]|\d+\.) [^\n]*)\n{2,}(?=(?:[-*]|\d+\.) )/g, "$1\n");
 }
 
-const html = computed(() =>
-  renderMarkdown(props.variant === "doc" ? tightenLists(props.text) : props.text),
-);
+const html = computed(() => {
+  const text = healBrokenWords(props.text);
+  return renderMarkdown(props.variant === "doc" ? tightenLists(text) : text);
+});
 </script>
 
 <template>
