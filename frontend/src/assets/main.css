@@ -261,8 +261,8 @@ button:active,
 }
 
 /* press squish — тактильный отклик; вкладки исключены, их подсветку двигает thumb */
-button:active:not(:disabled):not(.filter-tab):not(.content-tab):not(.lecture-row),
-.btn:active:not(.filter-tab):not(.content-tab):not(.lecture-row) {
+button:active:not(:disabled):not(.filter-tab):not(.content-tab):not(.lecture-row):not(.book-index-item),
+.btn:active:not(.filter-tab):not(.content-tab):not(.lecture-row):not(.book-index-item) {
   transform: scale(0.97);
 }
 a.card:active,

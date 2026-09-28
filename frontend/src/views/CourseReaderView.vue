@@ -732,7 +732,7 @@ onBeforeUnmount(() => {
               class="book"
               @click="openBook(b.title)"
             >
-              <span class="topic-title">{{ b.title }}</span>
+              <span class="topic-title">{{ prettyCourseTitle(b.title) }}</span>
             </button>
           </template>
           <template v-for="(ch, ci) in chapters" :key="`${ch.book}:${ch.title}:${ci}`">
@@ -950,7 +950,7 @@ onBeforeUnmount(() => {
           </nav>
         </article>
 
-        <article v-else-if="hasBooks && !currentBook" class="lecture contents">
+        <article v-else-if="hasBooks && !currentBook" class="lecture contents contents--books">
           <h1 class="lecture-title">{{ classroom.course.title }}</h1>
           <div class="book-index">
             <button
@@ -961,7 +961,7 @@ onBeforeUnmount(() => {
               class="book-index-item"
               @click="openBook(b.title)"
             >
-              {{ b.title }}
+              {{ prettyCourseTitle(b.title) }}
             </button>
           </div>
         </article>
@@ -1472,6 +1472,13 @@ onBeforeUnmount(() => {
   gap: 1.5rem;
 }
 
+.contents--books {
+  max-width: 32rem;
+  width: 100%;
+  margin: 0 auto;
+  gap: 1.1rem;
+}
+
 .contents-head {
   display: flex;
   align-items: center;
@@ -1486,22 +1493,16 @@ onBeforeUnmount(() => {
 
 .book-index {
   display: grid;
-  gap: 0.1rem;
-}
-
-@media (min-width: 1100px) {
-  .book-index {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.1rem 3rem;
-  }
+  gap: 0;
 }
 
 .book-index-item {
   display: block;
   width: 100%;
-  min-height: 0;
-  padding: 0.5rem 0;
+  min-height: 44px;
+  padding: 0.85rem 0;
   border: none;
+  border-bottom: 1px solid var(--border);
   border-radius: 0;
   background: transparent;
   color: var(--text);
@@ -1509,6 +1510,10 @@ onBeforeUnmount(() => {
   font-size: var(--text-md);
   text-align: left;
   text-transform: lowercase;
+}
+
+.book-index-item:last-child {
+  border-bottom: none;
 }
 
 .book-index-item:hover {
