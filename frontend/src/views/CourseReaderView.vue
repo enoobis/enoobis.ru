@@ -4,6 +4,7 @@ import { useRoute, useRouter } from "vue-router";
 import AppIcon from "../components/AppIcon.vue";
 import AppLoading from "../components/AppLoading.vue";
 import MarkdownText from "../components/MarkdownText.vue";
+import PageHeader from "../components/PageHeader.vue";
 import {
   deleteAssignment,
   deleteLecture,
@@ -142,6 +143,10 @@ const currentBookEntry = computed(
   () => contentBooks.value.find((b) => b.title === currentBook.value) ?? null,
 );
 
+const catalogMode = computed(
+  () => !!classroom.value && hasBooks.value && !currentBook.value && !activeId.value,
+);
+
 const bookLectures = computed(() => {
   if (!currentBook.value) return lectures.value;
   return lectures.value.filter((l) => (l.book ?? "").trim() === currentBook.value);
@@ -257,6 +262,7 @@ function openBook(title: string) {
 function openContents() {
   activeId.value = "";
   topicsOpen.value = false;
+  chatOpen.value = false;
   editing.value = null;
   openChapter.value = "";
   void router.replace({ query: {} });
@@ -413,6 +419,24 @@ async function downloadLecture() {
 
 function exitReader() {
   void router.push("/courses");
+}
+
+function onReaderBack() {
+  if (activeId.value && currentBook.value) {
+    openBook(currentBook.value);
+    return;
+  }
+  if (currentBook.value) {
+    openContents();
+    return;
+  }
+  exitReader();
+}
+
+function syncReaderChrome() {
+  const reading = !!classroom.value && !catalogMode.value;
+  document.documentElement.classList.toggle("course-reader", reading);
+  if (reading) void nextTick(measureReaderTop);
 }
 
 /* ---------- сдача задания ---------- */
@@ -674,13 +698,15 @@ function onReaderKey(e: KeyboardEvent) {
   }
 }
 
+watch(catalogMode, syncReaderChrome);
+watch(classroom, syncReaderChrome);
+
 onMounted(() => {
-  document.documentElement.classList.add("course-reader");
   document.addEventListener("keydown", onReaderKey);
   void load();
   void loadAiStatus();
   void loadChat();
-  void nextTick(measureReaderTop);
+  syncReaderChrome();
   window.addEventListener("resize", measureReaderTop);
   window.visualViewport?.addEventListener("resize", syncKeyboardInset);
   window.visualViewport?.addEventListener("scroll", syncKeyboardInset);
@@ -701,12 +727,37 @@ onBeforeUnmount(() => {
     <AppLoading v-if="loading && !classroom" class="page-empty" />
     <p v-else-if="err && !classroom" class="page-empty">{{ err }}</p>
 
+    <template v-else-if="classroom && catalogMode">
+      <section class="catalog page-shell">
+        <PageHeader :title="prettyCourseTitle(classroom.course.title)">
+          <template #back>
+            <button type="button" class="filter-icon-btn" aria-label="к курсам" @click="exitReader">
+              <AppIcon name="back" :size="18" />
+            </button>
+          </template>
+        </PageHeader>
+        <ul class="list category-list">
+          <li
+            v-for="b in contentBooks"
+            :key="b.title"
+            v-show="b.title"
+            class="catalog-hit"
+            @click="openBook(b.title)"
+          >
+            <button type="button" class="catalog-row">
+              <span class="catalog-row-title">{{ prettyCourseTitle(b.title) }}</span>
+            </button>
+          </li>
+        </ul>
+      </section>
+    </template>
+
     <template v-else-if="classroom">
     <div class="reader-grid">
       <!-- темы -->
       <aside class="reader-topics" :class="{ open: topicsOpen }">
         <header class="side-head">
-          <button type="button" class="filter-icon-btn" aria-label="к курсам" @click="exitReader">
+          <button type="button" class="filter-icon-btn" aria-label="назад" @click="onReaderBack">
             <AppIcon name="back" :size="18" />
           </button>
           <button type="button" class="side-title side-title-btn" @click="onSideTitleClick">
@@ -723,18 +774,6 @@ onBeforeUnmount(() => {
         </header>
 
         <nav ref="topicListRef" class="topic-list" :class="{ dragging }">
-          <template v-if="hasBooks && !currentBook">
-            <button
-              v-for="b in contentBooks"
-              :key="b.title"
-              v-show="b.title"
-              type="button"
-              class="book"
-              @click="openBook(b.title)"
-            >
-              <span class="topic-title">{{ prettyCourseTitle(b.title) }}</span>
-            </button>
-          </template>
           <template v-for="(ch, ci) in chapters" :key="`${ch.book}:${ch.title}:${ci}`">
             <template v-if="!hasBooks || (currentBook && ch.book === currentBook)">
             <button
@@ -950,22 +989,6 @@ onBeforeUnmount(() => {
           </nav>
         </article>
 
-        <article v-else-if="hasBooks && !currentBook" class="lecture contents contents--books">
-          <h1 class="lecture-title">{{ classroom.course.title }}</h1>
-          <div class="book-index">
-            <button
-              v-for="b in contentBooks"
-              :key="b.title"
-              v-show="b.title"
-              type="button"
-              class="book-index-item"
-              @click="openBook(b.title)"
-            >
-              {{ prettyCourseTitle(b.title) }}
-            </button>
-          </div>
-        </article>
-
         <article v-else-if="lectures.length" class="lecture contents">
           <header class="contents-head">
             <h1 class="lecture-title">{{ currentBook || classroom.course.title }}</h1>
@@ -1070,7 +1093,7 @@ onBeforeUnmount(() => {
 
       <!-- мобильный вход в чат -->
       <button
-        v-if="!chatOpen && !topicsOpen"
+        v-if="!catalogMode && !chatOpen && !topicsOpen"
         type="button"
         class="ask-bar only-narrow"
         @click="openChat"
@@ -1472,11 +1495,42 @@ onBeforeUnmount(() => {
   gap: 1.5rem;
 }
 
-.contents--books {
-  max-width: 32rem;
+.catalog {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.catalog .list > li {
+  padding: 0;
+}
+
+.catalog-hit {
+  cursor: pointer;
+}
+
+.catalog-row {
   width: 100%;
-  margin: 0 auto;
-  gap: 1.1rem;
+  display: flex;
+  align-items: center;
+  padding: var(--space-3) 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  min-height: 44px;
+  font: inherit;
+}
+
+.catalog-row:hover {
+  background: transparent;
+  color: var(--muted);
+}
+
+.catalog-row-title {
+  font-weight: 500;
+  font-size: var(--text-md);
 }
 
 .contents-head {
@@ -1489,36 +1543,6 @@ onBeforeUnmount(() => {
 .contents-start {
   padding: 0.45rem 1.1rem;
   border-radius: var(--radius-pill);
-}
-
-.book-index {
-  display: grid;
-  gap: 0;
-}
-
-.book-index-item {
-  display: block;
-  width: 100%;
-  min-height: 44px;
-  padding: 0.85rem 0;
-  border: none;
-  border-bottom: 1px solid var(--border);
-  border-radius: 0;
-  background: transparent;
-  color: var(--text);
-  font: inherit;
-  font-size: var(--text-md);
-  text-align: left;
-  text-transform: lowercase;
-}
-
-.book-index-item:last-child {
-  border-bottom: none;
-}
-
-.book-index-item:hover {
-  background: transparent;
-  color: var(--muted);
 }
 
 .contents-chapters {
