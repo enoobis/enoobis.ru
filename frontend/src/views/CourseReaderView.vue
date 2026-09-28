@@ -412,7 +412,7 @@ async function downloadLecture() {
 }
 
 function exitReader() {
-  void router.push(`/courses/${courseId.value}/lectures`);
+  void router.push("/courses");
 }
 
 /* ---------- сдача задания ---------- */
@@ -706,7 +706,7 @@ onBeforeUnmount(() => {
       <!-- темы -->
       <aside class="reader-topics" :class="{ open: topicsOpen }">
         <header class="side-head">
-          <button type="button" class="filter-icon-btn" aria-label="к курсу" @click="exitReader">
+          <button type="button" class="filter-icon-btn" aria-label="к курсам" @click="exitReader">
             <AppIcon name="back" :size="18" />
           </button>
           <button type="button" class="side-title side-title-btn" @click="onSideTitleClick">

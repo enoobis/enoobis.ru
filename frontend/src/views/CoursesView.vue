@@ -1586,8 +1586,13 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 
       <template v-if="!courseQuery.trim()">
         <ul v-if="!activeCategory && categories.length" class="list category-list">
-          <li v-for="cat in categories" :key="cat.title">
-            <button type="button" class="lecture-row" @click="openCategory(cat.title)">
+          <li
+            v-for="cat in categories"
+            :key="cat.title"
+            class="category-hit"
+            @click="openCategory(cat.title)"
+          >
+            <button type="button" class="lecture-row">
               <span class="list-row-title">{{ cat.title }}</span>
             </button>
           </li>
@@ -1601,8 +1606,13 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
         v-if="activeCategory || courseQuery.trim()"
         class="list category-list"
       >
-        <li v-for="c in filteredCourses" :key="c.id">
-          <button type="button" class="lecture-row" @click="openCourseRead(c.id)">
+        <li
+          v-for="c in filteredCourses"
+          :key="c.id"
+          class="category-hit"
+          @click="openCourseRead(c.id)"
+        >
+          <button type="button" class="lecture-row">
             <span class="list-row-title">{{ courseListTitle(c) }}</span>
           </button>
         </li>
@@ -3450,6 +3460,10 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 .category-list > li,
 .task-list > li {
   padding: 0;
+}
+
+.category-hit {
+  cursor: pointer;
 }
 
 .lecture-chapter {
