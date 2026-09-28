@@ -1,5 +1,6 @@
+import "./pdfjsPolyfills";
 import { getDocument, GlobalWorkerOptions, type PDFDocumentProxy } from "pdfjs-dist";
-import PdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?worker";
+import PdfWorker from "./pdfWorker?worker";
 
 GlobalWorkerOptions.workerPort = new PdfWorker();
 

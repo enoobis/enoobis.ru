@@ -19,7 +19,7 @@ import {
 const LIBRARY_QUOTA_BYTES = 5 * 1024 * 1024 * 1024;
 const LIBRARY_PAGE_SIZE = 20;
 import { useAuthStore } from "../stores/auth";
-import { toastError, toastSuccess } from "../utils/toast";
+import { toast, toastError, toastSuccess } from "../utils/toast";
 import AppIcon from "../components/AppIcon.vue";
 import AppLoading from "../components/AppLoading.vue";
 import LibraryBookRow from "../components/LibraryBookRow.vue";
@@ -309,12 +309,20 @@ async function submit() {
   }
 }
 
+const downloadingId = ref("");
+
 async function onDownload(b: LibraryBook) {
-  if (!auth.token) return;
+  if (!auth.token || downloadingId.value) return;
+  downloadingId.value = b.id;
+  toast("скачивается", "info");
   try {
     await downloadBook(auth.token, b.id, b.original_name);
+    toastSuccess("скачано");
   } catch (e) {
     err.value = describe(e instanceof Error ? e.message : "ошибка");
+    toastError(e);
+  } finally {
+    downloadingId.value = "";
   }
 }
 
@@ -585,6 +593,7 @@ onBeforeUnmount(() => {
             :can-manage="canManageBook(b)"
             :show-size="isStaff"
             :size-label="fmt(b.size_bytes)"
+            :downloading="downloadingId === b.id"
             @read="openReader(b)"
             @download="onDownload(b)"
             @edit="openEdit(b)"

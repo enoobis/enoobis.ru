@@ -312,7 +312,8 @@ async function loadPdf() {
     if (seq !== loadSeq) return;
   } catch (e) {
     if (seq !== loadSeq) return;
-    err.value = e instanceof Error ? e.message : "ошибка";
+    const raw = e instanceof Error ? e.message : "ошибка";
+    err.value = /is not a function/i.test(raw) ? "браузер не открывает этот pdf" : raw;
     loading.value = false;
   }
 }

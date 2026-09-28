@@ -8,6 +8,7 @@ defineProps<{
   canRead: boolean;
   showSize: boolean;
   sizeLabel: string;
+  downloading?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -47,8 +48,10 @@ const emit = defineEmits<{
           <button
             class="icon-btn-sm"
             type="button"
-            aria-label="скачать"
-            title="скачать"
+            :disabled="downloading"
+            :aria-busy="downloading"
+            :aria-label="downloading ? 'скачивается' : 'скачать'"
+            :title="downloading ? 'скачивается' : 'скачать'"
             @click="emit('download')"
           >
             <AppIcon name="download" :size="18" />
@@ -139,9 +142,13 @@ const emit = defineEmits<{
   color: var(--muted);
 }
 
-.actions .icon-btn-sm:hover {
+.actions .icon-btn-sm:hover:not(:disabled) {
   color: var(--text);
   background: var(--surface2);
+}
+
+.actions .icon-btn-sm:disabled {
+  opacity: 0.4;
 }
 
 .desc {

@@ -174,14 +174,19 @@ export async function downloadBook(token: string, id: string, fallbackName: stri
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) throw new Error(res.statusText);
-  const name = parseFilenameFromContentDisposition(res.headers.get("Content-Disposition")) ?? fallbackName;
+  const rawName = parseFilenameFromContentDisposition(res.headers.get("Content-Disposition")) ?? fallbackName;
+  const name = rawName.replace(/[\\/]/g, "_") || "book";
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = name;
+  a.setAttribute("download", name);
+  a.rel = "noopener";
+  a.style.display = "none";
   document.body.appendChild(a);
   a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  setTimeout(() => {
+    a.remove();
+    URL.revokeObjectURL(url);
+  }, 8000);
 }
