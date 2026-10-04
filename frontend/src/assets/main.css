@@ -1093,7 +1093,7 @@ html.profile-wallpaper-desktop .layout {
   padding-right: 0;
 }
 html.course-reader .layout {
-  max-width: calc(18rem + 2.5rem + 42rem);
+  max-width: calc(22rem + 2.5rem + 42rem);
   width: 100%;
   margin-inline: auto;
   padding-top: 0.75rem;

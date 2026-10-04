@@ -1165,7 +1165,7 @@ onBeforeUnmount(() => {
 /* читалка занимает экран целиком: страница не скроллится, колонки не уезжают */
 .reader-grid {
   display: grid;
-  grid-template-columns: minmax(15.5rem, 18rem) minmax(0, 1fr);
+  grid-template-columns: minmax(18rem, 22rem) minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
   gap: 2.5rem;
   height: calc(100dvh - var(--reader-top, 7rem));
@@ -1340,10 +1340,11 @@ onBeforeUnmount(() => {
   min-height: 0;
   flex: 1;
   padding-bottom: 2.5rem;
-  padding-left: 2cm;
-  /* ползунок у левого края колонки глав */
+  padding-left: 2mm;
+  /* ползунок у левого края колонки глав, вплотную к списку */
   direction: rtl;
-  scrollbar-color: color-mix(in srgb, var(--text) 28%, transparent) transparent;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--text) 42%, transparent) transparent;
 }
 
 .topic-list > * {
@@ -1356,8 +1357,11 @@ onBeforeUnmount(() => {
 }
 
 .topic-list::-webkit-scrollbar-thumb,
+.topic-list::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--text) 42%, transparent);
+}
+
 .reader-scroll::-webkit-scrollbar-thumb,
-.topic-list::-webkit-scrollbar-thumb:hover,
 .reader-scroll::-webkit-scrollbar-thumb:hover {
   background: color-mix(in srgb, var(--text) 28%, transparent);
 }
@@ -1458,9 +1462,9 @@ onBeforeUnmount(() => {
   flex: 1;
   min-width: 0;
   display: block;
-  overflow: visible;
-  white-space: normal;
-  overflow-wrap: break-word;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   line-height: 1.35;
 }
 
