@@ -1165,7 +1165,7 @@ onBeforeUnmount(() => {
 /* читалка занимает экран целиком: страница не скроллится, колонки не уезжают */
 .reader-grid {
   display: grid;
-  grid-template-columns: minmax(18rem, 22rem) minmax(0, 1fr);
+  grid-template-columns: minmax(18rem, 32rem) minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
   gap: 2.5rem;
   height: calc(100dvh - var(--reader-top, 7rem));
