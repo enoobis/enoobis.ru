@@ -1039,7 +1039,7 @@ onBeforeUnmount(() => {
             >
               <AppIcon name="back" :size="18" />
             </button>
-            <span v-else />
+            <span v-else class="lecture-nav-slot" aria-hidden="true" />
             <button type="button" class="lecture-nav-home" aria-label="главы" @click="showFolders">
               <AppIcon name="folder" :size="18" />
             </button>
@@ -1052,7 +1052,7 @@ onBeforeUnmount(() => {
             >
               <AppIcon name="forward" :size="18" />
             </button>
-            <span v-else />
+            <span v-else class="lecture-nav-slot" aria-hidden="true" />
           </nav>
         </article>
       </main>
@@ -1140,7 +1140,7 @@ onBeforeUnmount(() => {
 /* читалка занимает экран целиком: страница не скроллится, колонки не уезжают */
 .reader-grid {
   display: grid;
-  grid-template-columns: clamp(240px, 16vw, 340px) minmax(0, 1fr);
+  grid-template-columns: minmax(17rem, 22rem) minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
   gap: clamp(1.5rem, 1.2rem + 0.6vw, 2.5rem);
   height: calc(100dvh - var(--reader-top, 7rem));
@@ -1167,7 +1167,7 @@ onBeforeUnmount(() => {
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding-right: 1.5rem;
+  padding-inline: 0.25rem;
 }
 
 .side-head {
@@ -1251,10 +1251,13 @@ onBeforeUnmount(() => {
   background: var(--surface);
 }
 
-.book.on,
-.chapter.on {
+.book.on {
   background: var(--text);
   color: var(--bg);
+}
+
+.chapter.on {
+  color: var(--text);
 }
 
 .chapter-folder {
@@ -1263,7 +1266,7 @@ onBeforeUnmount(() => {
 }
 
 .chapter.on .chapter-folder {
-  color: var(--bg);
+  color: var(--text);
 }
 
 /* название главы длинное: лучше две строки, чем многоточие */
@@ -1375,8 +1378,13 @@ onBeforeUnmount(() => {
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  white-space: normal;
+  overflow-wrap: break-word;
+  line-height: 1.35;
 }
 
 .topic-done {
@@ -1402,8 +1410,10 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 0.4rem;
+  width: 100%;
+  max-width: min(72rem, 100%);
+  margin: 0 auto var(--space-3);
   padding-bottom: var(--space-2);
-  margin-bottom: var(--space-3);
   background: var(--bg);
 }
 
@@ -1434,8 +1444,8 @@ onBeforeUnmount(() => {
   gap: 0.85rem;
   min-width: 0;
   width: 100%;
-  max-width: none;
-  margin: 0;
+  max-width: min(72rem, 100%);
+  margin: 0 auto;
   padding-bottom: var(--space-8);
 }
 
@@ -1462,8 +1472,15 @@ onBeforeUnmount(() => {
 .lecture-nav {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
+  gap: 0.35rem;
   padding-top: var(--space-8);
+}
+
+.lecture-nav-slot {
+  width: 2.75rem;
+  height: 2.75rem;
+  flex-shrink: 0;
 }
 
 .lecture-nav-home,
