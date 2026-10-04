@@ -1242,14 +1242,14 @@ onBeforeUnmount(() => {
 }
 
 .book:hover,
-.chapter:hover {
+.chapter:hover:not(.on) {
   background: var(--surface);
 }
 
 .book.on,
 .chapter.on {
-  background: var(--surface);
-  color: var(--text);
+  background: var(--text);
+  color: var(--bg);
 }
 
 .chapter-folder {
@@ -1258,7 +1258,7 @@ onBeforeUnmount(() => {
 }
 
 .chapter.on .chapter-folder {
-  color: var(--text);
+  color: var(--bg);
 }
 
 /* название главы длинное: лучше две строки, чем многоточие */
