@@ -937,6 +937,11 @@ onBeforeUnmount(() => {
                 :class="{ on: book.title === currentBook }"
                 @click="openBook(book.title)"
               >
+                <AppIcon
+                  :name="book.title === currentBook ? 'bookOpen' : 'book'"
+                  :size="16"
+                  class="book-icon"
+                />
                 <span class="topic-title">{{ prettyCourseTitle(book.title) }}</span>
               </button>
               <div v-if="!book.title || book.title === currentBook" class="book-body">
@@ -1333,6 +1338,15 @@ onBeforeUnmount(() => {
   text-align: left;
   text-transform: lowercase;
   overflow: visible;
+}
+
+.book-icon {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+
+.book.on .book-icon {
+  color: var(--text);
 }
 
 .book {

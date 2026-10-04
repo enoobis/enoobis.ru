@@ -4,6 +4,7 @@ import {
   AtSign,
   Ban,
   Bold,
+  Book,
   BookOpen,
   Bookmark,
   BriefcaseBusiness,
@@ -113,6 +114,8 @@ export type AppIconName =
   | "chat"
   | "folder"
   | "folderOpen"
+  | "book"
+  | "bookOpen"
   | "copy"
   | "image"
   | "pin"
@@ -183,6 +186,8 @@ const icons: Record<AppIconName, Component> = {
   chat: MessageCircle,
   folder: Folder,
   folderOpen: FolderOpen,
+  book: Book,
+  bookOpen: BookOpen,
   copy: Copy,
   image: Image,
   pin: Pin,
