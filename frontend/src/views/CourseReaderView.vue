@@ -1151,9 +1151,9 @@ onBeforeUnmount(() => {
 /* читалка занимает экран целиком: страница не скроллится, колонки не уезжают */
 .reader-grid {
   display: grid;
-  grid-template-columns: minmax(20rem, 26rem) minmax(0, 1fr);
+  grid-template-columns: minmax(15.5rem, 18rem) minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
-  gap: 2rem;
+  gap: 2.5rem;
   height: calc(100dvh - var(--reader-top, 7rem));
   min-height: 0;
 }
@@ -1176,6 +1176,9 @@ onBeforeUnmount(() => {
 .reader-main {
   display: flex;
   flex-direction: column;
+  justify-self: start;
+  width: min(100%, 42rem);
+  max-width: 42rem;
   height: 100%;
   min-height: 0;
   min-width: 0;
@@ -1435,7 +1438,7 @@ onBeforeUnmount(() => {
   gap: 0.35rem;
   flex-shrink: 0;
   width: 100%;
-  padding: 0 1.35rem 0.85rem;
+  padding: 0 0.15rem 0.85rem;
   background: var(--bg);
 }
 
@@ -1459,20 +1462,20 @@ onBeforeUnmount(() => {
 
 .lecture {
   display: grid;
-  gap: 1.35rem;
+  gap: 1.15rem;
   min-width: 0;
   width: 100%;
   max-width: none;
   margin: 0;
-  padding: 0.35rem 2rem 2.5rem;
+  padding: 0.15rem 0.1rem 2.5rem;
 }
 
 .lecture :deep(.markdown-body.doc) {
-  font-size: 1.125rem;
-  line-height: 1.7;
+  font-size: 1.0625rem;
+  line-height: 1.75;
 }
 .lecture :deep(.markdown-body.doc p) {
-  margin: 0.85rem 0;
+  margin: 1rem 0;
 }
 .lecture :deep(.markdown-body.doc li) {
   margin: 0.4rem 0;
@@ -1493,10 +1496,10 @@ onBeforeUnmount(() => {
 
 .lecture-title {
   margin: 0;
-  font-size: clamp(1.85rem, 1.5rem + 0.8vw, 2.35rem);
+  font-size: 1.85rem;
   font-weight: 600;
   letter-spacing: -0.03em;
-  line-height: 1.15;
+  line-height: 1.2;
   overflow-wrap: anywhere;
   text-transform: lowercase;
 }
@@ -1507,8 +1510,8 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   flex-shrink: 0;
   width: 100%;
-  min-height: 4rem;
-  padding: 0.4rem 1.6rem;
+  min-height: 3.75rem;
+  padding: 0.35rem 0.1rem;
   border-top: 1px solid var(--border);
   background: var(--bg);
 }
@@ -1906,6 +1909,9 @@ onBeforeUnmount(() => {
   }
 
   .reader-main {
+    justify-self: stretch;
+    width: 100%;
+    max-width: none;
     height: 100%;
     overflow: hidden;
   }
