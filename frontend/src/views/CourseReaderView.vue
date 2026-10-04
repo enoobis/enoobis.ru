@@ -108,20 +108,33 @@ const chapters = computed<Chapter[]>(() => {
 
 const hasBooks = computed(() => chapters.value.some((c) => c.book));
 const activeChapter = computed(() => prettyCourseTitle((activeLecture.value?.chapter ?? "").trim()));
-const openChapter = ref("");
+const openChapters = ref<string[]>([]);
+
+function chapterKey(book: string, title: string): string {
+  return `${book}\0${title}`;
+}
+
+function isChapterOpen(book: string, title: string): boolean {
+  return openChapters.value.includes(chapterKey(book, title));
+}
+
+function revealChapter(book: string, title: string) {
+  if (!title || isChapterOpen(book, title)) return;
+  openChapters.value = [...openChapters.value, chapterKey(book, title)];
+}
 
 function chapterIndex(ch: Chapter): number {
   return chapters.value.findIndex((c) => c.offset === ch.offset);
 }
 
-function toggleChapter(title: string) {
-  const opening = openChapter.value !== title;
-  openChapter.value = opening ? title : "";
-  if (!opening) return;
-  const ch = chapters.value.find(
-    (c) => c.title === title && (!currentBook.value || c.book === currentBook.value),
-  );
-  const first = ch?.lectures[0];
+function toggleChapter(ch: Chapter) {
+  const key = chapterKey(ch.book, ch.title);
+  if (openChapters.value.includes(key)) {
+    openChapters.value = openChapters.value.filter((k) => k !== key);
+    return;
+  }
+  openChapters.value = [...openChapters.value, key];
+  const first = ch.lectures[0];
   if (first && first.id !== activeId.value) openLecture(first.id);
 }
 
@@ -171,17 +184,13 @@ const bookLectures = computed(() => {
 const contentsChapters = computed(() => currentBookEntry.value?.chapters ?? chapters.value);
 
 watch(activeChapter, (title) => {
-  if (title) openChapter.value = title;
+  if (title) revealChapter((activeLecture.value?.book ?? "").trim(), title);
 });
 
 watch(currentBook, (title) => {
-  if (activeId.value) return;
-  if (!title) {
-    openChapter.value = "";
-    return;
-  }
+  if (activeId.value || !title) return;
   const first = chapters.value.find((c) => c.book === title);
-  if (first?.title) openChapter.value = first.title;
+  if (first?.title) revealChapter(first.book, first.title);
 });
 
 const activeIndex = computed(() =>
@@ -233,7 +242,9 @@ async function load() {
         activeId.value = "";
       }
     }
-    if (activeChapter.value) openChapter.value = activeChapter.value;
+    if (activeChapter.value) {
+      revealChapter((activeLecture.value?.book ?? "").trim(), activeChapter.value);
+    }
   } catch (e) {
     err.value = errorText(e);
   } finally {
@@ -370,7 +381,7 @@ function openContents() {
   topicsOpen.value = false;
   chatOpen.value = false;
   editing.value = null;
-  openChapter.value = "";
+  openChapters.value = [];
   void router.replace({ query: {} });
   scrollMainTop();
 }
@@ -938,18 +949,18 @@ onBeforeUnmount(() => {
                     v-if="ch.title"
                     type="button"
                     class="chapter"
-                    :class="{ on: openChapter === ch.title, nested: !!book.title }"
-                    @click="toggleChapter(ch.title)"
+                    :class="{ on: isChapterOpen(ch.book, ch.title), nested: !!book.title }"
+                    @click="toggleChapter(ch)"
                   >
                     <AppIcon
-                      :name="openChapter === ch.title ? 'folderOpen' : 'folder'"
+                      :name="isChapterOpen(ch.book, ch.title) ? 'folderOpen' : 'folder'"
                       :size="16"
                       class="chapter-folder"
                     />
                     <span class="topic-title">{{ ch.title }}</span>
                   </button>
                   <div
-                    v-if="!ch.title || openChapter === ch.title"
+                    v-if="!ch.title || isChapterOpen(ch.book, ch.title)"
                     class="chapter-lectures"
                   >
                     <button
