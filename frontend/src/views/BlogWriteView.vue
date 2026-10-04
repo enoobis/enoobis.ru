@@ -809,13 +809,18 @@ onBeforeUnmount(() => {
 .markdown-preview :deep(pre) {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 0.8rem 0.9rem;
-  overflow: auto;
+  border-radius: var(--radius);
+  padding: 1.15rem 1.25rem;
+  width: max-content;
+  max-width: 100%;
+  overflow-x: auto;
 }
 .markdown-preview :deep(pre code) {
   background: transparent;
   padding: 0;
+  border-radius: 0;
+  white-space: pre;
+  overflow-wrap: normal;
 }
 .markdown-preview :deep(img) {
   max-width: 100%;

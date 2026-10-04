@@ -318,6 +318,10 @@ button:disabled {
   cursor: not-allowed;
   transform: none;
 }
+button.primary:disabled:has(.spinner) {
+  opacity: 1;
+  cursor: progress;
+}
 button:disabled:hover {
   transform: none;
 }
@@ -1081,6 +1085,28 @@ html.course-reader .layout {
   padding-top: 0.75rem;
 }
 
+html.chats-open body {
+  overflow: hidden;
+}
+html.chats-open .layout {
+  display: flex;
+  flex-direction: column;
+  height: calc(100dvh - var(--kb, 0px));
+  min-height: 0;
+  padding-bottom: 0;
+}
+html.chats-open .layout:has(.thread:not(.hidden)) {
+  max-width: min(60rem, 100%);
+}
+html.chats-open .ptr,
+html.chats-open .ptr-slot,
+html.chats-open .page-motion-root {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
 html.course-reader .nav {
   display: none;
 }
@@ -1632,13 +1658,15 @@ html[data-theme="contrast-white"] .glass {
   }
 }
 
-/* spinner — small inline loader */
+/* кольцо от currentColor: на белой кнопке тёмное, на тёмной — светлое */
 .spinner {
   width: 16px;
   height: 16px;
-  border: none;
-  border-radius: 0;
-  background: url("/favicon.png") center / contain no-repeat;
+  box-sizing: border-box;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  background: none;
   display: inline-block;
   animation: spin 0.7s linear infinite;
   vertical-align: middle;

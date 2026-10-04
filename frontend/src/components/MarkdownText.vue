@@ -127,14 +127,22 @@ const html = computed(() => {
 }
 .markdown-body :deep(pre) {
   margin: 1rem 0;
+  /* не меньше ~3мм, и дальше скругления, иначе скобка в углу срезается */
+  padding: 1.15rem 1.25rem;
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  width: max-content;
+  max-width: 100%;
   overflow-x: auto;
   background: var(--surface);
 }
+.markdown-body :deep(pre code),
 .markdown-body :deep(pre code.hljs) {
-  border-radius: var(--radius);
+  border-radius: 0;
   background: transparent;
+  padding: 0;
+  white-space: pre;
+  overflow-wrap: normal;
 }
 .markdown-body :deep(code) {
   font-family: var(--mono);

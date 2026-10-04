@@ -902,6 +902,7 @@ usePageRefresh(async () => {
 });
 
 onMounted(async () => {
+  document.documentElement.classList.add("chats-open");
   window.visualViewport?.addEventListener("resize", syncKeyboardInset);
   window.visualViewport?.addEventListener("scroll", syncKeyboardInset);
   syncKeyboardInset();
@@ -917,6 +918,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  document.documentElement.classList.remove("chats-open");
   window.visualViewport?.removeEventListener("resize", syncKeyboardInset);
   window.visualViewport?.removeEventListener("scroll", syncKeyboardInset);
   document.documentElement.style.removeProperty("--kb");
@@ -1447,15 +1449,17 @@ onUnmounted(() => {
 <style scoped>
 .chats {
   display: grid;
-  grid-template-columns: 320px 1fr;
+  grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
   gap: 0;
-  /* сначала vh - старые браузеры; dvh - мобильный chrome без «обрезания» композера */
-  height: calc(100vh - 8.75rem - var(--kb, 0px));
-  max-height: calc(100vh - 8.75rem - var(--kb, 0px));
-  height: calc(100dvh - 8.75rem - var(--kb, 0px));
-  max-height: calc(100dvh - 8.75rem - var(--kb, 0px));
+  flex: 1;
   min-height: 0;
   overflow: hidden;
+}
+.chats:has(.thread.hidden) {
+  grid-template-columns: minmax(0, 1fr);
+}
+.thread.hidden {
+  display: none;
 }
 
 .chat-list {
@@ -2481,25 +2485,21 @@ onUnmounted(() => {
   display: block;
 }
 
-@media (min-width: 761px) {
-  .chats {
-    min-height: 400px;
-  }
-}
-
 @media (max-width: 760px) {
   .chats {
-    grid-template-columns: 1fr;
-    height: calc(100vh - 6.25rem - var(--kb, 0px));
-    max-height: calc(100vh - 6.25rem - var(--kb, 0px));
-    height: calc(100dvh - 6.25rem - var(--kb, 0px));
-    max-height: calc(100dvh - 6.25rem - var(--kb, 0px));
+    grid-template-columns: minmax(0, 1fr);
   }
   .chat-list.hidden {
     display: none;
   }
-  .thread.hidden {
-    display: none;
+  .composer {
+    padding-bottom: max(0.85rem, env(safe-area-inset-bottom));
+  }
+  .composer .composer-ta {
+    font-size: 16px;
+  }
+  .chat-row-del {
+    opacity: 1;
   }
   .back {
     display: inline-flex;

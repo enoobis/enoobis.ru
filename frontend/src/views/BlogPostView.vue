@@ -558,12 +558,20 @@ h1 {
 .markdown-body :deep(pre) {
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  padding: 1.15rem 1.25rem;
+  width: max-content;
+  max-width: 100%;
   overflow-x: auto;
   margin: 1rem 0;
   background: var(--surface);
 }
+.markdown-body :deep(pre code),
 .markdown-body :deep(pre code.hljs) {
-  border-radius: var(--radius);
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  white-space: pre;
+  overflow-wrap: normal;
 }
 .markdown-body :deep(code) {
   font-family: var(--mono);

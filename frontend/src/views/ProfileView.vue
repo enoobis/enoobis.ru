@@ -830,13 +830,17 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
-  padding: 0.6rem 0.8rem;
+  padding: 1.15rem 1.25rem;
+  width: max-content;
+  max-width: 100%;
   overflow-x: auto;
   margin: 0.6rem 0;
 }
 .readme :deep(pre code) {
   background: none;
   padding: 0;
+  white-space: pre;
+  overflow-wrap: normal;
 }
 
 .ach {

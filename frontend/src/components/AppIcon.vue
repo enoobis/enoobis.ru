@@ -21,6 +21,7 @@ import {
   Flame,
   Flag,
   Folder,
+  FolderOpen,
   GraduationCap,
   Heading,
   Heart,
@@ -111,6 +112,7 @@ export type AppIconName =
   | "forward"
   | "chat"
   | "folder"
+  | "folderOpen"
   | "copy"
   | "image"
   | "pin"
@@ -180,6 +182,7 @@ const icons: Record<AppIconName, Component> = {
   forward: ChevronRight,
   chat: MessageCircle,
   folder: Folder,
+  folderOpen: FolderOpen,
   copy: Copy,
   image: Image,
   pin: Pin,

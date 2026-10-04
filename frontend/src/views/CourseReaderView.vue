@@ -130,8 +130,11 @@ function queryString(name: string): string {
   return typeof raw === "string" ? raw : "";
 }
 
+/* пока адрес ещё старый, «назад» не должен снова открывать книгу */
+const forceCatalog = ref(false);
+
 const currentBook = computed(() => {
-  if (!hasBooks.value) return "";
+  if (forceCatalog.value || !hasBooks.value) return "";
   const fromLec = (activeLecture.value?.book ?? "").trim();
   if (fromLec) return fromLec;
   const wanted = queryString("book");
@@ -241,6 +244,7 @@ function scrollMainTop() {
 function openLecture(id: string) {
   const lec = lectures.value.find((l) => l.id === id);
   const book = (lec?.book ?? "").trim();
+  forceCatalog.value = false;
   activeId.value = id;
   topicsOpen.value = false;
   editing.value = null;
@@ -251,17 +255,35 @@ function openLecture(id: string) {
 }
 
 function openBook(title: string) {
+  forceCatalog.value = false;
+  const first = lectures.value.find((l) => (l.book ?? "").trim() === title);
+  if (first) {
+    openLecture(first.id);
+    return;
+  }
   activeId.value = "";
   topicsOpen.value = false;
   editing.value = null;
-  openChapter.value = "";
-  const first = chapters.value.find((c) => c.book === title);
-  if (first?.title) openChapter.value = first.title;
   void router.replace({ query: { book: title } });
   scrollMainTop();
 }
 
+function showFolders() {
+  if (activeChapter.value) openChapter.value = activeChapter.value;
+  topicsOpen.value = true;
+}
+
+watch(
+  () => [queryString("book"), queryString("lecture"), lectures.value.length] as const,
+  ([book, lecture, n]) => {
+    if (forceCatalog.value || !book || lecture || !n) return;
+    const first = lectures.value.find((l) => (l.book ?? "").trim() === book);
+    if (first) openLecture(first.id);
+  },
+);
+
 function openContents() {
+  forceCatalog.value = true;
   activeId.value = "";
   topicsOpen.value = false;
   chatOpen.value = false;
@@ -272,10 +294,6 @@ function openContents() {
 }
 
 function onSideTitleClick() {
-  if (activeId.value && currentBook.value) {
-    openBook(currentBook.value);
-    return;
-  }
   openContents();
 }
 
@@ -424,11 +442,7 @@ function exitReader() {
 }
 
 function onReaderBack() {
-  if (activeId.value && currentBook.value) {
-    openBook(currentBook.value);
-    return;
-  }
-  if (currentBook.value) {
+  if (hasBooks.value && (activeId.value || currentBook.value)) {
     openContents();
     return;
   }
@@ -675,6 +689,7 @@ watch(courseId, () => {
 watch(
   () => String(route.query.lecture ?? ""),
   (id) => {
+    if (id) forceCatalog.value = false;
     if (id === activeId.value) return;
     activeId.value = id;
   },
@@ -828,14 +843,13 @@ onBeforeUnmount(() => {
               v-if="ch.title"
               type="button"
               class="chapter"
-              :class="{ on: ch.title === activeChapter && ch.book === currentBook, nested: hasBooks }"
+              :class="{ on: openChapter === ch.title, nested: hasBooks }"
               @click="toggleChapter(ch.title)"
             >
               <AppIcon
-                name="forward"
-                :size="14"
-                class="chapter-chev"
-                :class="{ open: openChapter === ch.title }"
+                :name="openChapter === ch.title ? 'folderOpen' : 'folder'"
+                :size="16"
+                class="chapter-folder"
               />
               <span class="topic-title">{{ ch.title }}</span>
             </button>
@@ -1015,22 +1029,22 @@ onBeforeUnmount(() => {
               v-if="prevLecture"
               type="button"
               class="lecture-nav-btn"
+              :aria-label="prettyCourseTitle(prevLecture.title)"
               @click="openLecture(prevLecture.id)"
             >
               <AppIcon name="back" :size="18" />
-              <span>{{ prevLecture.title }}</span>
             </button>
             <span v-else />
-            <button type="button" class="lecture-nav-home" @click="currentBook ? openBook(currentBook) : openContents()">
-              содержание
+            <button type="button" class="lecture-nav-home" aria-label="главы" @click="showFolders">
+              <AppIcon name="folder" :size="18" />
             </button>
             <button
               v-if="nextLecture"
               type="button"
-              class="lecture-nav-btn lecture-nav-btn--next"
+              class="lecture-nav-btn"
+              :aria-label="prettyCourseTitle(nextLecture.title)"
               @click="openLecture(nextLecture.id)"
             >
-              <span>{{ nextLecture.title }}</span>
               <AppIcon name="forward" :size="18" />
             </button>
             <span v-else />
@@ -1102,17 +1116,6 @@ onBeforeUnmount(() => {
           </button>
         </form>
       </aside>
-
-      <!-- мобильный вход в чат -->
-      <button
-        v-if="!catalogMode && !chatOpen && !topicsOpen"
-        type="button"
-        class="ask-bar only-narrow"
-        @click="openChat"
-      >
-        <span>?</span>
-        <AppIcon name="chat" :size="18" />
-      </button>
 
     <div
       v-if="topicsOpen || chatOpen"
@@ -1245,17 +1248,17 @@ onBeforeUnmount(() => {
 
 .book.on,
 .chapter.on {
-  font-weight: 500;
+  background: var(--surface);
+  color: var(--text);
 }
 
-.chapter-chev {
+.chapter-folder {
   flex-shrink: 0;
   color: var(--muted);
-  transition: transform var(--dur-2) var(--ease-out);
 }
 
-.chapter-chev.open {
-  transform: rotate(90deg);
+.chapter.on .chapter-folder {
+  color: var(--text);
 }
 
 /* название главы длинное: лучше две строки, чем многоточие */
@@ -1304,10 +1307,19 @@ onBeforeUnmount(() => {
   text-transform: lowercase;
 }
 
-.topic:hover,
-.topic.on {
+.topic:hover:not(.on) {
   background: var(--surface);
   color: var(--text);
+}
+
+.topic.on {
+  background: var(--text);
+  color: var(--bg);
+}
+
+.topic.on .topic-num,
+.topic.on .topic-done {
+  color: var(--bg);
 }
 
 .topic.movable {
@@ -1443,62 +1455,31 @@ onBeforeUnmount(() => {
 }
 
 .lecture-nav {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  display: flex;
   align-items: center;
-  gap: 1rem;
+  justify-content: space-between;
   padding-top: var(--space-8);
 }
 
-.lecture-nav-home {
-  padding: 0;
-  min-height: 0;
-  border: none;
-  background: transparent;
-  color: var(--muted);
-  font: inherit;
-  font-size: var(--text-sm);
-  text-transform: lowercase;
-  cursor: pointer;
-}
-
-.lecture-nav-home:hover {
-  background: transparent;
-  color: var(--text);
-}
-
+.lecture-nav-home,
 .lecture-nav-btn {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  min-width: 0;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
   padding: 0;
   border: none;
+  border-radius: var(--radius-pill);
   background: transparent;
   color: var(--muted);
-  font: inherit;
-  font-size: var(--text-sm);
-  text-align: left;
-  text-transform: lowercase;
   cursor: pointer;
 }
 
-.lecture-nav-btn--next {
-  justify-self: end;
-  margin-left: 0;
-  text-align: right;
-}
-
+.lecture-nav-home:hover,
 .lecture-nav-btn:hover {
+  background: var(--surface);
   color: var(--text);
-  background: transparent;
-}
-
-.lecture-nav-btn span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 /* ---------- содержание курса ---------- */
@@ -1750,19 +1731,19 @@ onBeforeUnmount(() => {
   right: 0;
   bottom: 0;
   z-index: 96;
-  width: min(26rem, 92vw);
+  width: min(24rem, 92vw);
   padding: var(--space-3);
-  border: 1px solid var(--border);
-  border-right: none;
-  border-radius: var(--radius) 0 0 var(--radius);
+  border-left: 1px solid var(--border);
   background: var(--bg);
   transform: translateX(110%);
   transition: transform var(--dur-3) var(--ease-snap);
+  visibility: hidden;
   pointer-events: none;
 }
 
 .reader-chat.open {
   transform: translateX(0);
+  visibility: visible;
   pointer-events: auto;
 }
 
@@ -1871,7 +1852,7 @@ onBeforeUnmount(() => {
     overflow-y: visible;
     overflow-x: clip;
     padding-right: 0;
-    padding-bottom: calc(var(--control-h) + var(--space-8));
+    padding-bottom: max(var(--space-8), env(safe-area-inset-bottom));
   }
 
   .main-bar {
@@ -1935,10 +1916,12 @@ onBeforeUnmount(() => {
     border-radius: calc(var(--radius) + 6px) calc(var(--radius) + 6px) 0 0;
     transform: translateY(110%);
     transition: transform var(--dur-3) var(--ease-snap);
+    visibility: hidden;
   }
 
   .reader-chat.open {
     transform: translateY(0);
+    visibility: visible;
     pointer-events: auto;
   }
 
@@ -1965,53 +1948,12 @@ onBeforeUnmount(() => {
     font-size: 16px;
   }
 
-  .ask-bar {
-    position: fixed;
-    left: var(--layout-pad);
-    right: var(--layout-pad);
-    bottom: max(var(--layout-pad), env(safe-area-inset-bottom));
-    z-index: 92;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    min-height: var(--control-h);
-    padding: 0 0.5rem 0 1.1rem;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-pill);
-    background: var(--surface);
-    color: var(--muted);
-    font-size: var(--text-sm);
-    text-transform: lowercase;
-  }
-
   .panel-backdrop {
     display: block;
     position: fixed;
     inset: 0;
     z-index: 94;
     background: var(--overlay-soft);
-  }
-}
-
-/* на телефоне три колонки не влезают: «содержание» уходит под стрелки */
-@media (max-width: 640px) {
-  .lecture-nav {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    row-gap: 1.25rem;
-  }
-
-  .lecture-nav > :first-child {
-    grid-area: 1 / 1;
-  }
-
-  .lecture-nav > :last-child {
-    grid-area: 1 / 2;
-  }
-
-  .lecture-nav-home {
-    grid-area: 2 / 1 / 3 / 3;
-    justify-self: center;
   }
 }
 
