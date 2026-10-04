@@ -1143,9 +1143,9 @@ onBeforeUnmount(() => {
 /* читалка занимает экран целиком: страница не скроллится, колонки не уезжают */
 .reader-grid {
   display: grid;
-  grid-template-columns: minmax(18rem, 24rem) minmax(0, 1fr);
+  grid-template-columns: minmax(20rem, 26rem) minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
-  gap: 1.75rem;
+  gap: 2rem;
   height: calc(100dvh - var(--reader-top, 7rem));
   min-height: 0;
 }
@@ -1214,16 +1214,17 @@ onBeforeUnmount(() => {
 
 .chapter {
   display: flex;
-  align-items: center;
-  gap: 0.4rem;
+  align-items: flex-start;
+  gap: 0.55rem;
   width: 100%;
   min-height: 0;
-  padding: 0.7rem 0.65rem;
+  padding: 0.85rem 0.7rem;
   border: none;
   border-radius: var(--radius);
   background: transparent;
   color: var(--text);
-  font-size: var(--text-md);
+  font-size: 1rem;
+  line-height: 1.35;
   text-align: left;
   text-transform: lowercase;
 }
@@ -1266,6 +1267,7 @@ onBeforeUnmount(() => {
 
 .chapter-folder {
   flex-shrink: 0;
+  margin-top: 0.12rem;
   color: var(--muted);
 }
 
@@ -1273,16 +1275,8 @@ onBeforeUnmount(() => {
   color: var(--text);
 }
 
-/* название главы длинное: лучше две строки, чем многоточие */
 .chapter .topic-title {
-  white-space: normal;
-  overflow-wrap: break-word;
-  word-spacing: 0.12em;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  line-height: 1.35;
+  word-spacing: 0.04em;
 }
 
 .topic.nested {
@@ -1295,7 +1289,7 @@ onBeforeUnmount(() => {
 
 .topic-list {
   display: grid;
-  gap: 1px;
+  gap: 0.15rem;
   align-content: start;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -1305,16 +1299,17 @@ onBeforeUnmount(() => {
 
 .topic {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  align-items: flex-start;
+  gap: 0.55rem;
   width: 100%;
   min-height: 0;
-  padding: 0.6rem 0.7rem;
+  padding: 0.7rem 0.75rem;
   border: none;
   border-radius: var(--radius);
   background: transparent;
   color: var(--muted);
-  font-size: var(--text-md);
+  font-size: 1rem;
+  line-height: 1.35;
   text-align: left;
   text-transform: lowercase;
 }
@@ -1373,19 +1368,17 @@ onBeforeUnmount(() => {
 
 .topic-num {
   flex-shrink: 0;
-  min-width: 1.1rem;
-  font-size: var(--text-xs);
+  min-width: 1.25rem;
+  margin-top: 0.12rem;
+  font-size: var(--text-sm);
   font-variant-numeric: tabular-nums;
 }
 
 .topic-title {
   flex: 1;
   min-width: 0;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
+  display: block;
+  overflow: visible;
   white-space: normal;
   overflow-wrap: break-word;
   line-height: 1.35;
@@ -1415,7 +1408,7 @@ onBeforeUnmount(() => {
   gap: 0.35rem;
   flex-shrink: 0;
   width: 100%;
-  padding: 0 0.15rem 0.85rem;
+  padding: 0 1.35rem 0.85rem;
   background: var(--bg);
 }
 
@@ -1439,17 +1432,31 @@ onBeforeUnmount(() => {
 
 .lecture {
   display: grid;
-  gap: 1.15rem;
+  gap: 1.35rem;
   min-width: 0;
   width: 100%;
   max-width: none;
   margin: 0;
-  padding: 0.25rem 0.35rem 2.5rem;
+  padding: 0.35rem 2rem 2.5rem;
 }
 
 .lecture :deep(.markdown-body.doc) {
-  font-size: clamp(1.06rem, 0.88rem + 0.22vw, 1.22rem);
-  line-height: 1.55;
+  font-size: 1.125rem;
+  line-height: 1.7;
+}
+.lecture :deep(.markdown-body.doc p) {
+  margin: 0.85rem 0;
+}
+.lecture :deep(.markdown-body.doc li) {
+  margin: 0.4rem 0;
+}
+.lecture :deep(.markdown-body.doc h2) {
+  font-size: 1.4rem;
+  margin: 1.8rem 0 0.55rem;
+}
+.lecture :deep(.markdown-body.doc h3) {
+  font-size: 1.2rem;
+  margin: 1.45rem 0 0.4rem;
 }
 
 .lecture :deep(a),
@@ -1459,10 +1466,10 @@ onBeforeUnmount(() => {
 
 .lecture-title {
   margin: 0;
-  font-size: clamp(1.45rem, 1.2rem + 0.32vw, 1.75rem);
+  font-size: clamp(1.85rem, 1.5rem + 0.8vw, 2.35rem);
   font-weight: 600;
-  letter-spacing: -0.02em;
-  line-height: 1.25;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
   overflow-wrap: anywhere;
   text-transform: lowercase;
 }
@@ -1473,12 +1480,15 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   flex-shrink: 0;
   width: 100%;
-  padding: 0.65rem 0.15rem 0.15rem;
+  min-height: 4rem;
+  padding: 0.4rem 1.6rem;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
 }
 
 .lecture-nav-slot {
-  width: 2.75rem;
-  height: 2.75rem;
+  width: 3rem;
+  height: 3rem;
   flex-shrink: 0;
 }
 
@@ -1487,13 +1497,13 @@ onBeforeUnmount(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.75rem;
-  height: 2.75rem;
+  width: 3rem;
+  height: 3rem;
   padding: 0;
   border: none;
   border-radius: var(--radius-pill);
   background: transparent;
-  color: var(--muted);
+  color: var(--text);
   cursor: pointer;
 }
 
@@ -1874,24 +1884,21 @@ onBeforeUnmount(() => {
   }
 
   .lecture {
-    padding-inline: 0;
-  }
-
-  .lecture-nav {
-    padding-bottom: max(0.2rem, env(safe-area-inset-bottom));
-  }
-
-  .main-bar {
-    padding-bottom: 0.65rem;
+    padding: 0.35rem 0.15rem 2rem;
   }
 
   .lecture-title {
-    font-size: 1.35rem;
+    font-size: 1.7rem;
   }
 
-  /* на узком экране крупный кегль рвёт строки, читаем чуть мельче */
   .lecture :deep(.markdown-body.doc) {
-    font-size: 1.04rem;
+    font-size: 1.05rem;
+    line-height: 1.7;
+  }
+
+  .lecture-nav {
+    min-height: 3.75rem;
+    padding: 0.25rem 0.35rem max(0.25rem, env(safe-area-inset-bottom));
   }
 
   .reader-topics {
