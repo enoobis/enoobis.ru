@@ -1080,9 +1080,12 @@ html.profile-wallpaper-desktop .layout {
   padding-right: 0;
 }
 html.course-reader .layout {
-  max-width: none;
+  max-width: calc(18rem + 2.5rem + 42rem);
   width: 100%;
+  margin-inline: auto;
   padding-top: 0.75rem;
+  padding-left: 0;
+  padding-right: 0;
 }
 
 html.chats-open body {
@@ -1108,7 +1111,7 @@ html.chats-open .page-motion-root {
 }
 
 html.course-reader .nav {
-  display: none;
+  margin-bottom: 0.75rem;
 }
 
 /* закрытая шторка чата уезжает за край — без clip страница получает боковой скролл */
@@ -1116,17 +1119,16 @@ html.course-reader body {
   overflow-x: clip;
 }
 
-@media (max-width: 1024px) {
-  html.reader-sheet,
-  html.reader-sheet body {
-    overflow: hidden;
-  }
+html.reader-sheet,
+html.reader-sheet body {
+  overflow: hidden;
 }
 
-@media (min-width: 1025px) {
+@media (max-width: 1024px) {
   html.course-reader .layout {
-    padding-left: 1.5rem;
-    padding-right: 1.5rem;
+    max-width: none;
+    padding-left: var(--layout-pad);
+    padding-right: var(--layout-pad);
   }
 }
 html.profile-wallpaper-desktop #app {

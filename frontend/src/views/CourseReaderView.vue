@@ -1103,7 +1103,7 @@ onBeforeUnmount(() => {
       <!-- чат -->
       <aside class="reader-chat" :class="{ open: chatOpen }" :inert="!chatOpen">
         <header class="side-head chat-head">
-          <span class="chat-grabber only-narrow" aria-hidden="true" />
+          <span class="chat-grabber" aria-hidden="true" />
           <div class="chat-titles">
             <span class="side-title">ии чат</span>
             <span v-if="activeLecture" class="chat-topic muted">
@@ -1200,6 +1200,8 @@ onBeforeUnmount(() => {
 }
 
 .reader-topics {
+  position: relative;
+  z-index: 95;
   padding-right: 0.75rem;
   border-right: 1px solid var(--border);
 }
@@ -1207,9 +1209,9 @@ onBeforeUnmount(() => {
 .reader-main {
   display: flex;
   flex-direction: column;
-  justify-self: center;
-  width: min(100%, 42rem);
-  max-width: 42rem;
+  justify-self: stretch;
+  width: 100%;
+  max-width: none;
   height: 100%;
   min-height: 0;
   min-width: 0;
@@ -1829,31 +1831,49 @@ onBeforeUnmount(() => {
 
 /* ---------- чат ---------- */
 
-/* панель чата — шторка, не третья колонка: чтение занимает экран */
+/* чат снизу, как на телефоне: главы и меню остаются */
 .reader-chat {
   position: fixed;
-  top: 0;
-  right: 0;
+  left: 50%;
+  right: auto;
   bottom: 0;
+  top: auto;
   z-index: 96;
-  width: min(24rem, 92vw);
-  padding: var(--space-3);
-  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  width: min(100%, calc(18rem + 2.5rem + 42rem));
+  height: min(70dvh, calc(100dvh - 4.5rem));
+  max-height: calc(100dvh - 4.5rem);
+  padding: var(--space-3) var(--layout-pad)
+    calc(max(var(--space-3), env(safe-area-inset-bottom)) + var(--kb, 0px));
   background: var(--bg);
-  transform: translateX(110%);
-  transition: transform var(--dur-3) var(--ease-snap);
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: calc(var(--radius) + 6px) calc(var(--radius) + 6px) 0 0;
+  transform: translateX(-50%);
   visibility: hidden;
   pointer-events: none;
 }
 
 .reader-chat.open {
-  transform: translateX(0);
   visibility: visible;
   pointer-events: auto;
 }
 
 .chat-head {
   align-items: flex-start;
+  padding-top: 0.6rem;
+}
+
+.chat-grabber {
+  position: absolute;
+  top: 0.5rem;
+  left: 50%;
+  width: 2.2rem;
+  height: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--border);
+  transform: translateX(-50%);
 }
 
 .chat-titles {
