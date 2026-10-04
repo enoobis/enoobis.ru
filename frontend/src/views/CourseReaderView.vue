@@ -886,7 +886,7 @@ onBeforeUnmount(() => {
       </aside>
 
       <!-- тема -->
-      <main ref="mainRef" class="reader-main">
+      <main class="reader-main">
         <div class="main-bar">
           <button
             type="button"
@@ -896,33 +896,34 @@ onBeforeUnmount(() => {
           >
             <AppIcon name="list" :size="18" />
           </button>
-          <span class="main-bar-title">{{ prettyCourseTitle(activeLecture?.title ?? currentBook) || "содержание" }}</span>
-          <button
-            type="button"
-            class="filter-icon-btn"
-            aria-label="чат"
-            @click="openChat"
-          >
-            <AppIcon name="chat" :size="17" />
-          </button>
-          <button
-            v-if="activeLecture && !editing"
-            type="button"
-            class="filter-icon-btn"
-            aria-label="скачать word"
-            @click="downloadLecture"
-          >
-            <AppIcon name="download" :size="17" />
-          </button>
-          <button
-            v-if="isTeacher && activeLecture && !editing"
-            type="button"
-            class="filter-icon-btn"
-            aria-label="править"
-            @click="startEdit"
-          >
-            <AppIcon name="edit" :size="17" />
-          </button>
+          <div class="main-bar-actions">
+            <button
+              type="button"
+              class="filter-icon-btn"
+              aria-label="чат"
+              @click="openChat"
+            >
+              <AppIcon name="chat" :size="18" />
+            </button>
+            <button
+              v-if="activeLecture && !editing"
+              type="button"
+              class="filter-icon-btn"
+              aria-label="скачать word"
+              @click="downloadLecture"
+            >
+              <AppIcon name="download" :size="18" />
+            </button>
+            <button
+              v-if="isTeacher && activeLecture && !editing"
+              type="button"
+              class="filter-icon-btn"
+              aria-label="править"
+              @click="startEdit"
+            >
+              <AppIcon name="edit" :size="18" />
+            </button>
+          </div>
         </div>
 
         <p v-if="err" class="error">{{ err }}</p>
@@ -947,7 +948,8 @@ onBeforeUnmount(() => {
           </div>
         </form>
 
-        <article v-else class="lecture">
+        <div v-else ref="mainRef" class="reader-scroll">
+        <article class="lecture">
           <h1 class="lecture-title">{{ prettyCourseTitle(activeLecture.title) }}</h1>
 
           <template v-for="ev in [videoEmbed(activeLecture.video_url)]" :key="activeLecture.id">
@@ -1029,32 +1031,33 @@ onBeforeUnmount(() => {
             </div>
           </section>
 
-          <nav class="lecture-nav">
-            <button
-              v-if="prevLecture"
-              type="button"
-              class="lecture-nav-btn"
-              :aria-label="prettyCourseTitle(prevLecture.title)"
-              @click="openLecture(prevLecture.id)"
-            >
-              <AppIcon name="back" :size="18" />
-            </button>
-            <span v-else class="lecture-nav-slot" aria-hidden="true" />
-            <button type="button" class="lecture-nav-home" aria-label="главы" @click="showFolders">
-              <AppIcon name="folder" :size="18" />
-            </button>
-            <button
-              v-if="nextLecture"
-              type="button"
-              class="lecture-nav-btn"
-              :aria-label="prettyCourseTitle(nextLecture.title)"
-              @click="openLecture(nextLecture.id)"
-            >
-              <AppIcon name="forward" :size="18" />
-            </button>
-            <span v-else class="lecture-nav-slot" aria-hidden="true" />
-          </nav>
         </article>
+        </div>
+        <nav v-if="!editing" class="lecture-nav">
+          <button
+            v-if="prevLecture"
+            type="button"
+            class="lecture-nav-btn"
+            :aria-label="prettyCourseTitle(prevLecture.title)"
+            @click="openLecture(prevLecture.id)"
+          >
+            <AppIcon name="back" :size="18" />
+          </button>
+          <span v-else class="lecture-nav-slot" aria-hidden="true" />
+          <button type="button" class="lecture-nav-home" aria-label="главы" @click="showFolders">
+            <AppIcon name="folder" :size="18" />
+          </button>
+          <button
+            v-if="nextLecture"
+            type="button"
+            class="lecture-nav-btn"
+            :aria-label="prettyCourseTitle(nextLecture.title)"
+            @click="openLecture(nextLecture.id)"
+          >
+            <AppIcon name="forward" :size="18" />
+          </button>
+          <span v-else class="lecture-nav-slot" aria-hidden="true" />
+        </nav>
       </main>
     </div>
 
@@ -1140,11 +1143,11 @@ onBeforeUnmount(() => {
 /* читалка занимает экран целиком: страница не скроллится, колонки не уезжают */
 .reader-grid {
   display: grid;
-  grid-template-columns: minmax(17rem, 22rem) minmax(0, 1fr);
+  grid-template-columns: minmax(18rem, 24rem) minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
-  gap: clamp(1.5rem, 1.2rem + 0.6vw, 2.5rem);
+  gap: 1.75rem;
   height: calc(100dvh - var(--reader-top, 7rem));
-  min-height: 24rem;
+  min-height: 0;
 }
 
 .reader-topics,
@@ -1163,11 +1166,12 @@ onBeforeUnmount(() => {
 }
 
 .reader-main {
+  display: flex;
+  flex-direction: column;
   height: 100%;
   min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding-inline: 0.25rem;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .side-head {
@@ -1214,12 +1218,12 @@ onBeforeUnmount(() => {
   gap: 0.4rem;
   width: 100%;
   min-height: 0;
-  padding: 0.55rem 0.5rem;
+  padding: 0.7rem 0.65rem;
   border: none;
   border-radius: var(--radius);
   background: transparent;
   color: var(--text);
-  font-size: var(--text-sm);
+  font-size: var(--text-md);
   text-align: left;
   text-transform: lowercase;
 }
@@ -1305,12 +1309,12 @@ onBeforeUnmount(() => {
   gap: 0.5rem;
   width: 100%;
   min-height: 0;
-  padding: 0.5rem 0.65rem;
+  padding: 0.6rem 0.7rem;
   border: none;
   border-radius: var(--radius);
   background: transparent;
   color: var(--muted);
-  font-size: var(--text-sm);
+  font-size: var(--text-md);
   text-align: left;
   text-transform: lowercase;
 }
@@ -1398,34 +1402,28 @@ onBeforeUnmount(() => {
   font-size: var(--text-sm);
 }
 
-.reader-main {
-  min-width: 0;
-  padding-bottom: var(--space-8);
+.reader-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .main-bar {
-  position: sticky;
-  top: 0;
-  z-index: 1;
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.35rem;
+  flex-shrink: 0;
   width: 100%;
-  max-width: min(72rem, 100%);
-  margin: 0 auto var(--space-3);
-  padding-bottom: var(--space-2);
+  padding: 0 0.15rem 0.85rem;
   background: var(--bg);
 }
 
-.main-bar-title {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--muted);
-  font-size: var(--text-sm);
-  text-transform: lowercase;
+.main-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  margin-left: auto;
 }
 
 /* без minmax(0,1fr) одна длинная ссылка растягивает колонку и режет весь текст */
@@ -1441,12 +1439,12 @@ onBeforeUnmount(() => {
 
 .lecture {
   display: grid;
-  gap: 0.85rem;
+  gap: 1.15rem;
   min-width: 0;
   width: 100%;
-  max-width: min(72rem, 100%);
-  margin: 0 auto;
-  padding-bottom: var(--space-8);
+  max-width: none;
+  margin: 0;
+  padding: 0.25rem 0.35rem 2.5rem;
 }
 
 .lecture :deep(.markdown-body.doc) {
@@ -1472,9 +1470,10 @@ onBeforeUnmount(() => {
 .lecture-nav {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 0.35rem;
-  padding-top: var(--space-8);
+  justify-content: space-between;
+  flex-shrink: 0;
+  width: 100%;
+  padding: 0.65rem 0.15rem 0.15rem;
 }
 
 .lecture-nav-slot {
@@ -1861,8 +1860,7 @@ onBeforeUnmount(() => {
 @media (max-width: 1024px) {
   .reader-grid {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto;
-    height: auto;
+    height: calc(100dvh - var(--reader-top, 4.5rem));
     min-height: 0;
   }
 
@@ -1870,18 +1868,21 @@ onBeforeUnmount(() => {
     display: inline-flex;
   }
 
-  /* на телефоне листаем страницу, а не колонку */
   .reader-main {
-    height: auto;
-    overflow-y: visible;
-    overflow-x: clip;
-    padding-right: 0;
-    padding-bottom: max(var(--space-8), env(safe-area-inset-bottom));
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .lecture {
+    padding-inline: 0;
+  }
+
+  .lecture-nav {
+    padding-bottom: max(0.2rem, env(safe-area-inset-bottom));
   }
 
   .main-bar {
-    position: static;
-    padding-bottom: 0;
+    padding-bottom: 0.65rem;
   }
 
   .lecture-title {
