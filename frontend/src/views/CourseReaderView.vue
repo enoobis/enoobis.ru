@@ -296,12 +296,6 @@ function openBook(title: string) {
   scrollMainTop();
 }
 
-function showFolders() {
-  chatOpen.value = false;
-  if (activeChapter.value) openChapter.value = activeChapter.value;
-  topicsOpen.value = true;
-}
-
 watch(
   () => [queryString("book"), queryString("lecture"), lectures.value.length] as const,
   ([book, lecture, n]) => {
@@ -937,14 +931,6 @@ onBeforeUnmount(() => {
           </button>
           <div class="main-bar-actions">
             <button
-              type="button"
-              class="filter-icon-btn"
-              aria-label="чат"
-              @click="openChat"
-            >
-              <AppIcon name="chat" :size="18" />
-            </button>
-            <button
               v-if="activeLecture && !editing"
               type="button"
               class="filter-icon-btn"
@@ -1083,8 +1069,8 @@ onBeforeUnmount(() => {
             <AppIcon name="back" :size="18" />
           </button>
           <span v-else class="lecture-nav-slot" aria-hidden="true" />
-          <button type="button" class="lecture-nav-home" aria-label="главы" @click="showFolders">
-            <AppIcon name="folder" :size="18" />
+          <button type="button" class="lecture-nav-btn" aria-label="чат" @click="openChat">
+            <AppIcon name="chat" :size="18" />
           </button>
           <button
             v-if="nextLecture"
@@ -1588,7 +1574,6 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
 }
 
-.lecture-nav-home,
 .lecture-nav-btn {
   display: inline-flex;
   align-items: center;
@@ -1603,7 +1588,6 @@ onBeforeUnmount(() => {
   cursor: pointer;
 }
 
-.lecture-nav-home:hover,
 .lecture-nav-btn:hover {
   background: var(--surface);
   color: var(--text);
