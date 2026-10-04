@@ -1242,7 +1242,8 @@ onBeforeUnmount(() => {
 
 .chapter {
   display: flex;
-  align-items: flex-start;
+  flex-wrap: nowrap;
+  align-items: center;
   gap: 0.55rem;
   width: 100%;
   min-height: 2.75rem;
@@ -1260,7 +1261,8 @@ onBeforeUnmount(() => {
 
 .book {
   display: flex;
-  align-items: flex-start;
+  flex-wrap: nowrap;
+  align-items: center;
   gap: 0.4rem;
   width: 100%;
   min-height: 2.6rem;
@@ -1363,7 +1365,7 @@ onBeforeUnmount(() => {
 
 .reader-scroll::-webkit-scrollbar-thumb,
 .reader-scroll::-webkit-scrollbar-thumb:hover {
-  background: color-mix(in srgb, var(--text) 28%, transparent);
+  background: color-mix(in srgb, var(--text) 42%, transparent);
 }
 
 .chapter-group {
@@ -1382,7 +1384,8 @@ onBeforeUnmount(() => {
 
 .topic {
   display: flex;
-  align-items: flex-start;
+  flex-wrap: nowrap;
+  align-items: center;
   gap: 0.55rem;
   width: 100%;
   min-height: 2.6rem;
@@ -1464,6 +1467,8 @@ onBeforeUnmount(() => {
   display: block;
   overflow: hidden;
   white-space: nowrap;
+  word-break: keep-all;
+  overflow-wrap: normal;
   text-overflow: ellipsis;
   line-height: 1.35;
 }
@@ -1484,8 +1489,9 @@ onBeforeUnmount(() => {
   min-height: 0;
   overflow-y: scroll;
   overscroll-behavior: contain;
-  padding-right: 2cm;
-  scrollbar-color: color-mix(in srgb, var(--text) 28%, transparent) transparent;
+  padding-right: 2mm;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--text) 42%, transparent) transparent;
 }
 
 .main-bar {
@@ -1849,7 +1855,9 @@ onBeforeUnmount(() => {
   z-index: 4;
   display: flex;
   flex-direction: column;
-  width: auto;
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
   height: min(72%, 100%);
   max-height: 100%;
   padding: var(--space-3) var(--layout-pad)
