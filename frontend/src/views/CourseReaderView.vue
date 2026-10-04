@@ -843,7 +843,10 @@ onBeforeUnmount(() => {
 
         <nav ref="topicListRef" class="topic-list" :class="{ dragging }">
           <template v-for="(ch, ci) in chapters" :key="`${ch.book}:${ch.title}:${ci}`">
-            <template v-if="!hasBooks || (currentBook && ch.book === currentBook)">
+            <section
+              v-if="!hasBooks || (currentBook && ch.book === currentBook)"
+              class="chapter-group"
+            >
             <button
               v-if="ch.title"
               type="button"
@@ -859,8 +862,12 @@ onBeforeUnmount(() => {
               <span class="topic-title">{{ ch.title }}</span>
             </button>
 
+            <div
+              v-if="!ch.title || openChapter === ch.title"
+              class="chapter-lectures"
+            >
             <button
-              v-for="(l, li) in !ch.title || openChapter === ch.title ? ch.lectures : []"
+              v-for="(l, li) in ch.lectures"
               :key="l.id"
               type="button"
               class="topic topic-row"
@@ -879,7 +886,8 @@ onBeforeUnmount(() => {
               <span class="topic-title">{{ prettyCourseTitle(l.title) }}</span>
               <AppIcon v-if="lectureDone(l.id)" name="seen" :size="15" class="topic-done" />
             </button>
-            </template>
+            </div>
+            </section>
           </template>
           <p v-if="!lectures.length" class="side-empty muted">тем нет</p>
         </nav>
@@ -1217,8 +1225,8 @@ onBeforeUnmount(() => {
   align-items: flex-start;
   gap: 0.55rem;
   width: 100%;
-  min-height: 0;
-  padding: 0.85rem 0.7rem;
+  min-height: 2.75rem;
+  padding: 0.7rem 0.75rem;
   border: none;
   border-radius: var(--radius);
   background: transparent;
@@ -1227,6 +1235,7 @@ onBeforeUnmount(() => {
   line-height: 1.35;
   text-align: left;
   text-transform: lowercase;
+  overflow: visible;
 }
 
 .book {
@@ -1288,13 +1297,30 @@ onBeforeUnmount(() => {
 }
 
 .topic-list {
-  display: grid;
-  gap: 0.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.35rem;
   align-content: start;
   overflow-y: auto;
   overscroll-behavior: contain;
+  touch-action: pan-y;
   min-height: 0;
   flex: 1;
+  padding-bottom: 2.5rem;
+}
+
+.chapter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  flex-shrink: 0;
+}
+
+.chapter-lectures {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 0.15rem 0 0.15rem 0.35rem;
 }
 
 .topic {
@@ -1302,8 +1328,8 @@ onBeforeUnmount(() => {
   align-items: flex-start;
   gap: 0.55rem;
   width: 100%;
-  min-height: 0;
-  padding: 0.7rem 0.75rem;
+  min-height: 2.6rem;
+  padding: 0.65rem 0.75rem;
   border: none;
   border-radius: var(--radius);
   background: transparent;
@@ -1312,6 +1338,7 @@ onBeforeUnmount(() => {
   line-height: 1.35;
   text-align: left;
   text-transform: lowercase;
+  overflow: visible;
 }
 
 .topic:hover:not(.on) {
@@ -1907,21 +1934,26 @@ onBeforeUnmount(() => {
     bottom: 0;
     left: 0;
     z-index: 96;
-    width: min(86vw, 21rem);
+    width: 100%;
     max-height: none;
-    padding: var(--layout-pad) var(--layout-pad)
-      max(var(--layout-pad), env(safe-area-inset-bottom));
+    padding: var(--layout-pad) var(--layout-pad) 0;
     background: var(--bg);
-    border-right: 1px solid var(--border);
+    border-right: none;
     border-radius: 0;
     transform: translateX(-110%);
     transition: transform var(--dur-3) var(--ease-snap);
     pointer-events: none;
+    overflow: hidden;
   }
 
+  .topic-list {
+    gap: 1.35rem;
+    padding-bottom: max(2.5rem, env(safe-area-inset-bottom));
+  }
+
+  .chapter,
   .topic {
-    min-height: 2.75rem;
-    font-size: var(--text-md);
+    min-height: 3rem;
   }
 
   .reader-topics.open {
