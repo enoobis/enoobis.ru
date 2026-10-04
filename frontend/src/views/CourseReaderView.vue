@@ -253,14 +253,73 @@ function measureReaderTop() {
   el.style.setProperty("--reader-top", `${Math.round(top) + 24}px`);
 }
 
-/* клавиатура телефона не должна прятать поле ввода чата */
-function syncKeyboardInset() {
+type VirtualKeyboardHandle = {
+  overlaysContent: boolean;
+  boundingRect: DOMRectReadOnly;
+  addEventListener(type: "geometrychange", listener: () => void): void;
+  removeEventListener(type: "geometrychange", listener: () => void): void;
+};
+
+function virtualKeyboard(): VirtualKeyboardHandle | null {
+  const nav = navigator as Navigator & { virtualKeyboard?: VirtualKeyboardHandle };
+  return nav.virtualKeyboard ?? null;
+}
+
+let kbTimer = 0;
+let lastKb = -1;
+
+/* клавиатура перекрывает низ экрана: поднимаем чат на её высоту, как в chatgpt */
+function applyKeyboardInset() {
   const el = readerRef.value;
+  if (!el) return;
   const vv = window.visualViewport;
-  if (!el || !vv) return;
-  const inset = window.innerHeight - vv.height - vv.offsetTop;
-  /* меньше 120px — это схлопнувшаяся панель браузера, а не клавиатура */
-  el.style.setProperty("--kb", inset > 120 ? `${Math.round(inset)}px` : "0px");
+  const fromVv = vv ? Math.max(0, window.innerHeight - vv.offsetTop - vv.height) : 0;
+  const fromVk = virtualKeyboard()?.boundingRect.height ?? 0;
+  const overlap = Math.max(fromVv, fromVk);
+  const typing = document.activeElement === chatFieldRef.value;
+  const kb = typing && overlap > 60 ? Math.round(overlap) : 0;
+  const visible = Math.round(
+    Math.min(vv?.height ?? window.innerHeight, Math.max(1, window.innerHeight - kb)),
+  );
+  el.style.setProperty("--kb", `${kb}px`);
+  el.style.setProperty("--vvh", `${visible}px`);
+  if (kb !== lastKb) {
+    lastKb = kb;
+    if (kb) void scrollChatDown();
+  }
+}
+
+function onChatFieldFocus() {
+  const vk = virtualKeyboard();
+  if (vk) {
+    try {
+      vk.overlaysContent = true;
+    } catch {
+      /* safari не даёт переключить режим */
+    }
+  }
+  window.clearTimeout(kbTimer);
+  applyKeyboardInset();
+  window.setTimeout(applyKeyboardInset, 80);
+  window.setTimeout(() => {
+    applyKeyboardInset();
+    void scrollChatDown();
+  }, 320);
+}
+
+function onChatFieldBlur() {
+  window.clearTimeout(kbTimer);
+  kbTimer = window.setTimeout(() => {
+    const vk = virtualKeyboard();
+    if (vk) {
+      try {
+        vk.overlaysContent = false;
+      } catch {
+        /* safari */
+      }
+    }
+    applyKeyboardInset();
+  }, 160);
 }
 
 function scrollMainTop() {
@@ -745,16 +804,20 @@ onMounted(() => {
   void loadChat();
   syncReaderChrome();
   window.addEventListener("resize", measureReaderTop);
-  window.visualViewport?.addEventListener("resize", syncKeyboardInset);
-  window.visualViewport?.addEventListener("scroll", syncKeyboardInset);
+  window.visualViewport?.addEventListener("resize", applyKeyboardInset);
+  window.visualViewport?.addEventListener("scroll", applyKeyboardInset);
+  virtualKeyboard()?.addEventListener("geometrychange", applyKeyboardInset);
+  applyKeyboardInset();
 });
 
 onBeforeUnmount(() => {
   document.documentElement.classList.remove("course-reader", "reader-sheet");
   document.removeEventListener("keydown", onReaderKey);
   window.removeEventListener("resize", measureReaderTop);
-  window.visualViewport?.removeEventListener("resize", syncKeyboardInset);
-  window.visualViewport?.removeEventListener("scroll", syncKeyboardInset);
+  window.visualViewport?.removeEventListener("resize", applyKeyboardInset);
+  window.visualViewport?.removeEventListener("scroll", applyKeyboardInset);
+  virtualKeyboard()?.removeEventListener("geometrychange", applyKeyboardInset);
+  window.clearTimeout(kbTimer);
   endPress();
 });
 </script>
@@ -1133,6 +1196,8 @@ onBeforeUnmount(() => {
               rows="1"
               :disabled="!ai?.enabled || chatBusy"
               placeholder="?"
+              @focus="onChatFieldFocus"
+              @blur="onChatFieldBlur"
               @keydown="onChatKeydown"
             />
             <button
@@ -1850,7 +1915,7 @@ onBeforeUnmount(() => {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 0;
+  bottom: max(var(--kb, 0px), env(keyboard-inset-height, 0px));
   top: auto;
   z-index: 4;
   display: flex;
@@ -1858,10 +1923,9 @@ onBeforeUnmount(() => {
   width: 100%;
   max-width: none;
   box-sizing: border-box;
-  height: min(72%, 100%);
-  max-height: 100%;
-  padding: var(--space-3) var(--layout-pad)
-    calc(max(var(--space-3), env(safe-area-inset-bottom)) + var(--kb, 0px));
+  height: min(72%, var(--vvh, 100%));
+  max-height: var(--vvh, 100%);
+  padding: var(--space-3) var(--layout-pad) max(var(--space-3), env(safe-area-inset-bottom));
   background: var(--bg);
   border: 1px solid var(--border);
   border-bottom: none;
@@ -2051,17 +2115,16 @@ onBeforeUnmount(() => {
     position: fixed;
     left: 0;
     right: 0;
-    bottom: 0;
+    bottom: max(var(--kb, 0px), env(keyboard-inset-height, 0px));
     top: auto;
     z-index: 96;
     display: flex;
     flex-direction: column;
     width: auto;
-    height: min(78dvh, calc(100dvh - 3.5rem));
-    max-height: calc(100dvh - 3.5rem);
+    height: min(78dvh, var(--vvh, 100dvh));
+    max-height: var(--vvh, 100dvh);
     /* без translate: закрытая шторка не растягивает страницу пустым полем */
-    padding: var(--space-3) var(--layout-pad)
-      calc(max(var(--space-3), env(safe-area-inset-bottom)) + var(--kb, 0px));
+    padding: var(--space-3) var(--layout-pad) max(var(--space-3), env(safe-area-inset-bottom));
     background: var(--bg);
     border: 1px solid var(--border);
     border-bottom: none;
