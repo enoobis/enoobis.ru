@@ -1434,7 +1434,7 @@ onBeforeUnmount(() => {
   gap: 0.85rem;
   min-width: 0;
   width: 100%;
-  max-width: clamp(46rem, 28rem + 28vw, 84rem);
+  max-width: none;
   margin: 0;
   padding-bottom: var(--space-8);
 }
