@@ -1354,9 +1354,10 @@ onBeforeUnmount(() => {
   min-height: 0;
   flex: 1;
   padding-bottom: 2.5rem;
+  padding-left: 2cm;
   /* ползунок у левого края колонки глав */
   direction: rtl;
-  scrollbar-color: var(--text) transparent;
+  scrollbar-color: color-mix(in srgb, var(--text) 28%, transparent) transparent;
 }
 
 .topic-list > * {
@@ -1365,14 +1366,14 @@ onBeforeUnmount(() => {
 
 .topic-list::-webkit-scrollbar,
 .reader-scroll::-webkit-scrollbar {
-  width: 8px;
+  width: 6px;
 }
 
 .topic-list::-webkit-scrollbar-thumb,
 .reader-scroll::-webkit-scrollbar-thumb,
 .topic-list::-webkit-scrollbar-thumb:hover,
 .reader-scroll::-webkit-scrollbar-thumb:hover {
-  background: var(--text);
+  background: color-mix(in srgb, var(--text) 28%, transparent);
 }
 
 .chapter-group {
@@ -1413,13 +1414,13 @@ onBeforeUnmount(() => {
 }
 
 .topic.on {
-  background: var(--text);
-  color: var(--bg);
+  background: transparent;
+  color: var(--text);
 }
 
 .topic.on .topic-num,
 .topic.on .topic-done {
-  color: var(--bg);
+  color: var(--text);
 }
 
 .topic.movable {
@@ -1493,7 +1494,8 @@ onBeforeUnmount(() => {
   min-height: 0;
   overflow-y: scroll;
   overscroll-behavior: contain;
-  scrollbar-color: var(--text) transparent;
+  padding-right: 2cm;
+  scrollbar-color: color-mix(in srgb, var(--text) 28%, transparent) transparent;
 }
 
 .main-bar {
