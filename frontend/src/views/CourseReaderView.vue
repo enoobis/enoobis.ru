@@ -1350,12 +1350,31 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: 1.35rem;
   align-content: start;
-  overflow-y: auto;
+  overflow-y: scroll;
   overscroll-behavior: contain;
   touch-action: pan-y;
   min-height: 0;
   flex: 1;
   padding-bottom: 2.5rem;
+  /* ползунок у левого края колонки глав */
+  direction: rtl;
+  scrollbar-color: var(--text) transparent;
+}
+
+.topic-list > * {
+  direction: ltr;
+}
+
+.topic-list::-webkit-scrollbar,
+.reader-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.topic-list::-webkit-scrollbar-thumb,
+.reader-scroll::-webkit-scrollbar-thumb,
+.topic-list::-webkit-scrollbar-thumb:hover,
+.reader-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--text);
 }
 
 .chapter-group {
@@ -1474,8 +1493,9 @@ onBeforeUnmount(() => {
 .reader-scroll {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
+  overflow-y: scroll;
   overscroll-behavior: contain;
+  scrollbar-color: var(--text) transparent;
 }
 
 .main-bar {
