@@ -561,7 +561,7 @@ h1 {
   padding: 1.15rem 1.25rem;
   width: max-content;
   max-width: 100%;
-  overflow-x: auto;
+  overflow-x: hidden;
   margin: 1rem 0;
   background: var(--surface);
 }
@@ -570,8 +570,8 @@ h1 {
   border-radius: 0;
   padding: 0;
   background: transparent;
-  white-space: pre;
-  overflow-wrap: normal;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .markdown-body :deep(code) {
   font-family: var(--mono);

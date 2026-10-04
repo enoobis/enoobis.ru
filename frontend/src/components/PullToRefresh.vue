@@ -117,7 +117,7 @@ onUnmounted(() => {
     <div
       class="ptr-slot"
       :class="{ settle: !dragging, live: dragging || refreshing }"
-      :style="{ transform: `translateY(${offset}px)` }"
+      :style="offset ? { transform: `translateY(${offset}px)` } : undefined"
     >
       <div
         v-if="offset > 1"

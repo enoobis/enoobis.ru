@@ -813,14 +813,14 @@ onBeforeUnmount(() => {
   padding: 1.15rem 1.25rem;
   width: max-content;
   max-width: 100%;
-  overflow-x: auto;
+  overflow-x: hidden;
 }
 .markdown-preview :deep(pre code) {
   background: transparent;
   padding: 0;
   border-radius: 0;
-  white-space: pre;
-  overflow-wrap: normal;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .markdown-preview :deep(img) {
   max-width: 100%;

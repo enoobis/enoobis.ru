@@ -833,14 +833,14 @@ useProfileOwnerThemeFromValue(() => profile.value?.theme_preference);
   padding: 1.15rem 1.25rem;
   width: max-content;
   max-width: 100%;
-  overflow-x: auto;
+  overflow-x: hidden;
   margin: 0.6rem 0;
 }
 .readme :deep(pre code) {
   background: none;
   padding: 0;
-  white-space: pre;
-  overflow-wrap: normal;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .ach {

@@ -133,7 +133,7 @@ const html = computed(() => {
   border-radius: var(--radius);
   width: max-content;
   max-width: 100%;
-  overflow-x: auto;
+  overflow-x: hidden;
   background: var(--surface);
 }
 .markdown-body :deep(pre code),
@@ -141,8 +141,8 @@ const html = computed(() => {
   border-radius: 0;
   background: transparent;
   padding: 0;
-  white-space: pre;
-  overflow-wrap: normal;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .markdown-body :deep(code) {
   font-family: var(--mono);

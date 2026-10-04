@@ -269,6 +269,7 @@ function openBook(title: string) {
 }
 
 function showFolders() {
+  chatOpen.value = false;
   if (activeChapter.value) openChapter.value = activeChapter.value;
   topicsOpen.value = true;
 }
@@ -627,6 +628,7 @@ async function scrollChatDown() {
 }
 
 async function openChat() {
+  topicsOpen.value = false;
   chatOpen.value = true;
   await nextTick();
   chatFieldRef.value?.focus();
@@ -718,6 +720,9 @@ function onReaderKey(e: KeyboardEvent) {
 watch(catalogMode, syncReaderChrome);
 watch(activeId, syncReaderChrome);
 watch(classroom, syncReaderChrome);
+watch([chatOpen, topicsOpen], ([chat, topics]) => {
+  document.documentElement.classList.toggle("reader-sheet", chat || topics);
+});
 
 onMounted(() => {
   document.addEventListener("keydown", onReaderKey);
@@ -731,7 +736,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
-  document.documentElement.classList.remove("course-reader");
+  document.documentElement.classList.remove("course-reader", "reader-sheet");
   document.removeEventListener("keydown", onReaderKey);
   window.removeEventListener("resize", measureReaderTop);
   window.visualViewport?.removeEventListener("resize", syncKeyboardInset);
@@ -887,7 +892,7 @@ onBeforeUnmount(() => {
             type="button"
             class="filter-icon-btn only-narrow"
             aria-label="темы"
-            @click="topicsOpen = true"
+            @click="chatOpen = false; topicsOpen = true"
           >
             <AppIcon name="list" :size="18" />
           </button>
@@ -1787,6 +1792,8 @@ onBeforeUnmount(() => {
   border-radius: var(--radius);
   border: 1px solid var(--border);
   min-width: 0;
+  color: var(--text);
+  overflow-wrap: anywhere;
 }
 
 .bubble.mine {
@@ -1904,23 +1911,23 @@ onBeforeUnmount(() => {
     bottom: 0;
     top: auto;
     z-index: 96;
+    display: flex;
+    flex-direction: column;
     width: auto;
-    height: 86dvh;
-    max-height: calc(100dvh - 2.5rem);
-    /* шторка всегда прижата к низу, клавиатура поднимает только содержимое */
+    height: min(78dvh, calc(100dvh - 3.5rem));
+    max-height: calc(100dvh - 3.5rem);
+    /* без translate: закрытая шторка не растягивает страницу пустым полем */
     padding: var(--space-3) var(--layout-pad)
       calc(max(var(--space-3), env(safe-area-inset-bottom)) + var(--kb, 0px));
     background: var(--bg);
     border: 1px solid var(--border);
     border-bottom: none;
     border-radius: calc(var(--radius) + 6px) calc(var(--radius) + 6px) 0 0;
-    transform: translateY(110%);
-    transition: transform var(--dur-3) var(--ease-snap);
+    transform: none;
     visibility: hidden;
   }
 
   .reader-chat.open {
-    transform: translateY(0);
     visibility: visible;
     pointer-events: auto;
   }

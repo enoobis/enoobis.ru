@@ -1116,6 +1116,13 @@ html.course-reader body {
   overflow-x: clip;
 }
 
+@media (max-width: 1024px) {
+  html.reader-sheet,
+  html.reader-sheet body {
+    overflow: hidden;
+  }
+}
+
 @media (min-width: 1025px) {
   html.course-reader .layout {
     padding-left: 1.5rem;
@@ -1658,16 +1665,14 @@ html[data-theme="contrast-white"] .glass {
   }
 }
 
-/* кольцо от currentColor: на белой кнопке тёмное, на тёмной — светлое */
+/* знак сайта. маска, не картинка: на белой кнопке тёмный, на тёмной — светлый */
 .spinner {
-  width: 16px;
-  height: 16px;
-  box-sizing: border-box;
-  border: 2px solid currentColor;
-  border-right-color: transparent;
-  border-radius: 50%;
-  background: none;
+  width: 18px;
+  height: 18px;
   display: inline-block;
+  background: currentColor;
+  -webkit-mask: url("/favicon.png") center / contain no-repeat;
+  mask: url("/favicon.png") center / contain no-repeat;
   animation: spin 0.7s linear infinite;
   vertical-align: middle;
 }
