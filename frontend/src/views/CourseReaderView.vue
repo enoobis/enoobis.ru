@@ -147,6 +147,8 @@ const catalogMode = computed(
   () => !!classroom.value && hasBooks.value && !currentBook.value && !activeId.value,
 );
 
+/* содержание книги — тот же список по центру, без второй копии слева */
+
 const bookLectures = computed(() => {
   if (!currentBook.value) return lectures.value;
   return lectures.value.filter((l) => (l.book ?? "").trim() === currentBook.value);
@@ -434,7 +436,7 @@ function onReaderBack() {
 }
 
 function syncReaderChrome() {
-  const reading = !!classroom.value && !catalogMode.value;
+  const reading = !!classroom.value && !!activeId.value;
   document.documentElement.classList.toggle("course-reader", reading);
   if (reading) void nextTick(measureReaderTop);
 }
@@ -699,6 +701,7 @@ function onReaderKey(e: KeyboardEvent) {
 }
 
 watch(catalogMode, syncReaderChrome);
+watch(activeId, syncReaderChrome);
 watch(classroom, syncReaderChrome);
 
 onMounted(() => {
@@ -752,7 +755,52 @@ onBeforeUnmount(() => {
       </section>
     </template>
 
-    <template v-else-if="classroom">
+    <template v-else-if="classroom && !activeLecture">
+      <section class="catalog page-shell">
+        <PageHeader :title="prettyCourseTitle(currentBook || classroom.course.title)">
+          <template #back>
+            <button
+              type="button"
+              class="filter-icon-btn"
+              :aria-label="currentBook ? 'к списку' : 'к курсам'"
+              @click="currentBook ? openContents() : exitReader()"
+            >
+              <AppIcon name="back" :size="18" />
+            </button>
+          </template>
+          <template v-if="bookLectures[0]" #actions>
+            <button type="button" class="contents-start" @click="openLecture(bookLectures[0].id)">
+              читать
+            </button>
+          </template>
+        </PageHeader>
+        <p v-if="!lectures.length" class="page-empty">тем нет</p>
+        <template v-else>
+          <section
+            v-for="(ch, ci) in contentsChapters"
+            :key="ch.title || ci"
+            class="toc-block"
+          >
+            <h2 v-if="ch.title" class="toc-chapter">{{ prettyCourseTitle(ch.title) }}</h2>
+            <ul class="list">
+              <li
+                v-for="l in ch.lectures"
+                :key="l.id"
+                class="catalog-hit"
+                @click="openLecture(l.id)"
+              >
+                <button type="button" class="catalog-row">
+                  <span class="catalog-row-title">{{ prettyCourseTitle(l.title) }}</span>
+                  <AppIcon v-if="lectureDone(l.id)" name="seen" :size="15" class="topic-done" />
+                </button>
+              </li>
+            </ul>
+          </section>
+        </template>
+      </section>
+    </template>
+
+    <template v-else-if="classroom && activeLecture">
     <div class="reader-grid">
       <!-- темы -->
       <aside class="reader-topics" :class="{ open: topicsOpen }">
@@ -761,7 +809,7 @@ onBeforeUnmount(() => {
             <AppIcon name="back" :size="18" />
           </button>
           <button type="button" class="side-title side-title-btn" @click="onSideTitleClick">
-            {{ activeLecture && currentBook ? currentBook : classroom.course.title }}
+            {{ prettyCourseTitle(activeLecture && currentBook ? currentBook : classroom.course.title) }}
           </button>
           <button
             type="button"
@@ -880,8 +928,8 @@ onBeforeUnmount(() => {
           </div>
         </form>
 
-        <article v-else-if="activeLecture" class="lecture">
-          <h1 class="lecture-title">{{ activeLecture.title }}</h1>
+        <article v-else class="lecture">
+          <h1 class="lecture-title">{{ prettyCourseTitle(activeLecture.title) }}</h1>
 
           <template v-for="ev in [videoEmbed(activeLecture.video_url)]" :key="activeLecture.id">
             <div v-if="ev" class="lecture-video">
@@ -988,42 +1036,6 @@ onBeforeUnmount(() => {
             <span v-else />
           </nav>
         </article>
-
-        <article v-else-if="lectures.length" class="lecture contents">
-          <header class="contents-head">
-            <h1 class="lecture-title">{{ currentBook || classroom.course.title }}</h1>
-            <button
-              v-if="bookLectures[0]"
-              type="button"
-              class="contents-start"
-              @click="openLecture(bookLectures[0].id)"
-            >
-              читать
-            </button>
-          </header>
-          <div class="contents-chapters">
-            <section
-              v-for="(ch, ci) in contentsChapters"
-              :key="ch.title || ci"
-              class="contents-chapter"
-            >
-              <h3 v-if="ch.title" class="contents-chapter-title">{{ prettyCourseTitle(ch.title) }}</h3>
-              <button
-                v-for="(l, n) in ch.lectures"
-                :key="l.id"
-                type="button"
-                class="contents-topic"
-                @click="openLecture(l.id)"
-              >
-                <span class="contents-num muted">{{ n + 1 }}</span>
-                <span class="topic-title">{{ prettyCourseTitle(l.title) }}</span>
-                <AppIcon v-if="lectureDone(l.id)" name="seen" :size="15" class="topic-done" />
-              </button>
-            </section>
-          </div>
-        </article>
-
-        <p v-else class="page-empty">тем нет</p>
       </main>
     </div>
 
@@ -1426,6 +1438,7 @@ onBeforeUnmount(() => {
   font-weight: 600;
   letter-spacing: -0.02em;
   line-height: 1.25;
+  overflow-wrap: anywhere;
   text-transform: lowercase;
 }
 
@@ -1529,81 +1542,33 @@ onBeforeUnmount(() => {
 }
 
 .catalog-row-title {
+  min-width: 0;
   font-weight: 500;
   font-size: var(--text-md);
+  overflow-wrap: anywhere;
 }
 
-.contents-head {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  flex-wrap: wrap;
+.toc-block + .toc-block {
+  margin-top: 1.35rem;
+}
+
+.toc-chapter {
+  margin: 0;
+  padding-top: 0.35rem;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--muted);
+  text-transform: lowercase;
+}
+
+.catalog-row .topic-done {
+  margin-left: auto;
+  color: var(--muted);
 }
 
 .contents-start {
   padding: 0.45rem 1.1rem;
   border-radius: var(--radius-pill);
-}
-
-.contents-chapters {
-  display: grid;
-  gap: 1.15rem 2.5rem;
-  grid-template-columns: 1fr;
-  align-items: start;
-}
-
-@media (min-width: 1100px) {
-  .contents-chapters {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (min-width: 1800px) {
-  .contents-chapters {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-.contents-chapter {
-  display: grid;
-  gap: 0.04rem;
-  margin: 0;
-}
-
-.contents-chapter-title {
-  margin: 0 0 0.35rem;
-  font-size: var(--text-sm);
-  font-weight: 500;
-  color: var(--muted);
-  text-transform: lowercase;
-}
-
-.contents-topic {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  width: 100%;
-  min-height: 0;
-  padding: 0.22rem 0;
-  border: none;
-  border-radius: 0;
-  background: transparent;
-  color: var(--text);
-  font-size: var(--text-md);
-  text-align: left;
-  text-transform: lowercase;
-}
-
-.contents-num {
-  flex-shrink: 0;
-  width: 1.15rem;
-  font-size: var(--text-sm);
-  font-variant-numeric: tabular-nums;
-}
-
-.contents-topic:hover {
-  background: transparent;
-  color: var(--muted);
 }
 
 .lecture-video {

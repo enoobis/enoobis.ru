@@ -55,7 +55,9 @@ export function healBrokenWords(raw) {
 function segmentToken(token) {
   let t = token;
   const low0 = t.toLowerCase();
-  if (t.length >= 5 && low0[0] === low0[1] && WORDS.has(low0.slice(1))) t = t.slice(1);
+  if (t.length >= 5 && low0[0] === low0[1] && !WORDS.has(low0) && WORDS.has(low0.slice(1))) {
+    t = t.slice(1);
+  }
   const low = t.toLowerCase();
   if (WORDS.has(low) || t.length < 6) return t;
   const parts = [];
