@@ -1097,77 +1097,74 @@ onBeforeUnmount(() => {
           </button>
           <span v-else class="lecture-nav-slot" aria-hidden="true" />
         </nav>
+        <aside class="reader-chat" :class="{ open: chatOpen }" :inert="!chatOpen">
+          <header class="side-head chat-head">
+            <span class="chat-grabber" aria-hidden="true" />
+            <div class="chat-titles">
+              <span class="side-title">ии чат</span>
+              <span v-if="activeLecture" class="chat-topic muted">
+                по теме: {{ activeLecture.title }}
+              </span>
+            </div>
+            <button
+              v-if="chat.length"
+              type="button"
+              class="filter-icon-btn"
+              aria-label="очистить"
+              @click="clearChat"
+            >
+              <AppIcon name="clear" :size="18" />
+            </button>
+            <button
+              type="button"
+              class="filter-icon-btn"
+              aria-label="закрыть"
+              @click="chatOpen = false"
+            >
+              <AppIcon name="close" :size="18" />
+            </button>
+          </header>
+
+          <div ref="chatBodyRef" class="chat-body">
+            <p v-if="!ai?.enabled" class="chat-hint muted">чат выключен</p>
+            <p v-else-if="!chat.length" class="chat-hint muted">спроси по этой теме</p>
+            <div
+              v-for="(m, i) in chat"
+              :key="i"
+              class="bubble"
+              :class="m.role === 'user' ? 'mine' : 'ai'"
+            >
+              <MarkdownText :text="m.text" />
+            </div>
+            <p v-if="chatBusy" class="chat-hint muted">думает…</p>
+            <p v-if="chatErr" class="chat-hint">{{ chatErr }}</p>
+          </div>
+
+          <form class="chat-form" @submit.prevent="sendChat">
+            <textarea
+              ref="chatFieldRef"
+              v-model="chatInput"
+              rows="1"
+              :disabled="!ai?.enabled || chatBusy"
+              placeholder="?"
+              @keydown="onChatKeydown"
+            />
+            <button
+              type="submit"
+              class="filter-icon-btn"
+              aria-label="отправить"
+              :disabled="!ai?.enabled || chatBusy || !chatInput.trim()"
+            >
+              <AppIcon name="send" :size="18" />
+            </button>
+          </form>
+        </aside>
       </main>
     </div>
 
-      <!-- чат -->
-      <aside class="reader-chat" :class="{ open: chatOpen }" :inert="!chatOpen">
-        <header class="side-head chat-head">
-          <span class="chat-grabber" aria-hidden="true" />
-          <div class="chat-titles">
-            <span class="side-title">ии чат</span>
-            <span v-if="activeLecture" class="chat-topic muted">
-              по теме: {{ activeLecture.title }}
-            </span>
-          </div>
-          <button
-            v-if="chat.length"
-            type="button"
-            class="filter-icon-btn"
-            aria-label="очистить"
-            @click="clearChat"
-          >
-            <AppIcon name="clear" :size="18" />
-          </button>
-          <button
-            type="button"
-            class="filter-icon-btn"
-            aria-label="закрыть"
-            @click="chatOpen = false"
-          >
-            <AppIcon name="close" :size="18" />
-          </button>
-        </header>
-
-        <div ref="chatBodyRef" class="chat-body">
-          <p v-if="!ai?.enabled" class="chat-hint muted">чат выключен</p>
-          <p v-else-if="!chat.length" class="chat-hint muted">спроси по этой теме</p>
-          <div
-            v-for="(m, i) in chat"
-            :key="i"
-            class="bubble"
-            :class="m.role === 'user' ? 'mine' : 'ai'"
-          >
-            <MarkdownText :text="m.text" />
-          </div>
-          <p v-if="chatBusy" class="chat-hint muted">думает…</p>
-          <p v-if="chatErr" class="chat-hint">{{ chatErr }}</p>
-        </div>
-
-        <form class="chat-form" @submit.prevent="sendChat">
-          <textarea
-            ref="chatFieldRef"
-            v-model="chatInput"
-            rows="1"
-            :disabled="!ai?.enabled || chatBusy"
-            placeholder="?"
-            @keydown="onChatKeydown"
-          />
-          <button
-            type="submit"
-            class="filter-icon-btn"
-            aria-label="отправить"
-            :disabled="!ai?.enabled || chatBusy || !chatInput.trim()"
-          >
-            <AppIcon name="send" :size="18" />
-          </button>
-        </form>
-      </aside>
-
     <div
       v-if="topicsOpen || chatOpen"
-      class="panel-backdrop"
-      :class="{ 'only-narrow': !chatOpen }"
+      class="panel-backdrop only-narrow"
       @click="topicsOpen = false; chatOpen = false"
     />
     </template>
@@ -1210,6 +1207,7 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   justify-self: stretch;
+  position: relative;
   width: 100%;
   max-width: none;
   height: 100%;
@@ -1851,26 +1849,26 @@ onBeforeUnmount(() => {
 
 /* ---------- чат ---------- */
 
-/* чат снизу, как на телефоне: главы и меню остаются */
+/* чат только над текстом, главы слева не закрывает */
 .reader-chat {
-  position: fixed;
-  left: 50%;
-  right: auto;
+  position: absolute;
+  left: 0;
+  right: 0;
   bottom: 0;
   top: auto;
-  z-index: 96;
+  z-index: 4;
   display: flex;
   flex-direction: column;
-  width: min(100%, calc(18rem + 2.5rem + 42rem));
-  height: min(70dvh, calc(100dvh - 4.5rem));
-  max-height: calc(100dvh - 4.5rem);
+  width: auto;
+  height: min(72%, 100%);
+  max-height: 100%;
   padding: var(--space-3) var(--layout-pad)
     calc(max(var(--space-3), env(safe-area-inset-bottom)) + var(--kb, 0px));
   background: var(--bg);
   border: 1px solid var(--border);
   border-bottom: none;
   border-radius: calc(var(--radius) + 6px) calc(var(--radius) + 6px) 0 0;
-  transform: translateX(-50%);
+  transform: none;
   visibility: hidden;
   pointer-events: none;
 }
