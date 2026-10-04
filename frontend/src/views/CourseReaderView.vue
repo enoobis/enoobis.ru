@@ -110,8 +110,19 @@ const hasBooks = computed(() => chapters.value.some((c) => c.book));
 const activeChapter = computed(() => prettyCourseTitle((activeLecture.value?.chapter ?? "").trim()));
 const openChapter = ref("");
 
+function chapterIndex(ch: Chapter): number {
+  return chapters.value.findIndex((c) => c.offset === ch.offset);
+}
+
 function toggleChapter(title: string) {
-  openChapter.value = openChapter.value === title ? "" : title;
+  const opening = openChapter.value !== title;
+  openChapter.value = opening ? title : "";
+  if (!opening) return;
+  const ch = chapters.value.find(
+    (c) => c.title === title && (!currentBook.value || c.book === currentBook.value),
+  );
+  const first = ch?.lectures[0];
+  if (first && first.id !== activeId.value) openLecture(first.id);
 }
 
 const contentBooks = computed(() => {
@@ -205,7 +216,23 @@ async function load() {
     classroom.value = await getClassroom(courseId.value, auth.token);
     const wanted = String(route.query.lecture ?? "");
     const exists = classroom.value.lectures.some((l) => l.id === wanted);
-    activeId.value = exists ? wanted : "";
+    if (exists) {
+      activeId.value = wanted;
+    } else {
+      const book = queryString("book");
+      const first = book
+        ? classroom.value.lectures.find((l) => (l.book ?? "").trim() === book)
+        : classroom.value.lectures[0];
+      if (first) {
+        activeId.value = first.id;
+        const q: Record<string, string> = { lecture: first.id };
+        const b = (first.book ?? "").trim();
+        if (b) q.book = b;
+        void router.replace({ query: q });
+      } else {
+        activeId.value = "";
+      }
+    }
     if (activeChapter.value) openChapter.value = activeChapter.value;
   } catch (e) {
     err.value = errorText(e);
@@ -255,6 +282,7 @@ function openLecture(id: string) {
 }
 
 function openBook(title: string) {
+  if ((activeLecture.value?.book ?? "").trim() === title) return;
   forceCatalog.value = false;
   const first = lectures.value.find((l) => (l.book ?? "").trim() === title);
   if (first) {
@@ -292,10 +320,6 @@ function openContents() {
   openChapter.value = "";
   void router.replace({ query: {} });
   scrollMainTop();
-}
-
-function onSideTitleClick() {
-  openContents();
 }
 
 /* ---------- перетаскивание тем (преподаватель) ---------- */
@@ -443,10 +467,6 @@ function exitReader() {
 }
 
 function onReaderBack() {
-  if (hasBooks.value && (activeId.value || currentBook.value)) {
-    openContents();
-    return;
-  }
   exitReader();
 }
 
@@ -828,9 +848,7 @@ onBeforeUnmount(() => {
           <button type="button" class="filter-icon-btn" aria-label="назад" @click="onReaderBack">
             <AppIcon name="back" :size="18" />
           </button>
-          <button type="button" class="side-title side-title-btn" @click="onSideTitleClick">
-            {{ prettyCourseTitle(activeLecture && currentBook ? currentBook : classroom.course.title) }}
-          </button>
+          <span class="side-title">{{ prettyCourseTitle(classroom.course.title) }}</span>
           <button
             type="button"
             class="filter-icon-btn only-narrow"
@@ -842,52 +860,65 @@ onBeforeUnmount(() => {
         </header>
 
         <nav ref="topicListRef" class="topic-list" :class="{ dragging }">
-          <template v-for="(ch, ci) in chapters" :key="`${ch.book}:${ch.title}:${ci}`">
-            <section
-              v-if="!hasBooks || (currentBook && ch.book === currentBook)"
-              class="chapter-group"
-            >
-            <button
-              v-if="ch.title"
-              type="button"
-              class="chapter"
-              :class="{ on: openChapter === ch.title, nested: hasBooks }"
-              @click="toggleChapter(ch.title)"
-            >
-              <AppIcon
-                :name="openChapter === ch.title ? 'folderOpen' : 'folder'"
-                :size="16"
-                class="chapter-folder"
-              />
-              <span class="topic-title">{{ ch.title }}</span>
-            </button>
-
-            <div
-              v-if="!ch.title || openChapter === ch.title"
-              class="chapter-lectures"
-            >
-            <button
-              v-for="(l, li) in ch.lectures"
-              :key="l.id"
-              type="button"
-              class="topic topic-row"
-              :class="{
-                on: l.id === activeLecture?.id,
-                held: dragChapter === ci && dragIndex === li,
-                landed: l.id === landedId,
-                movable: isTeacher,
-                nested: !!ch.title,
-              }"
-              :data-chapter="ci"
-              @pointerdown="onTopicPointerDown($event, li, ci)"
-              @click="onTopicClick(l.id)"
-            >
-              <span class="topic-num muted">{{ li + 1 }}</span>
-              <span class="topic-title">{{ prettyCourseTitle(l.title) }}</span>
-              <AppIcon v-if="lectureDone(l.id)" name="seen" :size="15" class="topic-done" />
-            </button>
+          <template v-for="(book, bi) in contentBooks" :key="`${book.title}:${bi}`">
+            <div class="book-block">
+              <button
+                v-if="book.title"
+                type="button"
+                class="book"
+                :class="{ on: book.title === currentBook }"
+                @click="openBook(book.title)"
+              >
+                <span class="topic-title">{{ prettyCourseTitle(book.title) }}</span>
+              </button>
+              <div v-if="!book.title || book.title === currentBook" class="book-body">
+                <section
+                  v-for="ch in book.chapters"
+                  :key="`${ch.book}:${ch.title}:${ch.offset}`"
+                  class="chapter-group"
+                >
+                  <button
+                    v-if="ch.title"
+                    type="button"
+                    class="chapter"
+                    :class="{ on: openChapter === ch.title, nested: !!book.title }"
+                    @click="toggleChapter(ch.title)"
+                  >
+                    <AppIcon
+                      :name="openChapter === ch.title ? 'folderOpen' : 'folder'"
+                      :size="16"
+                      class="chapter-folder"
+                    />
+                    <span class="topic-title">{{ ch.title }}</span>
+                  </button>
+                  <div
+                    v-if="!ch.title || openChapter === ch.title"
+                    class="chapter-lectures"
+                  >
+                    <button
+                      v-for="(l, li) in ch.lectures"
+                      :key="l.id"
+                      type="button"
+                      class="topic topic-row"
+                      :class="{
+                        on: l.id === activeLecture?.id,
+                        held: dragChapter === chapterIndex(ch) && dragIndex === li,
+                        landed: l.id === landedId,
+                        movable: isTeacher,
+                        nested: !!ch.title,
+                      }"
+                      :data-chapter="chapterIndex(ch)"
+                      @pointerdown="onTopicPointerDown($event, li, chapterIndex(ch))"
+                      @click="onTopicClick(l.id)"
+                    >
+                      <span class="topic-num muted">{{ li + 1 }}</span>
+                      <span class="topic-title">{{ prettyCourseTitle(l.title) }}</span>
+                      <AppIcon v-if="lectureDone(l.id)" name="seen" :size="15" class="topic-done" />
+                    </button>
+                  </div>
+                </section>
+              </div>
             </div>
-            </section>
           </template>
           <p v-if="!lectures.length" class="side-empty muted">тем нет</p>
         </nav>
@@ -1176,7 +1207,7 @@ onBeforeUnmount(() => {
 .reader-main {
   display: flex;
   flex-direction: column;
-  justify-self: start;
+  justify-self: center;
   width: min(100%, 42rem);
   max-width: 42rem;
   height: 100%;
@@ -1243,20 +1274,21 @@ onBeforeUnmount(() => {
 
 .book {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.4rem;
   width: 100%;
-  min-height: 0;
-  margin-top: 0.5rem;
-  padding: 0.55rem 0.5rem;
+  min-height: 2.6rem;
+  margin-top: 0;
+  padding: 0.6rem 0.65rem;
   border: none;
   border-radius: var(--radius);
   background: transparent;
-  color: var(--text);
-  font-size: var(--text-sm);
+  color: var(--muted);
+  font-size: 1rem;
   font-weight: 500;
   text-align: left;
   text-transform: lowercase;
+  overflow: visible;
 }
 
 .book:first-child {
@@ -1269,8 +1301,20 @@ onBeforeUnmount(() => {
 }
 
 .book.on {
-  background: var(--text);
-  color: var(--bg);
+  background: transparent;
+  color: var(--text);
+}
+
+.book-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.book-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
 }
 
 .chapter.on {
