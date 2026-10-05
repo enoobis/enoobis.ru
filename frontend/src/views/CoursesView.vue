@@ -12,8 +12,6 @@ import {
   deleteAssignment,
   deleteCourse,
   deleteLecture,
-  enrollCourse,
-  joinCourseByCode,
   getClassroom,
   setCoursePinned,
   gradeSubmission,
@@ -22,9 +20,8 @@ import {
   patchAssignment,
   patchLecture,
   removeCoTeacher,
-  setClosedStudents,
+  reorderLectures,
   submitAssignment,
-  unenrollCourse,
   updateCourse,
   uploadCourseIcon,
   uploadLectureAttachment,
@@ -103,10 +100,6 @@ const courseSearchChip = computed(() => {
 const title = ref("");
 const description = ref("");
 const createIconFile = ref<File | null>(null);
-const isOpen = ref(true);
-const studentsDraft = ref("");
-const joinCode = ref("");
-const activeClosedId = ref<string | null>(null);
 
 const streamBody = ref("");
 const assignmentTitle = ref("");
@@ -128,6 +121,8 @@ const teacherGradebookError = ref("");
 const teacherGradebookLoadedFor = ref("");
 
 const lectureTitle = ref("");
+const lectureBook = ref("");
+const lectureChapter = ref("");
 const lectureBody = ref("");
 const lectureVideoUrl = ref("");
 const lecturePendingFiles = ref<{ file_name: string; url: string }[]>([]);
@@ -136,6 +131,8 @@ const lectureUploading = ref(false);
 type LectureEditDraft = {
   id: string;
   title: string;
+  book: string;
+  chapter: string;
   body_text: string;
   video_url: string;
   attachments: { file_name: string; url: string }[];
@@ -225,25 +222,9 @@ const classroomLearners = computed(() => {
 const coTeacherNick = ref("");
 const coTeacherBusy = ref(false);
 
-function isCoTeacherOf(c: Course) {
-  return !!auth.user && c.co_teachers.some((co) => co.id === auth.user!.id);
-}
-
-function canLeaveFromCourse(c: Course): boolean {
-  if (!auth.user) return false;
-  return (
-    c.enrolled && c.teacher_id !== auth.user.id && !isCoTeacherOf(c)
-  );
-}
-
 function closeCourseMenu(ev: Event) {
   const el = ev.currentTarget as HTMLElement | null;
   el?.closest("details.course-menu")?.removeAttribute("open");
-}
-
-function copyCourseCode(c: Course, ev: Event) {
-  closeCourseMenu(ev);
-  void navigator.clipboard?.writeText(c.course_code);
 }
 
 async function onAddCoTeacher() {
@@ -346,7 +327,7 @@ function openCategory(title: string) {
   activeCategory.value = title;
 }
 
-/** название, описание, иконка, приватность — владелец или админ */
+/** название, описание, иконка — владелец или админ */
 function canEditCourseMeta(c: Course) {
   if (!auth.token || !canTeach.value) return false;
   return c.teacher_id === auth.user?.id || auth.role === "admin";
@@ -361,7 +342,6 @@ function canTogglePin(c: Course) {
 const editingCourseId = ref("");
 const editTitle = ref("");
 const editDescription = ref("");
-const editPrivate = ref(false);
 const editIconUrl = ref("");
 const editIconFile = ref<File | null>(null);
 const editIconInputRef = ref<HTMLInputElement | null>(null);
@@ -373,7 +353,6 @@ function openEditCourse(c: Course, ev?: Event) {
   editingCourseId.value = c.id;
   editTitle.value = c.title;
   editDescription.value = c.description ?? "";
-  editPrivate.value = !c.is_open;
   editIconUrl.value = c.icon_url ?? "";
   editIconFile.value = null;
 }
@@ -382,7 +361,6 @@ function closeEditCourse() {
   editingCourseId.value = "";
   editTitle.value = "";
   editDescription.value = "";
-  editPrivate.value = false;
   editIconUrl.value = "";
   editIconFile.value = null;
   editSaving.value = false;
@@ -408,7 +386,6 @@ async function saveEditCourse() {
     await updateCourse(id, auth.token, {
       title: nextTitle,
       description: editDescription.value,
-      is_open: !editPrivate.value,
     });
     if (editIconFile.value) {
       await uploadCourseIcon(id, editIconFile.value, auth.token);
@@ -994,7 +971,6 @@ async function onCreateCourse() {
     const created = await createCourse(auth.token, {
       title: title.value,
       description: description.value,
-      is_open: isOpen.value,
     });
     const iconFile = createIconFile.value;
     if (iconFile) {
@@ -1004,29 +980,6 @@ async function onCreateCourse() {
     description.value = "";
     createIconFile.value = null;
     creatingCourse.value = false;
-    await loadCourses();
-  } catch (e) {
-    err.value = e instanceof Error ? e.message : "ошибка";
-  }
-}
-
-async function onEnroll(courseId: string) {
-  if (!auth.token) return;
-  err.value = "";
-  try {
-    await enrollCourse(courseId, auth.token);
-    await loadCourses();
-    await loadClassroom(courseId);
-  } catch (e) {
-    err.value = e instanceof Error ? e.message : "ошибка";
-  }
-}
-
-async function onUnenroll(courseId: string) {
-  if (!auth.token) return;
-  err.value = "";
-  try {
-    await unenrollCourse(courseId, auth.token);
     await loadCourses();
   } catch (e) {
     err.value = e instanceof Error ? e.message : "ошибка";
@@ -1057,44 +1010,6 @@ async function onTogglePin(c: Course) {
     await setCoursePinned(c.id, !(c.is_pinned ?? false), auth.token);
     await loadCourses();
     if (classroom.value?.course.id === c.id) await loadClassroom(c.id);
-  } catch (e) {
-    err.value = e instanceof Error ? e.message : "ошибка";
-  }
-}
-
-async function onJoinByCode() {
-  if (!auth.token) return;
-  const code = joinCode.value.trim();
-  if (!code) return;
-  err.value = "";
-  try {
-    const joined = await joinCourseByCode(code, auth.token);
-    joinCode.value = "";
-    await loadCourses();
-    await loadClassroom(joined.id);
-  } catch (e) {
-    err.value = e instanceof Error ? e.message : "ошибка";
-  }
-}
-
-function openClosedEditor(c: Course) {
-  if (!canTeach.value) return;
-  if (c.teacher_id !== auth.user?.id && auth.role !== "admin") return;
-  activeClosedId.value = c.id;
-  studentsDraft.value = "";
-}
-
-async function saveClosedStudents() {
-  if (!auth.token || !activeClosedId.value) return;
-  const ids = studentsDraft.value
-    .split(/\s+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-  err.value = "";
-  try {
-    await setClosedStudents(activeClosedId.value, ids, auth.token);
-    activeClosedId.value = null;
-    await loadCourses();
   } catch (e) {
     err.value = e instanceof Error ? e.message : "ошибка";
   }
@@ -1311,30 +1226,66 @@ function removePendingLectureFile(idx: number) {
   lecturePendingFiles.value = lecturePendingFiles.value.filter((_, i) => i !== idx);
 }
 
+function lectureOrder(
+  lectures: { id: string; book?: string; chapter?: string }[],
+  lecture: { id: string; book?: string; chapter?: string },
+) {
+  const rest = lectures.filter((l) => l.id !== lecture.id);
+  const book = (lecture.book ?? "").trim();
+  const chapter = (lecture.chapter ?? "").trim();
+  let at = rest.length;
+  if (book || chapter) {
+    let last = -1;
+    const mark = (pred: (l: { book?: string; chapter?: string }) => boolean) => {
+      rest.forEach((l, i) => {
+        if (pred(l)) last = i;
+      });
+    };
+    if (book && chapter) {
+      mark((l) => (l.book ?? "").trim() === book && (l.chapter ?? "").trim() === chapter);
+    }
+    if (last < 0 && book) mark((l) => (l.book ?? "").trim() === book);
+    if (last < 0 && chapter) mark((l) => (l.chapter ?? "").trim() === chapter);
+    if (last >= 0) at = last + 1;
+  }
+  const ids = rest.map((l) => l.id);
+  ids.splice(at, 0, lecture.id);
+  return ids;
+}
+
 async function onCreateLecture() {
   if (!auth.token || !classroom.value || !isTeacherInCurrent.value) return;
   const t = lectureTitle.value.trim();
   if (!t) return;
   err.value = "";
   try {
-    await createLecture(
+    const book = lectureBook.value.trim();
+    const chapter = lectureChapter.value.trim();
+    const created = await createLecture(
       classroom.value.course.id,
       {
         title: t,
+        book,
+        chapter,
         body_text: lectureBody.value,
         video_url: lectureVideoUrl.value,
         attachments: lecturePendingFiles.value.length ? lecturePendingFiles.value : undefined,
       },
       auth.token,
     );
+    const ids = lectureOrder(classroom.value.lectures, { id: created.id, book, chapter });
+    if (ids.join() !== [...classroom.value.lectures.map((l) => l.id), created.id].join()) {
+      await reorderLectures(classroom.value.course.id, ids, auth.token);
+    }
     lectureTitle.value = "";
+    lectureBook.value = "";
+    lectureChapter.value = "";
     lectureBody.value = "";
     lectureVideoUrl.value = "";
     lecturePendingFiles.value = [];
     addingLecture.value = false;
     await loadClassroom(classroom.value.course.id);
-    const newest = classroom.value?.lectures[0];
-    if (newest) openLecture(newest.id);
+    openLecture(created.id);
   } catch (e) {
     err.value = e instanceof Error ? e.message : "ошибка";
   }
@@ -1344,6 +1295,8 @@ function startEditLecture(lec: Lecture) {
   editingLecture.value = {
     id: lec.id,
     title: lec.title,
+    book: lec.book ?? "",
+    chapter: lec.chapter ?? "",
     body_text: lec.body_text,
     video_url: lec.video_url,
     attachments: lec.attachments.map((x) => ({ file_name: x.file_name, url: x.url })),
@@ -1389,17 +1342,26 @@ async function onSaveLectureEdit() {
   if (!t) return;
   err.value = "";
   try {
+    const book = d.book.trim();
+    const chapter = d.chapter.trim();
     await patchLecture(
       classroom.value.course.id,
       d.id,
       {
         title: t,
+        book,
+        chapter,
         body_text: d.body_text,
         video_url: d.video_url,
         attachments: d.attachments,
       },
       auth.token,
     );
+    const ids = lectureOrder(classroom.value.lectures, { id: d.id, book, chapter });
+    const current = classroom.value.lectures.map((l) => l.id).join();
+    if (ids.join() !== current) {
+      await reorderLectures(classroom.value.course.id, ids, auth.token);
+    }
     editingLecture.value = null;
     await loadClassroom(classroom.value.course.id);
   } catch (e) {
@@ -1538,26 +1500,6 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
         </template>
       </PageHeader>
 
-      <div class="filter-bar">
-        <label class="filter-search">
-          <input
-            v-model="joinCode"
-            type="text"
-            placeholder="код"
-            autocomplete="off"
-            @keyup.enter="onJoinByCode"
-          />
-        </label>
-        <button
-          v-if="joinCode.trim()"
-          type="button"
-          class="secondary"
-          @click="onJoinByCode"
-        >
-          вступить
-        </button>
-      </div>
-
       <div v-if="courseSearchChip" class="active-chips">
         <button class="active-chip" type="button" @click="courseSearchChip.clear">
           {{ courseSearchChip.label }} ×
@@ -1574,10 +1516,6 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
             accept="image/jpeg,image/png,image/webp,image/gif"
             @change="onCreateIconChange"
           />
-        </label>
-        <label class="check">
-          <input v-model="isOpen" type="checkbox" />
-          <span>открытый курс</span>
         </label>
         <button type="button" :disabled="!title.trim()" @click="onCreateCourse">
           создать
@@ -1630,8 +1568,6 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
               <header class="course-card-head">
                 <div class="course-card-title">
                   <h3>{{ c.title }}</h3>
-                  <span class="dot">·</span>
-                  <span class="muted small">{{ c.is_open ? "открытый" : "закрытый" }}</span>
                 </div>
                 <div class="course-card-head-tools" @click.stop>
               <span
@@ -1656,36 +1592,12 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
                   изменить
                 </button>
                 <button
-                  v-if="c.is_open && !c.enrolled"
-                  type="button"
-                  class="course-menu-item"
-                  @click="onEnroll(c.id); closeCourseMenu($event)"
-                >
-                  записаться
-                </button>
-                <button
                   v-if="canTogglePin(c)"
                   type="button"
                   class="course-menu-item"
                   @click="onTogglePin(c); closeCourseMenu($event)"
                 >
                   {{ c.is_pinned ? "снять закреп" : "закрепить" }}
-                </button>
-                <button
-                  v-if="canLeaveFromCourse(c)"
-                  type="button"
-                  class="course-menu-item"
-                  @click="onUnenroll(c.id); closeCourseMenu($event)"
-                >
-                  покинуть
-                </button>
-                <button
-                  v-else
-                  type="button"
-                  class="course-menu-item"
-                  @click="copyCourseCode(c, $event)"
-                >
-                  копировать код
                 </button>
                 <template v-if="canEditCourseMeta(c)">
                   <span class="course-menu-sep" aria-hidden="true" />
@@ -1712,19 +1624,6 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
               <img v-if="c.icon_url" :src="c.icon_url" alt="" class="course-card-thumb-img" />
               <span v-else class="course-card-thumb-letter">{{ courseInitial(c.title) }}</span>
             </div>
-          </div>
-          <div class="course-card-actions" @click.stop">
-            <button v-if="c.is_open && !c.enrolled" type="button" @click="onEnroll(c.id)">
-              записаться
-            </button>
-            <button
-              v-if="!c.is_open && canTeach && (c.teacher_id === auth.user?.id || auth.role === 'admin')"
-              type="button"
-              class="secondary"
-              @click="openClosedEditor(c)"
-            >
-              доступ
-            </button>
           </div>
         </article>
       </div>
@@ -1777,13 +1676,6 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
                 >
                   {{ classroom.course.is_pinned ? "снять закреп" : "закрепить" }}
                 </button>
-                <button
-                  type="button"
-                  class="course-menu-item"
-                  @click="copyCourseCode(classroom.course, $event)"
-                >
-                  копировать код
-                </button>
                 <template v-if="isOwnerInCurrent">
                   <span class="course-menu-sep" aria-hidden="true" />
                   <button
@@ -1822,7 +1714,6 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
               <RouterLink :to="`/u/${classroom.course.teacher_nickname}`">
                 {{ classroom.course.teacher_nickname }}
               </RouterLink>
-              · {{ classroom.course.course_code }}
             </p>
           </div>
         </div>
@@ -1888,15 +1779,19 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
             :class="{ active: addingLecture }"
             @click="addingLecture = !addingLecture"
           >
-            {{ addingLecture ? "отмена" : "+ лекция" }}
+            {{ addingLecture ? "отмена" : "+ тема" }}
           </button>
         </div>
         <div
           v-if="isTeacherInCurrent && addingLecture && !selectedLecture"
-          class="form-card desktop-only"
+          class="form-card lecture-editor desktop-only"
         >
-          <input v-model="lectureTitle" placeholder="название" />
-          <textarea v-model="lectureBody" rows="4" placeholder="текст" />
+          <div class="edit-pair">
+            <input v-model="lectureBook" placeholder="книга" />
+            <input v-model="lectureChapter" placeholder="глава" />
+          </div>
+          <input v-model="lectureTitle" placeholder="тема" />
+          <textarea v-model="lectureBody" rows="8" placeholder="текст" />
           <input v-model="lectureVideoUrl" placeholder="ссылка на видео" />
           <div class="upload-row">
             <input
@@ -1925,7 +1820,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
             :disabled="lectureUploading || !lectureTitle.trim()"
             @click="onCreateLecture"
           >
-            опубликовать
+            добавить
           </button>
         </div>
 
@@ -1934,9 +1829,14 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
             <BackLink class="detail-back" @click="closeLecture">лекции</BackLink>
 
             <template v-if="editingLecture?.id === selectedLecture.id">
-              <input v-model="editingLecture.title" placeholder="название" />
-              <textarea v-model="editingLecture.body_text" rows="4" placeholder="текст" />
-              <input v-model="editingLecture.video_url" placeholder="видео url" />
+              <div class="form-card lecture-editor desktop-only">
+              <div class="edit-pair">
+              <input v-model="editingLecture.book" placeholder="книга" />
+              <input v-model="editingLecture.chapter" placeholder="глава" />
+              </div>
+              <input v-model="editingLecture.title" placeholder="тема" />
+              <textarea v-model="editingLecture.body_text" rows="12" placeholder="текст" />
+              <input v-model="editingLecture.video_url" placeholder="видео" />
               <div class="upload-row">
                 <input
                   type="file"
@@ -1962,6 +1862,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
                   удалить тему
                 </button>
               </div>
+              </div>
             </template>
 
             <template v-else>
@@ -1970,7 +1871,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
                 <button
                   v-if="isTeacherInCurrent"
                   type="button"
-                  class="icon-btn-sm"
+                  class="icon-btn-sm desktop-only"
                   aria-label="редактировать"
                   @click="startEditLecture(selectedLecture)"
                 >
@@ -2602,31 +2503,11 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
           <button type="button" class="secondary" @click="pickEditIcon">
             {{ editIconFile ? editIconFile.name : editIconUrl ? "сменить иконку" : "добавить иконку" }}
           </button>
-          <label class="check">
-            <input v-model="editPrivate" type="checkbox" />
-            <span>приватный</span>
-          </label>
           <div class="row-actions">
             <button type="button" :disabled="editSaving || !editTitle.trim()" @click="saveEditCourse">
               {{ editSaving ? "…" : "сохранить" }}
             </button>
             <button type="button" class="secondary" :disabled="editSaving" @click="closeEditCourse">
-              отмена
-            </button>
-          </div>
-        </div>
-      </div>
-      </Transition>
-
-      <Transition name="course-sheet">
-      <div v-if="activeClosedId" class="course-sheet-root" role="dialog" aria-modal="true" aria-label="доступ">
-        <button type="button" class="course-sheet-backdrop" aria-label="закрыть" @click="activeClosedId = null" />
-        <div class="course-sheet">
-          <h3>доступ</h3>
-          <textarea v-model="studentsDraft" rows="4" placeholder="uuid…" />
-          <div class="row-actions">
-            <button type="button" @click="saveClosedStudents">сохранить</button>
-            <button type="button" class="secondary" @click="activeClosedId = null">
               отмена
             </button>
           </div>
@@ -2960,6 +2841,15 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 .form-card input,
 .form-card textarea {
   width: 100%;
+}
+.lecture-editor textarea {
+  min-height: 18rem;
+  line-height: 1.65;
+}
+.edit-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.55rem;
 }
 .course-sheet-root {
   position: fixed;

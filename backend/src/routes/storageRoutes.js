@@ -14,9 +14,6 @@ const router = express.Router();
 
 const FILES_ROOT = path.resolve(process.env.PRIVATE_FILES_DIR ?? "./data/private-files");
 
-const NOTE_BODY_MAX = 64 * 1024;
-const NOTE_TITLE_MAX = 200;
-
 function staffOnly(req, res, next) {
   if (!canBlogAndStorage(req.user?.role)) {
     return res.status(403).json({ error: "forbidden" });
@@ -70,46 +67,12 @@ router.get("/notes", authRequired, staffOnly, (req, res) => {
   res.json({ items });
 });
 
-router.post("/notes", authRequired, staffOnly, (req, res) => {
-  const title = String(req.body?.title ?? "").slice(0, NOTE_TITLE_MAX);
-  const body = String(req.body?.body ?? "");
-  if (body.length > NOTE_BODY_MAX) {
-    return res.status(400).json({ error: "note_too_long" });
-  }
-  const id = uuidv4();
-  const now = nowIso();
-  run(
-    `INSERT INTO user_notes (id, owner_id, title, body, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    id,
-    req.user.id,
-    title,
-    body,
-    now,
-    now,
-  );
-  res.json({ id, title, body, created_at: now, updated_at: now });
+router.post("/notes", authRequired, staffOnly, (_req, res) => {
+  res.status(410).json({ error: "notes_disabled" });
 });
 
-router.patch("/notes/:id", authRequired, staffOnly, (req, res) => {
-  const row = get("SELECT id, owner_id FROM user_notes WHERE id = ?", req.params.id);
-  if (!row) return res.status(404).json({ error: "not_found" });
-  if (row.owner_id !== req.user.id && req.user.role !== "admin") {
-    return res.status(403).json({ error: "forbidden" });
-  }
-  const title = req.body?.title !== undefined ? String(req.body.title).slice(0, NOTE_TITLE_MAX) : null;
-  const body = req.body?.body !== undefined ? String(req.body.body) : null;
-  if (body !== null && body.length > NOTE_BODY_MAX) {
-    return res.status(400).json({ error: "note_too_long" });
-  }
-  const now = nowIso();
-  if (title !== null) run("UPDATE user_notes SET title = ?, updated_at = ? WHERE id = ?", title, now, row.id);
-  if (body !== null) run("UPDATE user_notes SET body = ?, updated_at = ? WHERE id = ?", body, now, row.id);
-  const updated = get(
-    "SELECT id, title, body, created_at, updated_at FROM user_notes WHERE id = ?",
-    row.id,
-  );
-  res.json(updated);
+router.patch("/notes/:id", authRequired, staffOnly, (_req, res) => {
+  res.status(410).json({ error: "notes_disabled" });
 });
 
 router.delete("/notes/:id", authRequired, staffOnly, (req, res) => {
@@ -153,21 +116,13 @@ router.post("/shares", authRequired, staffOnly, (req, res) => {
   const target_type = req.body?.target_type;
   const target_id = req.body?.target_id;
   const ttl = req.body?.ttl ?? "1d";
-  if (!["file", "note"].includes(target_type) || !target_id) {
+  if (target_type !== "file" || !target_id) {
     return res.status(400).json({ error: "bad_target" });
   }
-  if (target_type === "file") {
-    const f = get("SELECT id, owner_id FROM user_files WHERE id = ?", target_id);
-    if (!f) return res.status(404).json({ error: "not_found" });
-    if (f.owner_id !== req.user.id && req.user.role !== "admin") {
-      return res.status(403).json({ error: "forbidden" });
-    }
-  } else {
-    const n = get("SELECT id, owner_id FROM user_notes WHERE id = ?", target_id);
-    if (!n) return res.status(404).json({ error: "not_found" });
-    if (n.owner_id !== req.user.id && req.user.role !== "admin") {
-      return res.status(403).json({ error: "forbidden" });
-    }
+  const f = get("SELECT id, owner_id FROM user_files WHERE id = ?", target_id);
+  if (!f) return res.status(404).json({ error: "not_found" });
+  if (f.owner_id !== req.user.id && req.user.role !== "admin") {
+    return res.status(403).json({ error: "forbidden" });
   }
   const id = uuidv4();
   const tok = uniqueToken();

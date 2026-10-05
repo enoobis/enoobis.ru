@@ -8,7 +8,7 @@ import { search, type SearchResponse } from "../api/search";
 import { useAuthStore } from "../stores/auth";
 
 type SearchScope = "global" | "blog" | "micro" | "library" | "courses" | "leaderboard";
-type BlogSort = "new" | "popular" | "discussed";
+type BlogSort = "new" | "popular";
 type MicroFeed = "all" | "following";
 
 const props = defineProps<{
@@ -63,10 +63,7 @@ function readQuery() {
   if (!controlled.value) {
     q.value = typeof route.query.q === "string" ? route.query.q : "";
   }
-  blogSort.value =
-    route.query.sort === "popular" || route.query.sort === "discussed"
-      ? route.query.sort
-      : "new";
+  blogSort.value = route.query.sort === "popular" ? "popular" : "new";
   blogTag.value = typeof route.query.tag === "string" ? route.query.tag : "";
   microFeed.value = route.query.feed === "following" ? "following" : "all";
 }
@@ -257,9 +254,6 @@ onUnmounted(() => {
           </button>
           <button class="filter-chip" :class="{ on: blogSort === 'popular' }" type="button" @click="blogSort = 'popular'; applyFeedSearch()">
             популярные
-          </button>
-          <button class="filter-chip" :class="{ on: blogSort === 'discussed' }" type="button" @click="blogSort = 'discussed'; applyFeedSearch()">
-            обсуждаемые
           </button>
         </div>
       </div>

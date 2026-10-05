@@ -13,7 +13,7 @@ import {
   type TaxonomyItem,
 } from "../api/blog";
 
-type SortKey = "new" | "popular" | "discussed";
+type SortKey = "new" | "popular";
 
 const route = useRoute();
 const router = useRouter();
@@ -57,8 +57,6 @@ const sortedPosts = computed(() => {
     Number(!!b.is_pinned) - Number(!!a.is_pinned);
   if (sort.value === "popular") {
     items.sort((a, b) => pinFirst(a, b) || b.up_count - a.up_count);
-  } else if (sort.value === "discussed") {
-    items.sort((a, b) => pinFirst(a, b) || b.comment_count - a.comment_count);
   } else {
     items.sort(pinFirst);
   }
@@ -101,10 +99,7 @@ async function loadBlogTags() {
 function syncFromRoute() {
   q.value = typeof route.query.q === "string" ? route.query.q : "";
   tag.value = typeof route.query.tag === "string" ? route.query.tag : "";
-  sort.value =
-    route.query.sort === "popular" || route.query.sort === "discussed"
-      ? route.query.sort
-      : "new";
+  sort.value = route.query.sort === "popular" ? "popular" : "new";
 }
 
 function buildQuery() {
@@ -217,14 +212,6 @@ onBeforeUnmount(() => {
           @click="setSort('popular')"
         >
           популярные
-        </button>
-        <button
-          type="button"
-          class="filter-tab"
-          :class="{ on: sort === 'discussed' }"
-          @click="setSort('discussed')"
-        >
-          обсуждаемые
         </button>
       </div>
       <div v-if="blogTags.length" ref="tagMenuRoot" class="filter-menu-wrap">

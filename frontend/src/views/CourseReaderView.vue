@@ -714,18 +714,6 @@ function onTopicClick(id: string) {
   openLecture(id);
 }
 
-async function downloadLecture() {
-  const l = activeLecture.value;
-  if (!l) return;
-  err.value = "";
-  try {
-    const { downloadLectureDocx } = await import("../utils/lectureDocx");
-    await downloadLectureDocx(l.title, l.body_text);
-  } catch {
-    err.value = "не вышло собрать документ";
-  }
-}
-
 function exitReader() {
   void router.push("/courses");
 }
@@ -802,9 +790,14 @@ async function submitTask(a: Assignment) {
 
 /* ---------- правка темы (преподаватель) ---------- */
 
-const editing = ref<{ id: string; title: string; body_text: string; video_url: string } | null>(
-  null,
-);
+const editing = ref<{
+  id: string;
+  title: string;
+  book: string;
+  chapter: string;
+  body_text: string;
+  video_url: string;
+} | null>(null);
 const savingEdit = ref(false);
 
 function startEdit() {
@@ -813,6 +806,8 @@ function startEdit() {
   editing.value = {
     id: l.id,
     title: l.title,
+    book: l.book ?? "",
+    chapter: l.chapter ?? "",
     body_text: l.body_text,
     video_url: l.video_url,
   };
@@ -823,16 +818,42 @@ async function saveEdit() {
   savingEdit.value = true;
   err.value = "";
   try {
+    const book = editing.value.book.trim();
+    const chapter = editing.value.chapter.trim();
     await patchLecture(
       classroom.value.course.id,
       editing.value.id,
       {
         title: editing.value.title.trim(),
+        book,
+        chapter,
         body_text: editing.value.body_text,
         video_url: editing.value.video_url.trim(),
       },
       auth.token,
     );
+    const rest = lectures.value.filter((item) => item.id !== editing.value!.id);
+    const current = { id: editing.value.id, book, chapter };
+    let at = rest.length;
+    if (book || chapter) {
+      let last = -1;
+      rest.forEach((item, i) => {
+        const b = (item.book ?? "").trim();
+        const c = (item.chapter ?? "").trim();
+        if (book && chapter && b === book && c === chapter) last = i;
+      });
+      if (last < 0 && book) {
+        rest.forEach((item, i) => {
+          if ((item.book ?? "").trim() === book) last = i;
+        });
+      }
+      if (last >= 0) at = last + 1;
+    }
+    const ids = rest.map((item) => item.id);
+    ids.splice(at, 0, current.id);
+    if (ids.join() !== lectures.value.map((item) => item.id).join()) {
+      await reorderLectures(classroom.value.course.id, ids, auth.token);
+    }
     editing.value = null;
     await load();
   } catch (e) {
@@ -1209,7 +1230,7 @@ onBeforeUnmount(() => {
 
       <!-- тема -->
       <main class="reader-main">
-        <div class="main-bar">
+        <div class="main-bar" :class="{ 'has-actions': isTeacher && activeLecture && !editing }">
           <button
             type="button"
             class="filter-icon-btn only-narrow"
@@ -1218,18 +1239,8 @@ onBeforeUnmount(() => {
           >
             <AppIcon name="list" :size="18" />
           </button>
-          <div class="main-bar-actions">
+          <div v-if="isTeacher && activeLecture && !editing" class="main-bar-actions desktop-only">
             <button
-              v-if="activeLecture && !editing"
-              type="button"
-              class="filter-icon-btn"
-              aria-label="скачать word"
-              @click="downloadLecture"
-            >
-              <AppIcon name="download" :size="18" />
-            </button>
-            <button
-              v-if="isTeacher && activeLecture && !editing"
               type="button"
               class="filter-icon-btn"
               aria-label="править"
@@ -1243,9 +1254,13 @@ onBeforeUnmount(() => {
         <p v-if="err" class="error">{{ err }}</p>
 
         <form v-if="editing" class="edit-form" @submit.prevent="saveEdit">
-          <input v-model="editing.title" placeholder="название темы" />
-          <input v-model="editing.video_url" placeholder="видео url" />
-          <textarea v-model="editing.body_text" rows="16" placeholder="текст темы, markdown" />
+          <div class="edit-pair">
+            <input v-model="editing.book" placeholder="книга" />
+            <input v-model="editing.chapter" placeholder="глава" />
+          </div>
+          <input v-model="editing.title" placeholder="тема" />
+          <textarea v-model="editing.body_text" rows="18" placeholder="текст" />
+          <input v-model="editing.video_url" placeholder="видео" />
           <div class="edit-actions">
             <button type="submit" :disabled="savingEdit">
               {{ savingEdit ? "…" : "сохранить" }}
@@ -1262,7 +1277,7 @@ onBeforeUnmount(() => {
           </div>
         </form>
 
-        <div v-else ref="mainRef" class="reader-scroll">
+        <div ref="mainRef" class="reader-scroll" :class="{ 'editing-open': !!editing }">
         <article class="lecture">
           <h1 class="lecture-title">{{ prettyCourseTitle(activeLecture.title) }}</h1>
 
@@ -1795,13 +1810,17 @@ onBeforeUnmount(() => {
 }
 
 .main-bar {
-  display: flex;
+  display: none;
   align-items: center;
   gap: 0.35rem;
   flex-shrink: 0;
   width: 100%;
   padding: 0 0.15rem 0.85rem;
   background: var(--bg);
+}
+
+.main-bar.has-actions {
+  display: flex;
 }
 
 .main-bar-actions {
@@ -1989,14 +2008,35 @@ onBeforeUnmount(() => {
 }
 
 .edit-form {
+  display: none;
+  gap: var(--space-3);
+  align-content: start;
+  min-height: 0;
+  overflow: auto;
+}
+
+.edit-pair {
   display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: var(--space-3);
 }
 
 .edit-form textarea {
-  line-height: 1.6;
+  min-height: 22rem;
+  line-height: 1.65;
   font-family: var(--mono);
-  font-size: var(--text-sm);
+  font-size: 0.95rem;
+}
+
+@media (min-width: 641px) {
+  .edit-form {
+    display: grid;
+    flex: 1;
+  }
+
+  .reader-scroll.editing-open {
+    display: none;
+  }
 }
 
 .edit-actions {
@@ -2285,6 +2325,10 @@ onBeforeUnmount(() => {
 
   .only-narrow {
     display: inline-flex;
+  }
+
+  .main-bar {
+    display: flex;
   }
 
   .reader-main {

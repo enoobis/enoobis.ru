@@ -138,7 +138,7 @@ export function listCourses(token: string) {
 
 export function createCourse(
   token: string,
-  payload: { title: string; description?: string; is_open: boolean },
+  payload: { title: string; description?: string; is_open?: boolean },
 ) {
   return api<Course>("/api/courses", {
     method: "POST",
@@ -394,6 +394,8 @@ export function createLecture(
     title: string;
     body_text?: string;
     video_url?: string;
+    book?: string;
+    chapter?: string;
     attachments?: { file_name: string; url: string }[];
     task?: { title: string; description?: string; max_points?: number };
   },
@@ -435,6 +437,8 @@ export function patchLecture(
     title?: string;
     body_text?: string;
     video_url?: string;
+    book?: string;
+    chapter?: string;
     attachments?: { file_name: string; url: string }[];
   },
   token: string,

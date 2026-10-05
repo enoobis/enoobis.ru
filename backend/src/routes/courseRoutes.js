@@ -138,20 +138,7 @@ function courseToDto(row, viewerId) {
 }
 
 router.get("/courses", authRequired, (req, res) => {
-  const isAdmin = req.user.role === "admin";
-  const rows = isAdmin
-    ? all(`SELECT c.* FROM courses c ORDER BY c.created_at DESC`)
-    : all(
-        `SELECT c.* FROM courses c
-         WHERE c.is_open = 1
-            OR c.teacher_id = ?
-            OR EXISTS (SELECT 1 FROM course_students s WHERE s.course_id = c.id AND s.student_id = ?)
-            OR EXISTS (SELECT 1 FROM course_co_teachers ct WHERE ct.course_id = c.id AND ct.user_id = ?)
-         ORDER BY c.created_at DESC`,
-        req.user.id,
-        req.user.id,
-        req.user.id,
-      );
+  const rows = all(`SELECT c.* FROM courses c ORDER BY c.created_at DESC`);
   const visibleIds = new Set(rows.map((r) => r.id));
   let pinsRaw = getPinnedCourseIds(req.user.id);
   const pinsPruned = pinsRaw.filter((id) => visibleIds.has(id));
@@ -191,7 +178,7 @@ router.post("/courses", authRequired, (req, res) => {
     req.user.id,
     title,
     String(req.body?.description ?? ""),
-    req.body?.is_open === false ? 0 : 1,
+    1,
     now,
     code,
   );
@@ -515,7 +502,7 @@ function streamPostInCourse(courseId, postId) {
   );
 }
 
-function ensureCourseAccess(courseId, user) {
+function ensureCourseAccess(courseId, user, opts = {}) {
   const course = get("SELECT * FROM courses WHERE id = ?", courseId);
   if (!course) return { error: 404 };
   const isOwner = course.teacher_id === user.id;
@@ -526,13 +513,13 @@ function ensureCourseAccess(courseId, user) {
     courseId,
     user.id,
   );
-  if (!isTeacher && !isStudent && !course.is_open && user.role !== "admin")
+  if (!opts.read && !isTeacher && !isStudent && !course.is_open && user.role !== "admin")
     return { error: 403 };
   return { course, isTeacher, isOwner, isStudent };
 }
 
 router.get("/courses/:id/classroom", authRequired, (req, res) => {
-  const access = ensureCourseAccess(req.params.id, req.user);
+  const access = ensureCourseAccess(req.params.id, req.user, { read: true });
   if (access.error) return res.status(access.error).json({ error: "no access" });
   const { course, isTeacher, isOwner } = access;
   const isAdmin = req.user.role === "admin";

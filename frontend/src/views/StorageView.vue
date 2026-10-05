@@ -10,15 +10,10 @@ import {
   type StoredFile,
 } from "../api/files";
 import {
-  createNote,
   createShare,
-  deleteNote,
   deleteShare,
-  listNotes,
   listShares,
   shareReadUrl,
-  updateNote,
-  type Note,
   type ShareLink,
   type ShareTtl,
 } from "../api/storage";
@@ -31,11 +26,8 @@ import { useAuthStore } from "../stores/auth";
 import { filePreviewKind } from "../utils/filePreview";
 import { toastError, toastSuccess } from "../utils/toast";
 
-type Section = "files" | "notes";
-
 const auth = useAuthStore();
 
-const section = ref<Section>("files");
 const canBlogAndStorage = computed(() => auth.canBlogAndStorage);
 
 const files = ref<StoredFile[]>([]);
@@ -46,19 +38,13 @@ const uploading = ref(false);
 const dragOver = ref(false);
 const fileInput = ref<HTMLInputElement | null>(null);
 
-const notes = ref<Note[]>([]);
-const notesLoading = ref(false);
-const editingNote = ref<Note | null>(null);
-const noteTitle = ref("");
-const noteBody = ref("");
-
 const shares = ref<ShareLink[]>([]);
-const sharePicker = ref<{ type: "file" | "note"; id: string } | null>(null);
+const sharePicker = ref<{ id: string } | null>(null);
 const shareDirectMode = ref(false);
 
 const sharePickerFile = computed(() => {
   const p = sharePicker.value;
-  if (!p || p.type !== "file") return null;
+  if (!p) return null;
   return files.value.find((f) => f.id === p.id) ?? null;
 });
 
@@ -84,6 +70,8 @@ const usedPercent = computed(() =>
   quota.value > 0 ? Math.min(100, Math.round((used.value / quota.value) * 100)) : 0,
 );
 
+const fileShares = computed(() => shares.value.filter((s) => s.target_type === "file"));
+
 function fmt(n: number) {
   if (n < 1024) return `${n} б`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} кб`;
@@ -94,7 +82,6 @@ function fmt(n: number) {
 function describe(code: string) {
   if (code === "quota_exceeded") return "не хватает места";
   if (code === "file_too_large") return "файл слишком большой";
-  if (code === "note_too_long") return "заметка слишком длинная";
   if (code === "read_only_pdf") return "чтение только для pdf";
   if (code === "preview_not_supported") return "просмотр недоступен";
   return code || "ошибка";
@@ -177,19 +164,6 @@ async function loadFiles() {
   }
 }
 
-async function loadNotes() {
-  if (!auth.token) return;
-  notesLoading.value = true;
-  try {
-    const r = await listNotes(auth.token);
-    notes.value = r.items;
-  } catch (e) {
-    err.value = describe(e instanceof Error ? e.message : "ошибка");
-  } finally {
-    notesLoading.value = false;
-  }
-}
-
 async function loadShares() {
   if (!auth.token) return;
   try {
@@ -253,61 +227,8 @@ async function onDownload(f: StoredFile) {
   }
 }
 
-function openNew() {
-  editingNote.value = null;
-  noteTitle.value = "";
-  noteBody.value = "";
-}
-
-function openEdit(n: Note) {
-  editingNote.value = n;
-  noteTitle.value = n.title;
-  noteBody.value = n.body;
-}
-
-async function saveNote() {
-  if (!auth.token) return;
-  err.value = "";
-  try {
-    if (editingNote.value) {
-      const upd = await updateNote(auth.token, editingNote.value.id, {
-        title: noteTitle.value,
-        body: noteBody.value,
-      });
-      notes.value = notes.value.map((n) => (n.id === upd.id ? upd : n));
-      toastSuccess("сохранено");
-    } else {
-      const created = await createNote(auth.token, {
-        title: noteTitle.value,
-        body: noteBody.value,
-      });
-      notes.value = [created, ...notes.value];
-      toastSuccess("создано");
-    }
-    editingNote.value = null;
-    noteTitle.value = "";
-    noteBody.value = "";
-  } catch (e) {
-    err.value = describe(e instanceof Error ? e.message : "ошибка");
-    toastError(e);
-  }
-}
-
-async function onDeleteNote(n: Note) {
-  if (!auth.token) return;
-  if (!confirm("удалить заметку?")) return;
-  try {
-    await deleteNote(auth.token, n.id);
-    notes.value = notes.value.filter((x) => x.id !== n.id);
-    shares.value = shares.value.filter((s) => !(s.target_type === "note" && s.target_id === n.id));
-    if (editingNote.value?.id === n.id) editingNote.value = null;
-  } catch (e) {
-    err.value = describe(e instanceof Error ? e.message : "ошибка");
-  }
-}
-
-function shareFor(targetType: "file" | "note", id: string) {
-  return shares.value.find((s) => s.target_type === targetType && s.target_id === id);
+function shareFor(id: string) {
+  return shares.value.find((s) => s.target_type === "file" && s.target_id === id);
 }
 
 function foreverShareForFile(fileId: string) {
@@ -316,10 +237,10 @@ function foreverShareForFile(fileId: string) {
   );
 }
 
-function openShare(type: "file" | "note", id: string) {
-  const file = type === "file" ? files.value.find((f) => f.id === id) : null;
+function openShare(id: string) {
+  const file = files.value.find((f) => f.id === id);
   shareDirectMode.value = !!file && canDirectLink(file);
-  sharePicker.value = { type, id };
+  sharePicker.value = { id };
 }
 
 async function ensureForeverFileShare(fileId: string): Promise<ShareLink | null> {
@@ -352,18 +273,18 @@ async function makeShare(ttl: ShareTtl) {
   if (!auth.token || !sharePicker.value) return;
   try {
     const picked = sharePicker.value;
-    const pickedFile = picked.type === "file" ? files.value.find((f) => f.id === picked.id) : null;
+    const pickedFile = files.value.find((f) => f.id === picked.id) ?? null;
     const direct = shareDirectMode.value && !!pickedFile && canDirectLink(pickedFile);
     const effectiveTtl: ShareTtl = direct ? "forever" : ttl;
 
     let created: ShareLink;
-    if (direct && picked.type === "file") {
+    if (direct) {
       const forever = await ensureForeverFileShare(picked.id);
       if (!forever) return;
       created = forever;
     } else {
       created = await createShare(auth.token, {
-        target_type: picked.type,
+        target_type: "file",
         target_id: picked.id,
         ttl: effectiveTtl,
       });
@@ -421,12 +342,12 @@ function ttlLabel(expires_at: string | null) {
 }
 
 usePageRefresh(async () => {
-  await Promise.all([loadFiles(), loadNotes(), loadShares()]);
+  await Promise.all([loadFiles(), loadShares()]);
 });
 
 onMounted(async () => {
   if (!canBlogAndStorage.value) return;
-  await Promise.all([loadFiles(), loadNotes(), loadShares()]);
+  await Promise.all([loadFiles(), loadShares()]);
 });
 
 watch([readerOpen, mediaOpen], ([pdf, media]) => {
@@ -451,35 +372,9 @@ onBeforeUnmount(() => {
     <template v-else>
       <QuotaBar :percent="usedPercent" />
 
-      <div class="filter-bar filter-bar--stack">
-        <div class="filter-tabs" role="tablist" aria-label="разделы">
-          <button
-            class="filter-tab"
-            :class="{ on: section === 'files' }"
-            type="button"
-            role="tab"
-            :aria-selected="section === 'files'"
-            @click="section = 'files'"
-          >
-            файлы
-          </button>
-          <button
-            class="filter-tab"
-            :class="{ on: section === 'notes' }"
-            type="button"
-            role="tab"
-            :aria-selected="section === 'notes'"
-            @click="section = 'notes'"
-          >
-            заметки
-          </button>
-        </div>
-      </div>
-
       <p v-if="err" class="error">{{ err }}</p>
 
-      <template v-if="section === 'files'">
-        <button
+      <button
           type="button"
           class="dropzone"
           :class="{ over: dragOver, busy: uploading }"
@@ -526,8 +421,8 @@ onBeforeUnmount(() => {
               <button
                 class="icon-btn-sm"
                 type="button"
-                :title="shareFor('file', f.id) ? 'ещё ссылка' : 'поделиться'"
-                @click="openShare('file', f.id)"
+                :title="shareFor(f.id) ? 'ещё ссылка' : 'поделиться'"
+                @click="openShare(f.id)"
               >
                 <AppIcon name="link" :size="18" />
               </button>
@@ -537,49 +432,11 @@ onBeforeUnmount(() => {
             </div>
           </li>
         </ul>
-      </template>
 
-      <template v-else-if="section === 'notes'">
-        <div class="composer">
-          <div class="composer-head">
-            <input v-model="noteTitle" placeholder="название" maxlength="200" />
-            <div class="composer-head-actions">
-              <button v-if="editingNote" class="secondary" type="button" @click="openNew">отмена</button>
-              <button type="button" :disabled="!noteBody.trim() && !noteTitle.trim()" @click="saveNote">
-                {{ editingNote ? "сохранить" : "создать" }}
-              </button>
-            </div>
-          </div>
-          <textarea v-model="noteBody" rows="3" placeholder="текст" />
-        </div>
-
-        <AppLoading v-if="notesLoading" class="page-empty page-empty--tight" />
-        <p v-else-if="!notes.length" class="page-empty page-empty--tight muted">пусто</p>
-        <ul v-else class="list">
-          <li v-for="n in notes" :key="n.id" class="item">
-            <div class="info">
-              <span class="name">{{ n.title || "без названия" }}</span>
-              <span class="muted small">{{ n.body.slice(0, 80) }}</span>
-            </div>
-            <div class="actions">
-              <button class="icon-btn-sm" type="button" title="изменить" @click="openEdit(n)">
-                <AppIcon name="edit" :size="18" />
-              </button>
-              <button class="icon-btn-sm" type="button" title="поделиться" @click="openShare('note', n.id)">
-                <AppIcon name="link" :size="18" />
-              </button>
-              <button class="icon-btn-sm" type="button" title="удалить" @click="onDeleteNote(n)">
-                <AppIcon name="delete" :size="18" />
-              </button>
-            </div>
-          </li>
-        </ul>
-      </template>
-
-      <section v-if="shares.length" class="shares">
+      <section v-if="fileShares.length" class="shares">
         <h2>ссылки</h2>
         <ul class="list">
-          <li v-for="s in shares" :key="s.id" class="item">
+          <li v-for="s in fileShares" :key="s.id" class="item">
             <div class="info">
               <span class="name">{{ s.label || s.target_type }}</span>
               <span class="muted small">{{ ttlLabel(s.expires_at) }}</span>
@@ -707,71 +564,6 @@ onBeforeUnmount(() => {
 .dropzone.busy {
   pointer-events: none;
   opacity: 0.55;
-}
-
-.composer {
-  display: grid;
-  gap: 0.55rem;
-  padding: 0.85rem 1rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-}
-
-.composer:focus-within {
-  border-color: var(--focus-border);
-}
-
-.composer-head {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  min-width: 0;
-}
-
-.composer-head-actions {
-  display: flex;
-  gap: 0.35rem;
-  flex-shrink: 0;
-}
-
-.composer-head-actions button {
-  min-height: 36px;
-  padding: 0.35rem 0.75rem;
-  font-size: var(--text-sm);
-}
-
-.composer input,
-.composer textarea {
-  border: none;
-  border-radius: 0;
-  background: transparent;
-  min-height: 0;
-  width: 100%;
-}
-
-.composer-head input {
-  flex: 1;
-  min-width: 0;
-  padding: 0.2rem 0;
-  font-size: var(--text-md);
-  font-weight: 500;
-}
-
-.composer textarea {
-  resize: vertical;
-  min-height: 5rem;
-  max-height: 12rem;
-  padding: 0.55rem 0 0.15rem;
-  line-height: 1.5;
-  font-size: var(--text-md);
-  color: var(--text);
-}
-
-.composer input:focus,
-.composer textarea:focus {
-  outline: none;
-  background: transparent;
 }
 
 .item {

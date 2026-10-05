@@ -20,41 +20,13 @@ export type ShareLink = {
 
 export type ShareTtl = "1h" | "1d" | "7d" | "forever";
 
-export function listNotes(token: string) {
-  return api<{ items: Note[] }>("/api/notes", { token });
-}
-
-export function createNote(token: string, payload: { title: string; body: string }) {
-  return api<Note>("/api/notes", {
-    method: "POST",
-    token,
-    body: JSON.stringify(payload),
-  });
-}
-
-export function updateNote(
-  token: string,
-  id: string,
-  payload: { title?: string; body?: string },
-) {
-  return api<Note>(`/api/notes/${id}`, {
-    method: "PATCH",
-    token,
-    body: JSON.stringify(payload),
-  });
-}
-
-export function deleteNote(token: string, id: string) {
-  return api<{ ok: boolean }>(`/api/notes/${id}`, { method: "DELETE", token });
-}
-
 export function listShares(token: string) {
   return api<{ items: ShareLink[] }>("/api/shares", { token });
 }
 
 export function createShare(
   token: string,
-  payload: { target_type: "file" | "note"; target_id: string; ttl: ShareTtl },
+  payload: { target_type: "file"; target_id: string; ttl: ShareTtl },
 ) {
   return api<ShareLink>("/api/shares", {
     method: "POST",
