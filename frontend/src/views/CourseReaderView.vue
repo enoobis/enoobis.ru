@@ -262,74 +262,63 @@ function measureReaderTop() {
   const el = readerRef.value;
   if (!el) return;
   const top = el.getBoundingClientRect().top + window.scrollY;
-  el.style.setProperty("--reader-top", `${Math.round(top) + 24}px`);
+  el.style.setProperty("--reader-top", `${Math.round(top)}px`);
 }
 
 let kbTimer = 0;
 let appliedKb = 0;
-let focusBaseHeight = 0;
 
 function chatFieldFocused(): boolean {
   const field = chatFieldRef.value;
   return !!field && (document.activeElement === field || field.matches(":focus"));
 }
 
-/* edge сжимает страницу сам. chrome и webview оставляют низ под клавиатурой —
-   двигаем низ чата к низу видимой области, а не к низу layout viewport */
+function keyboardGap(): number {
+  const vv = window.visualViewport;
+  if (!vv) return 0;
+  return Math.max(0, Math.round(window.innerHeight - vv.offsetTop - vv.height));
+}
+
+function resetChatSheet() {
+  const sheet = chatSheetRef.value;
+  if (sheet) {
+    sheet.style.bottom = "";
+    sheet.style.maxHeight = "";
+  }
+  readerRef.value?.style.setProperty("--kb", "0px");
+  appliedKb = 0;
+}
+
+/* пока клавиатура открыта — низ чата на её верхней кромке. закрылась — чат снова вниз */
 function placeChatAboveKeyboard() {
   const sheet = chatSheetRef.value;
   const vv = window.visualViewport;
-  const root = readerRef.value;
   if (!sheet || !vv) return;
-  if (!chatOpen.value || !chatFieldFocused()) {
-    sheet.style.bottom = "";
-    sheet.style.maxHeight = "";
-    root?.style.setProperty("--kb", "0px");
-    appliedKb = 0;
+  const gap = keyboardGap();
+  if (!chatOpen.value || !chatFieldFocused() || gap < 80) {
+    resetChatSheet();
     return;
   }
-  const leftover = sheet.getBoundingClientRect().bottom - vv.height;
-  const prev = appliedKb;
-  if (Math.abs(leftover) >= 8) {
-    appliedKb = Math.max(0, Math.round(appliedKb + leftover));
-  }
-  if (appliedKb > 0) {
-    sheet.style.bottom = `${appliedKb}px`;
-    root?.style.setProperty("--kb", `${appliedKb}px`);
-    if (appliedKb !== prev) void scrollChatDown();
-  } else {
-    sheet.style.bottom = "";
-    root?.style.setProperty("--kb", "0px");
-  }
+  sheet.style.bottom = `${gap}px`;
   sheet.style.maxHeight = `${Math.max(180, Math.round(vv.height - 8))}px`;
+  readerRef.value?.style.setProperty("--kb", `${gap}px`);
+  if (gap !== appliedKb) {
+    appliedKb = gap;
+    void scrollChatDown();
+  }
 }
 
 function onChatFieldFocus() {
-  focusBaseHeight = window.innerHeight;
   window.clearTimeout(kbTimer);
   placeChatAboveKeyboard();
-  window.setTimeout(placeChatAboveKeyboard, 60);
-  window.setTimeout(placeChatAboveKeyboard, 180);
-  window.setTimeout(placeChatAboveKeyboard, 360);
-  kbTimer = window.setTimeout(() => {
-    placeChatAboveKeyboard();
-    if (appliedKb > 24 || !chatFieldFocused()) return;
-    if (!window.matchMedia("(pointer: coarse)").matches) return;
-    if (focusBaseHeight - window.innerHeight > 80) return;
-    const sheet = chatSheetRef.value;
-    const vv = window.visualViewport;
-    if (!sheet || !vv) return;
-    appliedKb = Math.round(Math.min(vv.height, window.innerHeight) * 0.42);
-    sheet.style.bottom = `${appliedKb}px`;
-    sheet.style.maxHeight = `${Math.max(180, Math.round(vv.height - appliedKb))}px`;
-    readerRef.value?.style.setProperty("--kb", `${appliedKb}px`);
-    void scrollChatDown();
-  }, 480);
+  window.setTimeout(placeChatAboveKeyboard, 80);
+  window.setTimeout(placeChatAboveKeyboard, 240);
+  window.setTimeout(placeChatAboveKeyboard, 420);
 }
 
 function onChatFieldBlur() {
   window.clearTimeout(kbTimer);
-  kbTimer = window.setTimeout(placeChatAboveKeyboard, 160);
+  kbTimer = window.setTimeout(resetChatSheet, 160);
 }
 
 function scrollMainTop() {
@@ -2097,8 +2086,8 @@ onBeforeUnmount(() => {
   }
 
   .lecture-nav {
-    min-height: 3.75rem;
-    padding: 0.25rem 0.35rem max(0.25rem, env(safe-area-inset-bottom));
+    min-height: 3.25rem;
+    padding: 0.2rem 0.35rem;
   }
 
   .reader-topics {
