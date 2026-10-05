@@ -264,9 +264,25 @@ function measureReaderTop() {
 }
 
 let kbTimer = 0;
+let kbTimers: number[] = [];
+let guessWatch = 0;
 let appliedKb = 0;
 let guessedKb = false;
 let focusBaseHeight = 0;
+let guessAt = 0;
+
+type KbSnap = {
+  vv: number;
+  inner: number;
+  client: number;
+  avail: number;
+  dvh: number;
+};
+
+let guessStart: KbSnap | null = null;
+let guessMin: KbSnap | null = null;
+let insetProbe: HTMLDivElement | null = null;
+let dvhProbe: HTMLDivElement | null = null;
 
 type VirtualKeyboardHandle = {
   overlaysContent: boolean;
@@ -290,11 +306,59 @@ function chatFieldFocused(): boolean {
   return !!field && (document.activeElement === field || field.matches(":focus"));
 }
 
+function ensureKbProbes() {
+  if (!insetProbe) {
+    insetProbe = document.createElement("div");
+    insetProbe.setAttribute("aria-hidden", "true");
+    insetProbe.style.cssText =
+      "position:fixed;left:0;bottom:0;width:0;height:env(keyboard-inset-height,0px);pointer-events:none;visibility:hidden";
+    document.body.appendChild(insetProbe);
+  }
+  if (!dvhProbe) {
+    dvhProbe = document.createElement("div");
+    dvhProbe.setAttribute("aria-hidden", "true");
+    dvhProbe.style.cssText =
+      "position:fixed;left:0;bottom:0;width:0;height:100dvh;pointer-events:none;visibility:hidden";
+    document.body.appendChild(dvhProbe);
+  }
+}
+
+function dropKbProbes() {
+  insetProbe?.remove();
+  dvhProbe?.remove();
+  insetProbe = null;
+  dvhProbe = null;
+}
+
+function kbSnap(): KbSnap {
+  ensureKbProbes();
+  const vv = window.visualViewport;
+  return {
+    vv: Math.round(vv?.height ?? window.innerHeight),
+    inner: window.innerHeight,
+    client: document.documentElement.clientHeight,
+    avail: window.screen.availHeight,
+    dvh: dvhProbe?.offsetHeight ?? 0,
+  };
+}
+
 function keyboardOverlap(): number {
+  ensureKbProbes();
   const vv = window.visualViewport;
   const fromVv = vv ? Math.max(0, Math.round(window.innerHeight - vv.offsetTop - vv.height)) : 0;
   const fromVk = Math.round(virtualKeyboard()?.boundingRect.height ?? 0);
-  return Math.max(fromVv, fromVk);
+  return Math.max(fromVv, fromVk, insetProbe?.offsetHeight ?? 0);
+}
+
+function stopGuessWatch() {
+  window.clearInterval(guessWatch);
+  guessWatch = 0;
+}
+
+function clearKbTimers() {
+  window.clearTimeout(kbTimer);
+  for (const t of kbTimers) window.clearTimeout(t);
+  kbTimers = [];
 }
 
 function resetChatSheet() {
@@ -304,12 +368,20 @@ function resetChatSheet() {
     sheet.style.left = "";
     sheet.style.right = "";
     sheet.style.bottom = "";
+    sheet.style.height = "";
     sheet.style.maxHeight = "";
+    sheet.style.paddingBottom = "";
     sheet.style.zIndex = "";
+    if (chatOpen.value && !isEdgeBrowser() && window.matchMedia("(max-width: 1024px)").matches) {
+      sheet.style.bottom = "0px";
+    }
   }
   readerRef.value?.style.setProperty("--kb", "0px");
   appliedKb = 0;
   guessedKb = false;
+  guessStart = null;
+  guessMin = null;
+  stopGuessWatch();
 }
 
 function armKeyboardOverlay(on: boolean) {
@@ -324,66 +396,141 @@ function armKeyboardOverlay(on: boolean) {
 
 function liftChat(gap: number) {
   const sheet = chatSheetRef.value;
-  const vv = window.visualViewport;
   if (!sheet) return;
-  const visible = Math.max(180, Math.round((vv?.height ?? window.innerHeight) - gap));
-  sheet.style.position = "fixed";
-  sheet.style.left = "0";
-  sheet.style.right = "0";
-  sheet.style.zIndex = "96";
-  sheet.style.bottom = `${gap}px`;
-  sheet.style.maxHeight = `${visible}px`;
-  readerRef.value?.style.setProperty("--kb", `${gap}px`);
+  if (window.matchMedia("(max-width: 1024px)").matches) {
+    sheet.style.position = "fixed";
+    sheet.style.left = "0";
+    sheet.style.right = "0";
+    sheet.style.zIndex = "96";
+  }
+  sheet.style.bottom = "0px";
+  sheet.style.paddingBottom = `${gap}px`;
+  readerRef.value?.style.setProperty("--kb", "0px");
   if (gap !== appliedKb) {
     appliedKb = gap;
     void scrollChatDown();
   }
 }
 
-/* приложение не сообщает высоту клавиатуры — поднимаем поле сами, пока оно в фокусе */
 function fallbackKeyboardHeight(): number {
   const h = Math.min(window.innerHeight, window.screen.height || window.innerHeight);
   return Math.max(220, Math.min(380, Math.round(h * 0.38)));
 }
 
+function rememberShrink(now: KbSnap) {
+  if (!guessMin || !guessStart) {
+    guessStart = { ...now };
+    guessMin = { ...now };
+    return;
+  }
+  guessMin.vv = Math.min(guessMin.vv, now.vv);
+  guessMin.inner = Math.min(guessMin.inner, now.inner);
+  guessMin.client = Math.min(guessMin.client, now.client);
+  guessMin.avail = Math.min(guessMin.avail, now.avail);
+  guessMin.dvh = Math.min(guessMin.dvh, now.dvh);
+}
+
+function grew(start: number, min: number, now: number): boolean {
+  if (start < 80 || now < 80) return false;
+  if (now >= start + 120) return true;
+  return min <= start - 120 && now >= min + 120;
+}
+
+function guessOutdated(): boolean {
+  const now = kbSnap();
+  const start = guessStart;
+  const min = guessMin;
+  const settled = Date.now() - guessAt > 400;
+  const closed =
+    settled &&
+    !!start &&
+    !!min &&
+    (grew(start.vv, min.vv, now.vv) ||
+      grew(start.inner, min.inner, now.inner) ||
+      grew(start.client, min.client, now.client) ||
+      grew(start.avail, min.avail, now.avail) ||
+      grew(start.dvh, min.dvh, now.dvh));
+  rememberShrink(now);
+  return closed;
+}
+
+function startKbWatch() {
+  if (guessWatch) return;
+  guessStart = kbSnap();
+  guessMin = { ...guessStart };
+  guessWatch = window.setInterval(() => {
+    if (!chatOpen.value || !chatFieldFocused()) {
+      resetChatSheet();
+      return;
+    }
+    const gap = keyboardOverlap();
+    if (gap >= 80) {
+      guessedKb = false;
+      liftChat(gap);
+      rememberShrink(kbSnap());
+      return;
+    }
+    if (guessedKb && !guessOutdated()) return;
+    if (appliedKb > 0 || guessedKb) resetChatSheet();
+  }, 150);
+}
+
 function placeChatAboveKeyboard() {
   const sheet = chatSheetRef.value;
-  if (!sheet) return;
+  if (!sheet || isEdgeBrowser()) return;
   const focused = chatOpen.value && chatFieldFocused();
-  const gap = focused ? keyboardOverlap() : 0;
+  if (!focused) {
+    resetChatSheet();
+    return;
+  }
+  const gap = keyboardOverlap();
   if (gap >= 80) {
     guessedKb = false;
     liftChat(gap);
+    startKbWatch();
     return;
   }
-  if (guessedKb && focused) return;
+  if (guessedKb && !guessOutdated()) return;
   resetChatSheet();
 }
 
 function onChatFieldFocus() {
+  if (isEdgeBrowser()) return;
   focusBaseHeight = window.innerHeight;
   armKeyboardOverlay(true);
-  window.clearTimeout(kbTimer);
+  clearKbTimers();
   placeChatAboveKeyboard();
-  window.setTimeout(placeChatAboveKeyboard, 80);
-  window.setTimeout(placeChatAboveKeyboard, 200);
+  kbTimers.push(window.setTimeout(placeChatAboveKeyboard, 80));
+  kbTimers.push(window.setTimeout(placeChatAboveKeyboard, 200));
   kbTimer = window.setTimeout(() => {
     if (!chatOpen.value || !chatFieldFocused()) return;
     if (keyboardOverlap() >= 80) return;
     if (focusBaseHeight - window.innerHeight > 80) return;
     if (!window.matchMedia("(pointer: coarse)").matches) return;
     guessedKb = true;
+    guessAt = Date.now();
+    startKbWatch();
     liftChat(fallbackKeyboardHeight());
   }, 280);
 }
 
 function onChatFieldBlur() {
-  window.clearTimeout(kbTimer);
-  guessedKb = false;
-  kbTimer = window.setTimeout(() => {
-    resetChatSheet();
-    if (!chatOpen.value) armKeyboardOverlay(false);
-  }, 80);
+  clearKbTimers();
+  resetChatSheet();
+  if (!chatOpen.value) armKeyboardOverlay(false);
+}
+
+function onChatFocusOut(e: FocusEvent) {
+  if (e.target !== chatFieldRef.value) return;
+  onChatFieldBlur();
+}
+
+function onDocPointerDown(e: PointerEvent) {
+  if (!chatOpen.value || appliedKb <= 0) return;
+  const t = e.target;
+  if (!(t instanceof Node) || chatSheetRef.value?.contains(t)) return;
+  chatFieldRef.value?.blur();
+  resetChatSheet();
 }
 
 function scrollMainTop() {
@@ -874,6 +1021,8 @@ onMounted(() => {
   window.visualViewport?.addEventListener("resize", placeChatAboveKeyboard);
   window.visualViewport?.addEventListener("scroll", placeChatAboveKeyboard);
   virtualKeyboard()?.addEventListener("geometrychange", placeChatAboveKeyboard);
+  document.addEventListener("focusout", onChatFocusOut);
+  document.addEventListener("pointerdown", onDocPointerDown, true);
 });
 
 onBeforeUnmount(() => {
@@ -884,8 +1033,12 @@ onBeforeUnmount(() => {
   window.visualViewport?.removeEventListener("resize", placeChatAboveKeyboard);
   window.visualViewport?.removeEventListener("scroll", placeChatAboveKeyboard);
   virtualKeyboard()?.removeEventListener("geometrychange", placeChatAboveKeyboard);
+  document.removeEventListener("focusout", onChatFocusOut);
+  document.removeEventListener("pointerdown", onDocPointerDown, true);
   armKeyboardOverlay(false);
-  window.clearTimeout(kbTimer);
+  clearKbTimers();
+  stopGuessWatch();
+  dropKbProbes();
   endPress();
 });
 </script>
