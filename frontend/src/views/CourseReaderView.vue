@@ -134,8 +134,6 @@ function toggleChapter(ch: Chapter) {
     return;
   }
   openChapters.value = [...openChapters.value, key];
-  const first = ch.lectures[0];
-  if (first && first.id !== activeId.value) openLecture(first.id);
 }
 
 const contentBooks = computed(() => {
@@ -268,15 +266,33 @@ function measureReaderTop() {
 let kbTimer = 0;
 let appliedKb = 0;
 
+type VirtualKeyboardHandle = {
+  overlaysContent: boolean;
+  boundingRect: DOMRect;
+  addEventListener(type: "geometrychange", listener: () => void): void;
+  removeEventListener(type: "geometrychange", listener: () => void): void;
+};
+
+function isEdgeBrowser(): boolean {
+  return /Edg(?:A|iOS)?\//.test(navigator.userAgent);
+}
+
+function virtualKeyboard(): VirtualKeyboardHandle | null {
+  if (isEdgeBrowser()) return null;
+  const nav = navigator as Navigator & { virtualKeyboard?: VirtualKeyboardHandle };
+  return nav.virtualKeyboard ?? null;
+}
+
 function chatFieldFocused(): boolean {
   const field = chatFieldRef.value;
   return !!field && (document.activeElement === field || field.matches(":focus"));
 }
 
-function keyboardGap(): number {
+function keyboardOverlap(): number {
   const vv = window.visualViewport;
-  if (!vv) return 0;
-  return Math.max(0, Math.round(window.innerHeight - vv.offsetTop - vv.height));
+  const fromVv = vv ? Math.max(0, Math.round(window.innerHeight - vv.offsetTop - vv.height)) : 0;
+  const fromVk = Math.round(virtualKeyboard()?.boundingRect.height ?? 0);
+  return Math.max(fromVv, fromVk);
 }
 
 function resetChatSheet() {
@@ -289,18 +305,30 @@ function resetChatSheet() {
   appliedKb = 0;
 }
 
-/* пока клавиатура открыта — низ чата на её верхней кромке. закрылась — чат снова вниз */
+function armKeyboardOverlay(on: boolean) {
+  const vk = virtualKeyboard();
+  if (!vk) return;
+  try {
+    vk.overlaysContent = on;
+  } catch {
+    /* webview без этого api */
+  }
+}
+
+/* edge сжимает страницу сам. chrome и приложение кладут клавиатуру сверху — поднимаем низ чата */
 function placeChatAboveKeyboard() {
   const sheet = chatSheetRef.value;
   const vv = window.visualViewport;
   if (!sheet || !vv) return;
-  const gap = keyboardGap();
-  if (!chatOpen.value || !chatFieldFocused() || gap < 80) {
+  const gap = chatOpen.value && chatFieldFocused() ? keyboardOverlap() : 0;
+  if (gap < 80) {
     resetChatSheet();
     return;
   }
+  const vvGap = Math.max(0, Math.round(window.innerHeight - vv.offsetTop - vv.height));
+  const visible = vvGap >= 80 ? vv.height : Math.max(180, vv.height - gap);
   sheet.style.bottom = `${gap}px`;
-  sheet.style.maxHeight = `${Math.max(180, Math.round(vv.height - 8))}px`;
+  sheet.style.maxHeight = `${Math.max(180, Math.round(visible - 8))}px`;
   readerRef.value?.style.setProperty("--kb", `${gap}px`);
   if (gap !== appliedKb) {
     appliedKb = gap;
@@ -309,16 +337,21 @@ function placeChatAboveKeyboard() {
 }
 
 function onChatFieldFocus() {
+  armKeyboardOverlay(true);
   window.clearTimeout(kbTimer);
   placeChatAboveKeyboard();
-  window.setTimeout(placeChatAboveKeyboard, 80);
-  window.setTimeout(placeChatAboveKeyboard, 240);
-  window.setTimeout(placeChatAboveKeyboard, 420);
+  window.setTimeout(placeChatAboveKeyboard, 50);
+  window.setTimeout(placeChatAboveKeyboard, 150);
+  window.setTimeout(placeChatAboveKeyboard, 320);
+  window.setTimeout(placeChatAboveKeyboard, 520);
 }
 
 function onChatFieldBlur() {
   window.clearTimeout(kbTimer);
-  kbTimer = window.setTimeout(resetChatSheet, 160);
+  kbTimer = window.setTimeout(() => {
+    resetChatSheet();
+    if (!chatOpen.value) armKeyboardOverlay(false);
+  }, 160);
 }
 
 function scrollMainTop() {
@@ -794,6 +827,8 @@ watch(activeId, syncReaderChrome);
 watch(classroom, syncReaderChrome);
 watch([chatOpen, topicsOpen], ([chat, topics]) => {
   document.documentElement.classList.toggle("reader-sheet", chat || topics);
+  armKeyboardOverlay(chat);
+  if (!chat) resetChatSheet();
 });
 
 onMounted(() => {
@@ -806,6 +841,7 @@ onMounted(() => {
   window.addEventListener("resize", placeChatAboveKeyboard);
   window.visualViewport?.addEventListener("resize", placeChatAboveKeyboard);
   window.visualViewport?.addEventListener("scroll", placeChatAboveKeyboard);
+  virtualKeyboard()?.addEventListener("geometrychange", placeChatAboveKeyboard);
 });
 
 onBeforeUnmount(() => {
@@ -815,6 +851,8 @@ onBeforeUnmount(() => {
   window.removeEventListener("resize", placeChatAboveKeyboard);
   window.visualViewport?.removeEventListener("resize", placeChatAboveKeyboard);
   window.visualViewport?.removeEventListener("scroll", placeChatAboveKeyboard);
+  virtualKeyboard()?.removeEventListener("geometrychange", placeChatAboveKeyboard);
+  armKeyboardOverlay(false);
   window.clearTimeout(kbTimer);
   endPress();
 });
