@@ -265,6 +265,8 @@ function measureReaderTop() {
 
 let kbTimer = 0;
 let appliedKb = 0;
+let guessedKb = false;
+let focusBaseHeight = 0;
 
 type VirtualKeyboardHandle = {
   overlaysContent: boolean;
@@ -298,11 +300,16 @@ function keyboardOverlap(): number {
 function resetChatSheet() {
   const sheet = chatSheetRef.value;
   if (sheet) {
+    sheet.style.position = "";
+    sheet.style.left = "";
+    sheet.style.right = "";
     sheet.style.bottom = "";
     sheet.style.maxHeight = "";
+    sheet.style.zIndex = "";
   }
   readerRef.value?.style.setProperty("--kb", "0px");
   appliedKb = 0;
+  guessedKb = false;
 }
 
 function armKeyboardOverlay(on: boolean) {
@@ -315,20 +322,17 @@ function armKeyboardOverlay(on: boolean) {
   }
 }
 
-/* edge сжимает страницу сам. chrome и приложение кладут клавиатуру сверху — поднимаем низ чата */
-function placeChatAboveKeyboard() {
+function liftChat(gap: number) {
   const sheet = chatSheetRef.value;
   const vv = window.visualViewport;
-  if (!sheet || !vv) return;
-  const gap = chatOpen.value && chatFieldFocused() ? keyboardOverlap() : 0;
-  if (gap < 80) {
-    resetChatSheet();
-    return;
-  }
-  const vvGap = Math.max(0, Math.round(window.innerHeight - vv.offsetTop - vv.height));
-  const visible = vvGap >= 80 ? vv.height : Math.max(180, vv.height - gap);
+  if (!sheet) return;
+  const visible = Math.max(180, Math.round((vv?.height ?? window.innerHeight) - gap));
+  sheet.style.position = "fixed";
+  sheet.style.left = "0";
+  sheet.style.right = "0";
+  sheet.style.zIndex = "96";
   sheet.style.bottom = `${gap}px`;
-  sheet.style.maxHeight = `${Math.max(180, Math.round(visible - 8))}px`;
+  sheet.style.maxHeight = `${visible}px`;
   readerRef.value?.style.setProperty("--kb", `${gap}px`);
   if (gap !== appliedKb) {
     appliedKb = gap;
@@ -336,22 +340,50 @@ function placeChatAboveKeyboard() {
   }
 }
 
+/* приложение не сообщает высоту клавиатуры — поднимаем поле сами, пока оно в фокусе */
+function fallbackKeyboardHeight(): number {
+  const h = Math.min(window.innerHeight, window.screen.height || window.innerHeight);
+  return Math.max(220, Math.min(380, Math.round(h * 0.38)));
+}
+
+function placeChatAboveKeyboard() {
+  const sheet = chatSheetRef.value;
+  if (!sheet) return;
+  const focused = chatOpen.value && chatFieldFocused();
+  const gap = focused ? keyboardOverlap() : 0;
+  if (gap >= 80) {
+    guessedKb = false;
+    liftChat(gap);
+    return;
+  }
+  if (guessedKb && focused) return;
+  resetChatSheet();
+}
+
 function onChatFieldFocus() {
+  focusBaseHeight = window.innerHeight;
   armKeyboardOverlay(true);
   window.clearTimeout(kbTimer);
   placeChatAboveKeyboard();
-  window.setTimeout(placeChatAboveKeyboard, 50);
-  window.setTimeout(placeChatAboveKeyboard, 150);
-  window.setTimeout(placeChatAboveKeyboard, 320);
-  window.setTimeout(placeChatAboveKeyboard, 520);
+  window.setTimeout(placeChatAboveKeyboard, 80);
+  window.setTimeout(placeChatAboveKeyboard, 200);
+  kbTimer = window.setTimeout(() => {
+    if (!chatOpen.value || !chatFieldFocused()) return;
+    if (keyboardOverlap() >= 80) return;
+    if (focusBaseHeight - window.innerHeight > 80) return;
+    if (!window.matchMedia("(pointer: coarse)").matches) return;
+    guessedKb = true;
+    liftChat(fallbackKeyboardHeight());
+  }, 280);
 }
 
 function onChatFieldBlur() {
   window.clearTimeout(kbTimer);
+  guessedKb = false;
   kbTimer = window.setTimeout(() => {
     resetChatSheet();
     if (!chatOpen.value) armKeyboardOverlay(false);
-  }, 160);
+  }, 80);
 }
 
 function scrollMainTop() {
