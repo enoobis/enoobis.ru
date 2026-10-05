@@ -255,6 +255,7 @@ async function load() {
 
 const readerRef = ref<HTMLElement | null>(null);
 const mainRef = ref<HTMLElement | null>(null);
+const chatSheetRef = ref<HTMLElement | null>(null);
 
 /* высота читалки = экран минус её отступ сверху, замеряем по факту */
 function measureReaderTop() {
@@ -264,73 +265,71 @@ function measureReaderTop() {
   el.style.setProperty("--reader-top", `${Math.round(top) + 24}px`);
 }
 
-type VirtualKeyboardHandle = {
-  overlaysContent: boolean;
-  boundingRect: DOMRectReadOnly;
-  addEventListener(type: "geometrychange", listener: () => void): void;
-  removeEventListener(type: "geometrychange", listener: () => void): void;
-};
+let kbTimer = 0;
+let appliedKb = 0;
+let focusBaseHeight = 0;
 
-function virtualKeyboard(): VirtualKeyboardHandle | null {
-  const nav = navigator as Navigator & { virtualKeyboard?: VirtualKeyboardHandle };
-  return nav.virtualKeyboard ?? null;
+function chatFieldFocused(): boolean {
+  const field = chatFieldRef.value;
+  return !!field && (document.activeElement === field || field.matches(":focus"));
 }
 
-let kbTimer = 0;
-let lastKb = -1;
-
-/* клавиатура перекрывает низ экрана: поднимаем чат на её высоту, как в chatgpt */
-function applyKeyboardInset() {
-  const el = readerRef.value;
-  if (!el) return;
+/* edge сжимает страницу сам. chrome и webview оставляют низ под клавиатурой —
+   двигаем низ чата к низу видимой области, а не к низу layout viewport */
+function placeChatAboveKeyboard() {
+  const sheet = chatSheetRef.value;
   const vv = window.visualViewport;
-  const fromVv = vv ? Math.max(0, window.innerHeight - vv.offsetTop - vv.height) : 0;
-  const fromVk = virtualKeyboard()?.boundingRect.height ?? 0;
-  const overlap = Math.max(fromVv, fromVk);
-  const typing = document.activeElement === chatFieldRef.value;
-  const kb = typing && overlap > 60 ? Math.round(overlap) : 0;
-  const visible = Math.round(
-    Math.min(vv?.height ?? window.innerHeight, Math.max(1, window.innerHeight - kb)),
-  );
-  el.style.setProperty("--kb", `${kb}px`);
-  el.style.setProperty("--vvh", `${visible}px`);
-  if (kb !== lastKb) {
-    lastKb = kb;
-    if (kb) void scrollChatDown();
+  const root = readerRef.value;
+  if (!sheet || !vv) return;
+  if (!chatOpen.value || !chatFieldFocused()) {
+    sheet.style.bottom = "";
+    sheet.style.maxHeight = "";
+    root?.style.setProperty("--kb", "0px");
+    appliedKb = 0;
+    return;
   }
+  const leftover = sheet.getBoundingClientRect().bottom - vv.height;
+  const prev = appliedKb;
+  if (Math.abs(leftover) >= 8) {
+    appliedKb = Math.max(0, Math.round(appliedKb + leftover));
+  }
+  if (appliedKb > 0) {
+    sheet.style.bottom = `${appliedKb}px`;
+    root?.style.setProperty("--kb", `${appliedKb}px`);
+    if (appliedKb !== prev) void scrollChatDown();
+  } else {
+    sheet.style.bottom = "";
+    root?.style.setProperty("--kb", "0px");
+  }
+  sheet.style.maxHeight = `${Math.max(180, Math.round(vv.height - 8))}px`;
 }
 
 function onChatFieldFocus() {
-  const vk = virtualKeyboard();
-  if (vk) {
-    try {
-      vk.overlaysContent = true;
-    } catch {
-      /* safari не даёт переключить режим */
-    }
-  }
+  focusBaseHeight = window.innerHeight;
   window.clearTimeout(kbTimer);
-  applyKeyboardInset();
-  window.setTimeout(applyKeyboardInset, 80);
-  window.setTimeout(() => {
-    applyKeyboardInset();
+  placeChatAboveKeyboard();
+  window.setTimeout(placeChatAboveKeyboard, 60);
+  window.setTimeout(placeChatAboveKeyboard, 180);
+  window.setTimeout(placeChatAboveKeyboard, 360);
+  kbTimer = window.setTimeout(() => {
+    placeChatAboveKeyboard();
+    if (appliedKb > 24 || !chatFieldFocused()) return;
+    if (!window.matchMedia("(pointer: coarse)").matches) return;
+    if (focusBaseHeight - window.innerHeight > 80) return;
+    const sheet = chatSheetRef.value;
+    const vv = window.visualViewport;
+    if (!sheet || !vv) return;
+    appliedKb = Math.round(Math.min(vv.height, window.innerHeight) * 0.42);
+    sheet.style.bottom = `${appliedKb}px`;
+    sheet.style.maxHeight = `${Math.max(180, Math.round(vv.height - appliedKb))}px`;
+    readerRef.value?.style.setProperty("--kb", `${appliedKb}px`);
     void scrollChatDown();
-  }, 320);
+  }, 480);
 }
 
 function onChatFieldBlur() {
   window.clearTimeout(kbTimer);
-  kbTimer = window.setTimeout(() => {
-    const vk = virtualKeyboard();
-    if (vk) {
-      try {
-        vk.overlaysContent = false;
-      } catch {
-        /* safari */
-      }
-    }
-    applyKeyboardInset();
-  }, 160);
+  kbTimer = window.setTimeout(placeChatAboveKeyboard, 160);
 }
 
 function scrollMainTop() {
@@ -815,19 +814,18 @@ onMounted(() => {
   void loadChat();
   syncReaderChrome();
   window.addEventListener("resize", measureReaderTop);
-  window.visualViewport?.addEventListener("resize", applyKeyboardInset);
-  window.visualViewport?.addEventListener("scroll", applyKeyboardInset);
-  virtualKeyboard()?.addEventListener("geometrychange", applyKeyboardInset);
-  applyKeyboardInset();
+  window.addEventListener("resize", placeChatAboveKeyboard);
+  window.visualViewport?.addEventListener("resize", placeChatAboveKeyboard);
+  window.visualViewport?.addEventListener("scroll", placeChatAboveKeyboard);
 });
 
 onBeforeUnmount(() => {
   document.documentElement.classList.remove("course-reader", "reader-sheet");
   document.removeEventListener("keydown", onReaderKey);
   window.removeEventListener("resize", measureReaderTop);
-  window.visualViewport?.removeEventListener("resize", applyKeyboardInset);
-  window.visualViewport?.removeEventListener("scroll", applyKeyboardInset);
-  virtualKeyboard()?.removeEventListener("geometrychange", applyKeyboardInset);
+  window.removeEventListener("resize", placeChatAboveKeyboard);
+  window.visualViewport?.removeEventListener("resize", placeChatAboveKeyboard);
+  window.visualViewport?.removeEventListener("scroll", placeChatAboveKeyboard);
   window.clearTimeout(kbTimer);
   endPress();
 });
@@ -1162,7 +1160,7 @@ onBeforeUnmount(() => {
           </button>
           <span v-else class="lecture-nav-slot" aria-hidden="true" />
         </nav>
-        <aside class="reader-chat" :class="{ open: chatOpen }" :inert="!chatOpen">
+        <aside ref="chatSheetRef" class="reader-chat" :class="{ open: chatOpen }" :inert="!chatOpen">
           <header class="side-head chat-head">
             <span class="chat-grabber" aria-hidden="true" />
             <div class="chat-titles">
