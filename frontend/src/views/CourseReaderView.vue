@@ -1468,7 +1468,7 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: minmax(18rem, 32rem) minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
-  gap: 2.5rem;
+  column-gap: 0;
   height: calc(100dvh - var(--reader-top, 7rem));
   min-height: 0;
 }
@@ -1500,6 +1500,7 @@ onBeforeUnmount(() => {
   height: 100%;
   min-height: 0;
   min-width: 0;
+  padding-left: 2.5rem;
   overflow: hidden;
 }
 
@@ -2198,7 +2199,9 @@ onBeforeUnmount(() => {
   padding: var(--space-3) var(--layout-pad) var(--space-3);
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 0;
+  border-left: none;
+  border-bottom: none;
+  border-radius: calc(var(--radius) + 6px) calc(var(--radius) + 6px) 0 0;
   overflow: hidden;
   transform: none;
   visibility: hidden;
@@ -2358,6 +2361,7 @@ onBeforeUnmount(() => {
     width: 100%;
     max-width: none;
     height: 100%;
+    padding-left: 0;
     overflow: hidden;
   }
 
