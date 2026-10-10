@@ -1390,12 +1390,7 @@ onBeforeUnmount(() => {
         <aside ref="chatSheetRef" class="reader-chat" :class="{ open: chatOpen }" :inert="!chatOpen">
           <header class="side-head chat-head">
             <span class="chat-grabber" aria-hidden="true" />
-            <div class="chat-titles">
-              <span class="side-title">ии чат</span>
-              <span v-if="activeLecture" class="chat-topic muted">
-                по теме: {{ activeLecture.title }}
-              </span>
-            </div>
+            <span class="chat-head-grow" aria-hidden="true" />
             <button
               v-if="chat.length"
               type="button"
@@ -1417,7 +1412,7 @@ onBeforeUnmount(() => {
 
           <div ref="chatBodyRef" class="chat-body">
             <p v-if="!ai?.enabled" class="chat-hint muted">чат выключен</p>
-            <p v-else-if="!chat.length" class="chat-hint muted">спроси по этой теме</p>
+            <p v-else-if="!chat.length" class="chat-empty">чат</p>
             <div
               v-for="(m, i) in chat"
               :key="i"
@@ -2216,8 +2211,12 @@ onBeforeUnmount(() => {
 }
 
 .chat-head {
-  align-items: flex-start;
   padding-top: 0.6rem;
+}
+
+.chat-head-grow {
+  flex: 1;
+  min-width: 0;
 }
 
 .chat-grabber {
@@ -2231,28 +2230,13 @@ onBeforeUnmount(() => {
   transform: translateX(-50%);
 }
 
-.chat-titles {
-  flex: 1;
-  min-width: 0;
-  display: grid;
-  gap: 0.1rem;
-}
-
-.chat-topic {
-  font-size: var(--text-2xs);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  text-transform: lowercase;
-}
-
 .chat-body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  display: grid;
-  align-content: start;
+  display: flex;
+  flex-direction: column;
   gap: 0.5rem;
   font-size: var(--text-sm);
 }
@@ -2260,6 +2244,37 @@ onBeforeUnmount(() => {
 .chat-hint {
   margin: 0;
   font-size: var(--text-xs);
+}
+
+.chat-empty {
+  margin: auto;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.reader-chat.open .chat-empty {
+  animation: chat-in 0.55s ease both, chat-soft 2.8s ease-in-out 0.55s infinite;
+}
+
+@keyframes chat-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 0.7;
+    transform: none;
+  }
+}
+
+@keyframes chat-soft {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.8;
+  }
 }
 
 .bubble {
@@ -2453,6 +2468,10 @@ onBeforeUnmount(() => {
   .reader-topics,
   .reader-chat {
     transition: none;
+  }
+  .reader-chat.open .chat-empty {
+    animation: none;
+    opacity: 0.6;
   }
 }
 </style>

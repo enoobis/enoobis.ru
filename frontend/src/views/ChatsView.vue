@@ -1777,6 +1777,8 @@ onUnmounted(() => {
   border: none;
   background: transparent;
   padding: 0;
+  border-radius: 0;
+  overflow: visible;
   font: inherit;
   text-align: left;
   cursor: pointer;
