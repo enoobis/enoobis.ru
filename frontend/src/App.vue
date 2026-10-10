@@ -702,7 +702,6 @@ function submitReaderPage() {
           <RouterLink to="/me/edit" class="profile-menu-item" @click="closeProfileMenu">
             <AppIcon name="settings" :size="22" /><span>настройки</span>
           </RouterLink>
-          <span class="profile-menu-sep" />
           <div class="profile-menu-footer">
             <button class="profile-menu-footer-btn" type="button" @click="logoutFromMenu">
               <AppIcon name="logout" :size="22" /><span>выход</span>
@@ -852,7 +851,6 @@ function submitReaderPage() {
               >
                 <AppIcon name="briefcase" :size="22" /><span>работа</span>
               </RouterLink>
-              <span class="profile-menu-sep" />
               <div class="profile-menu-footer">
                 <button class="profile-menu-footer-btn" type="button" @click="logoutFromMenu">
                   <AppIcon name="logout" :size="22" /><span>выход</span>
@@ -1447,8 +1445,23 @@ function submitReaderPage() {
   flex-shrink: 0;
 }
 .profile-menu-footer {
+  position: relative;
   display: flex;
   align-items: stretch;
+  margin-top: 0.3rem;
+  border-top: 1px solid var(--border);
+}
+.profile-menu-footer::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  background: var(--border);
+  transform: translateX(-0.5px);
+  pointer-events: none;
+  z-index: 1;
 }
 .profile-menu-footer-btn {
   flex: 1 1 0;
@@ -1471,8 +1484,8 @@ function submitReaderPage() {
   cursor: pointer;
   text-decoration: none;
 }
-.profile-menu-footer-btn + .profile-menu-footer-btn {
-  border-left: 1px solid var(--border);
+.nav-menu-root--mobile .profile-menu-footer {
+  margin-top: auto;
 }
 .nav-menu-root--mobile .profile-menu-footer-btn {
   min-height: 48px;
@@ -1521,17 +1534,6 @@ function submitReaderPage() {
 .profile-menu-role {
   font-size: var(--text-2xs);
   text-transform: lowercase;
-}
-
-.profile-menu-sep {
-  display: block;
-  height: 1px;
-  background: var(--border);
-  margin: 0.3rem 0;
-}
-
-.nav-menu-root--mobile .profile-menu-sep {
-  margin-top: auto;
 }
 
 .profile-menu-item {
@@ -1631,7 +1633,7 @@ function submitReaderPage() {
   width: 28px;
   height: 28px;
   object-fit: contain;
-  border-radius: 6px;
+  border-radius: 0;
   transform-origin: center center;
 }
 .brand-link:hover .brand-logo {
