@@ -1390,6 +1390,7 @@ onBeforeUnmount(() => {
         <aside ref="chatSheetRef" class="reader-chat" :class="{ open: chatOpen }" :inert="!chatOpen">
           <header class="side-head chat-head">
             <span class="chat-grabber" aria-hidden="true" />
+            <span class="chat-head-title">чат</span>
             <span class="chat-head-grow" aria-hidden="true" />
             <button
               v-if="chat.length"
@@ -1412,7 +1413,6 @@ onBeforeUnmount(() => {
 
           <div ref="chatBodyRef" class="chat-body">
             <p v-if="!ai?.enabled" class="chat-hint muted">чат выключен</p>
-            <p v-else-if="!chat.length" class="chat-empty">чат</p>
             <div
               v-for="(m, i) in chat"
               :key="i"
@@ -2211,12 +2211,29 @@ onBeforeUnmount(() => {
 }
 
 .chat-head {
+  position: relative;
   padding-top: 0.6rem;
 }
 
 .chat-head-grow {
   flex: 1;
   min-width: 0;
+}
+
+.chat-head-title {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  margin-top: 0.3rem;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--muted);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+.reader-chat.open .chat-head-title {
+  animation: chat-in 0.55s ease both, chat-soft 2.8s ease-in-out 0.55s infinite;
 }
 
 .chat-grabber {
@@ -2246,24 +2263,14 @@ onBeforeUnmount(() => {
   font-size: var(--text-xs);
 }
 
-.chat-empty {
-  margin: auto;
-  color: var(--muted);
-  font-size: var(--text-sm);
-}
-
-.reader-chat.open .chat-empty {
-  animation: chat-in 0.55s ease both, chat-soft 2.8s ease-in-out 0.55s infinite;
-}
-
 @keyframes chat-in {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translate(-50%, calc(-50% + 8px));
   }
   to {
     opacity: 0.7;
-    transform: none;
+    transform: translate(-50%, -50%);
   }
 }
 
@@ -2469,9 +2476,10 @@ onBeforeUnmount(() => {
   .reader-chat {
     transition: none;
   }
-  .reader-chat.open .chat-empty {
+  .reader-chat.open .chat-head-title {
     animation: none;
     opacity: 0.6;
+    transform: translate(-50%, -50%);
   }
 }
 </style>
