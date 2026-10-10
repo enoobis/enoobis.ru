@@ -679,17 +679,33 @@ onBeforeUnmount(() => {
 
 .editor-body.mode-edit,
 .editor-body.mode-preview {
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .editor-body.mode-split {
-  grid-template-columns: 1fr 1fr;
+  position: relative;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0;
+}
+
+.editor-body.mode-split::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  background: var(--border);
+  transform: translateX(-50%);
+  pointer-events: none;
+  z-index: 1;
 }
 
 @media (max-width: 900px) {
   .editor-body.mode-split {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
+  .editor-body.mode-split::before,
   .editor-body.mode-split .preview-pane {
     display: none;
   }
@@ -704,21 +720,18 @@ onBeforeUnmount(() => {
 }
 
 .pane {
+  min-width: 0;
   min-height: 60vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  box-sizing: border-box;
 }
 
 .mode-split .pane {
-  border-left: 1px solid var(--border);
-  padding-left: 1rem;
+  padding: 0.5rem 1.25rem;
+  border: none;
   align-items: stretch;
-}
-.mode-split .pane:first-child {
-  border-left: none;
-  padding-left: 0;
-  padding-right: 1rem;
 }
 
 .editor-pane {
@@ -743,6 +756,13 @@ onBeforeUnmount(() => {
   font-size: var(--text-sm);
   line-height: 1.7;
   color: var(--text);
+  box-sizing: border-box;
+}
+
+.mode-split .editor-pane textarea {
+  padding: 0;
+  resize: none;
+  min-height: 0;
 }
 
 .editor-pane textarea:focus {
@@ -752,6 +772,10 @@ onBeforeUnmount(() => {
 .preview-pane {
   overflow: auto;
   padding: 0.5rem 0 0;
+}
+
+.mode-split .preview-pane {
+  padding: 0.5rem 1.25rem;
 }
 
 .preview-title {

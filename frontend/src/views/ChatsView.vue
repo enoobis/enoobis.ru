@@ -2046,6 +2046,10 @@ onUnmounted(() => {
   padding: 0.35rem 0.25rem 0.85rem 0.5rem;
   flex-shrink: 0;
 }
+.thread-head .avatar,
+.thread-head .avatar img {
+  border-radius: 0;
+}
 .thread-head-actions {
   margin-left: auto;
   display: inline-flex;
@@ -2059,7 +2063,7 @@ onUnmounted(() => {
   min-height: 40px;
   padding: 0;
   border: none;
-  border-radius: var(--radius-pill);
+  border-radius: 0;
   background: transparent;
   color: var(--muted);
   display: inline-flex;
@@ -2081,7 +2085,7 @@ onUnmounted(() => {
   min-height: 40px;
   background: transparent;
   border: none;
-  border-radius: var(--radius-pill);
+  border-radius: 0;
   color: var(--muted);
   padding: 0;
   margin-right: 0.1rem;

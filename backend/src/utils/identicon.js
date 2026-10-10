@@ -4,22 +4,16 @@ import path from "node:path";
 import { v4 as uuidv4 } from "uuid";
 
 /** меняется при смене внешнего вида — старые файлы перегенерируются на старте */
-export const IDENTICON_VERSION = "v3";
+export const IDENTICON_VERSION = "v4";
 
 const SIZE = 256;
 const DOT = 44;
 const GRID = [34, 96, 160, 222];
 const MIN_RIBBON_POINTS = 4;
 
-/** углы решётки не влезают в круглую аватарку */
-function isCorner(col, row) {
-  return (col === 0 || col === 3) && (row === 0 || row === 3);
-}
-
 const POINTS = [];
 for (let row = 0; row < 4; row++) {
   for (let col = 0; col < 4; col++) {
-    if (isCorner(col, row)) continue;
     POINTS.push({ col, row, x: GRID[col], y: GRID[row] });
   }
 }
@@ -140,7 +134,7 @@ function buildPath(seed) {
 export function buildIdenticonSvg(seed) {
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" width="${SIZE}" height="${SIZE}" viewBox="0 0 ${SIZE} ${SIZE}">` +
-    `<circle cx="${SIZE / 2}" cy="${SIZE / 2}" r="${SIZE / 2}" fill="#000"/>` +
+    `<rect width="${SIZE}" height="${SIZE}" fill="#000"/>` +
     `<path d="${buildPath(seed)}" fill="none" stroke="#fff" stroke-width="${DOT}"` +
     ` stroke-linecap="round" stroke-linejoin="round"/>` +
     `</svg>`

@@ -1046,6 +1046,9 @@ function submitReaderPage() {
   background: var(--bg);
   transform-origin: top center;
 }
+.nav-dropdown.nav-header-sheet {
+  overflow: hidden;
+}
 
 .nav-dropdown.nav-header-sheet {
   background: var(--bg);
@@ -1071,7 +1074,11 @@ function submitReaderPage() {
 
 .nav-dropdown:not(.search-menu-sheet) {
   max-height: min(72vh, 28rem);
+  overflow-x: hidden;
   overflow-y: auto;
+}
+.nav-dropdown.nav-header-sheet:not(.search-menu-sheet) {
+  overflow: hidden;
 }
 
 .nav-sheet-enter-active,
@@ -1449,6 +1456,7 @@ function submitReaderPage() {
   display: flex;
   align-items: stretch;
   margin-top: 0.3rem;
+  overflow: hidden;
   border-top: 1px solid var(--border);
 }
 .profile-menu-footer::before {
