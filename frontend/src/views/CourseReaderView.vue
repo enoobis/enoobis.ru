@@ -2204,13 +2204,21 @@ onBeforeUnmount(() => {
   border-radius: calc(var(--radius) + 6px) calc(var(--radius) + 6px) 0 0;
   overflow: hidden;
   transform: none;
+  clip-path: inset(0 0 100% 0);
   visibility: hidden;
   pointer-events: none;
+  transition:
+    clip-path var(--dur-3) var(--ease-snap),
+    visibility 0s linear var(--dur-3);
 }
 
 .reader-chat.open {
+  clip-path: inset(0);
   visibility: visible;
   pointer-events: auto;
+  transition:
+    clip-path var(--dur-3) var(--ease-snap),
+    visibility 0s;
 }
 
 .chat-head {
@@ -2435,12 +2443,6 @@ onBeforeUnmount(() => {
     border-bottom: none;
     border-radius: calc(var(--radius) + 6px) calc(var(--radius) + 6px) 0 0;
     transform: none;
-    visibility: hidden;
-  }
-
-  .reader-chat.open {
-    visibility: visible;
-    pointer-events: auto;
   }
 
   .chat-grabber {
@@ -2479,6 +2481,10 @@ onBeforeUnmount(() => {
   .reader-topics,
   .reader-chat {
     transition: none;
+    clip-path: none;
+  }
+  .reader-chat:not(.open) {
+    clip-path: none;
   }
   .reader-chat.open .chat-head-title {
     animation: none;
