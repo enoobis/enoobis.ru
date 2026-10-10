@@ -3,7 +3,7 @@ export const SITE_TITLE = "enoobis";
 export const SITE_TAGLINE = "по приглашению";
 
 /** snippet for search engines and social previews */
-export const SITE_DESCRIPTION = "закрытое сообщество. вход по приглашению.";
+export const SITE_DESCRIPTION = "закрытое сообщество";
 
 /** last manual content refresh - update when you ship meaningful changes */
 export const SITE_WATERED_AT = "2026-06-19";
