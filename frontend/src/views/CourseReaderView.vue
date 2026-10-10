@@ -1479,13 +1479,13 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: var(--space-3);
   min-width: 0;
-  height: 100%;
   min-height: 0;
 }
 
 .reader-topics {
   position: relative;
   z-index: 95;
+  height: 100%;
   padding-right: 0.75rem;
   border-right: 1px solid var(--border);
 }
@@ -2185,21 +2185,21 @@ onBeforeUnmount(() => {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: max(var(--kb, 0px), env(keyboard-inset-height, 0px));
+  bottom: 0;
   top: auto;
   z-index: 4;
   display: flex;
   flex-direction: column;
-  width: 100%;
-  max-width: none;
+  width: auto;
+  max-width: 100%;
   box-sizing: border-box;
-  height: min(72%, var(--vvh, 100%));
-  max-height: var(--vvh, 100%);
-  padding: var(--space-3) var(--layout-pad) max(var(--space-3), env(safe-area-inset-bottom));
+  height: min(72%, 100%);
+  max-height: 100%;
+  padding: var(--space-3) var(--layout-pad) var(--space-3);
   background: var(--bg);
   border: 1px solid var(--border);
-  border-bottom: none;
-  border-radius: calc(var(--radius) + 6px) calc(var(--radius) + 6px) 0 0;
+  border-radius: 0;
+  overflow: hidden;
   transform: none;
   visibility: hidden;
   pointer-events: none;
