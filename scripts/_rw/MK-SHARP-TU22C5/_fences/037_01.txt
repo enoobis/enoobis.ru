@@ -1,0 +1,27 @@
+```consoletext
+
+
+C:\Users\eugen>cd C:\dotnet\console\mylib
+
+
+
+C:\dotnet\console\mylib>dotnet new classlib
+
+Шаблон "Библиотека классов" успешно создан.
+
+
+
+Идет обработка действий после создания...
+
+Восстановление C:\dotnet\console\mylib\mylib.csproj:
+
+  Определение проектов для восстановления...
+
+  Восстановлен C:\dotnet\console\mylib\mylib.csproj (за 79 ms).
+
+Восстановление выполнено.
+
+
+
+C:\dotnet\console\mylib>
+```

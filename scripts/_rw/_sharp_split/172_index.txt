@@ -1,0 +1,17 @@
+fences=13 prose_len=8031
+images=['![чтение и запись файлов через filestream в c#](/uploads/course-lectures/dd43715bfcbf7995e3ed3ec78ec9fefc121f76ee.png)']
+urls=[]
+  0: ```c# len=52 prose_before=429
+  1: ```c# len=142 prose_before=877
+  2: ```c# len=209 prose_before=578
+  3: ```c# len=124 prose_before=120
+  4: ```c# len=893 prose_before=2444
+  5: ```consoletext len=77 prose_before=883
+  6: ```c# len=59 prose_before=266
+  7: ```c# len=947 prose_before=1273
+  8: ```c# len=42 prose_before=189
+  9: ```consoletext len=64 prose_before=466
+  10: ```c# len=1153 prose_before=90
+  11: ```c# len=44 prose_before=376
+  12: ```consoletext len=70 prose_before=40
+  tail prose=0

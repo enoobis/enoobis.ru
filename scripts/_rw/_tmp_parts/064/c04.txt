@@ -1,0 +1,21 @@
+```cpp
+
+
+int main()
+
+{
+
+    {
+
+        Person tom{"Tom"};
+
+        Person bob{"Bob"};
+
+    }   // объекты Tom и Bob уничтожаются
+
+
+
+    Person sam{"Sam"};
+
+}   // объект Sam уничтожается
+```

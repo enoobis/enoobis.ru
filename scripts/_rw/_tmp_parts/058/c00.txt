@@ -1,0 +1,35 @@
+```cpp
+
+
+class Person 
+
+{
+
+private:
+
+    std::string name;
+
+    unsigned age;
+
+public:
+
+    Person(std::string p_name, unsigned p_age)
+
+    { 
+
+        name = p_name; 
+
+        age = p_age;
+
+    }
+
+    void print() 
+
+    {
+
+        std::cout << "Name: " << name << "\tAge: " << age << std::endl;
+
+    }
+
+};
+```

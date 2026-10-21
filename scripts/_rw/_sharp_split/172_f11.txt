@@ -1,0 +1,3 @@
+```c#
+fstream.Seek(0, SeekOrigin.Begin);
+```

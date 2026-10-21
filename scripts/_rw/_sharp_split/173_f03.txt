@@ -1,0 +1,17 @@
+```c#
+
+
+string path = "note1.txt";
+
+// асинхронное чтение
+
+using (StreamReader reader = new StreamReader(path))
+
+{
+
+    string text = await reader.ReadToEndAsync();
+
+    Console.WriteLine(text);
+
+}
+```

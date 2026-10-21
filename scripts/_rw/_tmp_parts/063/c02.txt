@@ -1,0 +1,9 @@
+```cpp
+
+
+Person(std::string p_name, unsigned p_age)
+
+{
+
+    ++count;    // при создании нового объекта увеличиваем счетчик
+```

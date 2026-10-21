@@ -1,0 +1,29 @@
+```c#
+
+
+using System.Text;
+
+
+
+string path = @"c:\app\content.txt";
+
+
+
+string originalText = "Hello  enoobis.com";
+
+// запись строки
+
+await File.WriteAllTextAsync(path, originalText, Encoding.GetEncoding("iso-8859-1"));
+
+// дозапись в конец файла
+
+await File.AppendAllTextAsync(path, "\nHello code", Encoding.GetEncoding("iso-8859-1"));
+
+
+
+// чтение файла
+
+string fileText = await File.ReadAllTextAsync(path, Encoding.GetEncoding("iso-8859-1"));
+
+Console.WriteLine(fileText);
+```

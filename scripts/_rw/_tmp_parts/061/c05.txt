@@ -1,0 +1,7 @@
+```cpp
+
+
+Point temp = p1.move(10, 5);
+
+temp.move(10, 10);
+```

@@ -1,0 +1,25 @@
+```c#
+
+
+void Increment(ref int val)
+
+{
+
+	val++;
+
+	Console.WriteLine(val);
+
+}
+
+
+
+void Increment(int val)
+
+{
+
+	val++;
+
+	Console.WriteLine(val);
+
+}
+```

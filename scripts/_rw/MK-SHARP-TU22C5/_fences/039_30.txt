@@ -1,0 +1,43 @@
+```c#
+
+
+Person person = new Person() {Name = "Tom"};
+
+// првоеряем работу field
+
+Console.WriteLine(person.Name);  // Tom
+
+person.Name = "Tomas";
+
+Console.WriteLine(person.Name);  // Tomas
+
+ 
+
+class Person
+
+{
+
+    public required string Name
+
+    {
+
+        get
+
+        {
+
+            return field;    // возвращаем значение свойства
+
+        }
+
+        set
+
+        {
+
+            field = value;   // устанавливаем новое значение свойства
+
+        }
+
+    }
+
+}
+```

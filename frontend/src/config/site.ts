@@ -1,6 +1,6 @@
 export const SITE_TITLE = "enoobis";
 
-export const SITE_TAGLINE = "по приглашению";
+export const SITE_TAGLINE = "закрытое сообщество";
 
 /** snippet for search engines and social previews */
 export const SITE_DESCRIPTION = "закрытое сообщество";

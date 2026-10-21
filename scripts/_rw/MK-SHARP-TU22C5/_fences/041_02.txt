@@ -1,0 +1,7 @@
+```c#
+
+
+Console.WriteLine(Person.retirementAge);
+
+Person.retirementAge = 67;
+```

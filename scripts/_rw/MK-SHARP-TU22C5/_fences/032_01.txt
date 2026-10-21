@@ -1,0 +1,23 @@
+```c#
+
+
+class Person 
+
+{
+
+    string name = "Tom";             // переменная уровня класса
+
+    public void PrintName() 
+
+    {
+
+        string name = "Tomas";      // переменная уровня метода скрывает переменную уровня класса
+
+
+
+        Console.WriteLine(name);    // Tomas
+
+    } 
+
+}
+```

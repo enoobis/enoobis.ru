@@ -1,0 +1,5 @@
+```consoletext
+
+
+dotnet add helloapp.csproj reference ..\mylib\mylib.csproj
+```

@@ -1,0 +1,67 @@
+```c#
+
+
+using System.Text;
+
+
+
+string path = "note2.dat";
+
+
+
+string text = "hello world";
+
+
+
+// запись в файл
+
+using (FileStream fstream = new FileStream(path, FileMode.OpenOrCreate))
+
+{
+
+    // преобразуем строку в байты
+
+    byte[] input = Encoding.Default.GetBytes(text);
+
+    // запись массива байтов в файл
+
+    fstream.Write(input, 0, input.Length);
+
+    Console.WriteLine("Текст записан в файл");
+
+}
+
+using (FileStream fstream = new FileStream(path, FileMode.OpenOrCreate))
+
+{ 
+
+    // заменим в файле слово world на слово house
+
+    string replaceText = "house";
+
+    fstream.Seek(-5, SeekOrigin.End); // минус 5 символов с конца потока
+
+    byte[] input = Encoding.Default.GetBytes(replaceText);
+
+    await fstream.WriteAsync(input, 0, input.Length);
+
+
+
+    // считываем весь файл
+
+    // возвращаем указатель в начало файла
+
+    fstream.Seek(0, SeekOrigin.Begin);
+
+    byte[] output = new byte[fstream.Length];
+
+    await fstream.ReadAsync(output, 0, output.Length);
+
+    // декодируем байты в строку
+
+    string textFromFile = Encoding.Default.GetString(output);
+
+    Console.WriteLine($"Текст из файла: {textFromFile}"); // hello house
+
+}
+```

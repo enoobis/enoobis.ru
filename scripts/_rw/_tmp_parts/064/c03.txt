@@ -1,0 +1,11 @@
+```cpp
+
+
+{
+
+    Person tom{"Tom"};
+
+    Person bob{"Bob"};
+
+}
+```

@@ -1,0 +1,55 @@
+```cpp
+
+
+#include <iostream>
+
+#include <string>
+
+
+
+class Person 
+
+{
+
+public:
+
+    std::string name;
+
+    unsigned age;
+
+    void print() 
+
+    {
+
+        std::cout << "Name: " << name << "\tAge: " << age << std::endl;
+
+    }
+
+    Person(std::string p_name, unsigned p_age)
+
+    { 
+
+        name = p_name; 
+
+        age = p_age;
+
+    }
+
+};
+
+int main()
+
+{
+
+    Person tom{"Tom", 38};
+
+    // поля name, age и функция print общедоступные
+
+    tom.name = "Tomas"; 
+
+    tom.age = 22;
+
+    tom.print();    // Name: Tomas   Age: 22
+
+}
+```

@@ -1,0 +1,17 @@
+```c#
+
+
+Person person = new() { Name = "Bob"};
+
+Console.WriteLine(person.Name); // Bob
+
+
+
+public class Person
+
+{
+
+    public string Name { get; init; } = "";
+
+}
+```

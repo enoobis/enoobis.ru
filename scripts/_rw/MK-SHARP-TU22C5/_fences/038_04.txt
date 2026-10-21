@@ -1,0 +1,45 @@
+```c#
+
+
+class StateConsumer
+
+{
+
+    public void PrintState()
+
+    {
+
+        State state = new State();
+
+
+
+        state.Print(); //Ошибка, получить доступ нельзя
+
+
+
+        state.PrintPrivate(); // Ошибка, получить доступ нельзя
+
+
+
+        state.PrintProtectedPrivate(); // Ошибка, получить доступ нельзя
+
+
+
+        state.PrintProtected(); // Ошибка, получить доступ нельзя
+
+
+
+        state.PrintInternal();    // норм
+
+
+
+        state.PrintProtectedInternal();  // норм
+
+
+
+        state.PrintPublic();      // норм
+
+    }
+
+}
+```

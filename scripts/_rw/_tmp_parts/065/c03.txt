@@ -1,0 +1,3 @@
+```cpp
+person tom{ 34, "Tom" };
+```

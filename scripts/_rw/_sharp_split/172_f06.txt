@@ -1,0 +1,7 @@
+```c#
+
+
+fstream.WriteByte(13);
+
+fstream.WriteByte(103);
+```

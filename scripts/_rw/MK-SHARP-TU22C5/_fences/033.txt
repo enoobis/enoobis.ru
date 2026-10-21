@@ -1,0 +1,500 @@
+```c#
+
+
+namespace имя_пространства_имен
+
+{
+
+	// содержимое пространства имен
+
+}
+`
+
+=====FENCE=====
+
+``
+
+
+
+
+Например, определим в файле **Program.cs** пространство имен, которое будет называться **Base**
+
+
+
+
+`
+
+=====FENCE=====
+
+``c#
+
+
+namespace Base
+
+{
+
+    class Person
+
+    {
+
+        string name;
+
+        public Person(string name) => this.name = name;
+
+        public void Print() => Console.WriteLine($"Имя: {name}");
+
+    }
+
+}
+`
+
+=====FENCE=====
+
+``
+
+
+
+
+Здесь пространство имен содержит класс Person, которой имеет одну переменную - name, конструктор и метод Print.
+
+
+
+
+![пространства имен в языке программирования c# и .net](/uploads/course-lectures/0356d894b6d5b8c1a3eee1e7f36a68bc2fa81fe5.png)
+
+
+
+
+Теперь попробуем использовать класс Person:
+
+
+
+
+`
+
+=====FENCE=====
+
+``c#
+
+
+Person tom = new Person("Tom"); // Ошибка - Visual Studio не видит класс Person
+
+tom.Print();
+
+
+
+namespace Base
+
+{
+
+    class Person
+
+    {
+
+        string name;
+
+        public Person(string name) => this.name = name;
+
+        public void Print() => Console.WriteLine($"Имя: {name}");
+
+    }
+
+}
+`
+
+=====FENCE=====
+
+``
+
+
+
+
+Здесь на первой строке мы столкнемся с ошибкой, так как Visual Studio не может найти класс Person. Чтобы все-таки обратиться к классу Person, необходимо использовать полное имя этого класса с учетом пространства имен:
+
+
+
+
+`
+
+=====FENCE=====
+
+``c#
+
+
+Base.Person tom = new("Tom");
+
+tom.Print();          // Имя: Tom
+
+
+
+namespace Base
+
+{
+
+    class Person
+
+    {
+
+        string name;
+
+        public Person(string name) => this.name = name;
+
+        public void Print() => Console.WriteLine($"Имя: {name}");
+
+    }
+
+}
+`
+
+=====FENCE=====
+
+``
+
+
+
+
+Поскольку класс Person располагается в пространстве имен Base, то его полное имя - **Base.Person**. Соответственно, используя это имя, мы можем обращаться к данному классу вне его пространства имен.
+
+
+
+
+### Подключение пространства имен
+
+
+
+
+Однако полное имя класса с учетом пространства имен добавляет в код избыточность - особенно, если пространство имен содержит множество классов, которые мы хотим использовать. И чтобы не писать полное имя класса, мы можем просто подключить пространство имен с помощью директивы **using**:
+
+
+
+
+`
+
+=====FENCE=====
+
+``c#
+
+
+using Base; // подключение пространства имен Base
+
+
+
+Person tom = new("Tom");
+
+tom.Print();     // Имя: Tom
+
+
+
+namespace Base
+
+{
+
+    class Person
+
+    {
+
+        string name;
+
+        public Person(string name) => this.name = name;
+
+        public void Print() => Console.WriteLine($"Имя: {name}");
+
+    }
+
+}
+`
+
+=====FENCE=====
+
+``
+
+
+
+
+![подключение пространства имен и using в языке программирования c# и .net](/uploads/course-lectures/f1e83a1e9a8d23426604f6ccb5ef45625b148169.png)
+
+
+
+
+
+
+
+
+
+
+### Вложенные пространства имен
+
+
+
+
+Одни пространства имен могут содержать другие. Например:
+
+
+
+
+`
+
+=====FENCE=====
+
+``c#
+
+
+namespace Base
+
+{
+
+    namespace PersonTypes
+
+    {
+
+        class Person
+
+        {
+
+            string name;
+
+            OrganisationTypes.Company company;
+
+            public Person(string name, OrganisationTypes.Company company) 
+
+            { 
+
+                this.name = name; 
+
+                this.company = company; 
+
+            }
+
+            public void Print()
+
+            {
+
+                Console.WriteLine($"Имя: {name} ");
+
+                company.Print();
+
+            }
+
+        }
+
+    }
+
+    namespace OrganisationTypes
+
+    {
+
+        class Company
+
+        {
+
+            string title;
+
+            public Company(string title) => this.title = title;
+
+            public void Print() => Console.WriteLine($"Название компании: {title}");
+
+        }
+
+    }
+
+}
+`
+
+=====FENCE=====
+
+``
+
+
+
+
+В данном случае классы Person и Company находятся в разных вложенных пространствах имен, поэтому чтобы в классе Person использовать класс Company, надо прописывать имя класса с учетом его пространства имен: `
+
+=====FENCE=====
+
+` (так как оба класса в итоге находятся в общем пространстве - Base, то его имя можно не указывать в названии класса) или подключать пространство имен класса Company с помощью директивы `using`.
+
+
+
+
+Для обращения к этим классам вне пространства Base необходимо использовать всю цепочку пространств имен:
+
+
+
+
+`
+
+=====FENCE=====
+
+``c#
+
+
+using Base.PersonTypes; // подключение пространства имен Base.PersonTypes для класса Person
+
+
+
+Base.OrganisationTypes.Company microsoft = new("Microsoft");
+
+Person tom = new("Tom", microsoft);
+
+tom.Print();     // Имя: Tom   Название компании: Microsoft
+
+
+
+namespace Base
+
+{
+
+    namespace PersonTypes
+
+    {
+
+        class Person
+
+        {
+
+            string name;
+
+            OrganisationTypes.Company company;
+
+            public Person(string name, OrganisationTypes.Company company) 
+
+            { 
+
+                this.name = name; 
+
+                this.company = company; 
+
+            }
+
+            public void Print()
+
+            {
+
+                Console.WriteLine($"Имя: {name} ");
+
+                company.Print();
+
+            }
+
+        }
+
+    }
+
+    namespace OrganisationTypes
+
+    {
+
+        class Company
+
+        {
+
+            string title;
+
+            public Company(string title) => this.title = title;
+
+            public void Print() => Console.WriteLine($"Название компании: {title}");
+
+        }
+
+    }
+
+}
+`
+
+=====FENCE=====
+
+``
+
+
+
+
+### Пространства имен уровня файла
+
+
+
+
+Начиная с .NET 6 и C# 10 можно определять пространства имен на уровне файла. Например, добавим в проект новый файл с кодом c#. Для этого в Visual Studio нажмем на название проекта правой кнопкой мыши и в появившемся меню выберем пункт **Add -> New Item...**
+
+
+
+
+![добавление нового пространства имен c# в visual studio](/uploads/course-lectures/a7d219f70c773505e30a9ea4f3360c87e10245cb.png)
+
+
+
+
+В окне добавления нового элемента выберем пункт **Class** и поле **Name** в качестве имени файла укажем **Base.cs**
+
+
+
+
+![пространства имен уровня файла c# в visual studio](/uploads/course-lectures/95b1e382f773ac3ad38be7276a41961821b403ea.png)
+
+
+
+
+После этого в проект будет добавлен файл **Base.cs**. Удалим из него все содержимое по умолчанию и определим в нем следующий код:
+
+
+
+
+`
+
+=====FENCE=====
+
+``c#
+
+
+namespace Base;
+
+
+
+class Person
+
+{
+
+    string name;
+
+    public Person(string name) => this.name = name;
+
+    public void Print() => Console.WriteLine($"Имя: {name} ");
+
+}
+`
+
+=====FENCE=====
+
+``
+
+
+
+
+Директива `
+
+=====FENCE=====
+
+` в начале файла указывает, что содержимое файла будет представлять пространство имен Base.
+
+
+
+
+Теперь подключим это пространство имен в файле **Program.cs**:
+
+
+
+
+`
+
+=====FENCE=====
+
+``c#
+
+
+using Base; // подключение пространства имен Base
+
+
+
+Person tom = new("Tom");
+
+tom.Print();
+`

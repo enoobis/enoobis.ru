@@ -1,0 +1,10 @@
+import re
+from pathlib import Path
+
+root = Path(r"C:\Users\user\Desktop\fggdfg\scripts\_rw\MK-PYTHON-TF10F\src")
+FENCE = re.compile(r"```[^\n]*\n.*?```", re.S)
+for i in range(48, 57):
+    text = (root / f"{i:03}.md").read_text(encoding="utf-8")
+    prose = FENCE.sub(" ", text)
+    words = re.findall(r"\S+", prose)
+    print(f"{i:03} words={len(words)} chars={sum(len(w) for w in words)}")

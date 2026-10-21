@@ -1,0 +1,86 @@
+
+
+
+
+
+Метод `CopyTo` класса `FileInfo` принимает два параметра: путь, по которому файл будет копироваться, и булевое значение, которое указывает, надо ли при копировании перезаписывать файл (если `true`, как в случае выше, файл при копировании перезаписывается). Если же в качестве последнего параметра передать значение `false`, то если такой файл уже существует, приложение выдаст ошибку.
+
+
+
+
+Метод `Copy` класса `File` принимает три параметра: путь к исходному файлу, путь, по которому файл будет копироваться, и булевое значение, указывающее, будет ли файл перезаписываться.
+
+
+
+
+### Чтение и запись файлов
+
+
+
+
+В дополнение к вышерассмотренным методам класс File также предоставляет ряд методов для чтения-записи текстовых и бинарных файлов:
+
+
+
+
+
+
+
+- AppendAllLines(String, IEnumerable ) / AppendAllLinesAsync(String, IEnumerable , CancellationToken) добавляют в файл набор строк. Если файл не существует, то он создается
+
+
+- AppendAllText(String, String) / AppendAllTextAsync(String, String, CancellationToken) добавляют в файл строку. Если файл не существует, то он создается
+
+
+
+
+- byte[] ReadAllBytes (string path) / Task  ReadAllBytesAsync (string path, CancellationToken cancellationToken) считывают содержимое бинарного файла в массив байтов
+
+
+
+
+- string[] ReadAllLines (string path) / Task  ReadAllLinesAsync (string path, CancellationToken cancellationToken) считывают содержимое текстового файла в массив строк
+
+
+
+
+
+
+- string ReadAllText (string path) / Task  ReadAllTextAsync (string path, CancellationToken cancellationToken) считывают содержимое текстового файла в строку
+
+
+
+
+
+
+- IEnumerable  ReadLines (string path) считывают содержимое текстового файла в коллекцию строк
+
+
+
+
+- void WriteAllBytes (string path, byte[] bytes) / Task WriteAllBytesAsync (string path, byte[] bytes, CancellationToken cancellationToken) записывают массив байт в бинарный файл. Если файл не существует, он создается. Если существует, то перезаписывается
+
+
+
+
+- void WriteAllLines (string path, string[] contents) / Task WriteAllLinesAsync (string path, IEnumerable  contents, CancellationToken cancellationToken) записывают массив строк в текстовый файл. Если файл не существует, он создается. Если существует, то перезаписывается
+
+
+
+
+- WriteAllText (string path, string? contents) / Task WriteAllTextAsync (string path, string? contents, CancellationToken cancellationToken) записывают строку в текстовый файл. Если файл не существует, он создается. Если существует, то перезаписывается
+
+
+
+
+
+Как видно, эти методы покрывают практически все основные сценарии - чтение и запись текстовых и бинарных файлов. Причем в зависимости от задачи можно применять как синхронные методы, так и их асинхронные аналоги.
+
+
+
+
+Например, запишем и считаем обратно в строку текстовый файл:
+
+
+
+

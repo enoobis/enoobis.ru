@@ -1,0 +1,65 @@
+===== FENCE 0 len=413 =====
+```c#
+
+string path = "note1.txt";
+string text = "Hello World\nHello  enoobis.COM";
+
+// полная перезапись файла 
+using (StreamWriter writer = new StreamWriter(path, false))
+{
+    await writer.WriteLineAsync(text);
+}
+// добавление в файл
+using (StreamWriter writer = new StreamWriter(path, true))
+{
+    await writer.WriteLineAsync("Addition");
+    await writer.WriteAsync("4,5");
+}
+```
+===== END =====
+===== FENCE 1 len=73 =====
+```consoletext
+
+Hello World
+Hello  enoobis.COM
+Addition
+4,5
+```
+===== END =====
+===== FENCE 2 len=138 =====
+```c#
+
+using (StreamWriter writer = new StreamWriter(path, true, System.Text.Encoding.Default))
+{
+    // операции с writer
+}
+```
+===== END =====
+===== FENCE 3 len=210 =====
+```c#
+
+string path = "note1.txt";
+// асинхронное чтение
+using (StreamReader reader = new StreamReader(path))
+{
+    string text = await reader.ReadToEndAsync();
+    Console.WriteLine(text);
+}
+```
+===== END =====
+===== FENCE 4 len=272 =====
+```c#
+
+string path = "/Users/eugene/Documents/app/note1.txt";
+
+// асинхронное чтение
+using (StreamReader reader = new StreamReader(path))
+{
+	string? line;
+	while ((line = await reader.ReadLineAsync()) != null)
+	{
+		Console.WriteLine(line);
+	}
+}
+```
+===== END =====

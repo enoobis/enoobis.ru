@@ -1,0 +1,9 @@
+```cpp
+
+
+tom.print_count();
+
+bob.print_count();
+
+sam.print_count();
+```

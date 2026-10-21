@@ -1,0 +1,17 @@
+```c#
+
+
+class Person
+
+{
+
+	// через инициализацию свойства
+
+	public string Name { get; } = "Tom";
+
+	// через конструктор
+
+	public Person(string name) => Name = name;
+
+}
+```

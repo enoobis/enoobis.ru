@@ -1,0 +1,256 @@
+=== 103 chars=5634 fences=14 prose=3052 cr=0 runs={1: 24, 3: 28}
+-- head --
+1: '**Множество** (set) представляет такой контейнер, который может хранить только уникальные значения. Как правило, множества применяются для создания коллекций, которые не должны иметь дубликатов.'
+2: ''
+3: ''
+4: ''
+5: ''
+6: 'Множества представлены типом **std::set<>**, который определен в заголовочном файле ` `. Создание пустого множества:'
+7: ''
+8: ''
+=== 104 chars=9033 fences=18 prose=4612 cr=0 runs={1: 24, 3: 36}
+-- head --
+1: 'Карта или **std::map** представляет контейнер, где каждое значение ассоциировано с определенным ключом. И по этому ключу можно получить элемент. Причем ключи могут иметь только уникальные значения. Примером такого контейнера может служить словарь, где каждому слову сопоставляется его перевод или объяснение. Поэтому такие структуры еще называют словарями.'
+2: ''
+3: ''
+4: ''
+5: ''
+6: 'Стандартная библиотека C++ предоставляет два типа словарей: **std::map ** и **std::unordered_map **. Эти типы представляют шаблоны, которые типизируются двумя типами. Первый тип - Key задает тип для ключей, а второй тип - Value устанавливает тип для значений.'
+7: ''
+8: ''
+=== 105 chars=3647 fences=6 prose=1917 cr=0 runs={1: 14, 3: 12}
+-- head --
+1: 'Стандарт C++20 предоставляет тип **std::span **, который позволяет ссылаться на любую последовательность значений типа T - это может быть и `std::vector `, и `std::array `, и стандартный массив, и ряд других последовательностей. Рассмотрим, в чем его преимущество.'
+2: ''
+3: ''
+4: ''
+5: ''
+6: 'Например, нам надо определить функцию, которая вычисляет максимальное значение в наборе данных. Но последовательностей может быть много. И, допустим, мы хотим, чтобы можно было найти максимальный элемент в векторе и массиве. Для этого мы могли бы определить две версии одной функции, которые принимают по отдельности вектор и массив:'
+7: ''
+8: ''
+=== 106 chars=6529 fences=19 prose=3485 cr=0 runs={1: 14, 3: 38}
+-- head --
+1: 'Как уже было рассмотрено в статье Введение в строки, в языке C++ для работы со строками определен специальный тип **std::string**, определенный в модуле ` `. Рассмотрим подробнее основные моменты работы с данным типом.'
+2: ''
+3: ''
+4: ''
+5: ''
+6: 'Объект типа string содержит последовательность символов типа char, которая может быть пустой. Например, определение пустой строки:'
+7: ''
+8: ''
+=== 107 chars=1926 fences=3 prose=1564 cr=0 runs={1: 24, 3: 6}
+-- head --
+1: '## Строки с поддержкой Unicode'
+2: ''
+3: 'Для поддержки строк с символами кодировок Unicode в С++ в модуле ` ` также есть еще ряд дополнительных типов строк.'
+4: ''
+5: '- std::wstring содержит строку символов типа wchar_t'
+6: ''
+7: '- std::u8string содержит строку символов типа char8_t (добавлена в C++20)'
+8: ''
+=== 108 chars=1997 fences=4 prose=1301 cr=0 runs={3: 8, 1: 18}
+-- head --
+1: '### Преобразование в строку'
+2: ''
+3: 'Нередко может возникнуть необходимость объединить строку с данными других типов, например, числами. Однако объединить строку мы можем только с другой строкой. Поэтому данные других типов вначале необходимо преобразовать в строку. Для преобразования в строку применяется функция **std:to_string()**, в которую передается преобразуемое значение:'
+4: ''
+5: '```cpp'
+6: '#include <iostream>'
+7: '#include <string>'
+8: ''
+=== 109 chars=7240 fences=12 prose=4563 cr=0 runs={3: 24, 1: 14}
+-- head --
+1: 'К строкам в языке С++ можно применять операции сравнения.'
+2: ''
+3: ''
+4: ''
+5: ''
+6: '```cpp'
+7: '> >= < <= == != <=>'
+8: '```'
+=== 110 chars=3974 fences=8 prose=1610 cr=0 runs={3: 16, 1: 8}
+-- head --
+1: '### Получение подстроки'
+2: ''
+3: ''
+4: ''
+5: ''
+6: 'Функция **substr()** получает подстроку. Эта функция принимает два параметра. Первый параметр представляет индекс, с которого начинается подстрока. Второй параметр - количество символов извлекаемой подстроки. Результатом функции является выделенная строка:'
+7: ''
+8: ''
+=== 111 chars=9415 fences=17 prose=4426 cr=0 runs={1: 28, 3: 34}
+-- head --
+1: 'Функция **find()** возвращает индекс первого вхождения подстроки или отдельного символа в строке в виде значние я типа `size_t`:'
+2: ''
+3: ''
+4: ''
+5: ''
+6: '```cpp'
+7: ''
+8: ''
+=== 112 chars=8143 fences=17 prose=4038 cr=0 runs={3: 34, 1: 14}
+-- head --
+1: '### Добавление в строку'
+2: ''
+3: ''
+4: ''
+5: ''
+6: 'Если надо добавить в конец строки другую строку, применяется метод **append()**, в который передается добавляемая строка:'
+7: ''
+8: ''
+=== 113 chars=5097 fences=6 prose=2912 cr=0 runs={1: 32, 3: 12}
+-- head --
+1: 'Стандартная библиотека С++ также предоставляет ряд встроенных функций для работы с символами. В основном они связанны с проверкой символов:'
+2: ''
+3: ''
+4: ''
+5: ''
+6: ''
+7: ''
+8: ''
+
+==== 103 FENCE INDEX ====
+#0 ```cpp | #include <iostream>
+#1 ```cpp | std::set<int> numbers {1, 2, 3, 4, 5};
+#2 ```cpp | #include <iostream>
+#3 ```cpp | #include <iostream>
+#4 ```cpp | #include <iostream>
+#5 ```bash | 1       2       3       4       5       6
+#6 ```cpp | #include <iostream>
+#7 ```bash | 4 5
+#8 ```cpp | #include <iostream>
+#9 ```cpp | #include <iostream>
+#10 ```cpp | #include <iostream>
+#11 ```bash | 1       2       3       4       5       6
+#12 ```cpp | #include <iostream>
+#13 ```bash | 6       1       4       5       2       3
+
+==== 104 FENCE INDEX ====
+#0 ```cpp | #include <iostream>
+#1 ```cpp | map[ключ]=значение
+#2 ```cpp | #include <iostream>
+#3 ```cpp | products["bread"] = 30;
+#4 ```cpp | unsigned breadPrice = products["bread"];
+#5 ```bash | bread   30
+#6 ```cpp | #include <iostream>
+#7 ```cpp | for (const auto& element : products)
+#8 ```cpp | for (const auto& [product, price] : products)
+#9 ```bash | apple   60
+#10 ```cpp | #include <iostream>
+#11 ```cpp | #include <iostream>
+#12 ```cpp | #include <iostream>
+#13 ```cpp | #include <iostream>
+#14 ```cpp | #include <iostream>
+#15 ```cpp | #include <iostream>
+#16 ```bash | apple   60
+#17 ```cpp | #include <iostream>
+
+==== 105 FENCE INDEX ====
+#0 ```cpp | int max(const std::vector<int>&);
+#1 ```cpp | #include <iostream>
+#2 ```cpp | #include <iostream>
+#3 ```cpp | std::vector<int> numbers{1, 2, 3, 4, 5};
+#4 ```cpp | const std::vector<int> numbers{1, 2, 3, 4, 5};
+#5 ```cpp | #include <iostream>
+
+==== 106 FENCE INDEX ====
+#0 ```cpp | std::string message;
+#1 ```cpp | std::string message {"Hello enoobis.ru!"};
+#2 ```cpp | std::string message (4, 'd'); // повторяем d 4 раза - message = dddd
+#3 ```cpp | std::string hello{"hello world"};
+#4 ```cpp | std::string message1 {"hello world", 4}; // берем первые 4 символа - message1 = hell
+#5 ```cpp | #include <iostream>
+#6 ```cpp | #include <iostream>
+#7 ```bash | Input your name: Tom
+#8 ```cpp | #include <iostream>
+#9 ```bash | Input your name: Tom Smith
+#10 ```cpp | #include <iostream>
+#11 ```cpp | #include <iostream>
+#12 ```cpp | #include <iostream>
+#13 ```cpp | std::string message{ "hello " + "world" + "!"};   // ! Ошибка
+#14 ```cpp | std::string hello {"hello"};
+#15 ```cpp | #include <iostream>
+#16 ```cpp | #include <iostream>
+#17 ```bash | Name:   "Tom"
+#18 ```cpp | #include <iostream>
+
+==== 107 FENCE INDEX ====
+#0 ```cpp | std::wstring text;
+#1 ```cpp | std::wstring text {L"Hello World!"};
+#2 ```cpp | #include <iostream>
+
+==== 108 FENCE INDEX ====
+#0 ```cpp | #include <iostream>
+#1 ```cpp | std::string str{ "123" };
+#2 ```cpp | #include <iostream>
+#3 ```cpp | #include <iostream>
+
+==== 109 FENCE INDEX ====
+#0 ```cpp | > >= < <= == != <=>
+#1 ```cpp | std::string s1 {"hello"};
+#2 ```cpp | #include <iostream>
+#3 ```bash | Alice
+#4 ```cpp | std::string tom {"Tom"};
+#5 ```cpp | std::string tom {"Tom"};
+#6 ```cpp | int compare(size_t _Off, size_t _Nx, const std::string &_Right) const
+#7 ```cpp | #include <iostream>
+#8 ```cpp | if (text.compare(i, word.length(), word) == 0)
+#9 ```bash | text contains world at index 6
+#10 ```cpp | #include <iostream>
+#11 ```bash | text contains substring at index 7
+
+==== 110 FENCE INDEX ====
+#0 ```cpp | #include <iostream>
+#1 ```cpp | std::string message{ "tom@localhost.com"};
+#2 ```cpp | std::string message{ "tom@localhost.com"};
+#3 ```cpp | std::string message{ "tom@localhost.com"};
+#4 ```cpp | #include <iostream>
+#5 ```cpp | #include <iostream>
+#6 ```cpp | #include <iostream>
+#7 ```cpp | #include <iostream>
+
+==== 111 FENCE INDEX ====
+#0 ```cpp | #include <iostream>
+#1 ```cpp | if (text.find("banana") == std::string::npos)
+#2 ```cpp | #include <iostream>
+#3 ```cpp | #include <iostream>
+#4 ```bash | The word is found 2 times.
+#5 ```cpp | #include <iostream>
+#6 ```cpp | #include <iostream>
+#7 ```cpp | #include <iostream>
+#8 ```cpp | #include <iostream>
+#9 ```cpp | #include <iostream>
+#10 ```cpp | #include <iostream>
+#11 ```cpp | const std::string separators{ " ,;:.\"!?'*\n" }; // разделители слов
+#12 ```cpp | size_t start { text.find_first_not_of(separators) };
+#13 ```cpp | while (start != std::string::npos)
+#14 ```cpp | size_t end = text.find_first_of(separators, start + 1); // находим, где закончилось слово
+#15 ```cpp | if (end == std::string::npos) // если НЕ найден ни один из символов-разделителей
+#16 ```cpp | start = text.find_first_not_of(separators, end + 1); // находим начальный индекс следующег
+
+==== 112 FENCE INDEX ====
+#0 ```cpp | #include <iostream>
+#1 ```cpp | #include <iostream>
+#2 ```cpp | std::string text {"Hello C++"};
+#3 ```cpp | std::string text {"Langs: C++"};
+#4 ```cpp | std::string text {"Number: 5678"};
+#5 ```cpp | std::string &std::string::replace(size_t _Off, size_t _Nx, const char *_Ptr)
+#6 ```cpp | #include <iostream>
+#7 ```cpp | std::string text {"Lang: Java"};
+#8 ```cpp | #include <iostream>
+#9 ```cpp | #include <iostream>
+#10 ```cpp | std::string text {"Phone: +12345678901"};
+#11 ```cpp | #include <iostream>
+#12 ```cpp | #include <iostream>
+#13 ```cpp | #include <iostream>
+#14 ```cpp | std::string text {"Hello Tom"};
+#15 ```cpp | std::string text {"Hello Tom"};
+#16 ```cpp | #include <iostream>
+
+==== 113 FENCE INDEX ====
+#0 ```cpp | #include <iostream>
+#1 ```cpp | #include <iostream>
+#2 ```cpp | #include <iostream>
+#3 ```bash | strings are not equal
+#4 ```cpp | #include <iostream>
+#5 ```bash | HELLO and hello are equal

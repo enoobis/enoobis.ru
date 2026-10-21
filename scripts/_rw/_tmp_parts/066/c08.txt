@@ -1,0 +1,3 @@
+```cpp
+enum class Operation: char {Add = '+', Subtract='-', Multiply='*'};
+```

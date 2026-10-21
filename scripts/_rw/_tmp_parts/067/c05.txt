@@ -1,0 +1,11 @@
+```cpp
+
+
+Employee(std::string name, unsigned age, std::string company): Person(name, age)
+
+{
+
+    this->company = company;
+
+}
+```

@@ -1,0 +1,27 @@
+```c#
+
+
+int Sum(int x, int y)
+
+{
+
+	return x + y;
+
+}
+
+int Sum(int number1, int number2)
+
+{
+
+	return number1 + number2;
+
+}
+
+void Sum(int x, int y)
+
+{
+
+	Console.WriteLine(x + y);
+
+}
+```

@@ -1,0 +1,11 @@
+```c#
+
+
+using (FileStream fstream = new FileStream("note3.dat", FileMode.OpenOrCreate))
+
+{
+
+    // операции с fstream
+
+}
+```

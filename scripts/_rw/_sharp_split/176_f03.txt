@@ -1,0 +1,27 @@
+```c#
+
+
+using System.Text.Json;
+
+
+
+Person tom = new Person("Tom", 37);
+
+
+
+var options = new JsonSerializerOptions
+
+{
+
+    WriteIndented = true
+
+};
+
+string json = JsonSerializer.Serialize<Person>(tom, options);
+
+Console.WriteLine(json);
+
+Person? restoredPerson = JsonSerializer.Deserialize<Person>(json);
+
+Console.WriteLine(restoredPerson?.Name);
+```

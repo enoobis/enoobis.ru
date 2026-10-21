@@ -1,0 +1,19 @@
+```c#
+
+
+using (BinaryReader reader = new BinaryReader(File.Open("person.dat", FileMode.Open)))
+
+{
+
+    // считываем из файла строку
+
+    string name = reader.ReadString();
+
+    // считываем из файла число 
+
+    int age = reader.ReadInt32();
+
+    Console.WriteLine($"Name: {name}  Age: {age}");
+
+}
+```

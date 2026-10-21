@@ -1,0 +1,25 @@
+```c#
+
+
+using System.IO.Compression;
+
+
+
+string sourceFolder = "D://test/"; // исходная папка
+
+string zipFile = "D://test.zip"; // сжатый файл
+
+string targetFolder = "D://newtest"; // папка, куда распаковывается файл
+
+
+
+ZipFile.CreateFromDirectory(sourceFolder, zipFile);
+
+Console.WriteLine($"Папка {sourceFolder} архивирована в файл {zipFile}");
+
+ZipFile.ExtractToDirectory(zipFile, targetFolder);
+
+
+
+Console.WriteLine($"Файл {zipFile} распакован в папку {targetFolder}");
+```

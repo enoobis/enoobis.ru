@@ -1,0 +1,17 @@
+```c#
+
+
+class Person
+
+{
+
+	string name;
+
+	
+
+	// эквивалентно public string Name { get { return name; } }
+
+	public string Name => name;
+
+}
+```

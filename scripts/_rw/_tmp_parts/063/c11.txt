@@ -1,0 +1,9 @@
+```bash
+
+
+Created 3 objects
+
+Max age: 120
+
+Max age: 110
+```

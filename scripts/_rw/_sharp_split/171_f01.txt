@@ -1,0 +1,19 @@
+```c#
+
+
+// абсолютные пути
+
+string path1 = @"C:\Users\eugene\Documents\content.txt";  // для Windows
+
+string path2 = "C:\\Users\\eugene\\Documents\\content.txt";  // для Windows
+
+string path3 = "/Users/eugene/Documents/content.txt";  // для MacOS/Linux
+
+
+
+// относительные пути
+
+string path4 = "MyDir\\content.txt";  // для Windows
+
+string path5 = "MyDir/content.txt";  // для MacOS/Linux
+```

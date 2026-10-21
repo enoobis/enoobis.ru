@@ -1,0 +1,362 @@
+```c#
+Console.WriteLine("Hello");
+`
+
+=====FENCE=====
+
+``
+
+
+
+
+При этом не подключая явно пространство имен `
+
+=====FENCE=====
+
+`, где располагается класс `Console`, тем не менее этот класс будет доступен, и мы его сможем использовать в любом файле кода C# в проекте. Дело в том, что начиная с .NET 6 в проекте по умолчанию подключается ряд наиболее часто используемых пространств имен, поэтому нам их не надо явно подключать. Эта настройка действует на уровне всего проекта. Так, откроем файл проекта. Для этого либо двойным кликом левой кнопкой мыши нажмем на проект, либо нажмем на проект правой кнопкой мыши и в появившемся меню выберем пункт **Edit Project File**
+
+
+
+
+![implicitusings в c# в visual studio](/uploads/course-lectures/38f4e04bfa812770fff94079542bf4f1bbfafdc3.png)
+
+
+
+
+После этого Visual Studio откроет нам файл проекта, который будет выглядеть примерно следующим образом:
+
+
+
+
+`
+
+=====FENCE=====
+
+``xml
+
+
+<Project Sdk="Microsoft.NET.Sdk">
+
+
+
+  <PropertyGroup>
+
+    <OutputType>Exe</OutputType>
+
+    <TargetFramework>net6.0</TargetFramework>
+
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <Nullable>enable</Nullable>
+
+  </PropertyGroup>
+
+
+
+</Project>
+`
+
+=====FENCE=====
+
+``
+
+
+
+
+Здесь строка
+
+
+
+
+`
+
+=====FENCE=====
+
+``xml
+<ImplicitUsings>enable</ImplicitUsings>
+`
+
+=====FENCE=====
+
+``
+
+
+
+
+точнее элемент `
+
+=====FENCE=====
+
+` задает подключение некоторого набора пространств имен по умолчанию. Значение **enable** указывает, что эта настройка будет применяться.
+
+
+
+
+Если мы запустим проект на выполнение, то после компиляции проект в проекте в папке **obj/Debug/net6.0** можно будет увидеть файл **[Имя_проекта].GlobalUsings.g.cs** (например, у меня проект называется HelloApp, соответственно файл будет называться **HelloApp.GlobalUsings.g.cs**). Если мы откроем этот файл, то увидим там следующее содержимое:
+
+
+
+
+`
+
+=====FENCE=====
+
+``c#
+
+
+global using global::System;
+
+global using global::System.Collections.Generic;
+
+global using global::System.IO;
+
+global using global::System.Linq;
+
+global using global::System.Net.Http;
+
+global using global::System.Threading;
+
+global using global::System.Threading.Tasks;
+`
+
+=====FENCE=====
+
+``
+
+
+
+
+Здесь перечислены все те пространства имен, которые подключаются в проект по умолчанию:
+
+
+
+
+`
+
+=====FENCE=====
+
+``c#
+
+
+System
+
+System.Collections.Generic
+
+System.IO
+
+System.Linq
+
+System.Net.Http
+
+System.Threading
+
+System.Threading.Tasks
+`
+
+=====FENCE=====
+
+``
+
+
+
+
+Стоит отметить, что это набор пространств имен, которые подключаются в проект консольного приложения по умолчанию, у других типов проектов набор подключаемых пространств может отличаться.
+
+
+
+
+### Отключение пространств по умолчанию
+
+
+
+
+В проектах, создаваемых в Visual Studio 2022 для .NET 6 и C# 10 эта возможность включена по умолчанию. Тем не менее при необходимости мы ее можем отключить. Для этого изменим эту настройку следующим образом:
+
+
+
+
+`
+
+=====FENCE=====
+
+``xml
+<ImplicitUsings>disable</ImplicitUsings>
+`
+
+=====FENCE=====
+
+``
+
+
+
+
+После этого Visual Studio 2022 подчеркнет нам класс `
+
+=====FENCE=====
+
+`, так как он нигде не определен в проекте, а его пространство имен не подключено:
+
+
+
+
+![implicitusings в .net 6 и c# 10 в visual studio 2022](/uploads/course-lectures/e3c45c04ead3c1789ebf1d80333e85ca2057b1cc.png)
+
+
+
+
+В этом случае нам потребуется либо подключить пространство имен `
+
+=====FENCE=====
+
+`, где располагается класс Console, либо использовать его полное имя:
+
+
+
+
+`
+
+=====FENCE=====
+
+``c#
+
+
+using System;   // или подключить пространство System
+
+Console.WriteLine("Hello world");
+
+
+
+// или использовать полное имя класса
+
+System.Console.WriteLine("Hello work");
+`
+
+=====FENCE=====
+
+``
+
+
+
+
+### Подключение и отключение пространств по отдельности
+
+
+
+
+Вместо подключения по умолчанию некоторого набора пространств имен по умолчанию также можно подключать и отключать по отдельности пространств имен. Так, изменим файл проекта следующим образом:
+
+
+
+
+`
+
+=====FENCE=====
+
+``xml
+
+
+<Project Sdk="Microsoft.NET.Sdk">
+
+
+
+  <PropertyGroup>
+
+    <OutputType>Exe</OutputType>
+
+    <TargetFramework>net6.0</TargetFramework>
+
+    <ImplicitUsings>disable</ImplicitUsings>
+
+    <Nullable>enable</Nullable>
+
+  </PropertyGroup>
+
+  
+
+  <ItemGroup>
+
+    <Using Include="System" />
+
+    <Using Include="System.Threading.Tasks" />
+
+  </ItemGroup>
+
+  
+
+</Project>
+`
+
+=====FENCE=====
+
+``
+
+
+
+
+Здесь атрибут **Include** элемента **Using** подключает пространства имен глобально по всему проекту. Например:
+
+
+
+
+`
+
+=====FENCE=====
+
+``c#
+<Using Include="System" />
+`
+
+=====FENCE=====
+
+``
+
+
+
+
+Подключает пространство System. Соответственно после этого нам не надо его подключать в файлы кода в проекте.
+
+
+
+
+Обратная ситуация - отключение некоторых ненужных пространств имен из тех, которые подключаются по умолчанию. Для этого применяется атрибут **Remove** элемента **Using**:
+
+
+
+
+`
+
+=====FENCE=====
+
+``xml
+
+
+<Project Sdk="Microsoft.NET.Sdk">
+
+
+
+  <PropertyGroup>
+
+    <OutputType>Exe</OutputType>
+
+    <TargetFramework>net6.0</TargetFramework>
+
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <Nullable>enable</Nullable>
+
+  </PropertyGroup>
+
+  
+
+  <ItemGroup>
+
+    <Using Remove="System" />
+
+    <Using Remove="System.Threading.Tasks"/>
+
+  </ItemGroup>
+
+  
+
+</Project>
+`

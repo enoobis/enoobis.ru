@@ -1,0 +1,91 @@
+==================== 076
+73: #include <iostream>
+186: #include <iostream>
+266: #include <iostream>
+347: #include <iostream>
+447: #include <iostream>
+534: ### Операторы присвоения
+547: #include <iostream>
+611: ### Унарные операции
+624: #include <iostream>
+692: #include <iostream>
+852: ### Переопределение оператора    Дополнительные материалы 
+858: - Упражнения для самопроверки
+==================== 077
+38: #include <iostream>
+155: #include <iostream>
+264: ### Явные преобразования
+277: #include <iostream>
+327: ### Преобразование между классами
+340: #include <iostream>
+342: #include <string>
+==================== 078
+9: #include <iostream>
+11: #include <string>
+153: #include <iostream>
+155: #include <string>
+227: #include <iostream>
+229: #include <string>
+==================== 079
+9: #include <iostream>
+99: #include <iostream>
+276: ### Копировани указателей
+289: #include <iostream>
+394: #include <iostream>
+476: ### Удаление оператора присваивания
+==================== 080
+6: ### Глобальное пространство имен
+19: #include <iostream>
+21: #include <string>
+83: ### Определение пространства имен
+121: #include <iostream>
+123: #include <string>
+205: ### Вложенные пространства имен
+218: #include <iostream>
+220: #include <string>
+318: ### Директива using
+331: #include <iostream>
+333: #include <string>
+403: #include <iostream>
+405: #include <string>
+460: ### Псевдонимы пространств
+485: #include <iostream>
+487: #include <string>
+==================== 081
+14: #include <iostream>
+16: #include <string>
+230: #include <iostream>
+232: #include <string>
+==================== 082
+19: - Реализация паттерна "Стратегия" или "Команда" : объект может хранить указатель на метод, который определяет его текущее поведение (стратегию)
+22: - Обработка данных по шаблону : можно создать массив указателей на поля и итерироваться по ним для выполнения однотипных операций (сериализация, валидация, вычисление суммы).
+25: - Диспетчеризация вызовов : в событийных системах, управляемых событиями, можно составить карту.словарь (например, `std::map` ), где ключом является некое событие, а значением — указатель на метод-обработчик этого события.
+45: - Объявление
+56: - Инициализация
+67: - Использование
+91: #include <iostream>
+93: #include <string>
+206: #include <iostream>
+208: #include <string>
+365: #include <iostream>
+367: #include <string>
+445: #include <iostream>
+447: #include <string>
+563: ## Указатели на функции-члены
+578: - Объявление:
+587: - Инициализация:
+596: - Использование:
+631: #include <iostream>
+633: #include <string>
+==================== 083
+14: #include <iostream>
+161: #include <iostream>
+261: #include <iostream>
+391: ### Создание объекта исключения
+409: #include <iostream>
+411: #include <string>
+465: ### Обработка и генерация разных типов исключений
+478: #include <iostream>
+762: ### try-catch и деструкторы
+775: #include <iostream>
+777: #include <string>

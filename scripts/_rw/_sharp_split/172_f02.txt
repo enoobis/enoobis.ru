@@ -1,0 +1,27 @@
+```c#
+
+
+FileStream? fstream = null;
+
+try
+
+{
+
+    fstream = new FileStream("note3.dat", FileMode.OpenOrCreate);
+
+    // операции с fstream
+
+}
+
+catch(Exception ex)
+
+{  }
+
+finally
+
+{
+
+    fstream?.Close();
+
+}
+```

@@ -1,0 +1,11 @@
+```cpp
+
+
+~Person()
+
+{
+
+	std::cout << "Person " << name << " deleted" << std::endl;
+
+}
+```

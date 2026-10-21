@@ -1,0 +1,11 @@
+```c#
+
+
+public string Name
+
+{
+
+	get { return name; }
+
+}
+```

@@ -1,0 +1,9 @@
+```cpp
+
+
+class Employee : public Person
+
+{
+
+};
+```

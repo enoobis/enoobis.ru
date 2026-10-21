@@ -1,0 +1,8 @@
+```c#
+// класс Directory
+string[] files = Directory.GetFiles(dirName, "*.exe");
+
+// класс DirectoryInfo
+var directory = new DirectoryInfo(dirName);
+FileInfo[] files = directory.GetFiles("*.exe");
+```

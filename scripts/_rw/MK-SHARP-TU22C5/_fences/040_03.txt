@@ -1,0 +1,13 @@
+```c#
+
+
+Calculator calc = new Calculator();
+
+calc.Add(1, 2); // 3
+
+calc.Add(1, 2, 3); // 6
+
+calc.Add(1, 2, 3, 4); // 10
+
+calc.Add(1.4, 2.5); // 3.9
+```

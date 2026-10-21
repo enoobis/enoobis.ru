@@ -1,0 +1,14 @@
+190 src_f=11 dst_f=11 src_parts=23 dst_parts=23
+  first diff src '```c#\n\n\n[2, 3, 4, 5] // этот паттерн соответствует любому массиву/списку, \n\n    '
+  first diff dst '```c#\n\n[2, 3, 4, 5] // этот паттерн соответствует любому массиву/списку, \n      '
+  rewritten
+191 src_f=12 dst_f=12 src_parts=25 dst_parts=25
+  first diff src '```c#\n\n\nint[] nums1 = { 1, 2, 3, 4 };\n\nint[] nums2 = new int[] { };   // пустой '
+  first diff dst '```c#\n\nint[] nums1 = { 1, 2, 3, 4 };\nint[] nums2 = new int[] { };   // пустой ма'
+  rewritten
+192 src_f=19 dst_f=19 src_parts=39 dst_parts=39
+  first diff src '```c#\n\n\nvoid Sum(params int[]  numbers)\n\n{\n\n    int result = 0;\n\n    foreach (va'
+  first diff dst '```c#\n\nvoid Sum(params int[]  numbers)\n{\n    int result = 0;\n    foreach (var n '
+  rewritten
+193 src_f=14 dst_f=14 src_parts=29 dst_parts=29
+  rewritten

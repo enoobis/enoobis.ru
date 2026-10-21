@@ -1,0 +1,35 @@
+```cpp
+
+
+#include <iostream>
+
+#include <string>
+
+
+
+struct person
+
+{
+
+	unsigned age;
+
+	std::string name;
+
+};
+
+
+
+int main()
+
+{
+
+	person tom;
+
+	tom.name = "Tom";
+
+	tom.age = 34;
+
+	std::cout << "Name: " << tom.name << "\tAge: " << tom.age << std::endl;
+
+}
+```

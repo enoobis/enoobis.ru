@@ -1,0 +1,17 @@
+```cpp
+
+
+public:
+
+    void print() const
+
+    {
+
+        std::cout << "Name: " << name << "\tAge: " << age << std::endl;
+
+    }
+
+    std::string name;       //  имя
+
+    unsigned age;           // возраст
+```

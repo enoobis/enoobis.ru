@@ -1,0 +1,29 @@
+```c#
+
+
+using System.Text;
+
+
+
+string path = "/Users/eugene/Documents/app/content.txt";
+
+
+
+string originalText = "Привет  enoobis.com";
+
+// запись строки
+
+await File.WriteAllTextAsync(path, originalText, Encoding.Unicode);
+
+// дозапись в конец файла
+
+await File.AppendAllTextAsync(path, "\nПривет мир", Encoding.Unicode);
+
+
+
+// чтение файла
+
+string fileText = await File.ReadAllTextAsync(path, Encoding.Unicode);
+
+Console.WriteLine(fileText);
+```

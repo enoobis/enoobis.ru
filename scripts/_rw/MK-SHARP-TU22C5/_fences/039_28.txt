@@ -1,0 +1,3 @@
+```c#
+Person tom = new Person { Name = "Tom", Age = 38 }; // ошибки нет
+```

@@ -1,0 +1,11 @@
+```cpp
+
+
+Employee(const Employee& employee): Person(employee)
+
+{ 
+
+    company=employee.company;
+
+}
+```

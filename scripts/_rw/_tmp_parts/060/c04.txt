@@ -1,0 +1,73 @@
+```cpp
+
+
+#include <iostream>
+
+#include <string>
+
+ 
+
+class Person 
+
+{
+
+private:
+
+    std::string name;
+
+    unsigned age;
+
+public:
+
+    Person(std::string p_name, unsigned p_age)
+
+    {
+
+        name = p_name;
+
+        age = p_age;
+
+    }
+
+    std::string getName() const
+
+    {
+
+        return name;
+
+    }
+
+    unsigned getAge() const
+
+    {
+
+        return age;
+
+    }
+
+    void print() const  
+
+    {
+
+        // в константной функции можно  вызывать только константные функции
+
+        std::cout << "Name: " << getName()  << "\tAge: " << getAge() << std::endl;
+
+    }
+
+};
+
+int main()
+
+{
+
+    const Person tom{"Tom", 38};
+
+    tom.print();            // Name: Tom       Age: 38
+
+    Person bob{"Bob", 42};
+
+    bob.print();            // Name: Bob       Age: 42
+
+}
+```

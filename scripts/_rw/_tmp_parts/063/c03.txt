@@ -1,0 +1,11 @@
+```cpp
+
+
+void print_count()
+
+{
+
+    std::cout << "Created " << count << " objects" << std::endl;
+
+}
+```

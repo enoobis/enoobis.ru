@@ -1,0 +1,25 @@
+```c#
+
+
+string path = "/Users/eugene/Documents/app/note1.txt";
+
+
+
+// асинхронное чтение
+
+using (StreamReader reader = new StreamReader(path))
+
+{
+
+	string? line;
+
+	while ((line = await reader.ReadLineAsync()) != null)
+
+	{
+
+		Console.WriteLine(line);
+
+	}
+
+}
+```

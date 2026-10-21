@@ -1,0 +1,178 @@
+===== FENCE 0 len=54 =====
+```c#
+FileStream(string filename, FileMode mode)
+```
+===== END =====
+===== FENCE 1 len=147 =====
+```c#
+
+FileStream File.Open(string file, FileMode mode);
+FileStream File.OpenRead(string file);
+FileStream File.OpenWrite(string file);
+```
+===== END =====
+===== FENCE 2 len=223 =====
+```c#
+
+FileStream? fstream = null;
+try
+{
+    fstream = new FileStream("note3.dat", FileMode.OpenOrCreate);
+    // операции с fstream
+}
+catch(Exception ex)
+{  }
+finally
+{
+    fstream?.Close();
+}
+```
+===== END =====
+===== FENCE 3 len=130 =====
+```c#
+
+using (FileStream fstream = new FileStream("note3.dat", FileMode.OpenOrCreate))
+{
+    // операции с fstream
+}
+```
+===== END =====
+===== FENCE 4 len=922 =====
+```c#
+
+using System.Text;
+
+string path = @"C:\app\note.txt";   // путь к файлу
+
+string text = "Hello  enoobis.COM"; // строка для записи
+
+// запись в файл
+using (FileStream fstream = new FileStream(path, FileMode.OpenOrCreate))
+{
+    // преобразуем строку в байты
+    byte[] buffer = Encoding.Default.GetBytes(text);
+    // запись массива байтов в файл
+    await fstream.WriteAsync(buffer, 0, buffer.Length);
+    Console.WriteLine("Текст записан в файл");
+}
+
+// чтение из файла
+using (FileStream fstream = File.OpenRead(path))
+{
+    // выделяем массив для считывания данных из файла
+    byte[] buffer = new byte[fstream.Length];
+    // считываем данные
+    await fstream.ReadAsync(buffer, 0, buffer.Length);
+    // декодируем байты в строку
+    string textFromFile = Encoding.Default.GetString(buffer);
+    Console.WriteLine($"Текст из файла: {textFromFile}");
+}
+```
+===== END =====
+===== FENCE 5 len=81 =====
+```consoletext
+
+Текст записан в файл
+Текст из файла: Hello  enoobis.COM
+```
+===== END =====
+===== FENCE 6 len=63 =====
+```c#
+
+fstream.WriteByte(13);
+fstream.WriteByte(103);
+```
+===== END =====
+===== FENCE 7 len=976 =====
+```c#
+
+using System.Text;
+
+string path = "note.dat";
+
+string text = "hello world";
+
+using (FileStream fstream = new FileStream(path, FileMode.OpenOrCreate))
+{
+    // преобразуем строку в байты
+    byte[] input = Encoding.Default.GetBytes(text);
+    // запись массива байтов в файл
+    fstream.Write(input, 0, input.Length);
+    Console.WriteLine("Текст записан в файл");
+}
+// чтение части файла
+using (FileStream fstream = new FileStream(path, FileMode.OpenOrCreate))
+{ 
+    // перемещаем указатель в конец файла, до конца файла- пять байт
+    fstream.Seek(-5, SeekOrigin.End); // минус 5 символов с конца потока
+
+    // считываем четыре символов с текущей позиции
+    byte[] output = new byte[5];
+    await fstream.ReadAsync(output, 0, output.Length);
+    // декодируем байты в строку
+    string textFromFile = Encoding.Default.GetString(output);
+    Console.WriteLine($"Текст из файла: {textFromFile}"); // world
+}
+```
+===== END =====
+===== FENCE 8 len=44 =====
+```c#
+fstream.Seek(-5, SeekOrigin.End)
+```
+===== END =====
+===== FENCE 9 len=68 =====
+```consoletext
+
+Текст записан в файл
+Текст из файла: world
+```
+===== END =====
+===== FENCE 10 len=1187 =====
+```c#
+
+using System.Text;
+
+string path = "note2.dat";
+
+string text = "hello world";
+
+// запись в файл
+using (FileStream fstream = new FileStream(path, FileMode.OpenOrCreate))
+{
+    // преобразуем строку в байты
+    byte[] input = Encoding.Default.GetBytes(text);
+    // запись массива байтов в файл
+    fstream.Write(input, 0, input.Length);
+    Console.WriteLine("Текст записан в файл");
+}
+using (FileStream fstream = new FileStream(path, FileMode.OpenOrCreate))
+{ 
+    // заменим в файле слово world на слово house
+    string replaceText = "house";
+    fstream.Seek(-5, SeekOrigin.End); // минус 5 символов с конца потока
+    byte[] input = Encoding.Default.GetBytes(replaceText);
+    await fstream.WriteAsync(input, 0, input.Length);
+
+    // считываем весь файл
+    // возвращаем указатель в начало файла
+    fstream.Seek(0, SeekOrigin.Begin);
+    byte[] output = new byte[fstream.Length];
+    await fstream.ReadAsync(output, 0, output.Length);
+    // декодируем байты в строку
+    string textFromFile = Encoding.Default.GetString(output);
+    Console.WriteLine($"Текст из файла: {textFromFile}"); // hello house
+}
+```
+===== END =====
+===== FENCE 11 len=46 =====
+```c#
+fstream.Seek(0, SeekOrigin.Begin);
+```
+===== END =====
+===== FENCE 12 len=74 =====
+```consoletext
+
+Текст записан в файл
+Текст из файла: hello house
+```
+===== END =====

@@ -1,0 +1,33 @@
+```c#
+
+
+using System.Text.Json;
+
+using System.Text.Unicode;
+
+using System.Text.Encodings.Web;
+
+
+
+Person tom = new Person("Евгений", 41);
+
+
+
+var options = new JsonSerializerOptions
+
+{
+
+    Encoder = JavaScriptEncoder.Create(UnicodeRanges.BasicLatin, UnicodeRanges.Cyrillic),
+
+    WriteIndented = true
+
+};
+
+string json = JsonSerializer.Serialize<Person>(tom, options);
+
+Console.WriteLine(json);
+
+Person? restoredPerson = JsonSerializer.Deserialize<Person>(json);
+
+Console.WriteLine(restoredPerson?.Name);
+```

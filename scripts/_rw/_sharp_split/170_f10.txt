@@ -1,0 +1,11 @@
+```c#
+string oldPath = @"C:\SomeFolder";
+string newPath = @"C:\SomeDir";
+DirectoryInfo dirInfo = new DirectoryInfo(oldPath);
+if (dirInfo.Exists && !Directory.Exists(newPath))
+{
+    dirInfo.MoveTo(newPath);
+	// или так
+    // Directory.Move(oldPath, newPath);
+}
+```

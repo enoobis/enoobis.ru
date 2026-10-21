@@ -1,0 +1,7 @@
+```cpp
+
+
+void drive(const Auto&);
+
+void setPrice(Auto&, unsigned);
+```

@@ -1,0 +1,10 @@
+114: blocks=10 prose_chars=2323 min60=1393 fences=20
+115: blocks=3 prose_chars=2404 min60=1442 fences=6
+116: blocks=12 prose_chars=3943 min60=2365 fences=24
+117: blocks=23 prose_chars=6688 min60=4012 fences=46
+118: blocks=9 prose_chars=2684 min60=1610 fences=18
+119: blocks=12 prose_chars=4009 min60=2405 fences=24
+120: blocks=4 prose_chars=1192 min60=715 fences=8
+121: blocks=20 prose_chars=5349 min60=3209 fences=40
+122: blocks=14 prose_chars=4121 min60=2472 fences=28
+123: blocks=8 prose_chars=1091 min60=654 fences=16

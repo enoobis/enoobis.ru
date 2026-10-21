@@ -1,0 +1,25 @@
+```c#
+
+
+string path = @"c:\app\content.txt";
+
+
+
+string originalText = "Hello  enoobis.com";
+
+// запись строки
+
+await File.WriteAllTextAsync(path, originalText);
+
+// дозапись в конец файла
+
+await File.AppendAllTextAsync(path, "\nHello work");
+
+
+
+// чтение файла
+
+string fileText = await File.ReadAllTextAsync(path);
+
+Console.WriteLine(fileText);
+```

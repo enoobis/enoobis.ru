@@ -1,0 +1,3 @@
+```cpp
+enum class Day {Monday = 1, Mon = Monday, Tuesday = Monday + 1, Wednesday, Thursday, Friday, Saturday, Sunday };
+```

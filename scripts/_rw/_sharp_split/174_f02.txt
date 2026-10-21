@@ -1,0 +1,63 @@
+```c#
+
+
+string path = "people.dat";
+
+
+
+// массив для записи
+
+Person[] people =
+
+{
+
+    new Person("Tom", 37),
+
+    new Person("Bob", 41)
+
+};
+
+
+
+using (BinaryWriter writer = new BinaryWriter(File.Open(path, FileMode.OpenOrCreate)))
+
+{
+
+    // записываем в файл значение каждого свойства объекта
+
+    foreach (Person person in people)
+
+    {
+
+        writer.Write(person.Name);
+
+        writer.Write(person.Age);
+
+    }
+
+    Console.WriteLine("File has been written");
+
+}
+
+
+
+class Person
+
+{
+
+    public string Name { get; set; }
+
+    public int Age { get; set; }
+
+    public Person(string name, int age)
+
+    {
+
+        Name = name;
+
+        Age = age;
+
+    }
+
+}
+```

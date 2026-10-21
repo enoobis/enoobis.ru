@@ -1,0 +1,7 @@
+```consoletext
+
+
+{"firstname":"Tom"}
+
+Name: Tom   Age: 0
+```

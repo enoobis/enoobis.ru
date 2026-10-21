@@ -1,0 +1,13 @@
+```c#
+
+
+class Person
+
+{
+
+    public string Name { private set; get;}
+
+    public Person(string name) => Name = name;
+
+}
+```

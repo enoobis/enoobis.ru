@@ -1,0 +1,47 @@
+```cpp
+
+
+#include <iostream>
+
+#include <string>
+
+class Person 
+
+{
+
+public:
+
+    std::string name;
+
+    unsigned age;
+
+    Person(std::string p_name, unsigned p_age)
+
+    {
+
+        name = p_name;
+
+        age = p_age;
+
+    }
+
+};
+
+int main()
+
+{
+
+    const Person tom{"Tom", 38};
+
+    // мы можем получить данные константы
+
+    std::cout << "Name: " << tom.name << "\tAge: " << tom.age << std::endl;
+
+    // но изменить их нельзя
+
+    // tom.name = "Tom";    // ! Ошибка
+
+    // tom.age = 38;        // ! Ошибка
+
+}
+```

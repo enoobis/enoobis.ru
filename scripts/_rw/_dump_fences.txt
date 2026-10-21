@@ -1,0 +1,597 @@
+=== 076 blocks 8 prose 2745 need 1647
+--- 076 #0 len 364 ---
+```python
+from datetime import datetime
+now = datetime.now()
+print(now.strftime("%Y-%m-%d"))             # 2017-05-03
+print(now.strftime("%d/%m/%Y"))             # 03/05/2017
+print(now.strftime("%d/%m/%y"))             # 03/05/17
+print(now.strftime("%d %B %Y (%A)"))        # 03 May 2017 (Wednesday)
+print(now.strftime("%d/%m/%y %I:%M"))       # 03/05/17 01:36
+```
+--- end ---
+--- 076 #1 len 181 ---
+```python
+from datetime import datetime
+import locale
+locale.setlocale(locale.LC_ALL, "")
+
+now = datetime.now()
+print(now.strftime("%d %B %Y (%A)"))        # 03 Май 2017 (среда)
+```
+--- end ---
+--- 076 #2 len 109 ---
+```python
+timedelta([days] [, seconds] [, microseconds] [, milliseconds] [, minutes] [, hours] [, weeks])
+```
+--- end ---
+--- 076 #3 len 325 ---
+```python
+from datetime import timedelta
+
+three_hours = timedelta(hours=3)
+print(three_hours)       # 3:00:00
+three_hours_thirty_minutes = timedelta(hours=3, minutes=30)  # 3:30:00
+
+two_days = timedelta(2)  # 2 days, 0:00:00
+
+two_days_three_hours_thirty_minutes = timedelta(days=2, hours=3, minutes=30)  # 2 days, 3:30:00
+```
+--- end ---
+--- 076 #4 len 251 ---
+```python
+from datetime import timedelta, datetime
+
+now = datetime.now()
+print(now)                      # 2017-05-03 17:46:44.558754
+two_days = timedelta(2)
+in_two_days = now + two_days
+print(in_two_days)              # 2017-05-05 17:46:44.558754
+```
+--- end ---
+--- 076 #5 len 185 ---
+```python
+from datetime import timedelta, datetime
+
+now = datetime.now()
+till_ten_hours_fifteen_minutes = now - timedelta(hours=10, minutes=15)
+print(till_ten_hours_fifteen_minutes)
+```
+--- end ---
+--- 076 #6 len 380 ---
+```python
+from datetime import timedelta, datetime
+
+now = datetime.now()
+twenty_two_may = datetime(2017, 5, 22)
+period = twenty_two_may - now
+print("{} дней  {} секунд   {} микросекунд".format(period.days, period.seconds, period.microseconds))
+# 18 дней  17537 секунд   72765 микросекунд
+
+print("Всего: {} секунд".format(period.total_seconds()))
+# Всего: 1572737.072765 секунд
+```
+--- end ---
+--- 076 #7 len 372 ---
+```python
+from datetime import datetime
+
+now = datetime.now()
+deadline = datetime(2017, 5, 22)
+if now > deadline:
+    print("Срок сдачи проекта прошел")
+elif now.day == deadline.day and now.month == deadline.month and now.year == deadline.year:
+    print("Срок сдачи проекта сегодня")
+else:
+    period = deadline - now
+    print("Осталось {} дней".format(period.days))
+```
+--- end ---
+=== 077 blocks 19 prose 8340 need 5004
+--- 077 #0 len 122 ---
+```python
+
+
+import threading
+
+
+
+current_thread = threading.main_thread()
+
+print("Main Thread:")
+
+print(current_thread)
+```
+--- end ---
+--- 077 #1 len 78 ---
+```bash
+
+
+Main Thread:
+
+<_MainThread(MainThread, started 124401057440256)>
+```
+--- end ---
+--- 077 #2 len 234 ---
+```python
+
+
+import threading
+
+
+
+current_thread = threading.main_thread()
+
+print("Main Thread name: ", current_thread.name)
+
+print("Main Thread id: ", current_thread.ident)
+
+print("Main Thread native id:", current_thread.native_id)
+```
+--- end ---
+--- 077 #3 len 107 ---
+```bash
+
+
+Main Thread name:  MainThread
+
+Main Thread id:  135968807522816
+
+Main Thread native id: 35474
+```
+--- end ---
+--- 077 #4 len 167 ---
+```python
+
+
+import threading
+
+
+
+ident = threading.get_ident()
+
+native_id = threading.get_native_id()
+
+
+
+print("Python ID: ", ident)
+
+print("Native ID:", native_id)
+```
+--- end ---
+--- 077 #5 len 124 ---
+```python
+
+
+class threading.Thread(group=None, target=None, name=None, args=(), kwargs={}, *, daemon=None, context=None)
+```
+--- end ---
+--- 077 #6 len 96 ---
+```python
+
+
+import threading
+
+
+
+my_thread = threading.Thread(target=print)
+
+print(my_thread)
+```
+--- end ---
+--- 077 #7 len 49 ---
+```bash
+
+
+<Thread(Thread-1 (print), initial)>
+```
+--- end ---
+--- 077 #8 len 297 ---
+```python
+
+
+import threading
+
+
+
+def my_task():
+
+    print("Дочерний поток: Начал работу...")
+
+    time.sleep(2)  # Имитация долгой работы
+
+    print("Дочерний поток: Завершил работу!")
+
+
+
+my_thread = threading.Thread(target=my_task)
+
+print(my_thread)    # <Thread(Thread-1 (my_task), initial)>
+```
+--- end ---
+--- 077 #9 len 420 ---
+```python
+
+
+import threading
+
+
+
+# Функция, выполняемая в другом потоке
+
+def my_task():
+
+    print("Дочерний поток: Начал работу...")
+
+    #time.sleep(2)  # Имитация долгой работы
+
+    print("Дочерний поток: Завершил работу!")
+
+
+
+print("Главный поток: Начал работу...")
+
+
+
+# Создаем поток
+
+my_thread = threading.Thread(target=my_task)
+
+
+
+# Запускаем поток
+
+my_thread.start()
+
+
+
+print("Главый поток: Завершил работу!")
+```
+--- end ---
+--- 077 #10 len 143 ---
+```bash
+
+
+Главный поток: Начал работу...
+
+Дочерний поток: Начал работу...
+
+Дочерний поток: Завершил работу!
+
+Главый поток: Завершил работу!
+```
+--- end ---
+--- 077 #11 len 143 ---
+```bash
+
+
+Главный поток: Начал работу...
+
+Дочерний поток: Начал работу...
+
+Главый поток: Завершил работу!
+
+Дочерний поток: Завершил работу!
+```
+--- end ---
+--- 077 #12 len 432 ---
+```python
+
+
+import threading
+
+import time
+
+
+
+# Функция, выполняемая в другом потоке
+
+def my_task():
+
+    print("Дочерний поток: Начал работу...")
+
+    time.sleep(2)  # Имитация долгой работы
+
+    print("Дочерний поток: Завершил работу!")
+
+
+
+print("Главный поток: Начал работу...")
+
+
+
+# Создаем поток
+
+my_thread = threading.Thread(target=my_task)
+
+
+
+# Запускаем поток
+
+my_thread.start()
+
+
+
+print("Главый поток: Завершил работу!")
+```
+--- end ---
+--- 077 #13 len 167 ---
+```python
+
+
+# Создаем поток
+
+my_thread = threading.Thread(target=my_task)
+
+
+
+# новый поток НЕ запускается, my_task выполняется как обычная функция
+
+my_thread.run()
+```
+--- end ---
+--- 077 #14 len 127 ---
+```python
+
+
+import threading
+
+
+
+my_thread = threading.Thread(target=print, args=("Hello enoobis.ru",))
+
+
+
+my_thread.start()
+```
+--- end ---
+--- 077 #15 len 325 ---
+```python
+
+
+import threading
+
+import time
+
+
+
+def greet_user(name, delay):
+
+    time.sleep(delay)
+
+    print(f"Привет, {name}!")
+
+
+
+# создаем два потока
+
+thread1 = threading.Thread(target=greet_user, args=("Алексей", 1))
+
+thread2 = threading.Thread(target=greet_user, args=("Мария", 2))
+
+
+
+thread1.start()
+
+thread2.start()
+```
+--- end ---
+--- 077 #16 len 46 ---
+```bash
+
+
+Привет, Алексей!
+
+Привет, Мария!
+```
+--- end ---
+--- 077 #17 len 338 ---
+```python
+
+
+import threading
+
+import time
+
+
+
+def work():
+
+    time.sleep(2)   # задержка в 2 секунды
+
+    print("Work Thread завершил работу")
+
+    
+
+my_tread = threading.Thread(target=work)
+
+my_tread.start()
+
+
+
+# Говорим главному потоку подождать завершения остальных потоков
+
+my_tread.join() 
+
+
+
+print("Main Thread завершил работу")
+```
+--- end ---
+--- 077 #18 len 510 ---
+```python
+
+
+import threading
+
+import time
+
+
+
+# условная функция загрузки файла
+
+def download_file(file_id):
+
+    print(f"Скачивание файла {file_id}...")
+
+    time.sleep(2)
+
+    print(f"Файл {file_id} успешно скачан!")
+
+
+
+# список потоков
+
+threads = []
+
+
+
+# Создаем и запускаем 3 потока
+
+for i in range(1, 4):
+
+    t = threading.Thread(target=download_file, args=(i,))
+
+    threads.append(t)
+
+    t.start()
+
+
+
+# дожидаемся завершения КАЖДОГО потока
+
+for t in threads: t.join()
+
+
+
+print("Все файлы скачаны!")
+```
+--- end ---
+=== 078 blocks 5 prose 4842 need 2905
+--- 078 #0 len 722 ---
+```python
+import threading
+import time
+
+x = 0  # общий ресурс
+
+threads = []    # список потоков
+
+def increase_x(): 
+    global x
+    x = 1    # устанавливаем новое значение для общего ресурса
+    thread_name = threading.current_thread().name   # имя текущего потока
+    for _ in range(1, 4):
+        print(f"{thread_name}: {x}")
+        x += 1              # изменение общего ресурса
+        time.sleep(0.5)     # имитация работы - полминуты
+
+
+# запускаем три потока
+for i in range(1, 4):
+    my_thread = threading.Thread(target=increase_x, name=f"Поток {i}")
+    threads.append(my_thread)
+    my_thread.start()           # запускаем потоки
+ 
+# ожидаем завершения потоков
+for my_thread in threads:
+    my_thread.join()
+```
+--- end ---
+--- 078 #1 len 110 ---
+```bash
+Поток 1: 1
+Поток 2: 1
+Поток 3: 1
+Поток 2: 2
+Поток 1: 2
+Поток 3: 3
+Поток 2: 5
+Поток 1: 6
+Поток 3: 7
+```
+--- end ---
+--- 078 #2 len 947 ---
+```python
+import threading
+import time
+
+x = 0  # общий ресурс
+
+x_lock = threading.Lock() # Создаем объект блокировки
+
+threads = []    # список потоков
+
+def increase_x(): 
+    global x
+    thread_name = threading.current_thread().name   # имя текущего потока
+
+    x_lock.acquire()    # Блокируем доступ для других потоков
+    try:
+        x = 1    # устанавливаем новое значение для общего ресурса
+        for _ in range(1, 4):
+
+            print(f"{thread_name}: {x}")
+            x += 1      # изменение общего ресурса
+            time.sleep(0.5)     # имитация работы
+    finally:
+        x_lock.release()      # обязательно разблокируем, даже если произошла ошибка
+
+# запускаем три потока
+for i in range(1, 4):
+    my_thread = threading.Thread(target=increase_x, name=f"Поток {i}")
+    threads.append(my_thread)
+    my_thread.start()           # запускаем потоки
+ 
+# ожидаем завершения потоков
+for my_thread in threads:
+    my_thread.join()
+```
+--- end ---
+--- 078 #3 len 110 ---
+```bash
+Поток 1: 1
+Поток 1: 2
+Поток 1: 3
+Поток 2: 1
+Поток 2: 2
+Поток 2: 3
+Поток 3: 1
+Поток 3: 2
+Поток 3: 3
+```
+--- end ---
+--- 078 #4 len 848 ---
+```python
+import threading
+import time
+
+x = 0  # общий ресурс
+
+x_lock = threading.Lock() # Создаем объект блокировки
+
+threads = []    # список потоков
+
+def increase_x(): 
+    global x
+    thread_name = threading.current_thread().name   # имя текущего потока
+
+    # Менеджер with сам вызовет acquire() и release()
+    with x_lock:
+        x = 1    # устанавливаем новое значение для общего ресурса
+        for _ in range(1, 4):
+            print(f"{thread_name}: {x}")
+            x += 1      # изменение общего ресурса
+            time.sleep(0.5)     # имитация работы
+
+# запускаем три потока
+for i in range(1, 4):
+    my_thread = threading.Thread(target=increase_x, name=f"Поток {i}")
+    threads.append(my_thread)
+    my_thread.start()           # запускаем потоки
+ 
+# ожидаем завершения потоков
+for my_thread in threads:
+    my_thread.join()
+```
+--- end ---
