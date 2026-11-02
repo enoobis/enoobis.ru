@@ -1,5 +1,0 @@
-```cpp
-
-
-static void print_count()
-```

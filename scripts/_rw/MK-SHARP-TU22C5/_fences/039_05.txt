@@ -1,5 +1,0 @@
-```c#
-
-
-string personName = person.Name;
-```

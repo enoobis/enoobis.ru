@@ -1,9 +1,0 @@
-```cpp
-
-
-class Person final
-
-{
-
-};
-```

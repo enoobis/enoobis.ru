@@ -1,3 +1,0 @@
-```cpp
-static inline unsigned count{}; // инициализируем нулем
-```

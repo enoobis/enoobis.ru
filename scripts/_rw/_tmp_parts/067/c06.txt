@@ -1,7 +1,0 @@
-```bash
-
-
-Name: Tom       Age: 38
-
-Name: Bob       Age: 42
-```

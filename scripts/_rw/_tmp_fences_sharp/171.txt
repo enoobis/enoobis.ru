@@ -1,152 +1,0 @@
-===== FENCE 0 len=70 =====
-```c#
-
-FileInfo fileInf = new FileInfo(@"C:\app\content.txt");
-```
-===== END =====
-===== FENCE 1 len=402 =====
-```c#
-
-// абсолютные пути
-string path1 = @"C:\Users\eugene\Documents\content.txt";  // для Windows
-string path2 = "C:\\Users\\eugene\\Documents\\content.txt";  // для Windows
-string path3 = "/Users/eugene/Documents/content.txt";  // для MacOS/Linux
-
-// относительные пути
-string path4 = "MyDir\\content.txt";  // для Windows
-string path5 = "MyDir/content.txt";  // для MacOS/Linux
-```
-===== END =====
-===== FENCE 2 len=401 =====
-```c#
-
-string path = @"C:\Users\eugene\Documents\content.txt";
-// string path = "/Users/eugene/Documents/content.txt";  // для MacOS/Linux
-FileInfo fileInfo = new FileInfo(path);
-if (fileInfo.Exists)
-{
-    Console.WriteLine($"Имя файла: {fileInfo.Name}");
-    Console.WriteLine($"Время создания: {fileInfo.CreationTime}");
-    Console.WriteLine($"Размер: {fileInfo.Length}");
-}
-```
-===== END =====
-===== FENCE 3 len=215 =====
-```c#
-
-string path = @"C:\app\content.txt";
-FileInfo fileInf = new FileInfo(path);
-if (fileInf.Exists)
-{
-   fileInf.Delete();
-   // альтернатива с помощью класса File
-   // File.Delete(path);
-}
-```
-===== END =====
-===== FENCE 4 len=283 =====
-```c#
-
-string path =  @"C:\OldDir\content.txt";
-string newPath = @"C:\NewDir\index.txt";
-FileInfo fileInf = new FileInfo(path);
-if (fileInf.Exists)
-{
-   fileInf.MoveTo(newPath);       
-   // альтернатива с помощью класса File
-   // File.Move(path, newPath);
-}
-```
-===== END =====
-===== FENCE 5 len=295 =====
-```c#
-
-string path =  @"C:\OldDir\content.txt";
-string newPath = @"C:\NewDir\index.txt";
-FileInfo fileInf = new FileInfo(path);
-if (fileInf.Exists)
-{
-   fileInf.MoveTo(newPath, true);       
-   // альтернатива с помощью класса File
-   // File.Move(path, newPath, true);
-}
-```
-===== END =====
-===== FENCE 6 len=295 =====
-```c#
-
-string path =  @"C:\OldDir\content.txt";
-string newPath = @"C:\NewDir\index2.txt";
-FileInfo fileInf = new FileInfo(path);
-if (fileInf.Exists)
-{
-   fileInf.CopyTo(newPath, true);      
-   // альтернатива с помощью класса File
-   // File.Copy(path, newPath, true);
-}
-```
-===== END =====
-===== FENCE 7 len=361 =====
-```c#
-
-string path = @"c:\app\content.txt";
-
-string originalText = "Hello  enoobis.com";
-// запись строки
-await File.WriteAllTextAsync(path, originalText);
-// дозапись в конец файла
-await File.AppendAllTextAsync(path, "\nHello work");
-
-// чтение файла
-string fileText = await File.ReadAllTextAsync(path);
-Console.WriteLine(fileText);
-```
-===== END =====
-===== FENCE 8 len=55 =====
-```consoletext
-
-Hello  enoobis.com
-Hello work
-```
-===== END =====
-===== FENCE 9 len=94 =====
-```c#
-await File.WriteAllLinesAsync(path, new[] { "Hello  enoobis.com", "Hello work" });
-```
-===== END =====
-===== FENCE 10 len=460 =====
-```c#
-
-using System.Text;
-
-string path = "/Users/eugene/Documents/app/content.txt";
-
-string originalText = "Привет  enoobis.com";
-// запись строки
-await File.WriteAllTextAsync(path, originalText, Encoding.Unicode);
-// дозапись в конец файла
-await File.AppendAllTextAsync(path, "\nПривет мир", Encoding.Unicode);
-
-// чтение файла
-string fileText = await File.ReadAllTextAsync(path, Encoding.Unicode);
-Console.WriteLine(fileText);
-```
-===== END =====
-===== FENCE 11 len=493 =====
-```c#
-
-using System.Text;
-
-string path = @"c:\app\content.txt";
-
-string originalText = "Hello  enoobis.com";
-// запись строки
-await File.WriteAllTextAsync(path, originalText, Encoding.GetEncoding("iso-8859-1"));
-// дозапись в конец файла
-await File.AppendAllTextAsync(path, "\nHello code", Encoding.GetEncoding("iso-8859-1"));
-
-// чтение файла
-string fileText = await File.ReadAllTextAsync(path, Encoding.GetEncoding("iso-8859-1"));
-Console.WriteLine(fileText);
-```
-===== END =====

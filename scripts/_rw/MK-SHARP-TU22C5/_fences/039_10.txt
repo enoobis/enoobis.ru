@@ -1,7 +1,0 @@
-```c#
-
-
-Console.WriteLine(person.Name);  // получить можно
-
-person.Name = "Bob";    // ! Ошибка - установить нельзя
-```

@@ -1,7 +1,0 @@
-```bash
-
-
-Tom drives Tesla
-
-Tesla : 8000
-```

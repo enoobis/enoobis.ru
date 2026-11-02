@@ -1,6 +1,0 @@
-
-
-
-
-
-В данном случае папка "D://test/" методом `ZipFile.CreateFromDirectory` архивируется в файл test.zip. Затем метод `ZipFile.ExtractToDirectory()` распаковывает данный файл в папку "D://newtest" (если такой папки нет, она создается).

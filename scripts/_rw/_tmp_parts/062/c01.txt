@@ -1,9 +1,0 @@
-```bash
-
-
-Tesla : 5000
-
-Tesla is driven
-
-Tesla : 8000
-```

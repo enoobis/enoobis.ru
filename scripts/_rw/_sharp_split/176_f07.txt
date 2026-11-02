@@ -1,5 +1,0 @@
-```c#
-
-
-public static JavaScriptEncoder Create(params System.Text.Unicode.UnicodeRange[] allowedRanges);
-```

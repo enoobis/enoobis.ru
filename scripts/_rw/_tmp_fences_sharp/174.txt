@@ -1,111 +1,0 @@
-===== FENCE 0 len=39 =====
-```c#
-BinaryWriter(Stream stream)
-```
-===== END =====
-===== FENCE 1 len=347 =====
-```c#
-
-string path = "person.dat";
-
-// создаем объект BinaryWriter
-using (BinaryWriter writer = new BinaryWriter(File.Open(path, FileMode.OpenOrCreate)))
-{
-    // записываем в файл строку
-    writer.Write("Tom");
-    // записываем в файл число int
-    writer.Write(37);
-    Console.WriteLine("File has been written");
-}
-```
-===== END =====
-===== FENCE 2 len=696 =====
-```c#
-
-string path = "people.dat";
-
-// массив для записи
-Person[] people =
-{
-    new Person("Tom", 37),
-    new Person("Bob", 41)
-};
-
-using (BinaryWriter writer = new BinaryWriter(File.Open(path, FileMode.OpenOrCreate)))
-{
-    // записываем в файл значение каждого свойства объекта
-    foreach (Person person in people)
-    {
-        writer.Write(person.Name);
-        writer.Write(person.Age);
-    }
-    Console.WriteLine("File has been written");
-}
-
-class Person
-{
-    public string Name { get; set; }
-    public int Age { get; set; }
-    public Person(string name, int age)
-    {
-        Name = name;
-        Age = age;
-    }
-}
-```
-===== END =====
-===== FENCE 3 len=33 =====
-```c#
-Reader(Stream stream)
-```
-===== END =====
-===== FENCE 4 len=310 =====
-```c#
-
-using (BinaryReader reader = new BinaryReader(File.Open("person.dat", FileMode.Open)))
-{
-    // считываем из файла строку
-    string name = reader.ReadString();
-    // считываем из файла число 
-    int age = reader.ReadInt32();
-    Console.WriteLine($"Name: {name}  Age: {age}");
-}
-```
-===== END =====
-===== FENCE 5 len=928 =====
-```c#
-
-// список для считываемых данных
-List<Person> people = new List<Person>();
-
-// создаем объект BinaryWriter
-using (BinaryReader reader = new BinaryReader(File.Open("people.dat", FileMode.Open)))
-{
-    // пока не достигнут конец файла
-    // считываем каждое значение из файла
-    while (reader.PeekChar() > -1)
-    {
-        string name = reader.ReadString();
-        int age = reader.ReadInt32();
-        // по считанным данным создаем объект Person и добавляем в список
-        people.Add(new Person(name, age));
-    }
-}
-// выводим содержимое списка people на консоль
-foreach(Person person in people)
-{
-    Console.WriteLine($"Name: {person.Name}  Age: {person.Age}");
-}
-
-class Person
-{
-    public string Name { get; set; }
-    public int Age { get; set; }
-    public Person(string name, int age)
-    {
-        Name = name;
-        Age = age;
-    }
-}
-```
-===== END =====

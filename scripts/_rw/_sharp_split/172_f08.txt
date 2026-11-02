@@ -1,3 +1,0 @@
-```c#
-fstream.Seek(-5, SeekOrigin.End)
-```

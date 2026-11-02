@@ -1,7 +1,0 @@
-```cpp
-
-
-Person::print_count();
-
-Person::maxAge
-```

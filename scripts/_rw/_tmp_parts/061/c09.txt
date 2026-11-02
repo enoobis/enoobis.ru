@@ -1,7 +1,0 @@
-```cpp
-
-
-Integer num{10};
-
-num.add(Integer{30}).subtract(Integer{15}).multiply(Integer{2});
-```

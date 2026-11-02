@@ -1,5 +1,0 @@
-```consoletext
-
-
-dotnet new sln
-```

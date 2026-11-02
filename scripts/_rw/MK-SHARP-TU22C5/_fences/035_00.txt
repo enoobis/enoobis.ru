@@ -1,3 +1,0 @@
-```c#
-Console.WriteLine("Hello");
-```

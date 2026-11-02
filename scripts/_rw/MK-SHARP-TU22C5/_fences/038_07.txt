@@ -1,9 +1,0 @@
-```c#
-
-
-file class Person
-
-{
-
-}
-```

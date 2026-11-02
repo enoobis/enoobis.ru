@@ -1,9 +1,0 @@
-```cpp
-
-
-using Day::Monday;     // подключаем только Monday
-
-........................
-
-Day today {Monday};
-```

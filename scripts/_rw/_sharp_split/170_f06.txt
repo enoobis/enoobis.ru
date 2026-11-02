@@ -1,9 +1,0 @@
-```c#
-string path = @"C:\SomeDir";
-string subpath = @"program\avalon";
-if (!Directory.Exists(path))
-{
-    Directory.CreateDirectory(path);
-}
-Directory.CreateDirectory($"{path}/{subpath}");
-```

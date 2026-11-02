@@ -1,3 +1,0 @@
-```c#
-FileStream(string filename, FileMode mode)
-```

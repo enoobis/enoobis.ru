@@ -1,9 +1,0 @@
-```cpp
-
-
-Person tom("Tom", 22);
-
-tom.name = "";
-
-tom.age = 1001;
-```

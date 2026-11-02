@@ -1,7 +1,0 @@
-```cpp
-
-
-friend void Person::drive(Auto&);
-
-friend void Person::setPrice(Auto&, unsigned);
-```

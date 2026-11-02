@@ -1,9 +1,0 @@
-```cpp
-
-
-Day today {Day::Thursday};
-
-// или так
-
-//Day today = Day::Thursday;
-```

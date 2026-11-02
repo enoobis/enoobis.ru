@@ -1,5 +1,0 @@
-```c#
-
-
-FileInfo fileInf = new FileInfo(@"C:\app\content.txt");
-```

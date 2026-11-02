@@ -1,3 +1,0 @@
-```cpp
-Employee employee {"Bob", 42};
-```

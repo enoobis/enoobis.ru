@@ -1,9 +1,0 @@
-```c#
-
-
-FileStream File.Open(string file, FileMode mode);
-
-FileStream File.OpenRead(string file);
-
-FileStream File.OpenWrite(string file);
-```

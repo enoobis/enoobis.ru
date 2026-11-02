@@ -1,8 +1,0 @@
-```c#
-// класс Directory
-string[] dirs = Directory.GetDirectories(dirName, "books*.");
-
-// класс DirectoryInfo
-var directory = new DirectoryInfo(dirName);
-DirectoryInfo[] dirs = directory.GetDirectories("books*.");
-```

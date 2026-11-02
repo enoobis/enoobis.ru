@@ -1,184 +1,0 @@
-===== FENCE 0 len=468 =====
-```c#
-
-using System.Text.Json;
-
-Person tom = new Person("Tom", 37);
-string json = JsonSerializer.Serialize(tom);
-Console.WriteLine(json);
-Person? restoredPerson = JsonSerializer.Deserialize<Person>(json);
-Console.WriteLine(restoredPerson?.Name); // Tom
-
-class Person
-{
-    public string Name { get;}
-    public int Age { get; set; }
-    public Person(string name, int age)
-    {
-        Name = name;
-        Age = age;
-    }
-}
-```
-===== END =====
-===== FENCE 1 len=47 =====
-```bash
-
-{"Name":"Tom","Age": 37}
-Tom
-```
-===== END =====
-===== FENCE 2 len=754 =====
-```c#
-
-using System.Text.Json;
-
-// сохранение данных
-using (FileStream fs = new FileStream("user.json", FileMode.OpenOrCreate))
-{
-    Person tom = new Person("Tom", 37);
-    await JsonSerializer.SerializeAsync<Person>(fs, tom);
-    Console.WriteLine("Data has been saved to file");
-}
-
-// чтение данных
-using (FileStream fs = new FileStream("user.json", FileMode.OpenOrCreate))
-{
-    Person? person = await JsonSerializer.DeserializeAsync<Person>(fs);
-    Console.WriteLine($"Name: {person?.Name}  Age: {person?.Age}");
-}
-
-class Person
-{
-    public string Name { get;}
-    public int Age { get; set; }
-    public Person(string name, int age)
-    {
-        Name = name;
-        Age = age;
-    }
-}
-```
-===== END =====
-===== FENCE 3 len=363 =====
-```c#
-
-using System.Text.Json;
-
-Person tom = new Person("Tom", 37);
-
-var options = new JsonSerializerOptions
-{
-    WriteIndented = true
-};
-string json = JsonSerializer.Serialize<Person>(tom, options);
-Console.WriteLine(json);
-Person? restoredPerson = JsonSerializer.Deserialize<Person>(json);
-Console.WriteLine(restoredPerson?.Name);
-```
-===== END =====
-===== FENCE 4 len=60 =====
-```bash
-
-{
-	"Name": "Tom",
-	"Age":  37
-}
-Tom
-```
-===== END =====
-===== FENCE 5 len=354 =====
-```c#
-
-using System.Text.Json;
-
-Person tom = new Person("Евгений", 41);
-
-var options = new JsonSerializerOptions WriteIndented = true};
-string json = JsonSerializer.Serialize<Person>(tom, options);
-Console.WriteLine(json);
-Person? restoredPerson = JsonSerializer.Deserialize<Person>(json);
-Console.WriteLine(restoredPerson?.Name);
-```
-===== END =====
-===== FENCE 6 len=104 =====
-```bash
-
-{
-  "Name": "\u0415\u0432\u0433\u0435\u043D\u0438\u0439",
-  "Age": 41
-}
-Евгений
-```
-===== END =====
-===== FENCE 7 len=111 =====
-```c#
-
-public static JavaScriptEncoder Create(params System.Text.Unicode.UnicodeRange[] allowedRanges);
-```
-===== END =====
-===== FENCE 8 len=523 =====
-```c#
-
-using System.Text.Json;
-using System.Text.Unicode;
-using System.Text.Encodings.Web;
-
-Person tom = new Person("Евгений", 41);
-
-var options = new JsonSerializerOptions
-{
-    Encoder = JavaScriptEncoder.Create(UnicodeRanges.BasicLatin, UnicodeRanges.Cyrillic),
-    WriteIndented = true
-};
-string json = JsonSerializer.Serialize<Person>(tom, options);
-Console.WriteLine(json);
-Person? restoredPerson = JsonSerializer.Deserialize<Person>(json);
-Console.WriteLine(restoredPerson?.Name);
-```
-===== END =====
-===== FENCE 9 len=69 =====
-```bash
-
-{
-  "Name": "Евгений",
-  "Age": 41
-}
-Евгений
-```
-===== END =====
-===== FENCE 10 len=587 =====
-```c#
-
-using System.Text.Json;
-using System.Text.Json.Serialization;
-
-Person tom = new Person("Tom", 37);
-
-string json = JsonSerializer.Serialize<Person>(tom);
-Console.WriteLine(json);
-Person? person = JsonSerializer.Deserialize<Person>(json);
-Console.WriteLine($"Name: {person?.Name}  Age: {person?.Age}");
-
-
-class Person
-{
-    [JsonPropertyName("firstname")]
-    public string Name { get;}
-    [JsonIgnore]
-    public int Age { get; set; }
-    public Person(string name, int age)
-    {
-        Name = name;
-        Age = age;
-    }
-}
-```
-===== END =====
-===== FENCE 11 len=64 =====
-```consoletext
-
-{"firstname":"Tom"}
-Name: Tom   Age: 0
-```
-===== END =====
