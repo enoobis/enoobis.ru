@@ -3,9 +3,11 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router";
 import AppIcon from "../components/AppIcon.vue";
 import AppLoading from "../components/AppLoading.vue";
+import LectureEditor from "../components/LectureEditor.vue";
 import MarkdownText from "../components/MarkdownText.vue";
 import PageHeader from "../components/PageHeader.vue";
 import {
+  createLecture,
   deleteAssignment,
   deleteLecture,
   getClassroom,
@@ -145,6 +147,122 @@ const contentBooks = computed(() => {
   }
   return out;
 });
+
+const adding = ref<"" | "book" | "chapter" | "topic">("");
+const addName = ref("");
+const addAt = ref<{ book: string; chapter: string }>({ book: "", chapter: "" });
+const addingBusy = ref(false);
+
+function canEditDesktop(): boolean {
+  return isTeacher.value && window.matchMedia("(min-width: 641px)").matches;
+}
+
+const treeBooks = computed(() => {
+  const books = contentBooks.value.map((b) => ({
+    title: b.title,
+    chapters: b.chapters.slice(),
+  }));
+  if (!adding.value) return books;
+  const bookName = addAt.value.book;
+  if (!bookName) return books;
+  let book = books.find((b) => b.title === bookName);
+  if (!book) {
+    book = { title: bookName, chapters: [] };
+    books.push(book);
+  }
+  const chapterName = addAt.value.chapter;
+  if (chapterName && !book.chapters.some((c) => c.title === chapterName)) {
+    book.chapters.push({ title: chapterName, book: bookName, offset: -1, lectures: [] });
+  }
+  return books;
+});
+
+function startAddBook() {
+  if (!canEditDesktop()) return;
+  adding.value = "book";
+  addName.value = "";
+  addAt.value = { book: "", chapter: "" };
+}
+
+function startAddChapter(book: string) {
+  if (!canEditDesktop()) return;
+  adding.value = "chapter";
+  addName.value = "";
+  addAt.value = { book, chapter: "" };
+}
+
+function startAddTopic(book: string, chapter: string) {
+  if (!canEditDesktop()) return;
+  adding.value = "topic";
+  addName.value = "";
+  addAt.value = { book, chapter };
+  if (chapter) revealChapter(book, chapter);
+}
+
+function cancelAdd() {
+  adding.value = "";
+  addName.value = "";
+}
+
+async function confirmAdd() {
+  const name = addName.value.trim();
+  if (!name || !auth.token || !classroom.value || addingBusy.value) return;
+  if (adding.value === "book") {
+    addAt.value = { book: name, chapter: "" };
+    adding.value = "chapter";
+    addName.value = "";
+    return;
+  }
+  if (adding.value === "chapter") {
+    addAt.value = { book: addAt.value.book, chapter: name };
+    adding.value = "topic";
+    addName.value = "";
+    revealChapter(addAt.value.book, name);
+    return;
+  }
+  addingBusy.value = true;
+  err.value = "";
+  try {
+    const book = addAt.value.book;
+    const chapter = addAt.value.chapter;
+    const created = await createLecture(
+      classroom.value.course.id,
+      { title: name, book, chapter, body_text: "" },
+      auth.token,
+    );
+    await load();
+    const rest = lectures.value.filter((l) => l.id !== created.id);
+    let at = rest.length;
+    let last = -1;
+    rest.forEach((l, i) => {
+      const b = (l.book ?? "").trim();
+      const c = (l.chapter ?? "").trim();
+      if (book && chapter && b === book && c === chapter) last = i;
+    });
+    if (last < 0 && book) {
+      rest.forEach((l, i) => {
+        if ((l.book ?? "").trim() === book) last = i;
+      });
+    }
+    if (last >= 0) at = last + 1;
+    const ids = rest.map((l) => l.id);
+    ids.splice(at, 0, created.id);
+    if (ids.join() !== lectures.value.map((l) => l.id).join()) {
+      await reorderLectures(classroom.value.course.id, ids, auth.token);
+      await load();
+    }
+    adding.value = "";
+    addName.value = "";
+    revealChapter(book, chapter);
+    openLecture(created.id);
+    await nextTick();
+    startEdit();
+  } catch (e) {
+    err.value = errorText(e);
+  } finally {
+    addingBusy.value = false;
+  }
+}
 
 function queryString(name: string): string {
   const q = route.query[name];
@@ -1113,8 +1231,26 @@ onBeforeUnmount(() => {
             </button>
           </template>
         </PageHeader>
-        <p v-if="!lectures.length" class="page-empty">тем нет</p>
-        <template v-else>
+        <p v-if="!lectures.length && !adding" class="page-empty">тем нет</p>
+        <div v-if="isTeacher && !lectures.length" class="toc-add desktop-only">
+          <input
+            v-if="adding"
+            v-model="addName"
+            class="add-line"
+            :placeholder="adding === 'book' ? 'книга' : adding === 'chapter' ? 'глава' : 'тема'"
+            @keyup.enter="confirmAdd"
+            @keyup.escape="cancelAdd"
+          />
+          <button
+            v-else
+            type="button"
+            class="add-ghost"
+            @click="startAddBook"
+          >
+            книга
+          </button>
+        </div>
+        <template v-if="lectures.length">
           <section
             v-for="(ch, ci) in contentsChapters"
             :key="ch.title || ci"
@@ -1159,7 +1295,7 @@ onBeforeUnmount(() => {
         </header>
 
         <nav ref="topicListRef" class="topic-list" :class="{ dragging }">
-          <template v-for="(book, bi) in contentBooks" :key="`${book.title}:${bi}`">
+          <template v-for="(book, bi) in treeBooks" :key="`${book.title}:${bi}`">
             <div class="book-block">
               <button
                 v-if="book.title"
@@ -1219,12 +1355,72 @@ onBeforeUnmount(() => {
                       <span class="topic-title">{{ prettyCourseTitle(l.title) }}</span>
                       <AppIcon v-if="lectureDone(l.id)" name="seen" :size="15" class="topic-done" />
                     </button>
+                    <form
+                      v-if="isTeacher && adding === 'topic' && addAt.book === ch.book && addAt.chapter === ch.title"
+                      class="add-form desktop-only"
+                      @submit.prevent="confirmAdd"
+                    >
+                      <input
+                        v-model="addName"
+                        class="add-line"
+                        placeholder="тема"
+                        @keyup.escape="cancelAdd"
+                      />
+                    </form>
+                    <button
+                      v-else-if="isTeacher && ch.title"
+                      type="button"
+                      class="add-ghost desktop-only"
+                      @click="startAddTopic(ch.book, ch.title)"
+                    >
+                      тема
+                    </button>
                   </div>
                 </section>
+                <form
+                  v-if="isTeacher && adding === 'chapter' && addAt.book === book.title"
+                  class="add-form desktop-only"
+                  @submit.prevent="confirmAdd"
+                >
+                  <input
+                    v-model="addName"
+                    class="add-line"
+                    placeholder="глава"
+                    @keyup.escape="cancelAdd"
+                  />
+                </form>
+                <button
+                  v-else-if="isTeacher && book.title"
+                  type="button"
+                  class="add-ghost desktop-only"
+                  @click="startAddChapter(book.title)"
+                >
+                  глава
+                </button>
               </div>
             </div>
           </template>
-          <p v-if="!lectures.length" class="side-empty muted">тем нет</p>
+          <form
+            v-if="isTeacher && adding === 'book'"
+            class="add-form desktop-only"
+            @submit.prevent="confirmAdd"
+          >
+            <input
+              v-model="addName"
+              class="add-line"
+              placeholder="книга"
+              @keyup.escape="cancelAdd"
+            />
+          </form>
+          <button
+            v-else-if="isTeacher"
+            type="button"
+            class="add-ghost desktop-only"
+            @click="startAddBook"
+          >
+            книга
+          </button>
+          <p v-if="!lectures.length && !adding" class="side-empty muted">тем нет</p>
         </nav>
       </aside>
 
@@ -1259,7 +1455,7 @@ onBeforeUnmount(() => {
             <input v-model="editing.chapter" placeholder="глава" />
           </div>
           <input v-model="editing.title" placeholder="тема" />
-          <textarea v-model="editing.body_text" rows="18" placeholder="текст" />
+          <LectureEditor v-model="editing.body_text" :course-id="classroom.course.id" />
           <input v-model="editing.video_url" placeholder="видео" />
           <div class="edit-actions">
             <button type="submit" :disabled="savingEdit">
@@ -1795,6 +1991,48 @@ onBeforeUnmount(() => {
   font-size: var(--text-sm);
 }
 
+.add-ghost {
+  display: flex;
+  width: 100%;
+  min-height: 2.4rem;
+  padding: 0.5rem 0.75rem;
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 1rem;
+  text-align: left;
+  text-transform: lowercase;
+  cursor: pointer;
+}
+
+.add-ghost:hover {
+  color: var(--text);
+}
+
+.add-form {
+  width: 100%;
+}
+
+.add-line {
+  width: 100%;
+  min-height: 2.4rem;
+  padding: 0.5rem 0.75rem;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 1rem;
+}
+
+.toc-add {
+  display: grid;
+  gap: 0.35rem;
+  max-width: 42rem;
+}
+
 .reader-scroll {
   flex: 1;
   min-height: 0;
@@ -2017,11 +2255,8 @@ onBeforeUnmount(() => {
   gap: var(--space-3);
 }
 
-.edit-form textarea {
-  min-height: 22rem;
-  line-height: 1.65;
-  font-family: var(--mono);
-  font-size: 0.95rem;
+.edit-form :deep(.lec-edit) {
+  min-height: 0;
 }
 
 @media (min-width: 641px) {

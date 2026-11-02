@@ -36,6 +36,7 @@ import {
 import AppIcon from "../components/AppIcon.vue";
 import AppLoading from "../components/AppLoading.vue";
 import BackLink from "../components/BackLink.vue";
+import LectureEditor from "../components/LectureEditor.vue";
 import MarkdownText from "../components/MarkdownText.vue";
 import PageHeader from "../components/PageHeader.vue";
 import FilterSearch from "../components/FilterSearch.vue";
@@ -98,8 +99,6 @@ const courseSearchChip = computed(() => {
 });
 
 const title = ref("");
-const description = ref("");
-const createIconFile = ref<File | null>(null);
 
 const streamBody = ref("");
 const assignmentTitle = ref("");
@@ -309,6 +308,8 @@ const filteredCourses = computed(() => {
   return courses.value.filter((c) => !courseCategory(c));
 });
 
+const looseCourses = computed(() => courses.value.filter((c) => !courseCategory(c)));
+
 function courseInitial(title: string) {
   const ch = title.trim().charAt(0);
   return ch ? ch.toLowerCase() : "?";
@@ -350,6 +351,7 @@ const editSaving = ref(false);
 function openEditCourse(c: Course, ev?: Event) {
   if (ev) closeCourseMenu(ev);
   if (!canEditCourseMeta(c)) return;
+  if (window.matchMedia("(max-width: 640px)").matches) return;
   editingCourseId.value = c.id;
   editTitle.value = c.title;
   editDescription.value = c.description ?? "";
@@ -530,11 +532,6 @@ function onCourseMenuToggle(ev: Event) {
 
 function onCourseMenuReposition() {
   document.querySelectorAll<HTMLDetailsElement>("details.course-menu[open]").forEach(placeCourseMenu);
-}
-
-function onCreateIconChange(event: Event) {
-  const input = event.target as HTMLInputElement;
-  createIconFile.value = input.files?.[0] ?? null;
 }
 
 function closeCourse() {
@@ -966,19 +963,16 @@ watch(tab, async (next) => {
 
 async function onCreateCourse() {
   if (!auth.token) return;
+  const name = title.value.trim();
+  if (!name) return;
   err.value = "";
   try {
-    const created = await createCourse(auth.token, {
-      title: title.value,
-      description: description.value,
+    const folder = activeCategory.value || name.toLowerCase();
+    await createCourse(auth.token, {
+      title: name,
+      category: folder,
     });
-    const iconFile = createIconFile.value;
-    if (iconFile) {
-      await uploadCourseIcon(created.id, iconFile, auth.token);
-    }
     title.value = "";
-    description.value = "";
-    createIconFile.value = null;
     creatingCourse.value = false;
     await loadCourses();
   } catch (e) {
@@ -1494,8 +1488,13 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
     <template v-if="!classroom">
       <PageHeader title="курсы">
         <template v-if="canTeach" #actions>
-          <button type="button" @click="creatingCourse = !creatingCourse">
-            {{ creatingCourse ? "отмена" : "+ курс" }}
+          <button
+            type="button"
+            class="filter-icon-btn desktop-only"
+            :aria-label="creatingCourse ? 'отмена' : 'курс'"
+            @click="creatingCourse = !creatingCourse"
+          >
+            <AppIcon :name="creatingCourse ? 'close' : 'plus'" :size="18" />
           </button>
         </template>
       </PageHeader>
@@ -1506,24 +1505,18 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
         </button>
       </div>
 
-      <div v-if="creatingCourse" class="form-card">
-        <input v-model="title" placeholder="название" />
-        <textarea v-model="description" rows="2" placeholder="описание" />
-        <label class="course-icon-pick muted small">
-          <span>иконка</span>
-          <input
-            type="file"
-            accept="image/jpeg,image/png,image/webp,image/gif"
-            @change="onCreateIconChange"
-          />
-        </label>
-        <button type="button" :disabled="!title.trim()" @click="onCreateCourse">
-          создать
-        </button>
-      </div>
-
       <template v-if="!courseQuery.trim()">
-        <ul v-if="!activeCategory && categories.length" class="list category-list">
+        <ul v-if="!activeCategory" class="list category-list">
+          <li v-if="creatingCourse" class="category-hit desktop-only">
+            <input
+              v-model="title"
+              class="lecture-row create-line"
+              maxlength="80"
+              placeholder="c, dart, rust"
+              @keyup.enter="onCreateCourse"
+              @keyup.escape="creatingCourse = false"
+            />
+          </li>
           <li
             v-for="cat in categories"
             :key="cat.title"
@@ -1534,8 +1527,18 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
               <span class="list-row-title">{{ cat.title }}</span>
             </button>
           </li>
+          <li
+            v-for="c in looseCourses"
+            :key="c.id"
+            class="category-hit"
+            @click="openCourseRead(c.id)"
+          >
+            <button type="button" class="lecture-row">
+              <span class="list-row-title">{{ courseListTitle(c) }}</span>
+            </button>
+          </li>
         </ul>
-        <BackLink v-else-if="activeCategory" @click="activeCategory = ''">
+        <BackLink v-else @click="activeCategory = ''">
           {{ activeCategory }}
         </BackLink>
       </template>
@@ -1544,6 +1547,16 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
         v-if="activeCategory || courseQuery.trim()"
         class="list category-list"
       >
+        <li v-if="creatingCourse && activeCategory" class="category-hit desktop-only">
+          <input
+            v-model="title"
+            class="lecture-row create-line"
+            maxlength="200"
+            placeholder="название"
+            @keyup.enter="onCreateCourse"
+            @keyup.escape="creatingCourse = false"
+          />
+        </li>
         <li
           v-for="c in filteredCourses"
           :key="c.id"
@@ -1555,80 +1568,8 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
           </button>
         </li>
       </ul>
-
-      <div v-else class="course-grid">
-        <article
-          v-for="c in filteredCourses"
-          :key="c.id"
-          class="course-card"
-          @click="openCourse(c.id)"
-        >
-          <div class="course-card-layout">
-            <div class="course-card-main">
-              <header class="course-card-head">
-                <div class="course-card-title">
-                  <h3>{{ c.title }}</h3>
-                </div>
-                <div class="course-card-head-tools" @click.stop>
-              <span
-                v-if="c.is_pinned"
-                class="course-card-pin"
-                title="закреплён"
-                aria-label="закреплён"
-              >
-                <AppIcon name="pinned" :size="14" />
-              </span>
-              <details class="course-menu course-menu--card">
-                <summary class="course-menu-trigger icon-btn-sm" aria-label="ещё">
-                  <AppIcon name="menu" :size="14" />
-                </summary>
-              <div class="course-menu-panel">
-                <button
-                  v-if="canEditCourseMeta(c)"
-                  type="button"
-                  class="course-menu-item"
-                  @click="openEditCourse(c, $event)"
-                >
-                  изменить
-                </button>
-                <button
-                  v-if="canTogglePin(c)"
-                  type="button"
-                  class="course-menu-item"
-                  @click="onTogglePin(c); closeCourseMenu($event)"
-                >
-                  {{ c.is_pinned ? "снять закреп" : "закрепить" }}
-                </button>
-                <template v-if="canEditCourseMeta(c)">
-                  <span class="course-menu-sep" aria-hidden="true" />
-                  <button
-                    type="button"
-                    class="course-menu-item course-menu-item--muted"
-                    @click="onDeleteCourse(c.id, c.title); closeCourseMenu($event)"
-                  >
-                    удалить курс
-                  </button>
-                </template>
-              </div>
-            </details>
-                </div>
-              </header>
-              <p v-if="c.description" class="muted small course-card-desc">
-                {{ c.description }}
-              </p>
-              <footer class="course-card-foot">
-                <span class="muted small">{{ c.teacher_nickname }}</span>
-              </footer>
-            </div>
-            <div class="course-card-thumb" aria-hidden="true">
-              <img v-if="c.icon_url" :src="c.icon_url" alt="" class="course-card-thumb-img" />
-              <span v-else class="course-card-thumb-letter">{{ courseInitial(c.title) }}</span>
-            </div>
-          </div>
-        </article>
-      </div>
       <p
-        v-if="!filteredCourses.length && (courseQuery.trim() || activeCategory || !categories.length)"
+        v-if="!filteredCourses.length && !creatingCourse && (courseQuery.trim() || activeCategory || (!categories.length && !looseCourses.length))"
         class="page-empty muted"
       >
         {{ courseQuery ? "ничего не найдено" : "пусто" }}
@@ -1772,56 +1713,6 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
       <template v-if="tab === 'lectures'">
         <div v-if="!selectedLecture" class="panel-toolbar">
           <FilterSearch v-model="lectureQuery" placeholder="поиск лекции" class="panel-search" />
-          <button
-            v-if="isTeacherInCurrent"
-            type="button"
-            class="secondary desktop-only"
-            :class="{ active: addingLecture }"
-            @click="addingLecture = !addingLecture"
-          >
-            {{ addingLecture ? "отмена" : "+ тема" }}
-          </button>
-        </div>
-        <div
-          v-if="isTeacherInCurrent && addingLecture && !selectedLecture"
-          class="form-card lecture-editor desktop-only"
-        >
-          <div class="edit-pair">
-            <input v-model="lectureBook" placeholder="книга" />
-            <input v-model="lectureChapter" placeholder="глава" />
-          </div>
-          <input v-model="lectureTitle" placeholder="тема" />
-          <textarea v-model="lectureBody" rows="8" placeholder="текст" />
-          <input v-model="lectureVideoUrl" placeholder="ссылка на видео" />
-          <div class="upload-row">
-            <input
-              type="file"
-              :disabled="lectureUploading"
-              @change="onLectureFileChange"
-            />
-            <span class="muted small">
-              {{ lectureUploading ? "загрузка…" : "до 20 мб" }}
-            </span>
-          </div>
-          <ul v-if="lecturePendingFiles.length" class="files">
-            <li v-for="(f, i) in lecturePendingFiles" :key="f.url + i">
-              <span>{{ f.file_name }}</span>
-              <button
-                type="button"
-                class="ghost-x"
-                @click="removePendingLectureFile(i)"
-              >
-                ×
-              </button>
-            </li>
-          </ul>
-          <button
-            type="button"
-            :disabled="lectureUploading || !lectureTitle.trim()"
-            @click="onCreateLecture"
-          >
-            добавить
-          </button>
         </div>
 
         <template v-if="selectedLecture">
@@ -1835,7 +1726,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
               <input v-model="editingLecture.chapter" placeholder="глава" />
               </div>
               <input v-model="editingLecture.title" placeholder="тема" />
-              <textarea v-model="editingLecture.body_text" rows="12" placeholder="текст" />
+              <LectureEditor v-model="editingLecture.body_text" :course-id="classroom.course.id" />
               <input v-model="editingLecture.video_url" placeholder="видео" />
               <div class="upload-row">
                 <input
@@ -2487,7 +2378,7 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 
     <Teleport to="body">
       <Transition name="course-sheet">
-      <div v-if="editingCourseId" class="course-sheet-root" role="dialog" aria-modal="true" aria-label="курс">
+      <div v-if="editingCourseId" class="course-sheet-root desktop-only" role="dialog" aria-modal="true" aria-label="курс">
         <button type="button" class="course-sheet-backdrop" aria-label="закрыть" @click="closeEditCourse" />
         <div class="course-sheet">
           <h3>курс</h3>
@@ -2842,9 +2733,15 @@ async function onGradeSubmission(assignmentId: string, s: AssignmentSubmission) 
 .form-card textarea {
   width: 100%;
 }
-.lecture-editor textarea {
+.lecture-editor :deep(.write) {
   min-height: 18rem;
-  line-height: 1.65;
+}
+
+.create-line {
+  width: 100%;
+  border: none;
+  background: transparent;
+  box-shadow: none;
 }
 .edit-pair {
   display: grid;

@@ -138,7 +138,7 @@ export function listCourses(token: string) {
 
 export function createCourse(
   token: string,
-  payload: { title: string; description?: string; is_open?: boolean },
+  payload: { title: string; description?: string; is_open?: boolean; category?: string },
 ) {
   return api<Course>("/api/courses", {
     method: "POST",

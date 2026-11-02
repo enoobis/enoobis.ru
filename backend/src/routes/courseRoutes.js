@@ -171,9 +171,10 @@ router.post("/courses", authRequired, (req, res) => {
   const id = uuidv4();
   const now = nowIso();
   const code = generateCourseCode();
+  const category = String(req.body?.category ?? "").trim().toLowerCase().slice(0, 80);
   run(
-    `INSERT INTO courses (id, teacher_id, title, description, is_open, created_at, course_code)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO courses (id, teacher_id, title, description, is_open, created_at, course_code, category)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     id,
     req.user.id,
     title,
@@ -181,6 +182,7 @@ router.post("/courses", authRequired, (req, res) => {
     1,
     now,
     code,
+    category,
   );
   return res.json(courseToDto(get("SELECT * FROM courses WHERE id = ?", id), req.user.id));
 });
